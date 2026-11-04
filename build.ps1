@@ -29,7 +29,9 @@ $savedTargetDir = $env:CARGO_TARGET_DIR
 if (-not $env:CARGO_TARGET_DIR -and $env:LOCALAPPDATA) {
   $env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA 'exile-leveling\cargo-target'
 }
-$targetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $PSScriptRoot 'log-api\target' }
+# cargo runs in log-api, so a relative CARGO_TARGET_DIR is relative to it.
+$targetDir = [IO.Path]::Combine((Join-Path $PSScriptRoot 'log-api'),
+  $(if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { 'target' }))
 
 Push-Location $PSScriptRoot
 try {
@@ -50,12 +52,12 @@ try {
   }
 
   $built = Join-Path $targetDir 'release\exile-leveling.exe'
-  if (-not (Test-Path $built)) {
+  if (-not (Test-Path -LiteralPath $built)) {
     throw "The build finished but $built is missing."
   }
   $exe = Join-Path $PSScriptRoot 'exile-leveling.exe'
   try {
-    Copy-Item $built $exe -Force
+    Copy-Item -LiteralPath $built -Destination $exe -Force
   }
   catch {
     throw "Couldn't replace $exe ($($_.Exception.Message)). If it's running, close its console window and run .\build.ps1 -SkipTree again."
