@@ -62,13 +62,34 @@ export function SkillTreeViewer({ urlTrees }: SkillTreeViewerProps) {
         skillTree,
       );
 
-      const bounds = calculateBounds(
-        urlTreeDelta.nodesActive,
-        urlTreeDelta.nodesAdded,
-        urlTreeDelta.nodesRemoved,
-        nodes,
-        viewBox,
-      );
+      // Zoom to the main-tree changes; ascendancy points sit far away and would
+      // shrink the view to the whole tree. Fall back to them if they're all there is.
+      const ascendancyNodes = new Set<string>();
+      for (const ascendancy of Object.values(skillTree.ascendancies)) {
+        if (ascendancy.graphIndex === skillTree.graphIndex) continue;
+        const graph = skillTree.graphs[ascendancy.graphIndex];
+        if (graph) for (const id in graph.nodes) ascendancyNodes.add(id);
+      }
+      const mainOnly = (ids: string[]) =>
+        ids.filter((id) => !ascendancyNodes.has(id));
+      const focusActive = mainOnly(urlTreeDelta.nodesActive);
+      const focusAdded = mainOnly(urlTreeDelta.nodesAdded);
+      const focusRemoved = mainOnly(urlTreeDelta.nodesRemoved);
+      const hasMainFocus =
+        focusAdded.length + focusRemoved.length > 0 ||
+        (urlTreeDelta.nodesAdded.length + urlTreeDelta.nodesRemoved.length ===
+          0 &&
+          focusActive.length > 0);
+
+      const bounds = hasMainFocus
+        ? calculateBounds(focusActive, focusAdded, focusRemoved, nodes, viewBox)
+        : calculateBounds(
+            urlTreeDelta.nodesActive,
+            urlTreeDelta.nodesAdded,
+            urlTreeDelta.nodesRemoved,
+            nodes,
+            viewBox,
+          );
 
       const style = compiledStyle({
         styleId: styleId,

@@ -38,9 +38,9 @@ export default function RoutesContainer() {
       getPersistent<Layout>(LAYOUT_KEY, LAYOUT_VERSION, NO_MIGRATORS) ??
       DEFAULT_LAYOUT,
   );
-  const setLayout = useCallback((next: Layout) => {
+  const setLayout = useCallback((next: Layout, save = true) => {
     setLayoutState(next);
-    setPersistent(LAYOUT_KEY, LAYOUT_VERSION, next);
+    if (save) setPersistent(LAYOUT_KEY, LAYOUT_VERSION, next);
   }, []);
 
   // Every step's done flag in route order, for shift-click ranges.
@@ -70,8 +70,18 @@ export default function RoutesContainer() {
         const routeKeys = range
           .filter((x) => x.family === "route")
           .map((x) => x.key);
+        // A gem can have more than one step (quest and vendor) sharing one flag:
+        // clearing from here leaves a gem alone if it also appears before this point.
+        const before = done
+          ? new Set<string>()
+          : new Set(
+              order
+                .slice(0, orderIndex)
+                .filter((x) => x.family === "gem")
+                .map((x) => x.key),
+            );
         const gemKeys = range
-          .filter((x) => x.family === "gem")
+          .filter((x) => x.family === "gem" && !before.has(x.key))
           .map((x) => x.key);
         if (routeKeys.length > 0)
           set(routeProgressFamily.setMany, routeKeys, done);
@@ -149,7 +159,7 @@ export default function RoutesContainer() {
       {layout.panel && (
         <Splitter
           split={layout.split}
-          onSplit={(split) => setLayout({ ...layout, split })}
+          onSplit={(split, save) => setLayout({ ...layout, split }, save)}
         />
       )}
       <Sidebar
@@ -162,7 +172,8 @@ export default function RoutesContainer() {
 
 interface SplitterProps {
   split: number;
-  onSplit: (split: number) => void;
+  /** Called while dragging (save = false) and once when the drag ends (save = true). */
+  onSplit: (split: number, save: boolean) => void;
 }
 
 /** Drag to resize the route column; double-click to reset. */
@@ -178,6 +189,12 @@ function Splitter({ split, onSplit }: SplitterProps) {
     return Math.min(0.8, Math.max(0.2, value));
   };
 
+  const endDrag = () => {
+    if (dragSplit === null) return;
+    onSplit(dragSplit, true);
+    setDragSplit(null);
+  };
+
   return (
     <div
       ref={ref}
@@ -187,7 +204,6 @@ function Splitter({ split, onSplit }: SplitterProps) {
       role="separator"
       aria-orientation="vertical"
       aria-valuenow={Math.round((dragSplit ?? split) * 100)}
-      title="Drag to resize"
       onPointerDown={(ev) => {
         ev.currentTarget.setPointerCapture(ev.pointerId);
         setDragSplit(split);
@@ -196,13 +212,12 @@ function Splitter({ split, onSplit }: SplitterProps) {
         if (dragSplit === null) return;
         const next = toSplit(ev.clientX);
         setDragSplit(next);
-        onSplit(next);
+        onSplit(next, false);
       }}
-      onPointerUp={(ev) => {
-        ev.currentTarget.releasePointerCapture(ev.pointerId);
-        setDragSplit(null);
-      }}
-      onDoubleClick={() => onSplit(DEFAULT_LAYOUT.split)}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
+      onDoubleClick={() => onSplit(DEFAULT_LAYOUT.split, true)}
     />
   );
 }

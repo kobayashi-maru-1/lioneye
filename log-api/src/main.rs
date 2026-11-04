@@ -50,7 +50,7 @@ async fn main() -> ExitCode {
         Ok(addr) => addr,
         Err(err) => {
             error!("Bad --address {}: {}", args.address, err);
-            return ExitCode::FAILURE;
+            return fail();
         }
     };
     let url = format!("http://{}/", addr);
@@ -58,13 +58,23 @@ async fn main() -> ExitCode {
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => listener,
         Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => {
-            info!("Already running on {}, opening it", url);
-            open_browser(args.browser, &url);
-            return ExitCode::SUCCESS;
+            if already_running(addr).await {
+                info!("Already running on {}, opening it", url);
+                open_browser(args.browser, &url);
+                return ExitCode::SUCCESS;
+            }
+            error!(
+                "Another program is using {}. Close it (an old exile-log-api, for example) or pass --address with another port.",
+                addr
+            );
+            return fail();
         }
         Err(err) => {
-            error!("Could not listen on {}: {}", addr, err);
-            return ExitCode::FAILURE;
+            error!(
+                "Could not listen on {}: {}. Try --address with another port.",
+                addr, err
+            );
+            return fail();
         }
     };
 
@@ -91,9 +101,43 @@ async fn main() -> ExitCode {
         Ok(_) => ExitCode::SUCCESS,
         Err(err) => {
             error!("{}", err);
-            ExitCode::FAILURE
+            fail()
         }
     }
+}
+
+/// Keeps the console open on an error when the exe was double-clicked, so the message can be read.
+fn fail() -> ExitCode {
+    use std::io::{IsTerminal, Write};
+    if std::io::stdin().is_terminal() {
+        // tracing writes through a background thread; give it a moment to flush.
+        std::thread::sleep(Duration::from_millis(200));
+        print!("Press Enter to close...");
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stdin().read_line(&mut String::new());
+    }
+    ExitCode::FAILURE
+}
+
+/// True when the program on `addr` is another copy of this exe.
+async fn already_running(addr: SocketAddr) -> bool {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let check = async {
+        let mut stream = tokio::net::TcpStream::connect(addr).await.ok()?;
+        let request = format!(
+            "GET {} HTTP/1.0\r\nHost: {}\r\n\r\n",
+            server::WHOAMI_PATH,
+            addr
+        );
+        stream.write_all(request.as_bytes()).await.ok()?;
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response).await.ok()?;
+        Some(String::from_utf8_lossy(&response).ends_with(server::WHOAMI))
+    };
+    matches!(
+        tokio::time::timeout(Duration::from_secs(2), check).await,
+        Ok(Some(true))
+    )
 }
 
 fn open_browser(browser: Browser, url: &str) {

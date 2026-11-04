@@ -6,7 +6,7 @@ use axum::{
         State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
-    http::{StatusCode, Uri, header},
+    http::{HeaderMap, StatusCode, Uri, header},
     response::{IntoResponse, Response},
     routing::get,
 };
@@ -33,6 +33,7 @@ pub struct AppState {
 pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/ws", get(ws_handler))
+        .route(WHOAMI_PATH, get(|| async { WHOAMI }))
         .fallback(static_handler)
         .with_state(state);
 
@@ -40,8 +41,38 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
     Ok(())
 }
 
-async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
+/// Lets a second copy of the exe tell this one apart from another program on the port.
+pub const WHOAMI_PATH: &str = "/api/whoami";
+pub const WHOAMI: &str = "exile-leveling";
+
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    headers: HeaderMap,
+    State(state): State<AppState>,
+) -> Response {
+    // Only this machine's pages may follow the log; other sites you visit can't.
+    if !local_origin(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
     ws.on_upgrade(move |socket| client(socket, state))
+}
+
+fn local_origin(headers: &HeaderMap) -> bool {
+    let Some(origin) = headers.get(header::ORIGIN) else {
+        return true; // not a browser page
+    };
+    let Ok(origin) = origin.to_str() else {
+        return false;
+    };
+    let host = origin
+        .strip_prefix("http://")
+        .or_else(|| origin.strip_prefix("https://"))
+        .unwrap_or("");
+    let host = match host.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or(""),
+        None => host.split(':').next().unwrap_or(""),
+    };
+    matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
 async fn client(mut socket: WebSocket, state: AppState) {
@@ -111,4 +142,27 @@ fn file_response(path: &str, file: rust_embed::EmbeddedFile) -> Response {
         file.data,
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::HeaderValue;
+
+    fn with_origin(origin: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::ORIGIN, HeaderValue::from_str(origin).unwrap());
+        headers
+    }
+
+    #[test]
+    fn only_local_origins_may_connect() {
+        assert!(local_origin(&HeaderMap::new()));
+        assert!(local_origin(&with_origin("http://127.0.0.1:6754")));
+        assert!(local_origin(&with_origin("http://localhost:5173")));
+        assert!(local_origin(&with_origin("http://[::1]:6754")));
+        assert!(!local_origin(&with_origin("https://evil.example")));
+        assert!(!local_origin(&with_origin("http://127.0.0.1.evil.example")));
+        assert!(!local_origin(&with_origin("null")));
+    }
 }

@@ -120,9 +120,15 @@ fn find_running_log(sys: &mut System) -> Option<PathBuf> {
     None
 }
 
+/// The most recently written of LatestClient.txt and Client.txt in `dir/logs`.
 fn first_log(dir: &Path) -> Option<PathBuf> {
     LOG_NAMES
         .iter()
         .map(|name| dir.join("logs").join(name))
-        .find(|path| matches!(path.try_exists(), Ok(true)))
+        .filter_map(|path| {
+            let modified = std::fs::metadata(&path).ok()?.modified().ok()?;
+            Some((modified, path))
+        })
+        .max_by_key(|(modified, _)| *modified)
+        .map(|(_, path)| path)
 }

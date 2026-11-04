@@ -84,16 +84,16 @@
   margin-bottom: var(--size-2);
 }
 
-/* All view: the tree takes the spare height, gems get a fair share, search sizes to fit. */
+/* All view: gems and search size to fit (gems up to half the height), the tree takes the rest. */
 .tree {
-  flex: 3 1 0;
+  flex: 1 1 0;
   min-height: 14rem;
   overflow: hidden;
 }
 
 .gems {
-  flex: 2 1 0;
-  min-height: 8rem;
+  flex: 0 1 auto;
+  max-height: 50%;
 }
 
 .search {

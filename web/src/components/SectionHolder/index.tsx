@@ -1,4 +1,5 @@
 import { atom, useAtom, useAtomValue } from "jotai";
+import { activeEdgeAtom } from "../../state/route";
 import { sectionCollapseFamily } from "../../state/section-collapse";
 import { TaskList, type RangeHandler, type TaskListProps } from "../TaskList";
 import styles from "./styles.module.css";
@@ -34,12 +35,31 @@ export function SectionHolder({ name, items, onRange }: SectionHolderProps) {
   const total = items?.length ?? 0;
   const finished = total > 0 && done === total;
 
-  // Fold the act the moment its last step is marked done.
+  // Fold the act the moment its last step is marked done; open it again if a step is cleared.
   const wasFinished = useRef(finished);
   useEffect(() => {
     if (finished && !wasFinished.current) setCollapsed(true);
+    if (!finished && wasFinished.current) setCollapsed(false);
     wasFinished.current = finished;
   }, [finished]);
+
+  // Open a folded act when auto-progress moves into it, so the marker stays visible.
+  const [activeEdge] = useAtomValue(activeEdgeAtom);
+  const edgeHere = useMemo(
+    () =>
+      (items ?? []).some(
+        (item) =>
+          item.edgeIndex !== null &&
+          (item.edgeIndex === activeEdge || item.edgeIndex === activeEdge + 1),
+      ),
+    [items, activeEdge],
+  );
+  const prevEdge = useRef(activeEdge);
+  useEffect(() => {
+    if (activeEdge !== prevEdge.current && edgeHere && collapsed)
+      setCollapsed(false);
+    prevEdge.current = activeEdge;
+  }, [activeEdge, edgeHere]);
 
   const scrollToSection = (collapsed: boolean) => {
     if (!collapsed) return;

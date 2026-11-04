@@ -1,8 +1,9 @@
 import { atom } from "jotai";
+import { unwrap } from "jotai/utils";
 import { activeEdgeAtom, routeSelector } from "./route";
 
 /** Act number of the route section you're in, from the auto-progress marker. */
-export const currentActAtom = atom(async (get) => {
+const currentActAsync = atom(async (get) => {
   const route = await get(routeSelector);
   const [activeEdge] = get(activeEdgeAtom);
 
@@ -23,6 +24,10 @@ export const currentActAtom = atom(async (get) => {
 
   return sectionName === null ? null : actNumber(sectionName);
 });
+
+// Unwrapped so a zone change keeps the last act while the new one resolves,
+// instead of suspending (which swapped the page for the loader and lost the scroll).
+export const currentActAtom = unwrap(currentActAsync, (prev) => prev ?? null);
 
 function actNumber(name: string): number | null {
   const match = /\bact\s*(\d+)/i.exec(name);

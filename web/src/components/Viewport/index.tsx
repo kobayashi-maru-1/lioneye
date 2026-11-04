@@ -1,7 +1,7 @@
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import * as d3 from "d3";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useResizeObserver from "@react-hook/resize-observer";
 
 export interface ViewportProps {
@@ -53,6 +53,8 @@ export function Viewport({
   const [viewportRef, setViewportRef] = useState<HTMLDivElement | null>(null);
   const [worldRef, setWorldRef] = useState<HTMLDivElement | null>(null);
   const [prevSize, setPrevSize] = useState<ResizeObserverSize | null>(null);
+  // Set when the focus arrived while the viewport was hidden (0x0).
+  const pendingFit = useRef(false);
 
   const [getTransform, setTransform] = useMemo(() => {
     if (viewportRef === null || worldRef === null) return [];
@@ -84,7 +86,20 @@ export function Viewport({
 
   useResizeObserver(viewportRef, (entry) => {
     const size = entry.contentBoxSize.at(0) ?? null;
+    // A hidden tab reports 0x0; fitting to that leaves the tree blank when shown again.
+    if (size !== null && (size.inlineSize === 0 || size.blockSize === 0))
+      return;
     setPrevSize(size);
+
+    if (pendingFit.current && size !== null && setTransform !== undefined) {
+      pendingFit.current = false;
+      const { newScale, newPos } = containRect(
+        { width: size.inlineSize, height: size.blockSize },
+        intialFocus,
+      );
+      setTransform(newScale, newPos.x, newPos.y);
+      return;
+    }
 
     if (size === null) return;
     if (prevSize === null) return;
@@ -132,6 +147,11 @@ export function Viewport({
     if (setTransform === undefined) return;
 
     const rect = viewportRef.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      pendingFit.current = true;
+      return;
+    }
+    pendingFit.current = false;
     const { newScale, newPos } = containRect(rect, intialFocus);
 
     setTransform(newScale, newPos.x, newPos.y);

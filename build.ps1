@@ -11,7 +11,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-Set-Location $PSScriptRoot
 
 foreach ($tool in 'node', 'npm', 'cargo') {
   if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
@@ -25,21 +24,33 @@ function Invoke-Step([string]$Name, [scriptblock]$Command) {
   if ($LASTEXITCODE -ne 0) { throw "$Name failed (exit $LASTEXITCODE)" }
 }
 
-Invoke-Step 'Installing packages' { npm ci }
-
-if (-not $SkipTree -or -not (Test-Path 'common\data\tree\*.json')) {
-  Invoke-Step 'Downloading skill tree data' { npm -w seeding run seed tree }
-}
-
-Invoke-Step 'Building the guide' { npm -w web run build:desktop }
-
-Push-Location log-api
+Push-Location $PSScriptRoot
 try {
-  Invoke-Step 'Building the exe' { cargo build --release }
+  Invoke-Step 'Installing packages' { npm ci }
+
+  if (-not $SkipTree -or -not (Test-Path 'common\data\tree\*.json')) {
+    Invoke-Step 'Downloading skill tree data' { npm -w seeding run seed tree }
+  }
+
+  Invoke-Step 'Building the guide' { npm -w web run build:desktop }
+
+  Push-Location log-api
+  try {
+    Invoke-Step 'Building the exe' { cargo build --release }
+  }
+  finally {
+    Pop-Location
+  }
+
+  $exe = Join-Path $PSScriptRoot 'exile-leveling.exe'
+  try {
+    Copy-Item 'log-api\target\release\exile-leveling.exe' $exe -Force
+  }
+  catch {
+    throw "Couldn't replace $exe. Close the running copy (its console window) and run .\build.ps1 -SkipTree again."
+  }
+  Write-Host "Done: $exe" -ForegroundColor Green
 }
 finally {
   Pop-Location
 }
-
-Copy-Item 'log-api\target\release\exile-leveling.exe' '.\exile-leveling.exe' -Force
-Write-Host "Done: $PSScriptRoot\exile-leveling.exe" -ForegroundColor Green

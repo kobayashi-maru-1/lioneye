@@ -2,6 +2,7 @@ use std::{
     fs::File,
     io::{BufRead, BufReader, Seek, SeekFrom},
     path::PathBuf,
+    time::SystemTime,
 };
 
 use regex::RegexSet;
@@ -10,16 +11,24 @@ pub struct Reader {
     path: PathBuf,
     patterns: RegexSet,
     byte_offset: u64,
+    /// Creation time of the file being read, to notice a new LatestClient.txt
+    created: Option<SystemTime>,
 }
 
 impl Reader {
     /// Reads lines added since the last call and passes the matching ones to `f`.
     pub fn read_latest(&mut self, mut f: impl FnMut(&str)) -> Result<(), std::io::Error> {
         let file = File::open(&self.path)?;
-        let len = file.metadata()?.len();
+        let metadata = file.metadata()?;
+        let len = metadata.len();
+        let created = metadata.created().ok();
 
-        // The file was replaced or truncated: skip what is already there.
-        if len < self.byte_offset {
+        if created.is_some() && created != self.created {
+            // A new file (the game restarted): read it from the start.
+            self.created = created;
+            self.byte_offset = 0;
+        } else if len < self.byte_offset {
+            // Truncated in place: skip what is already there.
             self.byte_offset = len;
             return Ok(());
         }
@@ -52,11 +61,12 @@ impl Reader {
 /// Opens the log and skips to its end, so only new lines are reported.
 pub fn build(path: impl Into<PathBuf>, patterns: RegexSet) -> Result<Reader, std::io::Error> {
     let path = path.into();
-    let len = File::open(&path)?.metadata()?.len();
+    let metadata = File::open(&path)?.metadata()?;
     Ok(Reader {
         path,
         patterns,
-        byte_offset: len,
+        byte_offset: metadata.len(),
+        created: metadata.created().ok(),
     })
 }
 
@@ -95,6 +105,16 @@ mod tests {
         std::fs::write(&path, "fresh\r\n").unwrap();
         reader.read_latest(|l| seen.push(l.to_string())).unwrap();
         assert_eq!(seen.len(), 2, "truncation skips");
+
+        // A replaced file (new creation time) is read from the start.
+        std::fs::remove_file(&path).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::fs::write(&path, "2026 Generating level 1 area \"1_1_town\" with seed 3\r\n").unwrap();
+        reader.read_latest(|l| seen.push(l.to_string())).unwrap();
+        if std::fs::metadata(&path).unwrap().created().is_ok() {
+            assert_eq!(seen.len(), 3, "new file read from the start");
+            assert!(seen[2].contains("1_1_town"));
+        }
 
         std::fs::remove_dir_all(&dir).ok();
     }
