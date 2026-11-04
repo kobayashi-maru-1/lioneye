@@ -24,6 +24,13 @@ function Invoke-Step([string]$Name, [scriptblock]$Command) {
   if ($LASTEXITCODE -ne 0) { throw "$Name failed (exit $LASTEXITCODE)" }
 }
 
+# Rust's build output is 1-2 GB. Keep it out of synced folders such as OneDrive.
+$savedTargetDir = $env:CARGO_TARGET_DIR
+if (-not $env:CARGO_TARGET_DIR -and $env:LOCALAPPDATA) {
+  $env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA 'exile-leveling\cargo-target'
+}
+$targetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $PSScriptRoot 'log-api\target' }
+
 Push-Location $PSScriptRoot
 try {
   Invoke-Step 'Installing packages' { npm ci }
@@ -42,15 +49,20 @@ try {
     Pop-Location
   }
 
+  $built = Join-Path $targetDir 'release\exile-leveling.exe'
+  if (-not (Test-Path $built)) {
+    throw "The build finished but $built is missing."
+  }
   $exe = Join-Path $PSScriptRoot 'exile-leveling.exe'
   try {
-    Copy-Item 'log-api\target\release\exile-leveling.exe' $exe -Force
+    Copy-Item $built $exe -Force
   }
   catch {
-    throw "Couldn't replace $exe. Close the running copy (its console window) and run .\build.ps1 -SkipTree again."
+    throw "Couldn't replace $exe ($($_.Exception.Message)). If it's running, close its console window and run .\build.ps1 -SkipTree again."
   }
   Write-Host "Done: $exe" -ForegroundColor Green
 }
 finally {
   Pop-Location
+  $env:CARGO_TARGET_DIR = $savedTargetDir
 }

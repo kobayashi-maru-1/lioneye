@@ -4,13 +4,15 @@ use std::{
 };
 
 use regex::RegexSet;
-use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+use sysinfo::{Process, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 use tokio::sync::{broadcast, watch};
 use tracing::info;
 
 use crate::log_reader;
 
 const PROCESS_NAME: &str = "PathOfExile";
+/// PoE2's client uses the same process names; its install folder tells it apart.
+const POE2_DIR: &str = "Path of Exile 2";
 const LOG_NAMES: [&str; 2] = ["LatestClient.txt", "Client.txt"];
 const AREA_PATTERN: &str = r"Generating level \d+ area";
 
@@ -102,14 +104,25 @@ fn refresh(sys: &mut System) {
     );
 }
 
+/// Running PoE1 clients. Names match by substring, which also catches PoE2.
+fn poe1_processes(sys: &System) -> impl Iterator<Item = &Process> {
+    sys.processes_by_name(PROCESS_NAME.as_ref())
+        .filter(|p| ![p.exe(), p.cwd()].into_iter().flatten().any(in_poe2_dir))
+}
+
+fn in_poe2_dir(path: &Path) -> bool {
+    path.components()
+        .any(|c| c.as_os_str().eq_ignore_ascii_case(POE2_DIR))
+}
+
 fn game_running(sys: &mut System) -> bool {
     refresh(sys);
-    sys.processes_by_name(PROCESS_NAME.as_ref()).next().is_some()
+    poe1_processes(sys).next().is_some()
 }
 
 fn find_running_log(sys: &mut System) -> Option<PathBuf> {
     refresh(sys);
-    for process in sys.processes_by_name(PROCESS_NAME.as_ref()) {
+    for process in poe1_processes(sys) {
         let dirs = [process.cwd(), process.exe().and_then(Path::parent)];
         for dir in dirs.into_iter().flatten() {
             if let Some(path) = first_log(dir) {
@@ -131,4 +144,23 @@ fn first_log(dir: &Path) -> Option<PathBuf> {
         })
         .max_by_key(|(modified, _)| *modified)
         .map(|(_, path)| path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn poe2_installs_are_skipped() {
+        assert!(in_poe2_dir(Path::new(
+            "C:/Program Files (x86)/Grinding Gear Games/Path of Exile 2/PathOfExile_x64.exe"
+        )));
+        assert!(in_poe2_dir(Path::new(
+            "D:/SteamLibrary/steamapps/common/path of exile 2"
+        )));
+        assert!(!in_poe2_dir(Path::new(
+            "D:/SteamLibrary/steamapps/common/Path of Exile/PathOfExileSteam.exe"
+        )));
+        assert!(!in_poe2_dir(Path::new("D:/Games/Path of Exile 2 backup/x")));
+    }
 }

@@ -45,6 +45,10 @@ Needs [Node.js 22+](https://nodejs.org) and [Rust](https://rustup.rs).
 .\build.ps1 -SkipTree  # reuse the downloaded tree data
 ```
 
+Rust's build output (1-2 GB) goes to `%LOCALAPPDATA%\exile-leveling\cargo-target`,
+outside the repo, so a synced folder such as OneDrive doesn't copy it. Set
+`CARGO_TARGET_DIR` to use another folder.
+
 Or run **Desktop exe** from the GitHub Actions tab and download the artifact.
 Pushing a tag such as `v1.0.0` attaches the exe to a release.
 

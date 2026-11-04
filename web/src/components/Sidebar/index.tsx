@@ -187,9 +187,9 @@ function Header({
             </>
           )}
           <span className={classNames(styles.spacer)} />
-          <AutoProgressStatus />
         </>
       )}
+      <AutoProgressStatus />
     </div>
   );
 }

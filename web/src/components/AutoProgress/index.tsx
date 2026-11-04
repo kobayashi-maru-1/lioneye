@@ -39,7 +39,7 @@ export function useAutoProgress() {
 
 const LABELS = {
   offline: "Offline",
-  waiting: "No game",
+  waiting: "Waiting",
   watching: "Auto",
 } as const;
 

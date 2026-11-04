@@ -27,11 +27,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      # One command per step: a pwsh step only fails on its last command's exit code.
+      - name: Install packages
+        run: npm ci
+
+      - name: Download skill tree data
+        run: npm -w seeding run seed tree
+
       - name: Build the guide
-        run: |
-          npm ci
-          npm -w seeding run seed tree
-          npm -w web run build:desktop
+        run: npm -w web run build:desktop
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -39,11 +43,13 @@ jobs:
         with:
           workspaces: log-api
 
+      - name: Test
+        working-directory: log-api
+        run: cargo test
+
       - name: Build the exe
         working-directory: log-api
-        run: |
-          cargo test
-          cargo build --release
+        run: cargo build --release
 
       - uses: actions/upload-artifact@v4
         with:
