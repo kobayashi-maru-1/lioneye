@@ -53,12 +53,23 @@ async fn main() -> ExitCode {
             return fail();
         }
     };
-    let url = format!("http://{}/", addr);
+    // 0.0.0.0 / [::] listen everywhere but can't be opened or connected to; use loopback for those.
+    let local = if addr.ip().is_unspecified() {
+        let ip: std::net::IpAddr = if addr.is_ipv4() {
+            std::net::Ipv4Addr::LOCALHOST.into()
+        } else {
+            std::net::Ipv6Addr::LOCALHOST.into()
+        };
+        SocketAddr::new(ip, addr.port())
+    } else {
+        addr
+    };
+    let url = format!("http://{}/", local);
 
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => listener,
         Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => {
-            if already_running(addr).await {
+            if already_running(local).await {
                 info!("Already running on {}, opening it", url);
                 open_browser(args.browser, &url);
                 return ExitCode::SUCCESS;

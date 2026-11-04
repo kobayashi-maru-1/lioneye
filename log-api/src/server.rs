@@ -64,13 +64,21 @@ fn local_origin(headers: &HeaderMap) -> bool {
     let Ok(origin) = origin.to_str() else {
         return false;
     };
-    let host = origin
+    let authority = origin
         .strip_prefix("http://")
         .or_else(|| origin.strip_prefix("https://"))
         .unwrap_or("");
-    let host = match host.strip_prefix('[') {
+    // The guide itself, however it was opened (e.g. a LAN address with --address 0.0.0.0:6754).
+    let same_host = headers
+        .get(header::HOST)
+        .and_then(|h| h.to_str().ok())
+        .is_some_and(|h| !authority.is_empty() && h.eq_ignore_ascii_case(authority));
+    if same_host {
+        return true;
+    }
+    let host = match authority.strip_prefix('[') {
         Some(v6) => v6.split(']').next().unwrap_or(""),
-        None => host.split(':').next().unwrap_or(""),
+        None => authority.split(':').next().unwrap_or(""),
     };
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
@@ -164,5 +172,12 @@ mod tests {
         assert!(!local_origin(&with_origin("https://evil.example")));
         assert!(!local_origin(&with_origin("http://127.0.0.1.evil.example")));
         assert!(!local_origin(&with_origin("null")));
+
+        let mut lan = with_origin("http://192.168.1.20:6754");
+        lan.insert(header::HOST, HeaderValue::from_static("192.168.1.20:6754"));
+        assert!(local_origin(&lan), "the guide opened from a LAN address");
+        let mut rebind = with_origin("http://evil.example");
+        rebind.insert(header::HOST, HeaderValue::from_static("127.0.0.1:6754"));
+        assert!(!local_origin(&rebind));
     }
 }

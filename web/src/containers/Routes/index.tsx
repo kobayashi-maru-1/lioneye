@@ -81,7 +81,10 @@ export default function RoutesContainer() {
                 .map((x) => x.key),
             );
         const gemKeys = range
-          .filter((x) => x.family === "gem" && !before.has(x.key))
+          .filter(
+            (x, i) =>
+              x.family === "gem" && ((!done && i === 0) || !before.has(x.key)),
+          )
           .map((x) => x.key);
         if (routeKeys.length > 0)
           set(routeProgressFamily.setMany, routeKeys, done);

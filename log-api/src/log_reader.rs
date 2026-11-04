@@ -1,37 +1,38 @@
 use std::{
     fs::File,
-    io::{BufRead, BufReader, Seek, SeekFrom},
+    io::{BufRead, BufReader, Read, Seek, SeekFrom},
     path::PathBuf,
-    time::SystemTime,
 };
 
 use regex::RegexSet;
+
+/// Bytes from the top of the log used to tell a new log file from the old one.
+/// PoE starts each log with a timestamped "LOG FILE OPENING" line.
+const FINGERPRINT_LEN: usize = 256;
 
 pub struct Reader {
     path: PathBuf,
     patterns: RegexSet,
     byte_offset: u64,
-    /// Creation time of the file being read, to notice a new LatestClient.txt
-    created: Option<SystemTime>,
+    /// Start of the file being read. File times can't be trusted for this on
+    /// Windows (NTFS keeps the old creation time for a quickly recreated file).
+    fingerprint: Vec<u8>,
 }
 
 impl Reader {
     /// Reads lines added since the last call and passes the matching ones to `f`.
     pub fn read_latest(&mut self, mut f: impl FnMut(&str)) -> Result<(), std::io::Error> {
-        let file = File::open(&self.path)?;
-        let metadata = file.metadata()?;
-        let len = metadata.len();
-        let created = metadata.created().ok();
+        let mut file = File::open(&self.path)?;
+        let len = file.metadata()?.len();
+        let head = fingerprint(&mut file)?;
 
-        if created.is_some() && created != self.created {
-            // A new file (the game restarted): read it from the start.
-            self.created = created;
+        // Shrunk, or the top of the file changed: it's a new log, read it all.
+        let same_start = head.len() >= self.fingerprint.len()
+            && head[..self.fingerprint.len()] == self.fingerprint[..];
+        if len < self.byte_offset || !same_start {
             self.byte_offset = 0;
-        } else if len < self.byte_offset {
-            // Truncated in place: skip what is already there.
-            self.byte_offset = len;
-            return Ok(());
         }
+        self.fingerprint = head;
 
         let mut reader = BufReader::new(file);
         reader.seek(SeekFrom::Start(self.byte_offset))?;
@@ -58,15 +59,24 @@ impl Reader {
     }
 }
 
+fn fingerprint(file: &mut File) -> Result<Vec<u8>, std::io::Error> {
+    let mut head = Vec::with_capacity(FINGERPRINT_LEN);
+    file.by_ref().take(FINGERPRINT_LEN as u64).read_to_end(&mut head)?;
+    file.seek(SeekFrom::Start(0))?;
+    Ok(head)
+}
+
 /// Opens the log and skips to its end, so only new lines are reported.
 pub fn build(path: impl Into<PathBuf>, patterns: RegexSet) -> Result<Reader, std::io::Error> {
     let path = path.into();
-    let metadata = File::open(&path)?.metadata()?;
+    let mut file = File::open(&path)?;
+    let len = file.metadata()?.len();
+    let fingerprint = fingerprint(&mut file)?;
     Ok(Reader {
         path,
         patterns,
-        byte_offset: metadata.len(),
-        created: metadata.created().ok(),
+        byte_offset: len,
+        fingerprint,
     })
 }
 
@@ -102,19 +112,28 @@ mod tests {
         assert_eq!(seen.len(), 2);
         assert!(seen[1].contains("\"1_1_3\" with seed 2"));
 
-        std::fs::write(&path, "fresh\r\n").unwrap();
-        reader.read_latest(|l| seen.push(l.to_string())).unwrap();
-        assert_eq!(seen.len(), 2, "truncation skips");
-
-        // A replaced file (new creation time) is read from the start.
-        std::fs::remove_file(&path).unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(20));
+        // Truncated or replaced: everything in it is new, so it's read from the start.
         std::fs::write(&path, "2026 Generating level 1 area \"1_1_town\" with seed 3\r\n").unwrap();
         reader.read_latest(|l| seen.push(l.to_string())).unwrap();
-        if std::fs::metadata(&path).unwrap().created().is_ok() {
-            assert_eq!(seen.len(), 3, "new file read from the start");
-            assert!(seen[2].contains("1_1_town"));
-        }
+        assert_eq!(seen.len(), 3, "shrunk file read from the start");
+        assert!(seen[2].contains("1_1_town"));
+
+        // Replaced by a longer file with a different start (a quick game restart).
+        let long = format!(
+            "2026/11/05 ***** LOG FILE OPENING *****\r\n{}2026 Generating level 2 area \"1_1_2\" with seed 4\r\n",
+            "filler line\r\n".repeat(20)
+        );
+        std::fs::write(&path, long).unwrap();
+        reader.read_latest(|l| seen.push(l.to_string())).unwrap();
+        assert_eq!(seen.len(), 4, "replaced file read from the start");
+        assert!(seen[3].contains("1_1_2"));
+
+        // Growing normally after that only reports new lines.
+        let mut f = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+        write!(f, "2026 Generating level 3 area \"1_1_3\" with seed 5\r\n").unwrap();
+        drop(f);
+        reader.read_latest(|l| seen.push(l.to_string())).unwrap();
+        assert_eq!(seen.len(), 5);
 
         std::fs::remove_dir_all(&dir).ok();
     }

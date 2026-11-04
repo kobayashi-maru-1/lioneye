@@ -55,10 +55,16 @@ export function SectionHolder({ name, items, onRange }: SectionHolderProps) {
     [items, activeEdge],
   );
   const prevEdge = useRef(activeEdge);
+  const prevEdgeHere = useRef(edgeHere);
   useEffect(() => {
-    if (activeEdge !== prevEdge.current && edgeHere && collapsed)
-      setCollapsed(false);
+    if (activeEdge !== prevEdge.current) {
+      if (edgeHere && collapsed) setCollapsed(false);
+      // Leaving a finished act folds it again.
+      if (!edgeHere && prevEdgeHere.current && finished && !collapsed)
+        setCollapsed(true);
+    }
     prevEdge.current = activeEdge;
+    prevEdgeHere.current = edgeHere;
   }, [activeEdge, edgeHere]);
 
   const scrollToSection = (collapsed: boolean) => {
