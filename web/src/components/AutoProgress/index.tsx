@@ -1,60 +1,70 @@
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect } from "react";
 import { activeEdgeAtom } from "../../state/route";
-import { type Id, toast } from "react-toastify";
+import { autoProgressAtom } from "../../state/auto-progress";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
-import React from "react";
+import classNames from "classnames";
+import styles from "./styles.module.css";
 
-const AUTO_PROGRESS_URL = "ws://localhost:6754";
+// The local exe serves the page and the auto-progress socket from the same address.
+const AUTO_PROGRESS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 
 export function useAutoProgress() {
   const write = useSetAtom(activeEdgeAtom);
+  const setState = useSetAtom(autoProgressAtom);
+
   const { readyState } = useWebSocket({
     url: AUTO_PROGRESS_URL,
     shouldReconnect: true,
     reconnectInterval: 1000,
     onMessage(event) {
-      if (typeof event.data === "string") {
-        write(event.data);
+      if (typeof event.data !== "string") return;
+      if (event.data.startsWith("status:")) {
+        const [status, path] = event.data.slice("status:".length).split("|");
+        setState(
+          status === "watching"
+            ? { kind: "watching", path: path ?? "" }
+            : { kind: "waiting" },
+        );
+        return;
       }
+      write(event.data);
     },
   });
 
-  const toastId = React.useRef<Id | null>(null);
-
   useEffect(() => {
-    if (readyState == ReadyState.CONNECTING) {
-      if (toastId.current === null || !toast.isActive(toastId.current)) {
-        toastId.current = toast("");
-      }
-
-      toast.update(toastId.current, {
-        render: "Setup Auto-Progress",
-        type: "info",
-        onClick: () => {
-          window.open(
-            "https://github.com/HeartofPhos/exile-log-api/releases",
-            "_blank",
-          );
-        },
-        style: { cursor: "pointer" },
-        autoClose: false,
-        closeOnClick: false,
-        closeButton: null,
-      });
-    } else {
-      if (toastId.current === null || !toast.isActive(toastId.current)) {
-        toastId.current = toast("");
-      }
-
-      toast.update(toastId.current, {
-        render: "Auto-Progress Connected",
-        type: "success",
-        onClick: null,
-        autoClose: null,
-        closeOnClick: null,
-        closeButton: null,
-      });
-    }
+    if (readyState !== ReadyState.OPEN) setState({ kind: "offline" });
   }, [readyState]);
+}
+
+const LABELS = {
+  offline: "Offline",
+  waiting: "No game",
+  watching: "Auto",
+} as const;
+
+const TITLES = {
+  offline: "Auto-progress is off: exile-leveling.exe isn't running.",
+  waiting: "Auto-progress is waiting for Path of Exile to start.",
+  watching: "Auto-progress is following ",
+} as const;
+
+/** Small status pill: green when the log is being followed. */
+export function AutoProgressStatus() {
+  const state = useAtomValue(autoProgressAtom);
+  const title =
+    state.kind === "watching"
+      ? TITLES.watching + state.path
+      : TITLES[state.kind];
+
+  return (
+    <span
+      className={classNames(styles.status, styles[state.kind])}
+      title={title}
+      role="status"
+    >
+      <span className={classNames(styles.dot)} aria-hidden />
+      {LABELS[state.kind]}
+    </span>
+  );
 }

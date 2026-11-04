@@ -3,6 +3,7 @@ import { gemLinksSelector } from "../../state/gem-links";
 import { searchStringsSelector } from "../../state/search-strings";
 import { urlTreesSelector } from "../../state/tree/url-tree";
 import { interactiveStyles } from "../../styles";
+import { AutoProgressStatus } from "../AutoProgress";
 import { GemLinkViewer } from "../GemLinkViewer";
 import { SearchStrings } from "../SearchStrings";
 import { SkillTreeViewer } from "../SkillTreeViewer";
@@ -13,49 +14,76 @@ import React from "react";
 import { FaLink, FaListUl } from "react-icons/fa";
 import { FiChevronLeft, FiChevronRight, FiSearch } from "react-icons/fi";
 import { TbHierarchy } from "react-icons/tb";
-import flattenChildren from "react-keyed-flatten-children";
+import { useNavigate } from "react-router-dom";
 
-export function Sidebar() {
-  const [expand, setExpand] = useState(true);
-  const [activeTab, setActiveTab] = useState<number>(0);
+const ALL = -1;
 
+interface SidebarProps {
+  expand: boolean;
+  onToggleExpand: (expand: boolean) => void;
+}
+
+/** Right-hand panel: tree, gem links and search strings, all shown by default. */
+export function Sidebar({ expand, onToggleExpand }: SidebarProps) {
+  const [activeTab, setActiveTab] = useState<number>(ALL);
   const sections = useSections();
-  if (sections.length === 0) return <></>;
 
   return (
-    <div className={classNames(styles.sidebar)}>
+    <aside
+      className={classNames(styles.sidebar, { [styles.collapsed]: !expand })}
+    >
       <Header
         expand={expand}
         sections={sections}
+        activeTab={activeTab}
         onActiveTab={setActiveTab}
-        onToggleExpand={setExpand}
+        onToggleExpand={onToggleExpand}
       />
-      {expand && <hr />}
-      <div
-        className={classNames(styles.contents, {
-          [styles.expand]: expand,
-        })}
-      >
-        {flattenChildren(
-          sections.map((v, i) => (
-            <>
-              {activeTab === -1 && i > 0 && <hr />}
-              <div
-                className={classNames(styles.content, {
-                  [styles.hidden]: activeTab !== i && activeTab !== -1,
-                })}
-              >
-                {v.content}
-              </div>
-            </>
-          )),
+      {expand && sections.length === 0 && <EmptyHint />}
+      {expand && sections.length > 0 && (
+        <div className={classNames(styles.contents)}>
+          {sections.map((section, i) => (
+            <section
+              key={section.key}
+              className={classNames(styles.content, styles[section.key], {
+                [styles.hidden]: activeTab !== i && activeTab !== ALL,
+                [styles.solo]: activeTab === i,
+              })}
+            >
+              {activeTab === ALL && (
+                <h2 className={classNames(styles.contentTitle)}>
+                  {section.tab}
+                </h2>
+              )}
+              {section.content}
+            </section>
+          ))}
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function EmptyHint() {
+  const navigate = useNavigate();
+  return (
+    <div className={classNames(styles.empty)}>
+      <p>No build yet.</p>
+      <button
+        className={classNames(
+          styles.emptyButton,
+          interactiveStyles.hoverPrimary,
         )}
-      </div>
+        onClick={() => navigate("/build")}
+      >
+        Import
+      </button>
     </div>
   );
 }
 
 interface Section {
+  key: "tree" | "gems" | "search";
   tab: React.ReactNode;
   content: React.ReactNode;
 }
@@ -66,10 +94,11 @@ function useSections() {
   const gemLinks = useAtomValue(gemLinksSelector);
 
   return useMemo(() => {
-    const sections: { tab: React.ReactNode; content: React.ReactNode }[] = [];
+    const sections: Section[] = [];
 
     if (urlTrees.length > 0) {
       sections.push({
+        key: "tree",
         tab: (
           <>
             <TbHierarchy className={classNames("inlineIcon")} />
@@ -82,6 +111,7 @@ function useSections() {
 
     if (gemLinks.length > 0) {
       sections.push({
+        key: "gems",
         tab: (
           <>
             <FaLink className={classNames("inlineIcon")} />
@@ -94,6 +124,7 @@ function useSections() {
 
     if (searchStrings !== null && searchStrings.length > 0) {
       sections.push({
+        key: "search",
         tab: (
           <>
             <FiSearch className={classNames("inlineIcon")} />
@@ -111,56 +142,72 @@ function useSections() {
 interface HeaderProps {
   expand: boolean;
   sections: Section[];
+  activeTab: number;
   onToggleExpand: (expand: boolean) => void;
   onActiveTab: (activeTab: number) => void;
 }
+
 function Header({
   expand,
   sections,
+  activeTab,
   onToggleExpand,
   onActiveTab,
 }: HeaderProps) {
   return (
     <div className={classNames(styles.header)}>
-      {expand && (
-        <>
-          {sections.map((v, i) => (
-            <button
-              key={i}
-              className={classNames(
-                styles.tab,
-                interactiveStyles.activeSecondary,
-              )}
-              onClick={() => {
-                onActiveTab(i);
-              }}
-            >
-              {v.tab}
-            </button>
-          ))}
-          <button
-            className={classNames(
-              styles.tab,
-              styles.all,
-              interactiveStyles.activeSecondary,
-            )}
-            onClick={() => {
-              onActiveTab(-1);
-            }}
-          >
-            <FaListUl className={classNames("inlineIcon")} />
-            All
-          </button>
-        </>
-      )}
       <button
         className={classNames(styles.toggle, interactiveStyles.activeSecondary)}
-        onClick={() => {
-          onToggleExpand(!expand);
-        }}
+        aria-label={expand ? "Hide panel" : "Show panel"}
+        title={expand ? "Hide panel" : "Show panel"}
+        onClick={() => onToggleExpand(!expand)}
       >
         {expand ? <FiChevronRight /> : <FiChevronLeft />}
       </button>
+      {expand && (
+        <>
+          {sections.length > 1 && (
+            <>
+              <TabButton
+                active={activeTab === ALL}
+                onClick={() => onActiveTab(ALL)}
+              >
+                <FaListUl className={classNames("inlineIcon")} />
+                All
+              </TabButton>
+              {sections.map((section, i) => (
+                <TabButton
+                  key={section.key}
+                  active={activeTab === i}
+                  onClick={() => onActiveTab(i)}
+                >
+                  {section.tab}
+                </TabButton>
+              ))}
+            </>
+          )}
+          <span className={classNames(styles.spacer)} />
+          <AutoProgressStatus />
+        </>
+      )}
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: React.PropsWithChildren<{ active: boolean; onClick: () => void }>) {
+  return (
+    <button
+      className={classNames(styles.tab, interactiveStyles.activeSecondary, {
+        [styles.activeTab]: active,
+      })}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }

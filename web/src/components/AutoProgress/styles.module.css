@@ -1,0 +1,28 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2);
+  padding: 0 var(--size-3);
+  font-weight: var(--font-heavy);
+  white-space: nowrap;
+  color: var(--on-secondary);
+}
+
+.dot {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background-color: var(--accent-secondary);
+}
+
+.offline .dot {
+  background-color: hsl(0, 70%, 55%);
+}
+
+.waiting .dot {
+  background-color: hsl(40, 90%, 55%);
+}
+
+.watching .dot {
+  background-color: hsl(120, 60%, 50%);
+}

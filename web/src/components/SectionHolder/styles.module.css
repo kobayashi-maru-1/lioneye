@@ -27,3 +27,24 @@
   text-align: center;
   cursor: pointer;
 }
+
+.title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-3);
+}
+
+.progress {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--accent-primary);
+}
+
+/* A finished act reads as done at a glance. */
+.finished .header {
+  color: var(--accent-primary);
+}
+
+.finished .progress {
+  color: hsl(120, 50%, 50%);
+}

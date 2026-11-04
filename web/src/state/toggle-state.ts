@@ -14,6 +14,8 @@ type ClearableAtomFamily = AtomFamily<
   WritableAtom<boolean, [newValue: boolean], void>
 > & {
   clear: WritableAtom<null, [], void>;
+  /** Sets many keys at once with a single save. */
+  setMany: WritableAtom<null, [keys: string[], newValue: boolean], void>;
 };
 
 export const buildToggleState = (
@@ -54,5 +56,23 @@ export const buildToggleState = (
     refresh(set);
   });
 
-  return Object.assign(toggleFamily, { clear: clearAtom });
+  const setManyAtom = atom(
+    null,
+    (_get, set, keys: string[], newValue: boolean) => {
+      for (const param of keys) {
+        if (newValue) toggleState.add(param);
+        else toggleState.delete(param);
+      }
+
+      if (toggleState.size > 0) setPersistent(key, version, [...toggleState]);
+      else clearPersistent(key);
+
+      refresh(set);
+    },
+  );
+
+  return Object.assign(toggleFamily, {
+    clear: clearAtom,
+    setMany: setManyAtom,
+  });
 };

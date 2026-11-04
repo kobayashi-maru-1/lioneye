@@ -69,7 +69,6 @@ hr {
   flex-direction: column;
   margin: 0 auto;
   position: relative;
-  max-width: 1280px;
   min-height: 100vh;
   padding-left: var(--size-2);
   padding-right: var(--size-2);
@@ -94,4 +93,11 @@ hr {
 a:link,
 a:visited {
   color: var(--on-primary);
+}
+
+/* Pages other than the route keep a readable width on a wide screen. */
+.page-narrow {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
 }

@@ -25,3 +25,5 @@ dist-ssr
 
 .env
 /common/data/tree/*.json
+# Desktop build output
+/exile-leveling.exe

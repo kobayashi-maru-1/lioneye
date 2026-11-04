@@ -38,7 +38,11 @@ export function App() {
               element={
                 <Page
                   title="Exile Leveling - Build"
-                  component={<BuildContainer />}
+                  component={
+                    <div className="page-narrow">
+                      <BuildContainer />
+                    </div>
+                  }
                 />
               }
             />
@@ -47,7 +51,11 @@ export function App() {
               element={
                 <Page
                   title="Exile Leveling - Edit Route"
-                  component={<EditRouteContainer />}
+                  component={
+                    <div className="page-narrow">
+                      <EditRouteContainer />
+                    </div>
+                  }
                 />
               }
             />

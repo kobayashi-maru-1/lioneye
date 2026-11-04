@@ -1,3 +1,5 @@
+> **Desktop build:** this copy runs as one Windows program with auto-progress built in. See [DESKTOP.md](DESKTOP.md).
+
 ## Getting Started
 
 - `npm i`

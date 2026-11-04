@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --build && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:desktop": "tsc --build && vite build --mode desktop"
   },
   "dependencies": {
     "@react-hook/resize-observer": "^2.0.2",

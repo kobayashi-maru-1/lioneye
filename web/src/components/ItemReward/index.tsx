@@ -1,3 +1,4 @@
+import { displaySetName } from "../../state/current-act";
 import { CopyToClipboard } from "../CopyToClipboard";
 import { GemCost } from "../GemCost";
 import { InlineFakeBlock } from "../InlineFakeBlock";
@@ -76,7 +77,7 @@ export function GemReward({ requiredGem, count, rewardType }: GemRewardProps) {
       }
       right={
         <div className={classNames(styles.rewardNote)}>
-          {requiredGem.note} <CopyToClipboard text={gem.name} />
+          {displaySetName(requiredGem.note)} <CopyToClipboard text={gem.name} />
         </div>
       }
     />

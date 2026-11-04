@@ -1,13 +1,12 @@
-import { formStyles } from "../../styles";
 import { GemCost } from "../GemCost";
 import { InlineFakeBlock } from "../InlineFakeBlock";
+import { SetPager, useFollowAct } from "../SetPager";
 import { SidebarTooltip } from "../SidebarTooltip";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { Data, type RouteData } from "common";
 import React, { type JSX } from "react";
-import { useEffect, useState } from "react";
-import { HiChevronLeft, HiChevronRight } from "react-icons/hi";
+import { useMemo, useState } from "react";
 import { MdCircle } from "react-icons/md";
 import flattenChildren from "react-keyed-flatten-children";
 
@@ -16,58 +15,27 @@ interface GemLinkViewerProps {
 }
 
 export function GemLinkViewer({ gemLinks }: GemLinkViewerProps) {
-  const findUniqueGemTitles = (links: RouteData.GemLinkGroup[]): string[] => {
+  const gemSections = useMemo(() => {
     const linkTitles = new Set<string>();
-    for (const link of links) {
-      linkTitles.add(link.title);
-    }
+    for (const link of gemLinks) linkTitles.add(link.title);
     return [...linkTitles];
-  };
-  const [curIndex, setCurIndex] = useState<number>(0);
-  const [gemSections, setGemSections] = useState<string[]>(
-    findUniqueGemTitles(gemLinks)
-  );
+  }, [gemLinks]);
+  const [curIndex, setCurIndex] = useFollowAct(gemSections);
   const [tooltipGemLink, setTooltipGemLink] =
     useState<RouteData.GemLink | null>(null);
 
-  useEffect(() => {
-    setCurIndex(0); // Prevent out-of-bounds issues if the gem links change from a new build import
-    setGemSections(findUniqueGemTitles(gemLinks));
-  }, [gemLinks]);
-
   const activeGemLinks: RouteData.GemLinkGroup[] = gemLinks.filter(
-    (link) => link.title === gemSections[curIndex]
+    (link) => link.title === gemSections[curIndex],
   );
   return (
     <div className={classNames(styles.gemLinks)}>
       {tooltipGemLink && <GemTooltip gemLink={tooltipGemLink} />}
-      <label className={classNames(styles.label)}>
-        {gemSections.length > 0 && gemSections[curIndex]}
-      </label>
-      <div className={classNames(styles.buttons)}>
-        <button
-          className={classNames(formStyles.formButton, styles.button)}
-          onClick={() => {
-            if (curIndex > 0) setCurIndex(curIndex - 1);
-          }}
-        >
-          <HiChevronLeft />
-        </button>
-        <button
-          className={classNames(formStyles.formButton, styles.button)}
-          onClick={() => {
-            if (curIndex < gemSections.length - 1) setCurIndex(curIndex + 1);
-          }}
-        >
-          <HiChevronRight />
-        </button>
-      </div>
+      <SetPager titles={gemSections} index={curIndex} onIndex={setCurIndex} />
       {activeGemLinks.length > 0 && (
         <div className={classNames(styles.gemLinkSection)}>
           {flattenChildren(
-            activeGemLinks.map(({ primaryGems, secondaryGems }, i) => (
+            activeGemLinks.map(({ primaryGems, secondaryGems }) => (
               <>
-                {i !== 0 && <hr />}
                 <div className={classNames(styles.gemLinkRow)}>
                   {flattenChildren(
                     primaryGems.map((gem) => (
@@ -76,7 +44,7 @@ export function GemLinkViewer({ gemLinks }: GemLinkViewerProps) {
                         isPrimary={true}
                         onTooltip={setTooltipGemLink}
                       />
-                    ))
+                    )),
                   )}
                   {flattenChildren(
                     secondaryGems.map((gem) => (
@@ -85,11 +53,11 @@ export function GemLinkViewer({ gemLinks }: GemLinkViewerProps) {
                         isPrimary={false}
                         onTooltip={setTooltipGemLink}
                       />
-                    ))
+                    )),
                   )}
                 </div>
               </>
-            ))
+            )),
           )}
         </div>
       )}

@@ -1,0 +1,38 @@
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  flex: none;
+  margin-bottom: var(--size-2);
+}
+
+.button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: var(--line-height);
+  width: 2.5rem;
+  flex: none;
+}
+
+.button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--on-secondary);
+  font-weight: var(--font-heavy);
+}
+
+.count {
+  margin-left: var(--size-3);
+  font-weight: 400;
+  color: var(--accent-primary);
+}

@@ -6,17 +6,24 @@ import type { WritableAtom } from "jotai";
 import { FaRegCircle, FaRegPlayCircle } from "react-icons/fa";
 import { edgeId, nextEdgeAtom } from "../../state/route";
 
+/** Marks a run of steps: done = this one and all before, not done = this one and all after. */
+export type RangeHandler = (orderIndex: number, done: boolean) => void;
+
 interface TaskItemProps {
   edgeIndex: number | null;
+  /** Position in the whole route, for shift-click ranges */
+  orderIndex?: number;
   isCompletedState?: WritableAtom<boolean, [boolean], void>;
   children?: React.ReactNode;
 }
 
 function TaskListItem({
   edgeIndex,
+  orderIndex,
   isCompletedState,
+  onRange,
   children,
-}: TaskItemProps) {
+}: TaskItemProps & { onRange?: RangeHandler }) {
   const [isCompleted, setIsCompleted] = isCompletedState
     ? useAtom(isCompletedState)
     : [undefined, undefined];
@@ -35,8 +42,13 @@ function TaskListItem({
           [styles.completed]: isCompleted,
         },
       )}
-      onClick={() => {
-        if (setIsCompleted) setIsCompleted(!isCompleted);
+      onClick={(ev) => {
+        if (!setIsCompleted) return;
+        if (ev.shiftKey && onRange && orderIndex !== undefined) {
+          onRange(orderIndex, !isCompleted);
+          return;
+        }
+        setIsCompleted(!isCompleted);
       }}
     >
       <div className={classNames(styles.listItemInner)}>
@@ -65,14 +77,15 @@ function TaskListItem({
 
 export interface TaskListProps {
   items?: TaskItemProps[];
+  onRange?: RangeHandler;
 }
 
-export function TaskList({ items }: TaskListProps) {
+export function TaskList({ items, onRange }: TaskListProps) {
   return (
     <ol className={classNames(styles.list)}>
       {items &&
         items.map(({ children, ...rest }, i) => (
-          <TaskListItem key={i} {...rest}>
+          <TaskListItem key={i} {...rest} onRange={onRange}>
             <span aria-hidden className={classNames(styles.bullet)}>
               {`${i + 1}`.padStart(2, "0")}.
             </span>

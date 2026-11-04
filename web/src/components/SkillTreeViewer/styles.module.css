@@ -2,37 +2,17 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
   width: 100%;
 }
 
+/* Fills whatever height the panel gives the tree. */
 .viewport {
   display: flex;
-  height: 20rem;
+  flex: 1;
+  min-height: 10rem;
   border-style: solid;
   border-width: var(--border-width);
   border-color: var(--accent-primary);
   border-radius: var(--border-radius);
-}
-
-.label {
-  text-align: center;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: var(--on-secondary);
-  min-height: var(--line-height);
-}
-
-.buttons {
-  display: flex;
-  align-items: stretch;
-  gap: var(--size-2);
-}
-
-.button {
-  display: flex;
-  justify-content: center;
-  align-content: center;
-  height: var(--line-height);
-  flex: 1;
 }

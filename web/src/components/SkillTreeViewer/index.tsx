@@ -1,7 +1,7 @@
 import { TREE_DATA_LOOKUP } from "../../state/tree";
 import type { UrlTree } from "../../state/tree/url-tree";
-import { formStyles } from "../../styles";
 import { randomId } from "../../utility";
+import { SetPager, useFollowAct } from "../SetPager";
 import { SidebarTooltip } from "../SidebarTooltip";
 import { Viewport, type ViewportProps } from "../Viewport";
 import styles from "./styles.module.css";
@@ -13,8 +13,7 @@ import {
 import classNames from "classnames";
 import type { SkillTree } from "common";
 import React, { type JSX } from "react";
-import { useEffect, useRef, useState } from "react";
-import { HiChevronLeft, HiChevronRight } from "react-icons/hi";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface SkillTreeViewerProps {
   urlTrees: UrlTree.Data[];
@@ -31,7 +30,8 @@ interface RenderData {
 
 export function SkillTreeViewer({ urlTrees }: SkillTreeViewerProps) {
   const svgDivRef = useRef<HTMLDivElement>(null);
-  const [curIndex, setCurIndex] = useState<number>(0);
+  const titles = useMemo(() => urlTrees.map((x) => x.name), [urlTrees]);
+  const [curIndex, setCurIndex] = useFollowAct(titles);
   const [renderData, setRenderData] = useState<RenderData>();
   const [styleId] = useState(() => randomId(6));
   const [tooltipNodeId, setTooltipNodeId] = useState<string | null>(null);
@@ -144,10 +144,11 @@ export function SkillTreeViewer({ urlTrees }: SkillTreeViewerProps) {
               nodeId={tooltipNodeId}
             />
           )}
+          <SetPager titles={titles} index={curIndex} onIndex={setCurIndex} />
           <div className={styles.viewport}>
             <Viewport
               intialFocus={renderData.intialFocus}
-              resizeHandling="clip"
+              resizeHandling="contain"
             >
               <style dangerouslySetInnerHTML={{ __html: renderData.style }} />
               <div
@@ -156,27 +157,6 @@ export function SkillTreeViewer({ urlTrees }: SkillTreeViewerProps) {
                 dangerouslySetInnerHTML={{ __html: renderData.svg }}
               />
             </Viewport>
-          </div>
-          <label className={classNames(styles.label)}>
-            {urlTrees.length > 0 && urlTrees[curIndex].name}
-          </label>
-          <div className={classNames(styles.buttons)}>
-            <button
-              className={classNames(formStyles.formButton, styles.button)}
-              onClick={() => {
-                if (curIndex > 0) setCurIndex(curIndex - 1);
-              }}
-            >
-              <HiChevronLeft />
-            </button>
-            <button
-              className={classNames(formStyles.formButton, styles.button)}
-              onClick={() => {
-                if (curIndex < urlTrees.length - 1) setCurIndex(curIndex + 1);
-              }}
-            >
-              <HiChevronRight />
-            </button>
           </div>
         </div>
       )}

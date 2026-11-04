@@ -1,43 +1,27 @@
 .gemLinks {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   width: 100%;
 }
 
-.label {
-  text-align: center;
-  color: var(--on-secondary);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  min-height: var(--line-height);
-}
-
-.buttons {
-  display: flex;
-  align-items: stretch;
-  gap: var(--size-2);
-}
-
-.button {
-  display: flex;
-  justify-content: center;
-  align-content: center;
-  height: var(--line-height);
-  flex: 1;
-}
-
+/* Link groups flow into as many columns as the panel is wide. */
 .gemLinkSection {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  align-items: start;
   overflow: auto;
   overscroll-behavior: contain;
-  gap: var(--size-1);
+  gap: var(--size-3);
 }
 
 .gemLinkRow {
   display: flex;
   flex-direction: column;
+  padding: var(--size-2) var(--size-3);
+  border: var(--border-width) solid var(--accent-secondary);
+  border-radius: var(--border-radius);
 }
 
 .gemLinkTitleInfo {
