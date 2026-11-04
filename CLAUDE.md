@@ -8,9 +8,11 @@ Read DESKTOP.md for how it runs, builds and pulls upstream updates.
 
 - This repo belongs to **kobayashi-maru-1**: <https://github.com/kobayashi-maru-1/poeleveling>
 - Public fork of HeartofPhos/exile-leveling, kept public on purpose.
-- `gh` on Andy's PC is signed in as AndyStout, a collaborator (write) on this repo.
-  Use it for pushes, workflow runs, artifacts and releases. Don't add or switch gh accounts.
-- Repo settings (visibility, collaborators, deletion) need kobayashi-maru-1 in a browser: ask Andy.
+- `gh` on Andy's PC holds two accounts. AndyStout (work) stays the active one; don't switch it.
+  Run gh for this repo as kobayashi-maru-1 per command:
+  `GH_TOKEN=$(gh auth token -u kobayashi-maru-1) gh <command> -R kobayashi-maru-1/poeleveling`
+  (PowerShell: `$env:GH_TOKEN = gh auth token -u kobayashi-maru-1`, then remove it after.)
+- AndyStout is not a collaborator here: keep the work account out of this repo.
 - `origin` uses `https://kobayashi-maru-1@github.com/...` so git pushes with that account's stored credential.
 - Commits: `user.name kobayashi-maru-1` is set in this clone's local git config.
 
