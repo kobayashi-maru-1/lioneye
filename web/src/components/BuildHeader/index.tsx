@@ -48,11 +48,25 @@ export function BuildHeader() {
           />
         )}
       </div>
+      {/* Your level is from the log, so it shows even when PoB's numbers can't. */}
+      {!numbersShown && characterLevel !== null && (
+        <div className={classNames(styles.numbers)}>
+          <Stat
+            label="Char lvl"
+            value={characterLevel.level}
+            colour="#d7c08d"
+          />
+        </div>
+      )}
       {numbersShown && (
         <div
           className={classNames(styles.numbers, { [styles.stale]: loading })}
         >
-          <Stat label="Level" value={characterLevel?.level} colour="#d7c08d" />
+          <Stat
+            label="Char lvl"
+            value={characterLevel?.level}
+            colour="#d7c08d"
+          />
           <Stat label="Life" value={headline.life} colour="#e05030" />
           <Stat label="ES" value={headline.es} colour="#88ffff" />
           <Stat label="Mana" value={headline.mana} colour="#7070ff" />

@@ -49,10 +49,12 @@ export function SectionHolder({ name, items, onRange }: SectionHolderProps) {
   const toggle = () => {
     const act = actRef.current;
     const bar = barRef.current;
+    // Inside: the act's top has scrolled above where its header pins.
     const inside =
       act !== null &&
       bar !== null &&
-      bar.getBoundingClientRect().top - act.getBoundingClientRect().top > 1;
+      act.getBoundingClientRect().top <
+        parseFloat(getComputedStyle(bar).top) - 2;
     setCollapsed(!collapsed);
     if (!collapsed && inside)
       requestAnimationFrame(() =>

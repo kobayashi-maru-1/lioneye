@@ -50,11 +50,12 @@ export function PageSection({
   const toggle = () => {
     const section = sectionRef.current;
     const header = headerRef.current;
+    // Inside: the panel's top has scrolled above where its header pins.
     const inside =
       section !== null &&
       header !== null &&
-      header.getBoundingClientRect().top - section.getBoundingClientRect().top >
-        1;
+      section.getBoundingClientRect().top <
+        parseFloat(getComputedStyle(header).top) - 2;
     setCollapsed(!collapsed);
     if (!collapsed && inside)
       requestAnimationFrame(() =>

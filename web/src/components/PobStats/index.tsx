@@ -1,5 +1,5 @@
 import { characterLevelAtom } from "../../state/character-level";
-import { currentActAtom } from "../../state/current-act";
+import { currentActAtom, indexForLevel } from "../../state/current-act";
 import { type MainSkillPick, mainSkillPickAtom } from "../../state/main-skill";
 import { pobAtom } from "../../state/pob";
 import { pobCodeToXml } from "../../state/pob/process";
@@ -239,10 +239,11 @@ export function usePanelSet(titles: string[], loadoutIndex: number | null) {
   // The loadout you picked (or the act picked), even before PoB has answered for it.
   const loadout = pob ? (pob.titles[pob.index] ?? "") : "";
   const act = useAtomValue(currentActAtom);
-  const level = useAtomValue(characterLevelAtom)?.level ?? "";
+  const level = useAtomValue(characterLevelAtom)?.level ?? null;
+  const levelIndex = indexForLevel(titles, level) ?? "";
   const [followIndex] = useFollowAct(titles);
-  const key = `${loadout}|${act ?? ""}|${level}|${titles.join("\n")}`;
-  // A panel pick belongs to one loadout, act and level; it's dropped when they change.
+  const key = `${loadout}|${act ?? ""}|${levelIndex}|${titles.join("\n")}`;
+  // A panel pick belongs to one loadout, act and level set; it's dropped when they change.
   const [override, setOverride] = useState<{
     key: string;
     index: number | null;

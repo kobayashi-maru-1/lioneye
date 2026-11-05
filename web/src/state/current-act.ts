@@ -59,23 +59,28 @@ export function indexForAct(titles: string[], act: number | null) {
 }
 
 /**
- * Level range a PoB set title names: "Lvl 30", "Level 12-28", "lv. 45 to 60". Open-ended
- * ("Lvl 30") runs until the next title's level.
+ * Level range a PoB set title names: "Lvl 30", "Level 12-28", "lv. 45 to 60". As with acts,
+ * a spaced dash is a separator ("Lvl 30 - 50 pts" is level 30, open-ended). Open-ended
+ * levels run until the next title's level.
  */
 export function levelRange(title: string): [number, number | null] | null {
-  const match = /\b(?:lvl|level|lv)\.?\s*(\d+)(?:\s*(?:-|–|to)\s*(\d+))?/i.exec(
-    title,
-  );
+  const match =
+    /\b(?:lvl|level|lv)\.?\s*(\d+)(?:\s*(?:-|–)(?=\d)\s*(\d+)|\s+to\s+(\d+))?/i.exec(
+      title,
+    );
   if (!match) return null;
   const start = Number(match[1]);
-  const end = match[2] === undefined ? null : Number(match[2]);
-  if (start < 1 || start > 100 || (end !== null && end < start)) return null;
+  const endText = match[2] ?? match[3];
+  let end = endText === undefined ? null : Number(endText);
+  if (start < 1 || start > 100) return null;
+  if (end !== null && (end < start || end > 100)) end = null;
   return [start, end];
 }
 
 /**
- * Index of the title for your level: the one whose range covers it, else the highest
- * starting level at or below it. Null when no title names a level (or no level yet).
+ * Index of the title for your level: the one whose range covers it, else the open-ended
+ * one with the highest starting level at or below it. Null when none fits (or no level
+ * yet): sets then follow the act.
  */
 export function indexForLevel(titles: string[], level: number | null) {
   if (level === null) return null;
@@ -83,7 +88,10 @@ export function indexForLevel(titles: string[], level: number | null) {
   for (const [index, title] of titles.entries()) {
     const range = levelRange(title);
     if (range === null || range[0] > level) continue;
-    if (range[1] !== null && level <= range[1]) return index;
+    if (range[1] !== null) {
+      if (level <= range[1]) return index;
+      continue;
+    }
     if (best === null || range[0] > best.start)
       best = { index, start: range[0] };
   }

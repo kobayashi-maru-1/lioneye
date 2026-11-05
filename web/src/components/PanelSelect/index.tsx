@@ -8,8 +8,11 @@ interface PanelSelectProps {
   label: string;
   /** Set titles; PoB colour codes and loadout links ("{a1}") are left out when shown. */
   options: string[];
+  /** The chosen index; -1 shows `placeholder`, so choosing any option (even the one it
+   * names) calls onChange — for pickers that jump rather than select. */
   value: number;
   onChange: (index: number) => void;
+  placeholder?: string;
   className?: string;
 }
 
@@ -19,17 +22,24 @@ export function PanelSelect({
   options,
   value,
   onChange,
+  placeholder,
   className,
 }: PanelSelectProps) {
+  const shown = value >= 0 ? options[value] : placeholder;
   return (
     <select
       className={classNames(styles.select, className)}
       aria-label={label}
-      title={displaySetName(stripPob(options[value] ?? ""))}
+      title={displaySetName(stripPob(shown ?? ""))}
       value={value}
       onChange={(event) => onChange(Number(event.target.value))}
       onClick={(event) => event.stopPropagation()}
     >
+      {value < 0 && (
+        <option value={-1} hidden>
+          {displaySetName(stripPob(placeholder ?? ""))}
+        </option>
+      )}
       {options.map((option, i) => (
         <option key={i} value={i}>
           {displaySetName(stripPob(option))}

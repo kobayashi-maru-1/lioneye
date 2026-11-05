@@ -74,8 +74,12 @@ function RouteSettings() {
       const route = await get(routeSelector);
       const pobCode = get(pobAtom);
       const output = [...route.sections, `pob-code:${pobCode ?? "none"}`];
-      await navigator.clipboard.writeText(JSON.stringify(output));
-      toast.success("Exported to Clipboard");
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(output));
+        toast.success("Exported to Clipboard");
+      } catch {
+        toast.error("Export failed. Try again.");
+      }
     }, []),
   );
 
@@ -106,7 +110,7 @@ function RouteSettings() {
               ?.focus()
           }
         >
-          GitHub
+          Open GitHub
         </button>
       </div>
     </div>

@@ -55,7 +55,7 @@ your PoB once in **Settings** (the ⚙ at the top right).
   Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while
   Campaign is on screen.
 - The card at the top shows the build (skill, ascendancy, PoB's level), your level from the
-  game log, its headline numbers and the **Loadout** dropdown. The loadout follows your
+  game log (**Char lvl**), its headline numbers and the **Loadout** dropdown. The loadout follows your
   level when PoB titles name levels (`Lvl 30`, `Level 12-28`), else your act (`Act 2`,
   `Act 4-6 - 50 pts`); pick another until your level or act changes. A zone's suggested
   level (`12+`) turns red while you're below it.

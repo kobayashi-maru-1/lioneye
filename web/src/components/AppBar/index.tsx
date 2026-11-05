@@ -27,7 +27,7 @@ export function AppBar() {
   const onGuide = pathname === "/";
 
   return (
-    <nav className={classNames(styles.bar)} aria-label="Sections">
+    <nav className={classNames(styles.bar)} aria-label="Main">
       {onGuide ? (
         targets.map((target) => (
           <button
@@ -51,7 +51,7 @@ export function AppBar() {
       <AutoProgressStatus />
       <button
         className={classNames(styles.button, styles.icon, {
-          [styles.active]: pathname === "/settings",
+          [styles.active]: pathname === "/settings" || pathname === "/build",
         })}
         aria-label="Settings"
         title="Settings"

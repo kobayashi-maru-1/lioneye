@@ -256,15 +256,14 @@ function ActPicker() {
     () => route.sections.map((section) => section.name),
     [route],
   );
-  const current = Math.max(
-    0,
-    names.findIndex((name) => act !== null && name === `Act ${act}`),
-  );
+  const current = names.find((name) => act !== null && name === `Act ${act}`);
+  // Shows the act you're in, but every choice jumps, including that act.
   return (
     <PanelSelect
       label="Act"
       options={names}
-      value={current}
+      value={-1}
+      placeholder={current ?? names[0]}
       onChange={(index) =>
         document
           .getElementById(`section-${names[index].replace(/\s+/g, "_")}`)

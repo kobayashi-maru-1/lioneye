@@ -15,16 +15,18 @@ import { HiChevronLeft, HiChevronRight } from "react-icons/hi";
 /**
  * Picks the set (loadout, tree or gem links) for where you are: by your level when the
  * titles name levels ("Lvl 30") and the log has shown one, else by the act you're in
- * ("Act 2"). Picking another overrides it until your level or act changes.
+ * ("Act 2"). Picking another overrides it until the set your level or act points to
+ * changes (a level-up that doesn't change it keeps your pick).
  */
 export function useFollowAct(titles: string[]) {
   const act = useAtomValue(currentActAtom);
   const level = useAtomValue(characterLevelAtom)?.level ?? null;
   const key = titles.join("\n");
-  const follow = () => indexForLevel(titles, level) ?? indexForAct(titles, act);
+  const levelIndex = indexForLevel(titles, level);
+  const follow = () => levelIndex ?? indexForAct(titles, act);
   const [state, setState] = useState(() => ({
     act,
-    level,
+    levelIndex,
     key,
     index: follow() ?? 0,
   }));
@@ -32,11 +34,15 @@ export function useFollowAct(titles: string[]) {
   // Adjusted during render rather than in an effect, so the first render with new
   // titles already has the right index (the Stats tab would otherwise calculate twice).
   let current = state;
-  if (state.act !== act || state.level !== level || state.key !== key) {
+  if (
+    state.act !== act ||
+    state.levelIndex !== levelIndex ||
+    state.key !== key
+  ) {
     const followed = follow();
     current = {
       act,
-      level,
+      levelIndex,
       key,
       index: followed ?? (state.index < titles.length ? state.index : 0),
     };

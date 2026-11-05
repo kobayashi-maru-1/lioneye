@@ -17,9 +17,11 @@ const LOG_NAMES: [&str; 2] = ["LatestClient.txt", "Client.txt"];
 const AREA_PATTERN: &str = r"Generating level \d+ area";
 /// `] : KobayashiSRS (Witch) is now level 8` — the guide follows your level.
 const LEVEL_PATTERN: &str = r"\] : .+ \(\w+\) is now level \d+";
-/// `] Merveil, the Siren: ...` — NPC and boss speech, for ticking boss kills. Chat with a
-/// channel prefix (#, $, @, %, &) is left out; the guide matches exact death lines.
-const SPEECH_PATTERN: &str = r"\] [^:#$@%&\]\s][^:\]]{0,60}: ";
+/// `] Sin: Abberath!` — speech from the speakers whose lines mark a boss death (the guide
+/// matches the exact lines; see web/src/state/boss-kills.ts). Only these speakers, so the
+/// rest of the log (half its lines look like "Name: text") isn't sent to the guide.
+const SPEECH_PATTERN: &str =
+    r"\] (?:Sin|Piety|Gravicius|Dominus|Malachai|Maligaro, the Inquisitor): ";
 /// `] : You have been permanently weakened by Kitava's ...` — Kitava's death, a system line.
 const KITAVA_PATTERN: &str = r"\] : You have been permanently weakened by Kitava";
 const PATTERNS: [&str; 4] = [AREA_PATTERN, LEVEL_PATTERN, SPEECH_PATTERN, KITAVA_PATTERN];
@@ -180,7 +182,10 @@ mod tests {
         assert!(forwarded(r#" Generating level 1 area "1_1_1" with seed 1"#));
         assert!(forwarded(" : KobayashiSRS (Witch) is now level 8"));
         assert!(forwarded(" Malachai: Why... are you so in love with Death?"));
-        assert!(forwarded(" Merveil, the Siren: The Siren's song is silenced."));
+        assert!(forwarded(" Sin: Abberath!"));
+        assert!(forwarded(" Maligaro, the Inquisitor: You have murdered... an artist..."));
+        assert!(!forwarded(" ALTERNATE TREE JEWEL: something"));
+        assert!(!forwarded(" Merveil, the Siren: This is love's true face!"));
         assert!(!forwarded(" #Global: hello"));
         assert!(!forwarded(" @From Someone: wtb"));
         assert!(!forwarded(" $Trader: selling"));

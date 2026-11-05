@@ -6,9 +6,21 @@ import { atom } from "jotai";
 /** `] : KobayashiSRS (Witch) is now level 8` (your class, or ascendancy once you have one). */
 const LEVEL_LINE = /\] : (.+) \((\w+)\) is now level (\d+)/;
 
+/** Each class's ascendancies, as the log names them after the Labyrinth. */
+const ASCENDANCIES: Record<string, string[]> = {
+  Witch: ["Necromancer", "Elementalist", "Occultist"],
+  Shadow: ["Assassin", "Trickster", "Saboteur"],
+  Ranger: ["Deadeye", "Raider", "Pathfinder", "Warden"],
+  Duelist: ["Slayer", "Gladiator", "Champion"],
+  Marauder: ["Juggernaut", "Berserker", "Chieftain"],
+  Templar: ["Inquisitor", "Hierophant", "Guardian"],
+  Scion: ["Ascendant", "Reliquarian"],
+};
+
 /**
- * The imported build's class and ascendancy, to tell your level-ups from a party
- * member's. Null without a build (then every level-up counts).
+ * The names your character can level up under: the imported build's class and its
+ * ascendancies (you may ascend before the build says which). Null without a build (then
+ * the first level-up decides).
  */
 const buildClassesAtom = atom((get) => {
   const code = get(pobAtom);
@@ -18,24 +30,31 @@ const buildClassesAtom = atom((get) => {
       pobCodeToXml(code),
       "application/xml",
     );
-    const build = doc.getElementsByTagName("Build")[0];
-    const names = [
-      build?.getAttribute("className"),
-      build?.getAttribute("ascendClassName"),
-    ].filter((name): name is string => !!name && name !== "None");
-    return names.length > 0 ? names : null;
+    const className = doc
+      .getElementsByTagName("Build")[0]
+      ?.getAttribute("className");
+    if (!className || className === "None") return null;
+    return [className, ...(ASCENDANCIES[className] ?? [])];
   } catch {
     return null;
   }
 });
 
-/** Takes a level-up line from the log; true when it was one. */
+/**
+ * Takes a level-up line from the log; true when it was one. Once a level-up is taken, only
+ * that character's count until the next import, so a party member never sets your level.
+ */
 export const levelLineAtom = atom(null, (get, set, line: string) => {
   const match = LEVEL_LINE.exec(line);
   if (!match) return false;
   const [, name, characterClass, level] = match;
-  const classes = get(buildClassesAtom);
-  if (classes !== null && !classes.includes(characterClass)) return true;
+  const current = get(characterLevelAtom);
+  if (current !== null) {
+    if (current.name !== name) return true;
+  } else {
+    const classes = get(buildClassesAtom);
+    if (classes !== null && !classes.includes(characterClass)) return true;
+  }
   set(characterLevelAtom, { level: Number(level), name });
   return true;
 });
