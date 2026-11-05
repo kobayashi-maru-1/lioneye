@@ -513,6 +513,7 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "flate2",
  "mime_guess",
  "mlua",
  "regex",

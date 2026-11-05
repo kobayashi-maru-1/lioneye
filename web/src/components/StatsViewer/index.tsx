@@ -38,7 +38,12 @@ export function StatsViewer({ code }: { code: string }) {
   );
   const stats = answer !== null && answer.xml === xml ? answer.stats : null;
   const loadouts = stats?.loadouts ?? NONE;
-  const [index, setIndex] = useFollowAct(loadouts);
+  // PoB's names carry its colour codes ("^2Act 1 - 12 pts"); match and show them without.
+  const titles = useMemo(
+    () => loadouts.map((name) => name.replace(COLOUR_CODE, "")),
+    [loadouts],
+  );
+  const [index, setIndex] = useFollowAct(titles);
   const requested = loadouts[index] ?? null;
 
   const [loading, setLoading] = useState(false);
@@ -71,7 +76,7 @@ export function StatsViewer({ code }: { code: string }) {
   return (
     <div className={classNames(styles.stats)}>
       {loadouts.length > 0 && (
-        <SetPager titles={loadouts} index={index} onIndex={setIndex} />
+        <SetPager titles={titles} index={index} onIndex={setIndex} />
       )}
       {error !== null && (
         <div className={classNames(styles.status)} title={error}>
