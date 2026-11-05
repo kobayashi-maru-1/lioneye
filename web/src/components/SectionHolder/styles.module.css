@@ -4,6 +4,10 @@
   background-color: var(--navy-deep);
   border: var(--border-width) solid var(--navy-border);
   border-radius: var(--border-radius);
+  /* Folding an act from its pinned header scrolls it to just under Campaign's header. */
+  scroll-margin-top: calc(
+    var(--navbar-height) + var(--jumpbar-height) + var(--panel-header-height)
+  );
 }
 
 .sectionbar {
@@ -26,7 +30,9 @@
 
 .header {
   width: 100%;
-  padding: var(--size-2) var(--size-4);
+  /* Fixed, so steps can scroll clear of it (TaskList scroll-margin). */
+  height: var(--actbar-height);
+  padding: 0 var(--size-4);
   color: var(--gold);
   font-size: 0.8rem;
   font-weight: var(--font-heavy);

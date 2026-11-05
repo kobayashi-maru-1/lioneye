@@ -58,8 +58,8 @@ interface ProgressRef {
 }
 
 /**
- * The guide on one page: PoB's stats on the left, and Campaign, Tree, Gems, Config,
- * Notes and Search as foldable sections, with a bar that jumps to each.
+ * The guide on one page, laid out like pob.codes: PoB's stats on the left; the header
+ * card and foldable panels (Campaign, Gems, Config, Tree, Notes, Search) on the right.
  */
 export default function RoutesContainer() {
   useAtom(scrollToActiveEdgeEffect);
@@ -287,7 +287,7 @@ function ConfigPanel() {
   return (
     <PageSection
       id="config"
-      title="Configs"
+      title="Config"
       actions={
         titles.length > 1 && (
           <PanelSelect
@@ -313,7 +313,7 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   return (
     <PageSection
       id="tree"
-      title="Passive Tree"
+      title="Tree"
       bodyClassName={styles.treeBody}
       actions={
         titles.length > 1 && (
@@ -334,7 +334,7 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
           if (!event.ctrlKey) event.stopPropagation();
         }}
       >
-        <SkillTreeViewer urlTrees={urlTrees} selectedTitle={titles[index]} />
+        <SkillTreeViewer urlTrees={urlTrees} selectedIndex={index} />
       </div>
     </PageSection>
   );

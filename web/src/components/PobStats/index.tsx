@@ -234,19 +234,30 @@ export function useLoadoutSets() {
  * the loadout or the act changes.
  */
 export function usePanelSet(titles: string[], loadoutIndex: number | null) {
-  const loadout = usePobStats()?.stats?.loadout ?? "";
+  const pob = usePobStats();
+  // The loadout you picked (or the act picked), even before PoB has answered for it.
+  const loadout = pob ? (pob.titles[pob.index] ?? "") : "";
   const act = useAtomValue(currentActAtom);
   const [followIndex] = useFollowAct(titles);
   const key = `${loadout}|${act ?? ""}|${titles.join("\n")}`;
+  // A panel pick belongs to one loadout and act; it's dropped (not kept) when they change.
   const [override, setOverride] = useState<{
     key: string;
-    index: number;
-  } | null>(null);
+    index: number | null;
+  }>({ key, index: null });
+  let current = override;
+  if (override.key !== key) {
+    current = { key, index: null };
+    setOverride(current);
+  }
   const base =
     loadoutIndex !== null && loadoutIndex >= 0 && loadoutIndex < titles.length
       ? loadoutIndex
       : followIndex;
-  const index = override?.key === key ? override.index : base;
+  const index =
+    current.index !== null && current.index < titles.length
+      ? current.index
+      : base;
   const choose = useCallback(
     (index: number) => setOverride({ key, index }),
     [key],

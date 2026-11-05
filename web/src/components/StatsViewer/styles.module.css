@@ -57,6 +57,8 @@
 
 .subheading {
   margin: var(--size-2) 0 var(--size-1);
+  padding: var(--size-3) 0 var(--size-2);
+  border-top: var(--border-width) solid #222;
   text-align: center;
   color: var(--gold);
   font-size: 0.8rem;

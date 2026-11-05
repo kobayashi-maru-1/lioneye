@@ -17,8 +17,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 interface SkillTreeViewerProps {
   urlTrees: UrlTree.Data[];
-  /** Show this tree (by title) instead of following the act; the pager then hides. */
-  selectedTitle?: string;
+  /** Show this tree (by position) instead of following the act; the pager then hides. */
+  selectedIndex?: number;
 }
 
 interface RenderData {
@@ -32,13 +32,15 @@ interface RenderData {
 
 export function SkillTreeViewer({
   urlTrees,
-  selectedTitle,
+  selectedIndex: chosenIndex,
 }: SkillTreeViewerProps) {
   const svgDivRef = useRef<HTMLDivElement>(null);
   const titles = useMemo(() => urlTrees.map((x) => x.name), [urlTrees]);
   const [followIndex, setCurIndex] = useFollowAct(titles);
   const selectedIndex =
-    selectedTitle === undefined ? -1 : titles.indexOf(selectedTitle);
+    chosenIndex !== undefined && chosenIndex >= 0 && chosenIndex < titles.length
+      ? chosenIndex
+      : -1;
   const curIndex = selectedIndex >= 0 ? selectedIndex : followIndex;
   const [renderData, setRenderData] = useState<RenderData>();
   const [styleId] = useState(() => randomId(6));

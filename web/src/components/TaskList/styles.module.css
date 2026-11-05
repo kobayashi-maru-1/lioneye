@@ -6,7 +6,11 @@
 .listItem {
   display: flex;
   width: 100%;
-  scroll-margin: calc(var(--navbar-height) * 2 + var(--jumpbar-height));
+  /* Clear of everything pinned above a step: navbar, jump bar, Campaign and act headers. */
+  scroll-margin: calc(
+    var(--navbar-height) + var(--jumpbar-height) + var(--panel-header-height) +
+      var(--actbar-height) + var(--size-3)
+  );
 }
 
 .edgeTag {

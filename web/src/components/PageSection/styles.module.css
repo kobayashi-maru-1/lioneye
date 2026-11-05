@@ -17,7 +17,7 @@
 .header {
   position: sticky;
   top: calc(var(--navbar-height) + var(--jumpbar-height));
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: var(--size-3);

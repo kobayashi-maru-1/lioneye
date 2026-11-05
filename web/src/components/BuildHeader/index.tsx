@@ -17,8 +17,10 @@ function format(value: number) {
 export function BuildHeader() {
   const pob = usePobStats();
   if (pob === null || pob.stats === null) return null;
-  const { titles, index, setIndex } = pob;
+  const { titles, index, setIndex, error, loading } = pob;
   const headline = pob.stats.headline ?? {};
+  // Never the old loadout's numbers under the new loadout's name.
+  const numbersShown = error === null;
 
   return (
     <section className={classNames(styles.header)}>
@@ -42,23 +44,27 @@ export function BuildHeader() {
           />
         )}
       </div>
-      <div className={classNames(styles.numbers)}>
-        <Stat label="Life" value={headline.life} colour="#e05030" />
-        <Stat label="ES" value={headline.es} colour="#88ffff" />
-        <Stat label="Mana" value={headline.mana} colour="#7070ff" />
-        <Stat label="eHP" value={headline.ehp} />
-        <Stat label="DPS" value={headline.dps} colour="#e8c060" />
-        <span className={classNames(styles.number)}>
-          <span className={classNames(styles.label)}>Res:</span>
-          <Resist value={headline.fire} colour="#b97123" />
-          {" / "}
-          <Resist value={headline.cold} colour="#3f6db3" />
-          {" / "}
-          <Resist value={headline.lightning} colour="#adaa47" />
-          {" / "}
-          <Resist value={headline.chaos} colour="#d02090" />
-        </span>
-      </div>
+      {numbersShown && (
+        <div
+          className={classNames(styles.numbers, { [styles.stale]: loading })}
+        >
+          <Stat label="Life" value={headline.life} colour="#e05030" />
+          <Stat label="ES" value={headline.es} colour="#88ffff" />
+          <Stat label="Mana" value={headline.mana} colour="#7070ff" />
+          <Stat label="eHP" value={headline.ehp} />
+          <Stat label="DPS" value={headline.dps} colour="#e8c060" />
+          <span className={classNames(styles.number)}>
+            <span className={classNames(styles.label)}>Res:</span>
+            <Resist value={headline.fire} colour="#b97123" />
+            {" / "}
+            <Resist value={headline.cold} colour="#3f6db3" />
+            {" / "}
+            <Resist value={headline.lightning} colour="#adaa47" />
+            {" / "}
+            <Resist value={headline.chaos} colour="#d02090" />
+          </span>
+        </div>
+      )}
     </section>
   );
 }
@@ -77,7 +83,7 @@ function Stat({
   value?: number;
   colour?: string;
 }) {
-  if (value === undefined) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return (
     <span className={classNames(styles.number)}>
       <span className={classNames(styles.label)}>{label}:</span>
@@ -91,7 +97,9 @@ function Stat({
 function Resist({ value, colour }: { value?: number; colour: string }) {
   return (
     <span className={classNames(styles.value)} style={{ color: colour }}>
-      {value === undefined ? "–" : `${format(value)}%`}
+      {typeof value === "number" && Number.isFinite(value)
+        ? `${format(value)}%`
+        : "–"}
     </span>
   );
 }

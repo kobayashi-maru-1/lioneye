@@ -32,8 +32,9 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--accent-primary);
-  font-size: 0.72rem;
+  color: #5a7090;
+  font-size: 0.68rem;
+  font-weight: var(--font-heavy);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }

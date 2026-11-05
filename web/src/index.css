@@ -31,7 +31,8 @@
   --font-heavy: 600;
   /* Fractional pixel rounding varies between browsers, lower-bound picked based on Firefox */
   --navbar-height: 2.625rem;
-  --actbar-height: 2.75rem;
+  /* A Campaign act's sticky header (SectionHolder), under the Campaign panel's. */
+  --actbar-height: 2rem;
   /* The guide page's sticky section bar (JumpBar), under the navbar. */
   --jumpbar-height: 2.25rem;
   /* A guide panel's sticky header (PageSection), under the jump bar. */

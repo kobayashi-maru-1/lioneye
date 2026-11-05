@@ -18,12 +18,12 @@
 .title {
   min-width: 0;
   color: var(--gold);
-  font-size: 1.15rem;
-  font-weight: 500;
+  font-size: 1.1rem;
+  font-weight: var(--font-heavy);
 }
 
 .level {
-  color: var(--on-primary);
+  color: #8f8f8f;
 }
 
 .loadout {
@@ -38,6 +38,12 @@
   column-gap: var(--size-5);
   row-gap: var(--size-2);
   font-size: 0.95rem;
+  transition: opacity 0.15s;
+}
+
+/* While the new loadout calculates. */
+.stale {
+  opacity: 0.5;
 }
 
 .number {

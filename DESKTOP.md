@@ -39,19 +39,26 @@ your PoB once on the **Build** page.
   zones you skip stay open. After a trip to town, the zone you came from ticks when you leave
   town for another zone, so selling mid-zone ticks nothing. Portalling back into a zone or
   returning to one you just left changes nothing. Click a circle to set where you are by hand.
-- An act folds to one line once all its steps are done. Click its header to open it again.
-- The page has foldable sections: **Campaign**, **Tree**, **Gems**, **Config**, **Notes**
-  and **Search**. The bar under the menu jumps to each (opening it if folded) and shows the
-  auto-progress pill. Auto-progress only scrolls to your zone while Campaign is on screen.
-  Folded sections stay folded next time. On the tree, Ctrl+scroll zooms and dragging pans.
-  **Config** lists only the options the loadout changes from PoB's defaults.
-- The left column shows Path of Building's sidebar (life, DPS and the rest) for the loadout
-  that matches your act, matched by PoB titles such as `Act 2` or `Act 4-6 - 50 pts`, and
-  calculated by the PoB release bundled in the exe. The arrows pick another loadout until you
-  reach the next act. Tree, Gems and Config show that loadout's sets.
-- Under the loadout, pick the main skill as in PoB. The pick is remembered by skill gem, so
-  the same skill stays selected in every loadout that has it; loadouts without it show PoB's
-  own pick, tagged **PoB pick**. Importing a build clears the pick.
+- The page is laid out like a pob.codes build page. Panels fold from their gold headers:
+  **Campaign**, **Gems**, **Config**, **Tree**, **Notes** and **Search**. A panel's header
+  (and the act header inside Campaign) stays pinned while you're in that panel.
+- An act folds to one line once all its steps are done, and Campaign folds once the last
+  act is done. Nothing reopens on its own: a folded act or panel stays folded until you
+  click it (or use the jump bar). Importing a build opens Campaign again.
+- The bar under the menu jumps to each panel and shows the auto-progress pill.
+  Auto-progress only scrolls to your zone while Campaign is on screen.
+- The card at the top shows the build (skill, ascendancy, level), its headline numbers and
+  the **Loadout** dropdown. The loadout follows your act, matched by PoB titles such as
+  `Act 2` or `Act 4-6 - 50 pts`; pick another until you reach the next act.
+- The left column shows Path of Building's sidebar (life, DPS and the rest) for that
+  loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
+  there's more; scroll it with the wheel.
+- Gems, Config and Tree show the loadout's sets; each has its own dropdown to look at
+  another set until the loadout or act changes. **Config** lists only the options a set
+  changes from PoB's defaults. On the tree, Ctrl+scroll zooms and dragging pans.
+- At the top of the left column, pick the main skill as in PoB. The pick is remembered by
+  skill gem, so the same skill stays selected in every loadout that has it; loadouts without
+  it show PoB's own pick, tagged **PoB pick**. Importing a build clears the pick.
 - The first stats after starting take a few seconds while PoB loads; it unloads after
   10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`. A build with a
   timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub the first time.

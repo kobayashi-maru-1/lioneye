@@ -2,8 +2,8 @@
 .jumpBar {
   position: sticky;
   top: var(--navbar-height);
-  /* Under the navbar's menu (3), over the pinned panel and act headers (1). */
-  z-index: 2;
+  /* Stack: navbar 4, jump bar 3, pinned panel header 2, pinned act header 1. */
+  z-index: 3;
   display: flex;
   align-items: stretch;
   flex-wrap: nowrap;

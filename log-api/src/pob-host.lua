@@ -579,8 +579,14 @@ local function headline()
 	local output = build.calcsTab.mainOutput or {}
 	local minion = build.calcsTab.mainEnv and build.calcsTab.mainEnv.minion
 	local minionOutput = minion and minion.output or {}
+	-- Only real numbers: PoB uses math.huge for "can't be killed" (eHP), and JSON has no infinity.
+	local function finite(value)
+		return type(value) == "number" and value == value and value ~= math.huge
+			and value ~= -math.huge and value or nil
+	end
 	local function positive(value)
-		return type(value) == "number" and value > 0 and value or nil
+		value = finite(value)
+		return value and value > 0 and value or nil
 	end
 	local _, active = mainActive()
 	local spec = build.spec
@@ -589,17 +595,17 @@ local function headline()
 		class = spec and spec.curClassName,
 		ascendancy = spec and spec.curAscendClassId ~= 0 and spec.curAscendClassName or nil,
 		level = build.characterLevel,
-		life = output.Life,
-		es = output.EnergyShield,
-		mana = output.Mana,
-		ehp = output.TotalEHP,
+		life = finite(output.Life),
+		es = finite(output.EnergyShield),
+		mana = finite(output.Mana),
+		ehp = finite(output.TotalEHP),
 		-- The player's damage, else the minion's (for minion builds).
 		dps = positive(output.FullDPS) or positive(output.CombinedDPS)
 			or positive(minionOutput.FullDPS) or positive(minionOutput.CombinedDPS) or 0,
-		fire = output.FireResist,
-		cold = output.ColdResist,
-		lightning = output.LightningResist,
-		chaos = output.ChaosResist,
+		fire = finite(output.FireResist),
+		cold = finite(output.ColdResist),
+		lightning = finite(output.LightningResist),
+		chaos = finite(output.ChaosResist),
 	}
 end
 
