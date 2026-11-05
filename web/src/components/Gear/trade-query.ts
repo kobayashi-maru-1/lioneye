@@ -1,10 +1,13 @@
 // Builds official trade site searches for PoB items (ported from the companion design's
 // trade-query.js). Uniques: name + base. Magic, normal, rare: base or slot category plus
-// explicit mods, each with a minimum of about 80% of the PoB value.
+// explicit mods, each with a minimum of a share of the PoB value (TradeOptions).
 import type { GearItem } from "../PobStats";
-import type { TradeItemsData, TradeStatsData } from "./data";
-
-const SHARE = 0.8;
+import {
+  DEFAULT_TRADE_OPTIONS,
+  type TradeItemsData,
+  type TradeOptions,
+  type TradeStatsData,
+} from "./data";
 
 export interface TradeIndex {
   /** Per stat group ("explicit", "crafted"...): stat text → trade ids with that text. */
@@ -95,9 +98,9 @@ const DRAWBACK =
 const NUM = /[+-]?\d+(?:\.\d+)?/g;
 
 // Small whole numbers (gem levels, flask charges) stay exact.
-function minOf(value: number) {
+function minOf(value: number, share: number) {
   if (Number.isInteger(value) && value < 5) return value;
-  const min = value * SHARE;
+  const min = value * share;
   return Number.isInteger(value)
     ? Math.floor(min)
     : Math.floor(min * 100) / 100;
@@ -115,6 +118,7 @@ function statFilter(
   crafted: boolean,
   slot: string,
   base: string,
+  share: number,
 ): StatFilter | null {
   const nums = (text.match(NUM) ?? []).map(Number);
   const template = text.replace(NUM, (s) => (s[0] === "+" ? "+#" : "#"));
@@ -146,7 +150,9 @@ function statFilter(
           const average =
             (nums.reduce((a, b) => a + b, 0) / nums.length) * sign;
           value =
-            average >= 0 ? { min: minOf(average) } : { max: -minOf(-average) };
+            average >= 0
+              ? { min: minOf(average, share) }
+              : { max: -minOf(-average, share) };
         }
         return { ids, value };
       }
@@ -155,14 +161,26 @@ function statFilter(
   return null;
 }
 
-/** The trade site search URL for an item in a slot, in a league. */
-export function tradeUrl(
+/** A trade search for something like an item: its URL and how many of its mods it uses. */
+export interface TradeSearch {
+  url: string;
+  /** Mods the search filters on, of the item's explicit mods (rares and magic items). */
+  matched: number;
+  total: number;
+}
+
+export function tradeSearch(
   index: TradeIndex,
   item: GearItem,
   slot: string,
   league: string,
-) {
-  const query: Record<string, unknown> = { status: { option: "online" } };
+  options: TradeOptions = DEFAULT_TRADE_OPTIONS,
+): TradeSearch {
+  let matched = 0;
+  let total = 0;
+  const query: Record<string, unknown> = {
+    status: { option: options.status },
+  };
   // "Foulborn X" is a variant of the unique X on the trade site.
   const name = (item.name ?? "").replace(/^Foulborn /, "");
   if (item.rarity === "UNIQUE" || item.rarity === "RELIC") {
@@ -197,9 +215,18 @@ export function tradeUrl(
     const anyOf: unknown[] = [];
     const seen = new Set<string>();
     for (const line of item.explicit) {
-      const filter = statFilter(index, line.text, !!line.crafted, slot, base);
+      total++;
+      const filter = statFilter(
+        index,
+        line.text,
+        !!line.crafted,
+        slot,
+        base,
+        options.valueShare,
+      );
       if (!filter || seen.has(filter.ids[0])) continue;
       seen.add(filter.ids[0]);
+      matched++;
       const filters = filter.ids.map((id) =>
         filter.value ? { id, value: filter.value } : { id },
       );
@@ -208,10 +235,56 @@ export function tradeUrl(
       else anyOf.push({ type: "count", value: { min: 1 }, filters });
     }
     const stats: unknown[] = [];
-    if (and.length) stats.push({ type: "and", filters: and });
+    // A share of the mods is enough ("min % of total mods"); all of them at 100%.
+    const need = Math.max(1, Math.ceil(and.length * options.modShare));
+    if (and.length && need < and.length)
+      stats.push({ type: "count", value: { min: need }, filters: and });
+    else if (and.length) stats.push({ type: "and", filters: and });
     stats.push(...anyOf);
     if (stats.length) query.stats = stats;
   }
+  return { url: searchUrl(league, query), matched, total };
+}
+
+/** The trade site search URL for an item in a slot, in a league. */
+export function tradeUrl(
+  index: TradeIndex,
+  item: GearItem,
+  slot: string,
+  league: string,
+  options?: TradeOptions,
+) {
+  return tradeSearch(index, item, slot, league, options).url;
+}
+
+/** A trade search for a gem at (at least) the build's level and quality. */
+export function gemTradeUrl(
+  name: string,
+  level: number | undefined,
+  quality: number | undefined,
+  league: string,
+  options: TradeOptions = DEFAULT_TRADE_OPTIONS,
+) {
+  const misc: Record<string, unknown> = {};
+  if (level !== undefined && level > 1) misc.gem_level = { min: level };
+  if (quality !== undefined && quality > 0) misc.quality = { min: quality };
+  const query: Record<string, unknown> = {
+    status: { option: options.status },
+    type: name,
+    filters: {
+      type_filters: { filters: { category: { option: "gem" } } },
+      ...(Object.keys(misc).length ? { misc_filters: { filters: misc } } : {}),
+    },
+  };
+  return searchUrl(league, query);
+}
+
+function searchUrl(league: string, query: Record<string, unknown>) {
   const q = JSON.stringify({ query, sort: { price: "asc" } });
   return `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}?q=${encodeURIComponent(q)}`;
+}
+
+/** The PoE wiki's search for a name (lands on its page when there is one). */
+export function wikiUrl(name: string) {
+  return `https://www.poewiki.net/wiki/Special:Search?search=${encodeURIComponent(name)}`;
 }

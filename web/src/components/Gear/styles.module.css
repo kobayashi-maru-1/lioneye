@@ -68,6 +68,7 @@
 /* An item: pob.codes navy tile, framed in its rarity colour. */
 .tile {
   position: relative;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -102,62 +103,11 @@
   border-bottom-right-radius: var(--border-radius);
 }
 
-/* Trade: a small corner button, clearer on hover. */
-.trade {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  padding: var(--size-1);
-  font-size: 0.7rem;
-  color: var(--gold) !important;
-  background-color: rgba(0, 0, 0, 0.6);
-  border-top-left-radius: var(--border-radius);
-  opacity: 0.6;
-}
-
-.tile:hover .trade {
-  opacity: 1;
-}
-
-.mods {
-  display: flex;
-  flex-direction: column;
-  gap: var(--size-1);
-  font-size: 0.85rem;
-  color: #8888ff;
-}
-
-.meta {
-  color: var(--accent-primary);
-}
-
-.mod {
-  color: #8888ff;
-}
-
-.crafted {
-  color: #b4b4ff;
-}
-
-.fractured {
-  color: #a29162;
-}
-
-.enchant {
-  color: #b8daf2;
-}
-
-.corrupted {
-  color: #d20000;
-}
-
-.base {
-  display: block;
-  color: var(--on-secondary);
-  font-weight: 400;
-}
-
 .status {
   margin: 0;
+}
+
+/* The tile whose tooltip is open. */
+.open {
+  box-shadow: 0 0 0 2px var(--gold);
 }

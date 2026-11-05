@@ -1,0 +1,116 @@
+/* The game's item tooltip: black body, coloured banner, small-caps centred text. */
+.tooltip {
+  --banner: #1d1d1d;
+  --edge: #6a6a6a;
+  --title: #c8c8c8;
+  width: 22rem;
+  max-width: 90vw;
+  background-color: rgba(0, 0, 0, 0.94);
+  border: var(--border-width) solid var(--edge);
+  font-variant: small-caps;
+  text-align: center;
+  user-select: text;
+}
+
+.normal {
+  --banner: #2a2a2a;
+  --edge: #8a8a8a;
+  --title: #c8c8c8;
+}
+
+.magic {
+  --banner: #1a1d3c;
+  --edge: #5c5fb5;
+  --title: #8888ff;
+}
+
+.rare {
+  --banner: #3a3412;
+  --edge: #b5a240;
+  --title: #ffff77;
+}
+
+.unique {
+  --banner: #3a2210;
+  --edge: #af6025;
+  --title: #af6025;
+}
+
+.gem {
+  --banner: #13302c;
+  --edge: #1ba29b;
+  --title: #1ba29b;
+}
+
+.header {
+  padding: var(--size-2) var(--size-4);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--banner) 70%, #000),
+    var(--banner) 45%,
+    color-mix(in srgb, var(--banner) 70%, #000)
+  );
+  border-bottom: var(--border-width) solid var(--edge);
+}
+
+.name {
+  color: var(--title);
+  font-size: 1.05rem;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+}
+
+/* A thin rule fading at both ends, in the banner's colour. */
+.sep {
+  height: 1px;
+  margin: 0 var(--size-4);
+  background: linear-gradient(90deg, transparent, var(--edge), transparent);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: var(--size-3) var(--size-4);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.property {
+  color: #7f7f7f;
+}
+
+.value {
+  color: #e8e8e8;
+}
+
+/* Mod lines. */
+.mod {
+  color: #8888ff;
+}
+
+.crafted {
+  color: #b4b4ff;
+}
+
+.fractured {
+  color: #a29162;
+}
+
+.enchant {
+  color: #b8daf2;
+}
+
+.corrupted {
+  color: #d20000;
+}
+
+/* Gem description and quest lines. */
+.description {
+  color: #1ba29b;
+  font-style: italic;
+}
+
+.note {
+  color: #7f7f7f;
+}

@@ -1,4 +1,3 @@
-import { persistentAtom } from "../../state";
 import { PageSection } from "../PageSection";
 import { PanelSelect } from "../PanelSelect";
 import {
@@ -7,17 +6,27 @@ import {
   usePanelSet,
   usePobStats,
 } from "../PobStats";
-import { SidebarTooltip } from "../SidebarTooltip";
-import { type Art, useArt, useLeagues, useTradeData } from "./data";
+import { Popover, PopoverAction, usePopover } from "../Popover";
+import {
+  PoeTooltip,
+  type TooltipKind,
+  TooltipProperty,
+  tooltipStyles,
+} from "../PoeTooltip";
+import {
+  type Art,
+  type TradeOptions,
+  useArt,
+  useTradeData,
+  useTradeLeague,
+  useTradeOptions,
+} from "./data";
 import styles from "./styles.module.css";
-import { tradeIndex, tradeUrl } from "./trade-query";
+import { type TradeIndex, tradeIndex, tradeUrl } from "./trade-query";
 import classNames from "classnames";
-import { useAtom } from "jotai";
-import { useMemo, useState } from "react";
-import { FaBalanceScale } from "react-icons/fa";
-
-/** The trade league for Trade buttons and item art; null: the current challenge league. */
-const gearLeagueAtom = persistentAtom<string | null>("gear-league", null, 0);
+import { useMemo } from "react";
+import { FaBalanceScale, FaRegClipboard } from "react-icons/fa";
+import { toast } from "react-toastify";
 
 /** Paper-doll slots and their grid areas (styles.doll). */
 const DOLL: Record<string, string> = {
@@ -34,7 +43,7 @@ const DOLL: Record<string, string> = {
   Belt: "belt",
 };
 
-const RARITY_COLOURS: Record<string, string> = {
+export const RARITY_COLOURS: Record<string, string> = {
   NORMAL: "#c8c8c8",
   MAGIC: "#8888ff",
   RARE: "#ffff77",
@@ -42,12 +51,20 @@ const RARITY_COLOURS: Record<string, string> = {
   RELIC: "#60c060",
 };
 
+const TOOLTIP_KIND: Record<string, TooltipKind> = {
+  NORMAL: "normal",
+  MAGIC: "magic",
+  RARE: "rare",
+  UNIQUE: "unique",
+  RELIC: "unique",
+};
+
 /** PoB names new rares "New Item"; the base says more. */
-function itemName(item: GearItem) {
+export function itemName(item: GearItem) {
   return item.name === "New Item" && item.base ? item.base : item.name;
 }
 
-function artFor(item: GearItem, art: Art | undefined) {
+export function artFor(item: GearItem, art: Art | undefined) {
   if (!art) return undefined;
   if (item.rarity === "UNIQUE" || item.rarity === "RELIC") {
     // "Foulborn X" uses X's art.
@@ -58,10 +75,20 @@ function artFor(item: GearItem, art: Art | undefined) {
   return base ? art.bases.get(base) : undefined;
 }
 
+/** Copies an item's text (PoB's Ctrl+C format) to the clipboard. */
+export async function copyItem(item: GearItem) {
+  try {
+    await navigator.clipboard.writeText(item.raw ?? itemName(item));
+    toast.success("Item copied");
+  } catch {
+    toast.error("Copy failed. Try again.");
+  }
+}
+
 /**
  * pob.codes-style Gear panel: the loadout's item set as a paper doll, with flasks, the
  * other slots (weapon swap, abyssal sockets, grafts) and the tree's jewels. Hover an item
- * for its mods; Trade opens a trade site search for something like it.
+ * for its tooltip; click to pin it and use Copy or Trade.
  */
 export function GearPanel() {
   const stats = usePobStats()?.stats ?? null;
@@ -75,13 +102,7 @@ export function GearPanel() {
     titles,
     lists ? lists.active.items - 1 : null,
   );
-
-  const leagues = useLeagues();
-  const [savedLeague, setLeague] = useAtom(gearLeagueAtom);
-  const league =
-    savedLeague !== null && (!leagues || leagues.includes(savedLeague))
-      ? savedLeague
-      : (leagues?.[0] ?? null);
+  const { league, leagues, setLeague } = useTradeLeague();
 
   return (
     <PageSection
@@ -130,6 +151,11 @@ interface GearViewProps {
   league: string | null;
 }
 
+interface Shown {
+  item: GearItem;
+  slot: string;
+}
+
 function GearView({ gear, setIndex, treeIndex, league }: GearViewProps) {
   const art = useArt(league);
   const trade = useTradeData();
@@ -137,7 +163,8 @@ function GearView({ gear, setIndex, treeIndex, league }: GearViewProps) {
     () => (trade ? tradeIndex(trade.stats, trade.items) : null),
     [trade],
   );
-  const [hovered, setHovered] = useState<GearItem | null>(null);
+  const popover = usePopover<Shown>();
+  const [options] = useTradeOptions();
 
   const slots = gear.sets[setIndex]?.slots ?? [];
   const doll = slots.filter((s) => DOLL[s.slot] !== undefined);
@@ -147,22 +174,26 @@ function GearView({ gear, setIndex, treeIndex, league }: GearViewProps) {
   );
   const jewels = gear.treeJewels[treeIndex] ?? [];
 
-  const tile = (slot: string, itemId: number, size: string, label?: string) => {
+  const tile = (
+    slot: string,
+    itemId: number,
+    size?: string,
+    label?: string,
+  ) => {
     const item = gear.items[String(itemId)];
     if (!item) return null;
+    const key = `${slot}-${itemId}`;
     return (
       <ItemTile
-        key={`${slot}-${itemId}`}
+        key={key}
         slot={slot}
         item={item}
         size={size}
         label={label}
         art={artFor(item, art)}
-        tradeHref={
-          index && league ? tradeUrl(index, item, slot, league) : undefined
-        }
         area={DOLL[slot]}
-        onHover={setHovered}
+        open={popover.state?.key === key}
+        handlers={popover.bind({ item, slot }, key)}
       />
     );
   };
@@ -170,11 +201,29 @@ function GearView({ gear, setIndex, treeIndex, league }: GearViewProps) {
   if (slots.length === 0 && jewels.length === 0)
     return <p className={classNames(styles.status)}>No items</p>;
 
+  const shown = popover.state;
   return (
     <div className={classNames(styles.gear)}>
-      {hovered && <ItemTooltip item={hovered} />}
+      {shown && (
+        <Popover
+          anchor={shown.anchor}
+          pinned={shown.pinned}
+          onClose={popover.close}
+          actions={
+            <ItemActions
+              item={shown.value.item}
+              slot={shown.value.slot}
+              index={index}
+              league={league}
+              options={options}
+            />
+          }
+        >
+          <ItemTooltip item={shown.value.item} />
+        </Popover>
+      )}
       <div className={classNames(styles.doll)}>
-        {doll.map((s) => tile(s.slot, s.item, styles[DOLL[s.slot]]))}
+        {doll.map((s) => tile(s.slot, s.item))}
       </div>
       {flasks.length > 0 && (
         <div className={classNames(styles.row)}>
@@ -194,6 +243,37 @@ function GearView({ gear, setIndex, treeIndex, league }: GearViewProps) {
         </Group>
       )}
     </div>
+  );
+}
+
+/** Copy and Trade, under a pinned item tooltip. */
+export function ItemActions({
+  item,
+  slot,
+  index,
+  league,
+  options,
+}: {
+  item: GearItem;
+  slot: string;
+  index: TradeIndex | null;
+  league: string | null;
+  options?: TradeOptions;
+}) {
+  return (
+    <>
+      <PopoverAction label="Copy item" onClick={() => copyItem(item)}>
+        <FaRegClipboard aria-hidden />
+      </PopoverAction>
+      {index && league && (
+        <PopoverAction
+          label="Trade search"
+          href={tradeUrl(index, item, slot, league, options)}
+        >
+          <FaBalanceScale aria-hidden />
+        </PopoverAction>
+      )}
+    </>
   );
 }
 
@@ -232,37 +312,36 @@ function Group({
 interface ItemTileProps {
   slot: string;
   item: GearItem;
-  /** Size class from styles (w1, helm, flask, small...). */
-  size: string;
+  /** Size class (flask, small); paper-doll tiles take their grid area's size. */
+  size?: string;
   label?: string;
   art?: string;
-  tradeHref?: string;
   area?: string;
-  onHover: (item: GearItem | null) => void;
+  open: boolean;
+  handlers: ReturnType<ReturnType<typeof usePopover<Shown>>["bind"]>;
 }
 
+/** An item: its art (or name) on a navy tile framed in its rarity colour. */
 function ItemTile({
   slot,
   item,
   size,
   label,
   art,
-  tradeHref,
   area,
-  onHover,
+  open,
+  handlers,
 }: ItemTileProps) {
   const name = itemName(item);
   return (
-    <div
-      className={classNames(styles.tile, size)}
+    <button
+      className={classNames(styles.tile, size, { [styles.open]: open })}
       style={{
         gridArea: area,
         borderColor: RARITY_COLOURS[item.rarity ?? "NORMAL"],
       }}
-      onPointerEnter={() => onHover(item)}
-      onPointerLeave={() => onHover(null)}
-      role="group"
       aria-label={`${slot}: ${name}`}
+      {...handlers}
     >
       {art ? (
         <img className={classNames(styles.art)} src={art} alt="" />
@@ -275,66 +354,65 @@ function ItemTile({
         </span>
       )}
       {label && <span className={classNames(styles.label)}>{label}</span>}
-      {tradeHref && (
-        <a
-          className={classNames(styles.trade)}
-          href={tradeHref}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`Trade ${name}`}
-          title="Trade"
-        >
-          <FaBalanceScale aria-hidden />
-        </a>
-      )}
-    </div>
+    </button>
   );
 }
 
-/** The item's name, base and mods, as in game. */
-function ItemTooltip({ item }: { item: GearItem }) {
-  const colour = RARITY_COLOURS[item.rarity ?? "NORMAL"];
+/** The item as the game shows it: banner, quality, sockets, requirements, mods. */
+export function ItemTooltip({ item }: { item: GearItem }) {
+  const name = itemName(item);
+  const showBase = item.base && item.base !== name;
+  const requires = item.requires;
+  const requireParts = requires
+    ? [
+        requires.level && `Level ${requires.level}`,
+        requires.str && `${requires.str} Str`,
+        requires.dex && `${requires.dex} Dex`,
+        requires.int && `${requires.int} Int`,
+      ].filter(Boolean)
+    : [];
   const lines = (list: GearItem["explicit"], kind: string) =>
     list.map((line, i) => (
       <div
         key={`${kind}${i}`}
-        className={classNames(styles.mod, {
-          [styles.crafted]: line.crafted,
-          [styles.fractured]: line.fractured,
-          [styles.enchant]: kind === "enchant",
+        className={classNames(tooltipStyles.mod, {
+          [tooltipStyles.crafted]: line.crafted,
+          [tooltipStyles.fractured]: line.fractured,
+          [tooltipStyles.enchant]: kind === "enchant",
         })}
       >
         {line.text}
       </div>
     ));
   return (
-    <SidebarTooltip
-      title={
-        <span style={{ color: colour }}>
-          {itemName(item)}
-          {item.base && item.base !== itemName(item) && (
-            <span className={classNames(styles.base)}>{item.base}</span>
-          )}
-        </span>
-      }
+    <PoeTooltip
+      kind={TOOLTIP_KIND[item.rarity ?? "NORMAL"] ?? "normal"}
+      name={name}
+      base={showBase ? item.base : undefined}
     >
-      <div className={classNames(styles.mods)}>
-        {(item.quality ?? 0) > 0 && (
-          <div className={classNames(styles.meta)}>
-            Quality: +{item.quality}%
-          </div>
-        )}
-        {item.sockets && (
-          <div className={classNames(styles.meta)}>Sockets: {item.sockets}</div>
-        )}
-        {lines(item.enchant, "enchant")}
-        {lines(item.implicit, "implicit")}
-        {item.implicit.length > 0 && item.explicit.length > 0 && <hr />}
-        {lines(item.explicit, "explicit")}
-        {item.corrupted && (
-          <div className={classNames(styles.corrupted)}>Corrupted</div>
-        )}
-      </div>
-    </SidebarTooltip>
+      {((item.quality ?? 0) > 0 || item.sockets) && (
+        <>
+          {(item.quality ?? 0) > 0 && (
+            <TooltipProperty label="Quality:" value={`+${item.quality}%`} />
+          )}
+          {item.sockets && (
+            <TooltipProperty label="Sockets:" value={item.sockets} />
+          )}
+        </>
+      )}
+      {requireParts.length > 0 && (
+        <TooltipProperty label="Requires" value={requireParts.join(", ")} />
+      )}
+      {item.enchant.length > 0 && lines(item.enchant, "enchant")}
+      {item.implicit.length > 0 && lines(item.implicit, "implicit")}
+      {(item.explicit.length > 0 || item.corrupted) && (
+        <>
+          {lines(item.explicit, "explicit")}
+          {item.corrupted && (
+            <div className={classNames(tooltipStyles.corrupted)}>Corrupted</div>
+          )}
+        </>
+      )}
+    </PoeTooltip>
   );
 }

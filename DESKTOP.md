@@ -44,7 +44,8 @@ your PoB once in **Settings** (the ⚙ at the top right).
   Others (Hillock, Merveil, Brutus and most Act 1-4 bosses) log nothing when they die;
   their step ticks when you leave the zone.
 - The page is laid out like a pob.codes build page. Panels fold from their gold header bars
-  (click anywhere on the bar): **Campaign**, **Gear**, **Gems**, **Config**, **Tree**, **Notes** and
+  (click anywhere on the bar): **Campaign**, **Gear**, **Gems**, **Trade List**, **Config**,
+  **Tree**, **Notes** and
   **Search**. A panel's header (and the act header inside Campaign) stays pinned while
   you're in that panel. Folding a panel or act while you're inside it lands on the next one.
 - An act folds to one line once all its steps are done, and Campaign folds once the last
@@ -63,13 +64,21 @@ your PoB once in **Settings** (the ⚙ at the top right).
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.
 - **Gear** shows the loadout's item set as a paper doll (with flasks, weapon swap, abyssal
-  sockets, grafts and the jewels in the tree's taken sockets). Item art comes from
-  poe.ninja for the league you pick; bases nobody trades (most leveling bases, flasks) show
-  their name instead. The trade site's stat and item lists drive the Trade buttons. The exe
-  fetches both with curl.exe and caches them in `%LOCALAPPDATA%exile-levelingcache` for
+  sockets, grafts and the jewels in the tree's taken sockets). Base art comes from RePoE's
+  base item list (every base, flasks included) and unique art from poe.ninja for the league
+  you pick. The trade site's stat and item lists drive the trade searches. The exe fetches
+  all of them with curl.exe and caches them in `%LOCALAPPDATA%\exile-leveling\cache` for
   12 hours (the cached copy is used offline).
-  Hover an item for its mods; its corner button opens a trade search for something like it
-  (rare mods at about 80% of their values).
+- Hover an item or gem for its in-game tooltip; click it to pin the tooltip and use its
+  buttons: items have **Copy** (the item text, as PoB's Ctrl+C) and **Trade**; gems have
+  **W** (the wiki) and **Trade**. Escape, a click elsewhere or a second click unpins it.
+- **Trade List** has a trade search for every item of the loadout's gear and every gem of
+  its skill set, as on pob.codes. Pick the league, the search type (**Instant Buyout**,
+  **In Person**, **Any**), **Min mods** (the share of a rare's mods a listing must have)
+  and **Min values** (each mod's minimum, as a share of yours). The settings apply to the
+  tooltip Trade buttons too.
+- Gem rows show level/quality from the PoB code. Builds imported before this version show
+  them after you import the build again.
 - Gear, Gems, Config and Tree show the loadout's sets; each has its own dropdown to look at
   another set until the loadout or act changes. **Config** lists only the options a set
   changes from PoB's defaults. On the tree, Ctrl+scroll zooms and dragging pans.

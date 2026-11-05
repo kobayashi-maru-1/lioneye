@@ -1,3 +1,5 @@
+import { persistentAtom } from "../../state";
+import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 
 /**
@@ -76,7 +78,20 @@ const NINJA_TYPES = [
   "BaseType",
 ];
 
-/** Item art from poe.ninja: unique name → icon, base type → icon. */
+/** RePoE's base item list (base_items.json), keyed by metadata id. */
+type RepoeBases = Record<
+  string,
+  {
+    name?: string;
+    release_state?: string;
+    visual_identity?: { dds_file?: string };
+  }
+>;
+
+/** GGG's image server; a base's art is its .dds path as .png under it. */
+const POE_IMAGES = "https://web.poecdn.com/image/";
+
+/** Item art: unique name → icon (poe.ninja), base type → icon (RePoE, else poe.ninja). */
 export interface Art {
   uniques: Map<string, string>;
   bases: Map<string, string>;
@@ -91,7 +106,7 @@ export function useArt(league: string | null) {
             NINJA_TYPES.map((type) =>
               getData<NinjaData>("ninja", { league, type }),
             ),
-          ).then((results) => {
+          ).then(async (results) => {
             const art: Art = { uniques: new Map(), bases: new Map() };
             // Plain bases win over influenced ones (their art has no influence marks).
             const plain = new Set<string>();
@@ -112,6 +127,23 @@ export function useArt(league: string | null) {
                 if (isPlain) plain.add(key);
               }
             });
+            // Every base's own art (flasks and leveling bases too), from the game's art
+            // paths on GGG's image server. poe.ninja's base art stays as the fallback.
+            const repoe = await getData<RepoeBases>("repoe-bases").catch(
+              () => null,
+            );
+            const fromRepoe = new Set<string>();
+            for (const base of Object.values(repoe ?? {})) {
+              const dds = base.visual_identity?.dds_file;
+              if (!base.name || !dds || base.release_state === "unreleased")
+                continue;
+              if (fromRepoe.has(base.name)) continue;
+              fromRepoe.add(base.name);
+              art.bases.set(
+                base.name,
+                `${POE_IMAGES}${dds.replace(/\.dds$/i, ".png")}`,
+              );
+            }
             return art;
           }),
     `art|${league}`,
@@ -136,4 +168,44 @@ export function useTradeData() {
       ]).then(([stats, items]) => ({ stats, items })),
     "trade",
   );
+}
+
+/** The trade league for Trade buttons, item art and the Trade List; saved per browser. */
+const tradeLeagueAtom = persistentAtom<string | null>("gear-league", null, 0);
+
+/** The league in use (yours if it's still listed, else the current challenge league). */
+export function useTradeLeague() {
+  const leagues = useLeagues();
+  const [saved, setLeague] = useAtom(tradeLeagueAtom);
+  const league =
+    saved !== null && (!leagues || leagues.includes(saved))
+      ? saved
+      : (leagues?.[0] ?? null);
+  return { league, leagues, setLeague };
+}
+
+/** Trade search settings, shared by every Trade button and the Trade List. */
+export interface TradeOptions {
+  /** "securable": instant buyout; "online": in person; "any": any listing. */
+  status: "securable" | "online" | "any";
+  /** Each mod's minimum, as a share of the build's value (0.5-1). */
+  valueShare: number;
+  /** Share of an item's matched mods a listing must have (0.5-1). */
+  modShare: number;
+}
+
+export const DEFAULT_TRADE_OPTIONS: TradeOptions = {
+  status: "securable",
+  valueShare: 0.8,
+  modShare: 0.7,
+};
+
+const tradeOptionsAtom = persistentAtom<TradeOptions>(
+  "trade-options",
+  DEFAULT_TRADE_OPTIONS,
+  0,
+);
+
+export function useTradeOptions() {
+  return useAtom(tradeOptionsAtom);
 }

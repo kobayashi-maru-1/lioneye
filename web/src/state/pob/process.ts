@@ -78,10 +78,20 @@ function processSkills(
 
     let primaryGemIds: string[] = [];
     let secondaryGemIds: string[] = [];
+    // The level and quality PoB sets for each gem in this group.
+    const gemProps = new Map<string, { level?: number; quality?: number }>();
+    const number = (value: string | null) =>
+      value !== null && value !== "" && !isNaN(Number(value))
+        ? Number(value)
+        : undefined;
     for (const gemElement of gemElements) {
       const attribute = gemElement.attributes.getNamedItem("gemId");
       if (attribute) {
         const gemId = MapGemId(attribute.value);
+        gemProps.set(gemId, {
+          level: number(gemElement.getAttribute("level")),
+          quality: number(gemElement.getAttribute("quality")),
+        });
         const note = cleanPobText(
           recentEmptySkillLabel || parentTitle || skillLabel || "",
         );
@@ -110,20 +120,23 @@ function processSkills(
       gemLinks.push({
         title: gemLinkTitle,
         label: skillLabel ? cleanPobText(skillLabel) : undefined,
-        primaryGems: primaryGemIds.map((x) =>
-          gemIdToGemLink(x, characterClass),
-        ),
-        secondaryGems: secondaryGemIds.map((x) =>
-          gemIdToGemLink(x, characterClass),
-        ),
+        primaryGems: primaryGemIds.map((x) => ({
+          ...gemIdToGemLink(x, characterClass),
+          ...gemProps.get(x),
+        })),
+        secondaryGems: secondaryGemIds.map((x) => ({
+          ...gemIdToGemLink(x, characterClass),
+          ...gemProps.get(x),
+        })),
       });
     else if (secondaryGemIds.length > 0)
       gemLinks.push({
         title: gemLinkTitle,
         label: skillLabel ? cleanPobText(skillLabel) : undefined,
-        primaryGems: secondaryGemIds.map((x) =>
-          gemIdToGemLink(x, characterClass),
-        ),
+        primaryGems: secondaryGemIds.map((x) => ({
+          ...gemIdToGemLink(x, characterClass),
+          ...gemProps.get(x),
+        })),
         secondaryGems: [],
       });
   }

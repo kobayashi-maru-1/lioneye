@@ -118,6 +118,9 @@ export namespace RouteData {
   export interface GemLink {
     id: GameData.Gem["id"];
     quests: { questId: GameData.Quest["id"]; rewardOfferId: string }[];
+    /** Level and quality the PoB build sets for this gem. */
+    level?: number;
+    quality?: number;
   }
 }
 

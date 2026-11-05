@@ -1,6 +1,7 @@
 //! Public game data the Gear panel needs, fetched for the guide (the page can't call
 //! these sites itself) and cached on disk: the trade site's leagues, stat list and item
-//! list (for Trade buttons) and poe.ninja's item lists (for item art).
+//! list (for Trade buttons), poe.ninja's item lists (unique art) and RePoE's base item
+//! list (base art).
 
 use std::{
     fs,
@@ -31,6 +32,8 @@ pub enum Source {
     TradeLeagues,
     TradeStats,
     TradeItems,
+    /// RePoE's base item list: each base's art path on GGG's image server.
+    RepoeBases,
     Ninja { league: String, kind: String },
 }
 
@@ -41,6 +44,7 @@ impl Source {
             "trade-leagues" => Some(Source::TradeLeagues),
             "trade-stats" => Some(Source::TradeStats),
             "trade-items" => Some(Source::TradeItems),
+            "repoe-bases" => Some(Source::RepoeBases),
             "ninja" => {
                 let league = league.filter(|l| is_league(l))?;
                 let kind = kind.filter(|k| NINJA_TYPES.contains(k))?;
@@ -58,6 +62,7 @@ impl Source {
             Source::TradeLeagues => "https://www.pathofexile.com/api/trade/data/leagues".into(),
             Source::TradeStats => "https://www.pathofexile.com/api/trade/data/stats".into(),
             Source::TradeItems => "https://www.pathofexile.com/api/trade/data/items".into(),
+            Source::RepoeBases => "https://repoe-fork.github.io/base_items.json".into(),
             Source::Ninja { league, kind } => format!(
                 "https://poe.ninja/poe1/api/economy/stash/current/item/overview?league={}&type={kind}",
                 league.replace(' ', "%20")
@@ -70,6 +75,7 @@ impl Source {
             Source::TradeLeagues => "trade-leagues.json".into(),
             Source::TradeStats => "trade-stats.json".into(),
             Source::TradeItems => "trade-items.json".into(),
+            Source::RepoeBases => "repoe-bases.json".into(),
             Source::Ninja { league, kind } => {
                 format!("ninja-{}-{kind}.json", league.replace(' ', "+"))
             }
@@ -176,6 +182,7 @@ mod tests {
     #[test]
     fn only_known_sources_and_safe_leagues() {
         assert!(Source::parse("trade-stats", None, None).is_some());
+        assert!(Source::parse("repoe-bases", None, None).is_some());
         assert!(Source::parse("ninja", Some("Hardcore Mirage"), Some("BaseType")).is_some());
         assert!(Source::parse("ninja", Some("Mirage&x=1"), Some("BaseType")).is_none());
         assert!(Source::parse("ninja", Some("Mirage"), Some("Currency")).is_none());

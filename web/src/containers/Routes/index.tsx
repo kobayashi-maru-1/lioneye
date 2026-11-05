@@ -24,6 +24,7 @@ import { SearchStrings } from "../../components/SearchStrings";
 import { SectionHolder } from "../../components/SectionHolder";
 import { SkillTreeViewer } from "../../components/SkillTreeViewer";
 import { StatsViewer } from "../../components/StatsViewer";
+import { TradeListPanel } from "../../components/TradeList";
 import type { TaskListProps } from "../../components/TaskList";
 import { currentActAtom } from "../../state/current-act";
 import { gemLinksSelector } from "../../state/gem-links";
@@ -205,6 +206,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
       { id: "campaign", label: "Campaign" },
       ...(showStats ? [{ id: "gear", label: "Gear" }] : []),
       ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
+      ...(showStats ? [{ id: "trade", label: "Trade" }] : []),
       ...(showStats ? [{ id: "config", label: "Config" }] : []),
       ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
       ...(notes !== null ? [{ id: "notes", label: "Notes" }] : []),
@@ -238,6 +240,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
               {gemLinks.length > 0 && <GemsPanel gemLinks={gemLinks} />}
             </div>
           )}
+          {showStats && <TradeListPanel />}
           {showStats && <ConfigPanel />}
           {urlTrees.length > 0 && <TreePanel urlTrees={urlTrees} />}
           {notes !== null && (

@@ -1,0 +1,147 @@
+/* pob.codes Trade List: settings on top, gear and gem searches side by side. */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--size-3) var(--size-5);
+  margin-bottom: var(--size-4);
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-1);
+}
+
+.controlLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--size-3);
+  color: var(--gold);
+  font-size: 0.75rem;
+  font-weight: var(--font-heavy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.slider {
+  width: 12rem;
+}
+
+.slider input {
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.sliderValue {
+  color: var(--on-secondary);
+}
+
+.lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+  align-items: start;
+  gap: var(--size-4);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.listTitle {
+  margin-bottom: var(--size-2);
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: var(--font-heavy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  padding: var(--size-2) 0;
+  border-bottom: var(--border-width) solid var(--panel-border);
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+}
+
+.icon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: var(--font-heavy);
+}
+
+.slot {
+  color: var(--gold);
+}
+
+.gemName {
+  color: var(--gold);
+}
+
+.sub {
+  font-size: 0.8rem;
+  color: var(--accent-primary);
+}
+
+/* The Wiki and Copy buttons: small navy squares, as on pob.codes. */
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.9rem;
+  height: 1.9rem;
+  font-weight: var(--font-heavy);
+  color: var(--on-secondary) !important;
+  background-color: #141a28;
+  border: var(--border-width) solid #4a5a7a;
+  border-radius: var(--border-radius);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.search {
+  flex: none;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.9rem;
+  font-weight: var(--font-heavy);
+  color: #dad5cd !important;
+  background-color: #1c1a17;
+  border: var(--border-width) solid #3d372f;
+  border-radius: var(--border-radius);
+  text-decoration: none;
+}
+
+.search:hover,
+.iconButton:hover {
+  filter: brightness(1.25);
+}
+
+.empty {
+  margin: 0;
+}

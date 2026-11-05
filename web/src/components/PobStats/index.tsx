@@ -102,6 +102,10 @@ export interface GearItem {
   /** "R-G-B B": a dash links sockets, a space separates groups. */
   sockets?: string;
   corrupted?: boolean;
+  /** What the item requires (attributes after its mods). */
+  requires?: { level?: number; str?: number; dex?: number; int?: number };
+  /** The item as text (Ctrl+C format), for Copy. */
+  raw?: string;
   enchant: ItemLine[];
   implicit: ItemLine[];
   explicit: ItemLine[];
@@ -354,6 +358,11 @@ function gearData(gear: Partial<Gear>): Gear {
   for (const [id, item] of Object.entries(raw)) {
     items[id] = {
       ...item,
+      // PoB's JSON writes an empty table as [].
+      requires:
+        item.requires && !Array.isArray(item.requires)
+          ? item.requires
+          : undefined,
       enchant: list(item.enchant),
       implicit: list(item.implicit),
       explicit: list(item.explicit),

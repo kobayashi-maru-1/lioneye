@@ -1,12 +1,16 @@
+import { useTradeLeague, useTradeOptions } from "../Gear/data";
+import { gemTradeUrl, wikiUrl } from "../Gear/trade-query";
 import { GemCost } from "../GemCost";
 import { InlineFakeBlock } from "../InlineFakeBlock";
+import { PoeTooltip, TooltipProperty, tooltipStyles } from "../PoeTooltip";
+import { Popover, PopoverAction, usePopover } from "../Popover";
 import { SetPager, useFollowAct } from "../SetPager";
-import { SidebarTooltip } from "../SidebarTooltip";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { Data, type RouteData } from "common";
-import React, { type JSX } from "react";
-import { useMemo, useState } from "react";
+import React from "react";
+import { useMemo } from "react";
+import { FaBalanceScale } from "react-icons/fa";
 import { MdCircle } from "react-icons/md";
 import flattenChildren from "react-keyed-flatten-children";
 
@@ -26,22 +30,55 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
   const selectedIndex =
     selectedTitle === undefined ? -1 : gemSections.indexOf(selectedTitle);
   const curIndex = selectedIndex >= 0 ? selectedIndex : followIndex;
-  const [tooltipGemLink, setTooltipGemLink] =
-    useState<RouteData.GemLink | null>(null);
+  // pob.codes-style: hover a gem for its tooltip; click to pin it (Wiki and Trade).
+  const popover = usePopover<RouteData.GemLink>();
+  const { league } = useTradeLeague();
+  const [options] = useTradeOptions();
 
   const activeGemLinks: RouteData.GemLinkGroup[] = gemLinks.filter(
     (link) => link.title === gemSections[curIndex],
   );
+  const shown = popover.state;
+  const shownGem = shown ? Data.Gems[shown.value.id] : undefined;
   return (
     <div className={classNames(styles.gemLinks)}>
-      {tooltipGemLink && <GemTooltip gemLink={tooltipGemLink} />}
+      {shown && shownGem && (
+        <Popover
+          anchor={shown.anchor}
+          pinned={shown.pinned}
+          onClose={popover.close}
+          actions={
+            <>
+              <PopoverAction label="Wiki" href={wikiUrl(shownGem.name)}>
+                W
+              </PopoverAction>
+              {league && (
+                <PopoverAction
+                  label="Trade search"
+                  href={gemTradeUrl(
+                    shownGem.name,
+                    shown.value.level,
+                    shown.value.quality,
+                    league,
+                    options,
+                  )}
+                >
+                  <FaBalanceScale aria-hidden />
+                </PopoverAction>
+              )}
+            </>
+          }
+        >
+          <GemTooltip gemLink={shown.value} />
+        </Popover>
+      )}
       {selectedIndex < 0 && (
         <SetPager titles={gemSections} index={curIndex} onIndex={setCurIndex} />
       )}
       {activeGemLinks.length > 0 && (
         <div className={classNames(styles.gemLinkSection)}>
           {flattenChildren(
-            activeGemLinks.map(({ label, primaryGems, secondaryGems }) => (
+            activeGemLinks.map(({ label, primaryGems, secondaryGems }, g) => (
               <>
                 <div className={classNames(styles.gemLinkRow)}>
                   {label && (
@@ -53,22 +90,18 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
                     </div>
                   )}
                   {flattenChildren(
-                    primaryGems.map((gem) => (
-                      <GemLink
-                        gemLink={gem}
-                        isPrimary={true}
-                        onTooltip={setTooltipGemLink}
-                      />
-                    )),
-                  )}
-                  {flattenChildren(
-                    secondaryGems.map((gem) => (
-                      <GemLink
-                        gemLink={gem}
-                        isPrimary={false}
-                        onTooltip={setTooltipGemLink}
-                      />
-                    )),
+                    [...primaryGems, ...secondaryGems].map((gem, i) => {
+                      const key = `${g}-${i}-${gem.id}`;
+                      return (
+                        <GemLink
+                          key={key}
+                          gemLink={gem}
+                          isPrimary={i < primaryGems.length}
+                          open={popover.state?.key === key}
+                          handlers={popover.bind(gem, key)}
+                        />
+                      );
+                    }),
                   )}
                 </div>
               </>
@@ -83,27 +116,44 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
 interface GemLinkProps {
   gemLink: RouteData.GemLink;
   isPrimary: boolean;
-  onTooltip: (gemlink: RouteData.GemLink | null) => void;
+  open: boolean;
+  handlers: ReturnType<
+    ReturnType<typeof usePopover<RouteData.GemLink>>["bind"]
+  >;
 }
 
-function GemLink({ gemLink, isPrimary, onTooltip }: GemLinkProps) {
+function GemLink({ gemLink, isPrimary, open, handlers }: GemLinkProps) {
   const gem = Data.Gems[gemLink.id];
+  const levelQuality =
+    gemLink.level !== undefined
+      ? `${gemLink.level}/${gemLink.quality ?? 0}`
+      : undefined;
   return (
-    <div
-      className={isPrimary ? styles.gemPrimary : styles.gemSecondary}
-      onPointerEnter={() => {
-        onTooltip(gemLink);
-      }}
-      onPointerLeave={() => {
-        onTooltip(null);
-      }}
+    <button
+      className={classNames(
+        styles.gemLink,
+        isPrimary ? styles.gemPrimary : styles.gemSecondary,
+        { [styles.open]: open },
+      )}
+      aria-label={gem.name}
+      {...handlers}
     >
-      <MdCircle
-        color={Data.GemColours[gem.primary_attribute]}
-        className={classNames("inlineIcon")}
-      />
-      <span>{gem.name}</span>
-    </div>
+      <span>
+        <MdCircle
+          color={Data.GemColours[gem.primary_attribute]}
+          className={classNames("inlineIcon")}
+        />
+        {gem.name}
+      </span>
+      {levelQuality && (
+        <span
+          className={classNames(styles.levelQuality)}
+          title="Level / quality"
+        >
+          {levelQuality}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -111,40 +161,44 @@ interface GemTooltipProps {
   gemLink: RouteData.GemLink;
 }
 
+/** The gem as an in-game tooltip, with where to get it while leveling. */
 function GemTooltip({ gemLink }: GemTooltipProps) {
   const gem = Data.Gems[gemLink.id];
 
   return (
-    <SidebarTooltip
-      title={
-        <div className={classNames(styles.gemLinkTitleInfo)}>
-          <span>
-            <MdCircle
-              color={Data.GemColours[gem.primary_attribute]}
-              className={classNames("inlineIcon")}
-            />
-            {gem.name}
-          </span>
-          <InlineFakeBlock child={<GemCost gem={gem} />} />
+    <PoeTooltip kind="gem" name={gem.name}>
+      <>
+        {gemLink.level !== undefined && (
+          <TooltipProperty label="Level:" value={gemLink.level} />
+        )}
+        {(gemLink.quality ?? 0) > 0 && (
+          <TooltipProperty label="Quality:" value={`+${gemLink.quality}%`} />
+        )}
+        <TooltipProperty
+          label="Cost:"
+          value={<InlineFakeBlock child={<GemCost gem={gem} />} />}
+        />
+      </>
+      {gemLink.quests.length > 0 && (
+        <div className={classNames(styles.gemLinkQuestInfo)}>
+          {gemLink.quests.flatMap((x, i) => {
+            const quest = Data.Quests[x.questId];
+            const npc =
+              quest.reward_offers[x.rewardOfferId]?.vendor[gem.id]?.npc;
+            return (
+              <React.Fragment key={i}>
+                <span className={classNames(tooltipStyles.description)}>
+                  {quest.name}
+                </span>
+                <span>{npc}</span>
+                <span className={classNames(tooltipStyles.note)}>
+                  Act {quest.act}
+                </span>
+              </React.Fragment>
+            );
+          })}
         </div>
-      }
-    >
-      <div className={classNames(styles.gemLinkQuestInfo)}>
-        {gemLink.quests.flatMap<JSX.Element>((x, i) => {
-          const quest = Data.Quests[x.questId];
-          const npc = quest.reward_offers[x.rewardOfferId]?.vendor[gem.id]?.npc;
-          const text = (
-            <React.Fragment key={i}>
-              {i !== 0 && <hr className={classNames(styles.questSeperator)} />}
-              <span>{quest.name}</span>
-              <span>{npc}</span>
-              <span>Act {quest.act}</span>
-            </React.Fragment>
-          );
-
-          return text;
-        })}
-      </div>
-    </SidebarTooltip>
+      )}
+    </PoeTooltip>
   );
 }

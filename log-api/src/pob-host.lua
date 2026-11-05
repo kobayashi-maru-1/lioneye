@@ -650,6 +650,15 @@ local function itemData(item)
 		level = item.itemLevel,
 		sockets = #sockets > 0 and table.concat(sockets) or nil,
 		corrupted = item.corrupted or nil,
+		-- What PoB's item tooltip shows under "Requires" (attributes after mods).
+		requires = {
+			level = (item.requirements.level or 0) > 0 and item.requirements.level or nil,
+			str = (item.requirements.strMod or 0) > 0 and item.requirements.strMod or nil,
+			dex = (item.requirements.dexMod or 0) > 0 and item.requirements.dexMod or nil,
+			int = (item.requirements.intMod or 0) > 0 and item.requirements.intMod or nil,
+		},
+		-- The item as text (Ctrl+C format), for the guide's Copy button.
+		raw = item:BuildRaw(),
 		enchant = lines(item.enchantModLines),
 		implicit = lines(item.implicitModLines),
 		explicit = lines(item.explicitModLines),

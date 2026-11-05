@@ -62,3 +62,28 @@
 .gemSecondary {
   margin-left: var(--size-4);
 }
+
+/* A gem row: a button (hover for its tooltip, click to pin it), level/quality on the right. */
+.gemLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-3);
+  width: 100%;
+  padding: 0 var(--size-1);
+  text-align: left;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.gemLink:hover,
+.open {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.levelQuality {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--accent-primary);
+}
