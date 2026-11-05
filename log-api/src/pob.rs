@@ -20,6 +20,8 @@ use tracing::{debug, error, info, warn};
 static ARCHIVE: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/pob/pob.zip"));
 const VERSION: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/pob/version.txt"));
 const HOST: &str = include_str!("pob-host.lua");
+/// Path to a pob-host.lua to use instead of the built-in one (development only).
+const HOST_OVERRIDE: &str = "EXILE_LEVELING_POB_HOST";
 /// Frees PoB's memory (a few hundred MB) when the guide hasn't asked for stats in this long.
 const IDLE: Duration = Duration::from_secs(10 * 60);
 
@@ -114,6 +116,14 @@ impl Pob {
     fn load() -> Result<Pob, String> {
         let started = Instant::now();
         let dir = unpack()?;
+        // For working on pob-host.lua without rebuilding the exe.
+        let host = match std::env::var_os(HOST_OVERRIDE) {
+            Some(path) => {
+                info!("Using {} from {}", HOST_OVERRIDE, PathBuf::from(&path).display());
+                fs::read_to_string(&path).map_err(|err| format!("Couldn't read {HOST_OVERRIDE}: {err}"))?
+            }
+            None => HOST.to_string(),
+        };
         // PoB is our own bundled code and needs the full standard library (debug, jit, bit).
         let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL, LuaOptions::new()) };
         let setup = || -> mlua::Result<Function> {
@@ -126,7 +136,7 @@ impl Pob {
                     Ok(())
                 })?,
             )?;
-            lua.load(HOST).set_name("pob-host").exec()?;
+            lua.load(host.as_str()).set_name("pob-host").exec()?;
             globals.get::<Function>("host_stats")
         };
         let stats = setup().map_err(|err| err.to_string())?;

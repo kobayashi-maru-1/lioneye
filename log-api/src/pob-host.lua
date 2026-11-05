@@ -30,6 +30,8 @@ os.remove = function(path) return raw.remove(abs(path)) end
 os.rename = function(from, to) return raw.rename(abs(from), abs(to)) end
 -- No console to read from.
 io.read = function() return nil end
+-- The standalone interpreter's command-line table; PoB reads arg[1] as a build link to open.
+arg = {}
 
 local lastLine = ""
 print = function(...)
