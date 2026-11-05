@@ -6,7 +6,10 @@ http://127.0.0.1:6754 and opens it in a borderless Edge app window.
 
 ## Run
 
-1. Start `exile-leveling.exe`. A console window shows what it's doing; close it to stop.
+1. Start `exile-leveling.exe`. It runs in the tray (by the clock), with no console window.
+   Click the icon or pick **Open** to bring the guide back; pick **Quit** to stop.
+   The icon's tooltip shows **Waiting** or **Auto**. The log is at
+   `%LOCALAPPDATA%\exile-leveling\exile-leveling.log`; started from a terminal, it also prints there.
 2. The guide opens in an Edge app window. Drag it to the monitor you want; Edge
    remembers its size and place next time.
 3. Start Path of Exile. The pill at the top right of the panel turns green (**Auto**)

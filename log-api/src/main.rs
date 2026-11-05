@@ -1,3 +1,6 @@
+// No console window on Windows: the app lives in the tray (see tray.rs).
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 use std::{net::SocketAddr, path::PathBuf, process::ExitCode, time::Duration};
 
 use clap::{Parser, ValueEnum};
@@ -6,6 +9,8 @@ use tracing::{error, info, warn};
 
 mod log_reader;
 mod server;
+#[cfg(windows)]
+mod tray;
 mod watcher;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
@@ -35,24 +40,59 @@ struct Args {
     browser: Browser,
 }
 
-#[tokio::main]
-async fn main() -> ExitCode {
-    let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .with_ansi(false)
-        .with_writer(non_blocking)
-        .init();
+fn main() -> ExitCode {
+    // Started from a terminal: print there. Double-clicked: no console at all.
+    let console = attach_parent_console();
+    let _log_guards = init_logging(console);
 
     let args = Args::parse();
 
-    let addr: SocketAddr = match args.address.parse() {
-        Ok(addr) => addr,
-        Err(err) => {
-            error!("Bad --address {}: {}", args.address, err);
-            return fail();
-        }
+    let runtime = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+        Ok(runtime) => runtime,
+        Err(err) => return fail(console, &format!("Could not start: {err}")),
     };
+
+    let (listener, url) = match runtime.block_on(listen(&args)) {
+        Ok(Some(found)) => found,
+        Ok(None) => return ExitCode::SUCCESS,
+        Err(msg) => return fail(console, &msg),
+    };
+
+    info!("Guide: {}", url);
+    info!("Log: {}", log_file().display());
+
+    let (lines_tx, _) = broadcast::channel::<String>(256);
+    let (status_tx, status_rx) = watch::channel(watcher::Status::Waiting);
+    let state = server::AppState {
+        lines: lines_tx.clone(),
+        status: status_rx.clone(),
+    };
+
+    open_browser(args.browser, &url);
+
+    // Server and watcher run on the runtime's threads; the main thread runs the tray.
+    let heart_beat = Duration::from_secs(args.heart_beat.max(1));
+    let log_path = args.log_path.clone();
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    runtime.spawn(async move {
+        let res = tokio::select! {
+            res = server::serve(listener, state) => res,
+            res = watcher::run(log_path, heart_beat, lines_tx, status_tx) => res,
+        };
+        let _ = done_tx.send(res.map_err(|err| err.to_string()));
+    });
+
+    let code = wait(&args, &url, console, status_rx, done_rx);
+    runtime.shutdown_timeout(Duration::from_secs(1));
+    code
+}
+
+/// Binds the address. `Ok(None)` means another copy is already running and was brought up instead.
+async fn listen(args: &Args) -> Result<Option<(tokio::net::TcpListener, String)>, String> {
+    let addr: SocketAddr = args
+        .address
+        .parse()
+        .map_err(|err| format!("Bad --address {}: {}", args.address, err))?;
     // 0.0.0.0 / [::] listen everywhere but can't be opened or connected to; use loopback for those.
     let local = if addr.ip().is_unspecified() {
         let ip: std::net::IpAddr = if addr.is_ipv4() {
@@ -66,69 +106,155 @@ async fn main() -> ExitCode {
     };
     let url = format!("http://{}/", local);
 
-    let listener = match tokio::net::TcpListener::bind(addr).await {
-        Ok(listener) => listener,
+    match tokio::net::TcpListener::bind(addr).await {
+        Ok(listener) => Ok(Some((listener, url))),
         Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => {
             if already_running(local).await {
                 info!("Already running on {}, opening it", url);
                 open_browser(args.browser, &url);
-                return ExitCode::SUCCESS;
+                return Ok(None);
             }
-            error!(
+            Err(format!(
                 "Another program is using {}. Close it (an old exile-log-api, for example) or pass --address with another port.",
                 addr
-            );
-            return fail();
+            ))
         }
+        Err(err) => Err(format!(
+            "Could not listen on {}: {}. Try --address with another port.",
+            addr, err
+        )),
+    }
+}
+
+/// Runs until Quit in the tray, or until the server or watcher stops.
+#[cfg(windows)]
+fn wait(
+    args: &Args,
+    url: &str,
+    console: bool,
+    status: watch::Receiver<watcher::Status>,
+    done: std::sync::mpsc::Receiver<Result<(), String>>,
+) -> ExitCode {
+    // Open from the tray always shows a window, even with --browser none.
+    let browser = if args.browser == Browser::None { Browser::Edge } else { args.browser };
+    let (stopped_tx, stopped_rx) = std::sync::mpsc::channel::<()>();
+    let (result_tx, result_rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    // Forward the server result so the tray loop wakes up when it stops.
+    std::thread::spawn(move || {
+        let res = done.recv().unwrap_or(Ok(()));
+        let _ = result_tx.send(res);
+        let _ = stopped_tx.send(());
+    });
+
+    info!("Running in the tray. Quit from its menu.");
+    match tray::run(status, stopped_rx, || open_browser(browser, url)) {
+        Ok(tray::Exit::Quit) => ExitCode::SUCCESS,
+        Ok(tray::Exit::Stopped) => match result_rx.try_recv() {
+            Ok(Err(msg)) => fail(console, &msg),
+            _ => ExitCode::SUCCESS,
+        },
         Err(err) => {
-            error!(
-                "Could not listen on {}: {}. Try --address with another port.",
-                addr, err
-            );
-            return fail();
-        }
-    };
-
-    info!("Guide: {}", url);
-    info!("Close this window to stop the guide and auto-progress.");
-
-    let (lines_tx, _) = broadcast::channel::<String>(256);
-    let (status_tx, status_rx) = watch::channel(watcher::Status::Waiting);
-
-    let state = server::AppState {
-        lines: lines_tx.clone(),
-        status: status_rx,
-    };
-
-    open_browser(args.browser, &url);
-
-    let heart_beat = Duration::from_secs(args.heart_beat.max(1));
-    let res = tokio::select! {
-        res = server::serve(listener, state) => res,
-        res = watcher::run(args.log_path, heart_beat, lines_tx, status_tx) => res,
-    };
-
-    match res {
-        Ok(_) => ExitCode::SUCCESS,
-        Err(err) => {
-            error!("{}", err);
-            fail()
+            // No tray (rare): keep serving until the server stops, as before.
+            warn!("Tray icon unavailable ({err}). End exile-leveling.exe in Task Manager to stop.");
+            match result_rx.recv() {
+                Ok(Err(msg)) => fail(console, &msg),
+                _ => ExitCode::SUCCESS,
+            }
         }
     }
 }
 
-/// Keeps the console open on an error when the exe was double-clicked, so the message can be read.
-fn fail() -> ExitCode {
-    use std::io::{IsTerminal, Write};
-    if std::io::stdin().is_terminal() {
-        // tracing writes through a background thread; give it a moment to flush.
-        std::thread::sleep(Duration::from_millis(200));
-        print!("Press Enter to close...");
-        let _ = std::io::stdout().flush();
-        let _ = std::io::stdin().read_line(&mut String::new());
+#[cfg(not(windows))]
+fn wait(
+    _args: &Args,
+    _url: &str,
+    console: bool,
+    _status: watch::Receiver<watcher::Status>,
+    done: std::sync::mpsc::Receiver<Result<(), String>>,
+) -> ExitCode {
+    info!("Press Ctrl+C to stop.");
+    match done.recv() {
+        Ok(Err(msg)) => fail(console, &msg),
+        _ => ExitCode::SUCCESS,
+    }
+}
+
+/// Logs the error and, with no console to show it, puts it in a message box.
+fn fail(console: bool, msg: &str) -> ExitCode {
+    error!("{}", msg);
+    if !console {
+        show_error(msg);
     }
     ExitCode::FAILURE
 }
+
+/// `%LOCALAPPDATA%\exile-leveling\exile-leveling.log` (or the temp folder), replaced on each start.
+fn log_file() -> PathBuf {
+    let base = std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    base.join("exile-leveling").join("exile-leveling.log")
+}
+
+fn init_logging(console: bool) -> Vec<tracing_appender::non_blocking::WorkerGuard> {
+    use tracing_subscriber::fmt::writer::{BoxMakeWriter, MakeWriterExt};
+
+    let mut guards = Vec::new();
+    let file = {
+        let path = log_file();
+        path.parent()
+            .and_then(|dir| std::fs::create_dir_all(dir).ok())
+            .and_then(|_| std::fs::File::create(&path).ok())
+    };
+    let file_writer = file.map(|file| {
+        let (writer, guard) = tracing_appender::non_blocking(file);
+        guards.push(guard);
+        writer
+    });
+    let out_writer = console.then(|| {
+        let (writer, guard) = tracing_appender::non_blocking(std::io::stdout());
+        guards.push(guard);
+        writer
+    });
+
+    let writer = match (file_writer, out_writer) {
+        (Some(file), Some(out)) => BoxMakeWriter::new(file.and(out)),
+        (Some(file), None) => BoxMakeWriter::new(file),
+        (None, Some(out)) => BoxMakeWriter::new(out),
+        (None, None) => BoxMakeWriter::new(std::io::sink),
+    };
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_ansi(false)
+        .with_writer(writer)
+        .init();
+    guards
+}
+
+#[cfg(windows)]
+fn attach_parent_console() -> bool {
+    use windows_sys::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
+    unsafe { AttachConsole(ATTACH_PARENT_PROCESS) != 0 }
+}
+
+#[cfg(not(windows))]
+fn attach_parent_console() -> bool {
+    true
+}
+
+#[cfg(windows)]
+fn show_error(msg: &str) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW};
+    let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+    let text = wide(msg);
+    let title = wide("Exile Leveling");
+    unsafe {
+        MessageBoxW(std::ptr::null_mut(), text.as_ptr(), title.as_ptr(), MB_OK | MB_ICONERROR);
+    }
+}
+
+#[cfg(not(windows))]
+fn show_error(_msg: &str) {}
 
 /// True when the program on `addr` is another copy of this exe.
 async fn already_running(addr: SocketAddr) -> bool {
