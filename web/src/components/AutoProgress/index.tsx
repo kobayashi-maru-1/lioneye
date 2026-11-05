@@ -2,6 +2,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect } from "react";
 import { activeEdgeAtom } from "../../state/route";
 import { autoProgressAtom } from "../../state/auto-progress";
+import { levelLineAtom } from "../../state/level-lines";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
 import classNames from "classnames";
 import styles from "./styles.module.css";
@@ -11,6 +12,7 @@ const AUTO_PROGRESS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${
 
 export function useAutoProgress() {
   const write = useSetAtom(activeEdgeAtom);
+  const takeLevelLine = useSetAtom(levelLineAtom);
   const setState = useSetAtom(autoProgressAtom);
 
   const { readyState } = useWebSocket({
@@ -28,6 +30,8 @@ export function useAutoProgress() {
         );
         return;
       }
+      // Level-ups set your level; anything else (zone changes) moves the route.
+      if (takeLevelLine(event.data)) return;
       write(event.data);
     },
   });

@@ -15,6 +15,7 @@
 
 /* Pinned under the jump bar while the panel's content scrolls past. */
 .header {
+  cursor: pointer;
   position: sticky;
   top: calc(var(--navbar-height) + var(--jumpbar-height));
   z-index: 2;

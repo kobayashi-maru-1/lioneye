@@ -1,7 +1,9 @@
+import { characterLevelAtom } from "../../state/character-level";
 import { PanelSelect } from "../PanelSelect";
 import { type Headline, usePobStats } from "../PobStats";
 import styles from "./styles.module.css";
 import classNames from "classnames";
+import { useAtomValue } from "jotai";
 
 /** Whole numbers from 100 up, one decimal below, with thousands separators. */
 function format(value: number) {
@@ -16,6 +18,8 @@ function format(value: number) {
  */
 export function BuildHeader() {
   const pob = usePobStats();
+  // Your level from the game log; the title keeps the level PoB calculates at.
+  const characterLevel = useAtomValue(characterLevelAtom);
   if (pob === null || pob.stats === null) return null;
   const { titles, index, setIndex, error, loading } = pob;
   const headline = pob.stats.headline ?? {};
@@ -48,6 +52,7 @@ export function BuildHeader() {
         <div
           className={classNames(styles.numbers, { [styles.stale]: loading })}
         >
+          <Stat label="Level" value={characterLevel?.level} colour="#d7c08d" />
           <Stat label="Life" value={headline.life} colour="#e05030" />
           <Stat label="ES" value={headline.es} colour="#88ffff" />
           <Stat label="Mana" value={headline.mana} colour="#7070ff" />

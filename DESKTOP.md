@@ -28,7 +28,7 @@ Running the exe again while it's already open brings its window to the front.
 
 Progress, your imported build and layout are saved in Edge for
 `127.0.0.1:6754`. Builds imported on the hosted site don't carry over, so import
-your PoB once on the **Build** page.
+your PoB once in **Settings** (the ⚙ at the top right).
 
 ## Using the guide
 
@@ -39,17 +39,22 @@ your PoB once on the **Build** page.
   zones you skip stay open. After a trip to town, the zone you came from ticks when you leave
   town for another zone, so selling mid-zone ticks nothing. Portalling back into a zone or
   returning to one you just left changes nothing. Click a circle to set where you are by hand.
-- The page is laid out like a pob.codes build page. Panels fold from their gold headers:
-  **Campaign**, **Gems**, **Config**, **Tree**, **Notes** and **Search**. A panel's header
-  (and the act header inside Campaign) stays pinned while you're in that panel.
+- The page is laid out like a pob.codes build page. Panels fold from their gold header bars
+  (click anywhere on the bar): **Campaign**, **Gems**, **Config**, **Tree**, **Notes** and
+  **Search**. A panel's header (and the act header inside Campaign) stays pinned while
+  you're in that panel. Folding a panel or act while you're inside it lands on the next one.
 - An act folds to one line once all its steps are done, and Campaign folds once the last
   act is done. Nothing reopens on its own: a folded act or panel stays folded until you
-  click it (or use the jump bar). Importing a build opens Campaign again.
-- The bar under the menu jumps to each panel and shows the auto-progress pill.
-  Auto-progress only scrolls to your zone while Campaign is on screen.
-- The card at the top shows the build (skill, ascendancy, level), its headline numbers and
-  the **Loadout** dropdown. The loadout follows your act, matched by PoB titles such as
-  `Act 2` or `Act 4-6 - 50 pts`; pick another until you reach the next act.
+  click it (or use the bar). Importing a build opens Campaign again.
+- The one bar at the top jumps to each panel and holds the auto-progress pill and ⚙
+  **Settings** (import, build options, search strings, gems, Edit route, Export). The
+  Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while
+  Campaign is on screen.
+- The card at the top shows the build (skill, ascendancy, PoB's level), your level from the
+  game log, its headline numbers and the **Loadout** dropdown. The loadout follows your
+  level when PoB titles name levels (`Lvl 30`, `Level 12-28`), else your act (`Act 2`,
+  `Act 4-6 - 50 pts`); pick another until your level or act changes. A zone's suggested
+  level (`12+`) turns red while you're below it.
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.

@@ -1,7 +1,7 @@
 import { ErrorFallback } from "../components/ErrorFallback";
 import { Loading } from "../components/Loading";
 import { useAutoProgress } from "../components/AutoProgress";
-import { Navbar } from "../components/Navbar";
+import { AppBar } from "../components/AppBar";
 import { pipe } from "../utility";
 import { withBlank } from "../utility/withBlank";
 import { withScrollRestoration } from "../utility/withScrollRestoration";
@@ -23,7 +23,7 @@ export function App() {
 
   return (
     <>
-      <Navbar />
+      <AppBar />
       <Suspense fallback={<Loading />}>
         <ErrorBoundary FallbackComponent={ErrorFallback}>
           <Routes>
@@ -33,19 +33,23 @@ export function App() {
                 <Page title="Exile Leveling" component={<RoutesContainer />} />
               }
             />
-            <Route
-              path="/build"
-              element={
-                <Page
-                  title="Exile Leveling - Build"
-                  component={
-                    <div className="page-narrow">
-                      <BuildContainer />
-                    </div>
-                  }
-                />
-              }
-            />
+            {/* Settings (was "Build"); /build kept for old links. */}
+            {["/settings", "/build"].map((path) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <Page
+                    title="Exile Leveling - Settings"
+                    component={
+                      <div className="page-narrow">
+                        <BuildContainer />
+                      </div>
+                    }
+                  />
+                }
+              />
+            ))}
             <Route
               path="/edit-route"
               element={

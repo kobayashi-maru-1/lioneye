@@ -9,8 +9,12 @@ import { configSelector } from "../../state/config";
 import { requiredGemsSelector } from "../../state/gem";
 import { formStyles } from "../../styles";
 import classNames from "classnames";
-import { RESET } from "jotai/utils";
+import { RESET, useAtomCallback } from "jotai/utils";
 import { pobAtom } from "../../state/pob";
+import { routeSelector } from "../../state/route";
+import { useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 export default function BuildContainer() {
   const [config, setConfig] = useAtom(configSelector);
@@ -57,6 +61,54 @@ export default function BuildContainer() {
           <hr />
         </>
       )}
+      <RouteSettings />
+    </div>
+  );
+}
+
+/** What the old menu bar held: route editing, the third-party export, the project link. */
+function RouteSettings() {
+  const navigate = useNavigate();
+  const exportRoute = useAtomCallback(
+    useCallback(async (get) => {
+      const route = await get(routeSelector);
+      const pobCode = get(pobAtom);
+      const output = [...route.sections, `pob-code:${pobCode ?? "none"}`];
+      await navigator.clipboard.writeText(JSON.stringify(output));
+      toast.success("Exported to Clipboard");
+    }, []),
+  );
+
+  return (
+    <div className={classNames(formStyles.form)}>
+      <div className={classNames(formStyles.formRow)}>
+        <label>Route</label>
+      </div>
+      <div className={classNames(formStyles.groupLeft)}>
+        <button
+          className={classNames(formStyles.formButton)}
+          onClick={() => navigate("/edit-route")}
+        >
+          Edit route
+        </button>
+        <button
+          className={classNames(formStyles.formButton)}
+          title="Copy the route and build for other tools"
+          onClick={() => exportRoute()}
+        >
+          Export
+        </button>
+        <button
+          className={classNames(formStyles.formButton)}
+          onClick={() =>
+            window
+              .open("https://github.com/HeartofPhos/exile-leveling", "_blank")
+              ?.focus()
+          }
+        >
+          GitHub
+        </button>
+      </div>
     </div>
   );
 }

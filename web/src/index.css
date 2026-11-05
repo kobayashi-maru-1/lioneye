@@ -29,11 +29,11 @@
   --size-5: 1.5rem;
   --line-height: 1.5em;
   --font-heavy: 600;
-  /* Fractional pixel rounding varies between browsers, lower-bound picked based on Firefox */
-  --navbar-height: 2.625rem;
+  /* The old menu bar is gone (AppBar replaced it); kept at 0 so every offset reads the same. */
+  --navbar-height: 0rem;
   /* A Campaign act's sticky header (SectionHolder), under the Campaign panel's. */
   --actbar-height: 2rem;
-  /* The guide page's sticky section bar (JumpBar), under the navbar. */
+  /* The app bar (AppBar), pinned at the top. */
   --jumpbar-height: 2.25rem;
   /* A guide panel's sticky header (PageSection), under the jump bar. */
   --panel-header-height: 2.75rem;

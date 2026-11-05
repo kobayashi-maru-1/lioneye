@@ -42,24 +42,29 @@ export function SectionHolder({ name, items, onRange }: SectionHolderProps) {
     wasFinished.current = finished;
   }, [finished]);
 
-  // Folding a long act from its header keeps the header in view.
+  // Folding an act while you're inside it (its header pinned) lands on the next act's
+  // header instead of mid-page.
+  const actRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const toggle = () => {
-    const folding = !collapsed;
-    setCollapsed(folding);
-    if (folding)
+    const act = actRef.current;
+    const bar = barRef.current;
+    const inside =
+      act !== null &&
+      bar !== null &&
+      bar.getBoundingClientRect().top - act.getBoundingClientRect().top > 1;
+    setCollapsed(!collapsed);
+    if (!collapsed && inside)
       requestAnimationFrame(() =>
-        document.getElementById(sectionId)?.scrollIntoView({
-          behavior: "auto",
-          block: "nearest",
-          inline: "nearest",
-        }),
+        (act.nextElementSibling ?? act).scrollIntoView({ block: "start" }),
       );
   };
 
   const icon = collapsed ? <FiChevronDown /> : <FiChevronUp />;
   return (
-    <div id={sectionId} className={classNames(styles.act)}>
+    <div id={sectionId} ref={actRef} className={classNames(styles.act)}>
       <div
+        ref={barRef}
         className={classNames(styles.sectionbar, {
           [styles.finished]: finished,
         })}

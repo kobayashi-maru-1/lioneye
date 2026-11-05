@@ -15,6 +15,11 @@ const PROCESS_NAME: &str = "PathOfExile";
 const POE2_DIR: &str = "Path of Exile 2";
 const LOG_NAMES: [&str; 2] = ["LatestClient.txt", "Client.txt"];
 const AREA_PATTERN: &str = r"Generating level \d+ area";
+/// `] : KobayashiSRS (Witch) is now level 8` — the guide follows your level.
+const LEVEL_PATTERN: &str = r"\] : .+ \(\w+\) is now level \d+";
+/// `] Merveil, the Siren: ...` — NPC and boss speech, for ticking boss kills. Chat with a
+/// channel prefix (#, $, @, %, &) is left out; the guide matches exact death lines.
+const SPEECH_PATTERN: &str = r"\] [^:#$@%&\]\s][^:\]]{0,60}: ";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -35,7 +40,7 @@ impl Status {
     }
 }
 
-/// Finds the PoE log, tails it, and broadcasts area lines. Goes back to waiting
+/// Finds the PoE log, tails it, and broadcasts area, level and speech lines. Goes back to waiting
 /// when the game closes so a restart (and a fresh LatestClient.txt) is picked up.
 pub async fn run(
     fixed_path: Option<PathBuf>,
@@ -43,7 +48,7 @@ pub async fn run(
     lines: broadcast::Sender<String>,
     status: watch::Sender<Status>,
 ) -> anyhow::Result<()> {
-    let patterns = RegexSet::new([AREA_PATTERN])?;
+    let patterns = RegexSet::new([AREA_PATTERN, LEVEL_PATTERN, SPEECH_PATTERN])?;
     let mut sys = System::new();
     let mut interval = tokio::time::interval(heart_beat);
 
@@ -162,5 +167,20 @@ mod tests {
             "D:/SteamLibrary/steamapps/common/Path of Exile/PathOfExileSteam.exe"
         )));
         assert!(!in_poe2_dir(Path::new("D:/Games/Path of Exile 2 backup/x")));
+    }
+
+    #[test]
+    fn forwards_area_level_and_speech_lines_only() {
+        let patterns = RegexSet::new([AREA_PATTERN, LEVEL_PATTERN, SPEECH_PATTERN]).unwrap();
+        let prefix = "2026/11/05 07:38:21 542259468 cffb065b [INFO Client 52060]";
+        let forwarded = |rest: &str| patterns.is_match(&format!("{prefix}{rest}"));
+        assert!(forwarded(r#" Generating level 1 area "1_1_1" with seed 1"#));
+        assert!(forwarded(" : KobayashiSRS (Witch) is now level 8"));
+        assert!(forwarded(" Malachai: Why... are you so in love with Death?"));
+        assert!(forwarded(" Merveil, the Siren: The Siren's song is silenced."));
+        assert!(!forwarded(" #Global: hello"));
+        assert!(!forwarded(" @From Someone: wtb"));
+        assert!(!forwarded(" $Trader: selling"));
+        assert!(!forwarded(" : You have entered The Coast."));
     }
 }

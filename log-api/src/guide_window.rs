@@ -14,8 +14,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 /// The page titles set in web/src/containers/index.tsx; keep in sync.
-const TITLES: [&str; 3] = [
+const TITLES: [&str; 4] = [
     "Exile Leveling",
+    "Exile Leveling - Settings",
+    // Before the Build page became Settings; a window from an older copy is still ours.
     "Exile Leveling - Build",
     "Exile Leveling - Edit Route",
 ];
@@ -118,6 +120,7 @@ mod tests {
     #[test]
     fn matches_app_windows_only() {
         assert!(is_guide_title("Exile Leveling"));
+        assert!(is_guide_title("Exile Leveling - Settings"));
         assert!(is_guide_title("Exile Leveling - Build"));
         assert!(is_guide_title("Exile Leveling - Edit Route"));
         assert!(!is_guide_title("Exile Leveling - Personal - Microsoft\u{200b} Edge"));

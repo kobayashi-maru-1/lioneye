@@ -14,6 +14,7 @@ import { toast } from "react-toastify";
 import { activeEdgeAtom } from "../route";
 import { mainSkillPickAtom } from "../main-skill";
 import { pageSectionCollapseFamily } from "../page-section-collapse";
+import { characterLevelAtom } from "../character-level";
 
 const POB_CODE_VERSION = 0;
 
@@ -43,6 +44,8 @@ export const pobAtom = atom(
       set(mainSkillPickAtom, RESET);
       // A new campaign starts open.
       set(pageSectionCollapseFamily("campaign"), false);
+      // A new build is usually a new character; its level comes from the next level-up.
+      set(characterLevelAtom, RESET);
       set(activeEdgeAtom, RESET);
 
       set(routeProgressFamily.clear);
@@ -59,6 +62,8 @@ export const pobAtom = atom(
         set(mainSkillPickAtom, RESET);
         // A new campaign starts open.
         set(pageSectionCollapseFamily("campaign"), false);
+        // A new build is usually a new character; its level comes from the next level-up.
+        set(characterLevelAtom, RESET);
         set(activeEdgeAtom, RESET);
 
         set(routeProgressFamily.clear);

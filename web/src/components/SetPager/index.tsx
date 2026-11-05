@@ -1,9 +1,11 @@
 import { useAtomValue } from "jotai";
 import { formStyles } from "../../styles";
+import { characterLevelAtom } from "../../state/character-level";
 import {
   currentActAtom,
   displaySetName,
   indexForAct,
+  indexForLevel,
 } from "../../state/current-act";
 import styles from "./styles.module.css";
 import classNames from "classnames";
@@ -11,25 +13,30 @@ import { useCallback, useState } from "react";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi";
 
 /**
- * Picks the set (tree or gem links) whose title covers the act you're in.
- * The arrows override it until you move into another act.
+ * Picks the set (loadout, tree or gem links) for where you are: by your level when the
+ * titles name levels ("Lvl 30") and the log has shown one, else by the act you're in
+ * ("Act 2"). Picking another overrides it until your level or act changes.
  */
 export function useFollowAct(titles: string[]) {
   const act = useAtomValue(currentActAtom);
+  const level = useAtomValue(characterLevelAtom)?.level ?? null;
   const key = titles.join("\n");
+  const follow = () => indexForLevel(titles, level) ?? indexForAct(titles, act);
   const [state, setState] = useState(() => ({
     act,
+    level,
     key,
-    index: indexForAct(titles, act) ?? 0,
+    index: follow() ?? 0,
   }));
 
   // Adjusted during render rather than in an effect, so the first render with new
   // titles already has the right index (the Stats tab would otherwise calculate twice).
   let current = state;
-  if (state.act !== act || state.key !== key) {
-    const followed = indexForAct(titles, act);
+  if (state.act !== act || state.level !== level || state.key !== key) {
+    const followed = follow();
     current = {
       act,
+      level,
       key,
       index: followed ?? (state.index < titles.length ? state.index : 0),
     };

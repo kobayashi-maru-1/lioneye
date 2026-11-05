@@ -1,8 +1,8 @@
-/* Sits under the navbar; its height is --jumpbar-height (index.css). */
-.jumpBar {
+/* The app's only bar: pinned at the top, --jumpbar-height tall (index.css). */
+.bar {
   position: sticky;
-  top: var(--navbar-height);
-  /* Stack: navbar 4, jump bar 3, pinned panel header 2, pinned act header 1. */
+  top: 0;
+  /* Stack: this bar 3, pinned panel header 2, pinned act header 1. */
   z-index: 3;
   display: flex;
   align-items: stretch;
@@ -17,7 +17,7 @@
 }
 
 /* pob.codes header links: small gold capitals. */
-.jump {
+.button {
   display: flex;
   align-items: center;
   flex: none;
@@ -32,8 +32,13 @@
   white-space: nowrap;
 }
 
-.jump:hover {
+.button:hover,
+.active {
   color: #c99550;
+}
+
+.icon {
+  font-size: 1rem;
 }
 
 .spacer {

@@ -4,7 +4,7 @@ import { ConfigList } from "../../components/ConfigList";
 import { FragmentStep } from "../../components/FragmentStep";
 import { GemLinkViewer } from "../../components/GemLinkViewer";
 import { GemReward } from "../../components/ItemReward";
-import { JumpBar } from "../../components/JumpBar";
+import { jumpTargetsAtom } from "../../components/AppBar";
 import {
   PageSection,
   pageSectionId,
@@ -24,6 +24,7 @@ import { SectionHolder } from "../../components/SectionHolder";
 import { SkillTreeViewer } from "../../components/SkillTreeViewer";
 import { StatsViewer } from "../../components/StatsViewer";
 import type { TaskListProps } from "../../components/TaskList";
+import { currentActAtom } from "../../state/current-act";
 import { gemLinksSelector } from "../../state/gem-links";
 import { gemProgressFamily } from "../../state/gem-progress";
 import { pobAtom } from "../../state/pob";
@@ -193,18 +194,25 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
   useCampaignInView();
   useFoldCampaignAtEnd();
 
-  const targets = [
-    { id: "campaign", label: "Campaign" },
-    ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
-    ...(showStats ? [{ id: "config", label: "Config" }] : []),
-    ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
-    ...(notes !== null ? [{ id: "notes", label: "Notes" }] : []),
-    ...(hasSearch ? [{ id: "search", label: "Search" }] : []),
-  ];
+  // The app bar's jump buttons, one per panel shown.
+  const setTargets = useSetAtom(jumpTargetsAtom);
+  const targetKey = [gemLinks.length > 0, showStats, urlTrees.length > 0]
+    .concat([notes !== null, hasSearch])
+    .join();
+  useEffect(() => {
+    setTargets([
+      { id: "campaign", label: "Campaign" },
+      ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
+      ...(showStats ? [{ id: "config", label: "Config" }] : []),
+      ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
+      ...(notes !== null ? [{ id: "notes", label: "Notes" }] : []),
+      ...(hasSearch ? [{ id: "search", label: "Search" }] : []),
+    ]);
+  }, [targetKey]);
+  useEffect(() => () => setTargets([]), []);
 
   return (
     <>
-      <JumpBar targets={targets} />
       <div
         className={classNames(styles.page, {
           [styles.noSidebar]: !showStats,
@@ -218,7 +226,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
         <div className={classNames(styles.main)}>
           {code === null && <EmptyHint />}
           {showStats && <BuildHeader />}
-          <PageSection id="campaign" title="Campaign">
+          <PageSection id="campaign" title="Campaign" actions={<ActPicker />}>
             {campaign}
           </PageSection>
           {gemLinks.length > 0 && <GemsPanel gemLinks={gemLinks} />}
@@ -237,6 +245,32 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
         </div>
       </div>
     </>
+  );
+}
+
+/** Jumps to an act's header (what the old menu's Sections list did); shows the act you're in. */
+function ActPicker() {
+  const route = useAtomValue(routeSelector);
+  const act = useAtomValue(currentActAtom);
+  const names = useMemo(
+    () => route.sections.map((section) => section.name),
+    [route],
+  );
+  const current = Math.max(
+    0,
+    names.findIndex((name) => act !== null && name === `Act ${act}`),
+  );
+  return (
+    <PanelSelect
+      label="Act"
+      options={names}
+      value={current}
+      onChange={(index) =>
+        document
+          .getElementById(`section-${names[index].replace(/\s+/g, "_")}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    />
   );
 }
 
@@ -407,7 +441,7 @@ function EmptyHint() {
           styles.emptyButton,
           interactiveStyles.hoverPrimary,
         )}
-        onClick={() => navigate("/build")}
+        onClick={() => navigate("/settings")}
       >
         Import
       </button>

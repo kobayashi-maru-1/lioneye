@@ -14,6 +14,7 @@
 }
 
 .areaLevel {
+  white-space: nowrap;
   color: rgb(128, 128, 128);
 }
 
@@ -45,4 +46,10 @@
 .noWrap {
   display: inline-block;
   white-space: pre;
+}
+
+/* Below the zone's suggested level (your level from the log). */
+.underLevel {
+  color: #e05030;
+  font-weight: var(--font-heavy);
 }

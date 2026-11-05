@@ -3,7 +3,7 @@ import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 
 /** Whether a page section is folded. */
@@ -41,21 +41,55 @@ export function PageSection({
   children,
 }: React.PropsWithChildren<PageSectionProps>) {
   const [collapsed, setCollapsed] = useAtom(pageSectionCollapseFamily(id));
+  const sectionRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   const icon = collapsed ? <FiChevronDown /> : <FiChevronUp />;
 
+  // The whole bar folds and opens the panel (its dropdown aside). Folding while you're
+  // inside the panel (its header pinned) lands on the next panel instead of mid-page.
+  const toggle = () => {
+    const section = sectionRef.current;
+    const header = headerRef.current;
+    const inside =
+      section !== null &&
+      header !== null &&
+      header.getBoundingClientRect().top - section.getBoundingClientRect().top >
+        1;
+    setCollapsed(!collapsed);
+    if (!collapsed && inside)
+      requestAnimationFrame(() =>
+        (section.nextElementSibling ?? section).scrollIntoView({
+          block: "start",
+        }),
+      );
+  };
+
   return (
-    <section id={pageSectionId(id)} className={classNames(styles.section)}>
-      <div className={classNames(styles.header)}>
+    <section
+      id={pageSectionId(id)}
+      ref={sectionRef}
+      className={classNames(styles.section)}
+    >
+      <div
+        ref={headerRef}
+        className={classNames(styles.header)}
+        onClick={toggle}
+      >
+        {/* The bar's click does the folding; the button gives keyboards a way in. */}
         <button
           className={classNames(styles.toggle)}
           aria-expanded={!collapsed}
-          onClick={() => setCollapsed(!collapsed)}
         >
           <span className={classNames(styles.title)}>{title}</span>
           {icon}
         </button>
         {actions && !collapsed && (
-          <div className={classNames(styles.actions)}>{actions}</div>
+          <div
+            className={classNames(styles.actions)}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {actions}
+          </div>
         )}
       </div>
       {!collapsed && (

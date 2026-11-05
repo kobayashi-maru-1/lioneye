@@ -1,9 +1,11 @@
+import { characterLevelAtom } from "../../../state/character-level";
 import { CopyToClipboard } from "../../CopyToClipboard";
 import { InlineFakeBlock } from "../../InlineFakeBlock";
 import { ItemReward } from "../../ItemReward";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { Data, type Fragments, type GameData } from "common";
+import { useAtomValue } from "jotai";
 import React from "react";
 import {
   BsArrowDownLeftSquare,
@@ -25,9 +27,20 @@ function minAreaLevel(areaLevel: number) {
 }
 
 function MinAreaLevelComponent(areaLevel: number) {
+  return <MinAreaLevel areaLevel={areaLevel} />;
+}
+
+/** The zone's suggested level ("12+"), red while your level (from the log) is below it. */
+function MinAreaLevel({ areaLevel }: { areaLevel: number }) {
+  const level = useAtomValue(characterLevelAtom)?.level;
+  const minimum = minAreaLevel(areaLevel);
+  const under = level !== undefined && level < minimum;
   return (
-    <span className={classNames(styles.areaLevel)}>
-      {minAreaLevel(areaLevel)}
+    <span
+      className={classNames(styles.areaLevel, { [styles.underLevel]: under })}
+      title={under ? `Under-leveled (level ${level})` : undefined}
+    >
+      {minimum}
       {"+"}
     </span>
   );
@@ -40,7 +53,7 @@ function EnemyComponent(enemy: string) {
 function AreaComponent(
   name: string,
   isTownArea: boolean,
-  areaLevel: number | undefined
+  areaLevel: number | undefined,
 ) {
   return (
     <div className={classNames(styles.noWrap)}>
@@ -66,8 +79,8 @@ function QuestComponent(fragment: Fragments.QuestFragment) {
     new Set(
       fragment.rewardOffers
         .map((x) => quest.reward_offers[x]?.quest_npc)
-        .filter((x) => x !== undefined)
-    )
+        .filter((x) => x !== undefined),
+    ),
   );
 
   return (
@@ -196,7 +209,7 @@ const ASCEND_LOOKUP: Record<
 };
 
 function AscendComponent(
-  version: Fragments.AscendFragment["version"]
+  version: Fragments.AscendFragment["version"],
 ): [React.ReactNode, React.ReactNode] {
   const { url, areaId } = ASCEND_LOOKUP[version];
   const area = Data.Areas[areaId];
@@ -223,7 +236,7 @@ function AscendComponent(
 }
 
 export function Fragment(
-  fragment: Fragments.AnyFragment
+  fragment: Fragments.AnyFragment,
 ): [React.ReactNode, React.ReactNode] {
   if (typeof fragment === "string") return [<>{fragment}</>, null];
 
@@ -254,7 +267,7 @@ export function Fragment(
           {AreaComponent(
             dstArea.map_name || dstArea.name,
             dstArea.is_town_area,
-            dstArea.level
+            dstArea.level,
           )}
           {dstArea.act !== srcArea.act &&
             dstArea.id !== "Labyrinth_Airlock" && (
