@@ -1,0 +1,41 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* Below the navbar and the sticky jump bar when scrolled to. */
+  scroll-margin-top: calc(
+    var(--navbar-height) + var(--jumpbar-height) + var(--size-3)
+  );
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  width: 100%;
+  padding: var(--size-2) var(--size-3);
+  color: var(--on-secondary);
+  font-weight: var(--font-heavy);
+  background-color: var(--secondary);
+  border: var(--border-width) solid var(--accent-secondary);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.header:hover {
+  background-color: var(--highlight-secondary);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--size-3) 0;
+}

@@ -40,17 +40,22 @@ your PoB once on the **Build** page.
   town for another zone, so selling mid-zone ticks nothing. Portalling back into a zone or
   returning to one you just left changes nothing. Click a circle to set where you are by hand.
 - An act folds to one line once all its steps are done. Click its header to open it again.
-- The right panel shows the tree, gem links and search strings together (**All**).
-  The tabs show one at a time; the arrow at the left hides the panel.
-- The tree and gem set follow the act you're in, matched by PoB titles such as
-  `Act 2` or `Act 4-6 - 50 pts`. The arrows pick another set until you reach the next act.
-- **Stats** shows Path of Building's sidebar (life, DPS and the rest) for the loadout that
-  matches your act, calculated by the PoB release bundled in the exe. The arrows pick another
-  loadout. The first view after starting takes a few seconds while PoB loads; it unloads
-  after 10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`.
-  A build with a timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub
-  the first time. Specs on an older tree are calculated on the latest one (noted under the stats).
-- Drag the bar between the route and the panel to resize; double-click it to reset.
+- The page has foldable sections: **Campaign**, **Tree**, **Gems**, **Config**, **Notes**
+  and **Search**. The bar under the menu jumps to each (opening it if folded) and shows the
+  auto-progress pill. Auto-progress only scrolls to your zone while Campaign is on screen.
+- The left column shows Path of Building's sidebar (life, DPS and the rest) for the loadout
+  that matches your act, matched by PoB titles such as `Act 2` or `Act 4-6 - 50 pts`, and
+  calculated by the PoB release bundled in the exe. The arrows pick another loadout until you
+  reach the next act. Tree, Gems and Config show that loadout's sets.
+- Under the loadout, pick the main skill as in PoB. The pick is remembered by skill gem, so
+  the same skill stays selected in every loadout that has it; loadouts without it show PoB's
+  own pick, tagged **PoB pick**. Importing a build clears the pick.
+- The first stats after starting take a few seconds while PoB loads; it unloads after
+  10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`. A build with a
+  timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub the first time.
+  Specs on an older tree are calculated on the latest one (noted under the stats).
+- On the hosted site (no exe) there are no stats or config; Tree and Gems follow your act
+  with their own arrows.
 
 ## Build
 

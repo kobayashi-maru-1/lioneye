@@ -1,0 +1,30 @@
+/* Sits under the navbar; its height is --jumpbar-height (index.css). */
+.jumpBar {
+  position: sticky;
+  top: var(--navbar-height);
+  z-index: 3;
+  display: flex;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  height: var(--jumpbar-height);
+  margin: 0 calc(var(--size-2) * -1);
+  padding: 0 var(--size-2);
+  color: var(--on-secondary);
+  font-weight: var(--font-heavy);
+  background-color: var(--secondary);
+  border-bottom: var(--border-width) solid var(--accent-secondary);
+}
+
+.jump {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 var(--size-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}

@@ -3,7 +3,7 @@
   flex-direction: column;
   position: sticky;
   background-color: var(--primary);
-  top: var(--navbar-height);
+  top: calc(var(--navbar-height) + var(--jumpbar-height));
   z-index: 1;
 }
 

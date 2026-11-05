@@ -1,0 +1,14 @@
+.notes {
+  display: flex;
+  flex-direction: column;
+  user-select: text;
+}
+
+.line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.blank {
+  height: var(--size-3);
+}

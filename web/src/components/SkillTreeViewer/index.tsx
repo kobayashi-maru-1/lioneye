@@ -17,6 +17,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 interface SkillTreeViewerProps {
   urlTrees: UrlTree.Data[];
+  /** Show this tree (by title) instead of following the act; the pager then hides. */
+  selectedTitle?: string;
 }
 
 interface RenderData {
@@ -28,10 +30,16 @@ interface RenderData {
   masteries: UrlTreeDelta["masteries"];
 }
 
-export function SkillTreeViewer({ urlTrees }: SkillTreeViewerProps) {
+export function SkillTreeViewer({
+  urlTrees,
+  selectedTitle,
+}: SkillTreeViewerProps) {
   const svgDivRef = useRef<HTMLDivElement>(null);
   const titles = useMemo(() => urlTrees.map((x) => x.name), [urlTrees]);
-  const [curIndex, setCurIndex] = useFollowAct(titles);
+  const [followIndex, setCurIndex] = useFollowAct(titles);
+  const selectedIndex =
+    selectedTitle === undefined ? -1 : titles.indexOf(selectedTitle);
+  const curIndex = selectedIndex >= 0 ? selectedIndex : followIndex;
   const [renderData, setRenderData] = useState<RenderData>();
   const [styleId] = useState(() => randomId(6));
   const [tooltipNodeId, setTooltipNodeId] = useState<string | null>(null);
@@ -165,7 +173,9 @@ export function SkillTreeViewer({ urlTrees }: SkillTreeViewerProps) {
               nodeId={tooltipNodeId}
             />
           )}
-          <SetPager titles={titles} index={curIndex} onIndex={setCurIndex} />
+          {selectedIndex < 0 && (
+            <SetPager titles={titles} index={curIndex} onIndex={setCurIndex} />
+          )}
           <div className={styles.viewport}>
             <Viewport
               intialFocus={renderData.intialFocus}

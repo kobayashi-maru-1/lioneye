@@ -1,125 +1,36 @@
-import { type MainSkillPick, mainSkillPickAtom } from "../../state/main-skill";
-import { pobCodeToXml } from "../../state/pob/process";
+import type { MainSkillPick } from "../../state/main-skill";
 import { formStyles } from "../../styles";
-import { SetPager, useFollowAct } from "../SetPager";
+import { type SkillState, usePobStats } from "../PobStats";
+import { PobText, stripPob } from "../PobText";
+import { SetPager } from "../SetPager";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useAtom } from "jotai";
-import React, { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment } from "react";
 
-/** The exe runs Path of Building; the hosted site has nothing to ask. */
-export const STATS_AVAILABLE = import.meta.env.MODE !== "production";
-
-const STATS_URL = "/api/pob/stats";
-
-type StatRow =
-  { gap: true } | { text: string } | { label: string; value: string };
-
-/** PoB's main skill selectors for the shown loadout. Indexes are PoB's (from 1). */
-interface SkillState {
-  /** Whether your remembered pick was found in this loadout (unset: no pick sent). */
-  picked?: boolean;
-  id?: string;
-  label?: string;
-  groups: string[];
-  /** Active skill ids per group, to remember a group you pick by its gem. */
-  groupSkills: string[][];
-  /** Each group's own main skill (PoB's choice), the default when you pick that group. */
-  groupMain: number[];
-  group?: number;
-  skills: string[];
-  skill?: number;
-  parts: string[];
-  part?: number;
-  minions: string[];
-  minion?: number;
-  minionSkills: string[];
-  minionSkill?: number;
-}
-
-interface Stats {
-  loadouts: string[];
-  loadout: string | null;
-  skill: SkillState | null;
-  rows: StatRow[];
-  warnings: string[];
-}
-
-const NONE: string[] = [];
-
-/** Path of Building's sidebar stats for the loadout that matches your act. */
-export function StatsViewer({ code }: { code: string }) {
-  const xml = useMemo(() => {
-    try {
-      return pobCodeToXml(code);
-    } catch {
-      return null;
-    }
-  }, [code]);
-
-  // Kept with the build it came from, so a new import never shows the old build's loadouts.
-  // Also kept with the pick it was asked with, so the "PoB pick" tag never describes
-  // an older pick while a new one calculates.
-  const [answer, setAnswer] = useState<{
-    xml: string;
-    pickKey: string;
-    stats: Stats;
-  } | null>(null);
-  const stats = answer !== null && answer.xml === xml ? answer.stats : null;
-  const loadouts = stats?.loadouts ?? NONE;
-  // PoB's names carry its colour codes ("^2Act 1 - 12 pts"); match and show them without.
-  const titles = useMemo(
-    () => loadouts.map((name) => name.replace(COLOUR_CODE, "")),
-    [loadouts],
-  );
-  const [index, setIndex] = useFollowAct(titles);
-  const requested = loadouts[index] ?? null;
-
-  const [pick, setPick] = useAtom(mainSkillPickAtom);
-  const pickKey = JSON.stringify(pick);
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    if (xml === null) return;
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    fetchStats(xml, requested, pick, controller.signal)
-      .then((stats) => {
-        setAnswer({ xml, pickKey, stats });
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : String(err));
-        setLoading(false);
-      });
-    return () => controller.abort();
-  }, [xml, requested, pickKey, attempt]);
-
-  if (xml === null)
-    return (
+/**
+ * Path of Building's sidebar for the shown loadout: loadout pager, main skill and
+ * stats. Reads the page's PobStatsProvider.
+ */
+export function StatsViewer() {
+  const pob = usePobStats();
+  if (pob === null || pob.xml === null) {
+    return pob?.unreadable ? (
       <p className={classNames(styles.status)}>Build unreadable. Re-import.</p>
-    );
+    ) : null;
+  }
+  const { stats, titles, index, setIndex, loading, error, retry } = pob;
 
   return (
     <div className={classNames(styles.stats)}>
-      {loadouts.length > 0 && (
+      {titles.length > 0 && (
         <SetPager titles={titles} index={index} onIndex={setIndex} />
       )}
       {stats?.skill && stats.skill.groups.length > 0 && (
         <SkillPicker
           state={stats.skill}
-          fallback={
-            pick !== null &&
-            answer?.pickKey === pickKey &&
-            stats.skill.picked === false
-          }
+          fallback={pob.fallback}
           disabled={loading}
-          onPick={setPick}
+          onPick={pob.setPick}
         />
       )}
       {error !== null && (
@@ -127,7 +38,7 @@ export function StatsViewer({ code }: { code: string }) {
           Stats failed
           <button
             className={classNames(formStyles.formButton, styles.retry)}
-            onClick={() => setAttempt((n) => n + 1)}
+            onClick={retry}
           >
             Retry
           </button>
@@ -325,93 +236,9 @@ function Select({
           value={i + 1}
           disabled={isEnabled ? !isEnabled(i + 1) : false}
         >
-          {option.replace(COLOUR_CODE, "")}
+          {stripPob(option)}
         </option>
       ))}
     </select>
   );
-}
-
-async function fetchStats(
-  xml: string,
-  loadout: string | null,
-  pick: MainSkillPick | null,
-  signal: AbortSignal,
-): Promise<Stats> {
-  const response = await fetch(STATS_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ xml, loadout, pick }),
-    signal,
-  });
-  if (!response.ok) {
-    const text = response.status === 404 ? "" : await response.text();
-    throw new Error(text || "PoB unavailable. Restart the app.");
-  }
-  const stats = (await response.json()) as Partial<Stats>;
-  return {
-    loadouts: list(stats.loadouts),
-    loadout: stats.loadout ?? null,
-    skill: stats.skill ? skillState(stats.skill) : null,
-    rows: list(stats.rows),
-    warnings: list(stats.warnings),
-  };
-}
-
-// PoB's JSON writes an empty list as {}.
-function list<T>(value: T[] | undefined | object): T[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function skillState(skill: Partial<SkillState>): SkillState {
-  return {
-    ...skill,
-    groups: list(skill.groups),
-    groupSkills: list<string[]>(skill.groupSkills).map((ids) => list(ids)),
-    groupMain: list(skill.groupMain),
-    skills: list(skill.skills),
-    parts: list(skill.parts),
-    minions: list(skill.minions),
-    minionSkills: list(skill.minionSkills),
-  };
-}
-
-// PoB colour codes: ^0-^9, or ^x then a hex colour. ^7 is PoB's normal text.
-const COLOUR_CODE = /\^(x[0-9a-fA-F]{6}|[0-9])/g;
-const DIGIT_COLOURS: Record<string, string | undefined> = {
-  "1": "#ff5050",
-  "2": "#50ff50",
-  "3": "#6f6fff",
-  "4": "#ffff50",
-  "5": "#ff50ff",
-  "6": "#50ffff",
-  "8": "#808080",
-  "9": "#606060",
-};
-
-function PobText({ text }: { text: string }) {
-  const parts: React.ReactNode[] = [];
-  let colour: string | undefined;
-  let last = 0;
-  for (const match of text.matchAll(COLOUR_CODE)) {
-    const start = match.index ?? 0;
-    if (start > last) {
-      parts.push(
-        <span key={parts.length} style={{ color: colour }}>
-          {text.slice(last, start)}
-        </span>,
-      );
-    }
-    const code = match[1];
-    colour = code.startsWith("x") ? `#${code.slice(1)}` : DIGIT_COLOURS[code];
-    last = start + match[0].length;
-  }
-  if (last < text.length) {
-    parts.push(
-      <span key={parts.length} style={{ color: colour }}>
-        {text.slice(last)}
-      </span>,
-    );
-  }
-  return <>{parts}</>;
 }

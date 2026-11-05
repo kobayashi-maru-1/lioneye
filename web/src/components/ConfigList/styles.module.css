@@ -1,0 +1,31 @@
+.config {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  column-gap: var(--size-4);
+  row-gap: var(--size-1);
+}
+
+.section {
+  grid-column: 1 / -1;
+  margin-top: var(--size-3);
+  color: var(--on-secondary);
+  font-weight: var(--font-heavy);
+  border-bottom: var(--border-width) solid var(--accent-secondary);
+}
+
+.section:first-child {
+  margin-top: 0;
+}
+
+.label {
+  overflow-wrap: anywhere;
+}
+
+.value {
+  color: var(--on-secondary);
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  margin: 0;
+}

@@ -455,6 +455,63 @@ local function skillState(picked)
 	}
 end
 
+-- Sets and config ----------------------------------------------------------------------
+
+-- Titles of the sets PoB uses for the shown loadout, so the guide's tree and gem
+-- sections can follow the same loadout.
+local function setTitles()
+	local tree = build.treeTab.specList[build.treeTab.activeSpec]
+	local skills = build.skillsTab.skillSets[build.skillsTab.activeSkillSetId]
+	local items = build.itemsTab.itemSets[build.itemsTab.activeItemSetId]
+	local config = build.configTab.configSets[build.configTab.activeConfigSetId]
+	return {
+		tree = tree and tree.title or "Default",
+		skills = skills and skills.title or "Default",
+		items = items and items.title or "Default",
+		config = config and config.title or "Default",
+	}
+end
+
+local configOptions
+
+-- The config options this loadout sets away from PoB's defaults, with PoB's labels,
+-- under their section names: { section } and { label, value } rows.
+local function configRows()
+	configOptions = configOptions or LoadModule("Modules/ConfigOptions")
+	local tab = build.configTab
+	local out = setmetatable({}, ARRAY)
+	local section, lastSection
+	for _, option in ipairs(configOptions) do
+		if option.section then
+			section = option.section
+		elseif option.var and option.label then
+			local value = tab.input[option.var]
+			local default = tab.defaultState[option.var]
+			local unset = value == nil or value == default or value == ""
+				or (option.type == "check" and value == false)
+				or (default == nil and value == 0)
+			if not unset then
+				local shown
+				if option.type == "check" then
+					shown = "Yes"
+				elseif option.type == "list" then
+					for _, entry in ipairs(option.list or {}) do
+						if entry.val == value then
+							shown = entry.label
+						end
+					end
+				end
+				if section ~= lastSection then
+					out[#out + 1] = { section = section }
+					lastSection = section
+				end
+				out[#out + 1] = { label = option.label, value = shown or tostring(value) }
+			end
+		end
+	end
+	return out
+end
+
 -- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
 -- when the build is new to PoB, else the loadout picked last. `id` and the rest are the
 -- guide's remembered main skill (all nil: PoB's own).
@@ -490,6 +547,8 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		loadouts = loadouts(),
 		loadout = currentLoadout(),
 		skill = skillState(picked),
+		sets = setTitles(),
+		config = configRows(),
 		rows = rows(),
 		warnings = warnings(),
 	})

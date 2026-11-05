@@ -1,31 +1,72 @@
-/* Route on the left, sticky reference panel on the right. */
-.layout {
+/* PoB's stats on the left (sticky), the guide's sections on the right. */
+.page {
+  --sidebar-top: calc(var(--navbar-height) + var(--jumpbar-height) + var(--size-3));
   display: grid;
-  grid-template-columns: minmax(0, 0.45fr) auto minmax(0, 0.55fr);
+  grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
   align-items: start;
-  gap: 0 var(--size-2);
+  gap: var(--size-3);
   padding-top: var(--size-3);
 }
 
-.layout.noPanel {
-  grid-template-columns: minmax(0, 1fr) auto;
+.page.noSidebar {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.route {
-  min-width: 0;
-}
-
-.splitter {
+.sidebar {
   position: sticky;
-  top: calc(var(--navbar-height) + var(--size-3));
-  height: calc(100vh - var(--navbar-height) - var(--size-3) * 2);
-  width: var(--size-3);
-  cursor: col-resize;
-  touch-action: none;
+  top: var(--sidebar-top);
+  max-height: calc(100vh - var(--sidebar-top) - var(--size-3));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--size-3);
+  background-color: var(--primary);
+  border: var(--border-width) solid var(--accent-primary);
   border-radius: var(--border-radius);
 }
 
-.splitter:hover,
-.splitter.dragging {
-  background-color: var(--highlight-secondary);
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-3);
+  min-width: 0;
+}
+
+/* The tree needs a real height to draw in. */
+.treeBody {
+  height: min(75vh, 52rem);
+}
+
+.icon {
+  display: inline-flex;
+  margin-right: var(--size-2);
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--size-3);
+  padding: var(--size-3);
+  border: var(--border-width) solid var(--accent-secondary);
+  border-radius: var(--border-radius);
+}
+
+.emptyButton {
+  font-weight: var(--font-heavy);
+  padding: var(--size-1) var(--size-4);
+  border: var(--border-width) solid var(--accent-primary);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+/* Narrow windows: stats above the sections instead of beside them. */
+@media (max-width: 52rem) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: static;
+    max-height: none;
+  }
 }

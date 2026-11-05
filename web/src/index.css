@@ -21,6 +21,8 @@
   /* Fractional pixel rounding varies between browsers, lower-bound picked based on Firefox */
   --navbar-height: 2.625rem;
   --actbar-height: 2.75rem;
+  /* The guide page's sticky section bar (JumpBar), under the navbar. */
+  --jumpbar-height: 2.25rem;
 }
 
 *,
@@ -35,7 +37,8 @@
   line-height: var(--line-height);
   padding: 0;
   margin: 0;
-  scroll-margin: var(--navbar-height);
+  /* Clear of the navbar and the guide page's jump bar when scrolled into view. */
+  scroll-margin: calc(var(--navbar-height) + var(--jumpbar-height));
 }
 
 *:focus-visible {

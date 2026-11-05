@@ -203,7 +203,8 @@ export const activeEdgeAtom = atom(
           }
         }),
       );
-      if (routeKeys.length > 0) set(routeProgressFamily.setMany, routeKeys, true);
+      if (routeKeys.length > 0)
+        set(routeProgressFamily.setMany, routeKeys, true);
       if (gemKeys.length > 0) set(gemProgressFamily.setMany, gemKeys, true);
     };
 
@@ -221,10 +222,17 @@ export const activeEdgeAtom = atom(
 
     // Waypoint jumps and skipped zones: move to the next visit of this zone a few stops ahead.
     // Towns and the labyrinth are visited off-route, so they only count as the very next stop.
-    if (messageAreaId.endsWith("_town") || messageAreaId === "Labyrinth_Airlock") return;
+    if (
+      messageAreaId.endsWith("_town") ||
+      messageAreaId === "Labyrinth_Airlock"
+    )
+      return;
     // Coming back into the current zone (portal, death) or walking back to a zone
     // just left (a hub like the Crossroads) isn't progress.
-    const recent = edges.slice(Math.max(0, nextEdgeIndex - RECENT), nextEdgeIndex);
+    const recent = edges.slice(
+      Math.max(0, nextEdgeIndex - RECENT),
+      nextEdgeIndex,
+    );
     if (recent.includes(messageAreaId)) return;
     const ahead = edges.slice(nextEdgeIndex + 1, nextEdgeIndex + 1 + MAX_SKIP);
     const offset = ahead.indexOf(messageAreaId);
@@ -244,10 +252,20 @@ export const nextEdgeAtom = transientAtomFamily((param: number | null) => {
   );
 });
 
+/**
+ * False while the page's Campaign section is off screen, so a zone change doesn't pull
+ * you away from the tree or notes you jumped to.
+ */
+export const campaignInViewAtom = atom(true);
+
 const scrollBehaviour = atom<ScrollBehavior | null>("instant");
 export const scrollToActiveEdgeEffect = atomEffect((get, set) => {
   const behavior = get(scrollBehaviour);
   if (behavior === null) {
+    return;
+  }
+  if (!get.peek(campaignInViewAtom)) {
+    set(scrollBehaviour, null);
     return;
   }
 

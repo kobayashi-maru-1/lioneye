@@ -12,15 +12,20 @@ import flattenChildren from "react-keyed-flatten-children";
 
 interface GemLinkViewerProps {
   gemLinks: RouteData.GemLinkGroup[];
+  /** Show this skill set (by title) instead of following the act; the pager then hides. */
+  selectedTitle?: string;
 }
 
-export function GemLinkViewer({ gemLinks }: GemLinkViewerProps) {
+export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
   const gemSections = useMemo(() => {
     const linkTitles = new Set<string>();
     for (const link of gemLinks) linkTitles.add(link.title);
     return [...linkTitles];
   }, [gemLinks]);
-  const [curIndex, setCurIndex] = useFollowAct(gemSections);
+  const [followIndex, setCurIndex] = useFollowAct(gemSections);
+  const selectedIndex =
+    selectedTitle === undefined ? -1 : gemSections.indexOf(selectedTitle);
+  const curIndex = selectedIndex >= 0 ? selectedIndex : followIndex;
   const [tooltipGemLink, setTooltipGemLink] =
     useState<RouteData.GemLink | null>(null);
 
@@ -30,7 +35,9 @@ export function GemLinkViewer({ gemLinks }: GemLinkViewerProps) {
   return (
     <div className={classNames(styles.gemLinks)}>
       {tooltipGemLink && <GemTooltip gemLink={tooltipGemLink} />}
-      <SetPager titles={gemSections} index={curIndex} onIndex={setCurIndex} />
+      {selectedIndex < 0 && (
+        <SetPager titles={gemSections} index={curIndex} onIndex={setCurIndex} />
+      )}
       {activeGemLinks.length > 0 && (
         <div className={classNames(styles.gemLinkSection)}>
           {flattenChildren(

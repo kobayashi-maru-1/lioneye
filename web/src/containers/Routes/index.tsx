@@ -1,17 +1,42 @@
-import { useAtom, useAtomValue } from "jotai";
-import { useAtomCallback } from "jotai/utils";
+import { BuildNotes, buildNotes } from "../../components/BuildNotes";
+import { ConfigList } from "../../components/ConfigList";
 import { FragmentStep } from "../../components/FragmentStep";
+import { GemLinkViewer } from "../../components/GemLinkViewer";
 import { GemReward } from "../../components/ItemReward";
+import { JumpBar } from "../../components/JumpBar";
+import { PageSection, pageSectionId } from "../../components/PageSection";
+import {
+  PobStatsProvider,
+  STATS_AVAILABLE,
+  useLoadoutSets,
+  usePobStats,
+} from "../../components/PobStats";
+import { SearchStrings } from "../../components/SearchStrings";
 import { SectionHolder } from "../../components/SectionHolder";
-import { Sidebar } from "../../components/Sidebar";
+import { SkillTreeViewer } from "../../components/SkillTreeViewer";
+import { StatsViewer } from "../../components/StatsViewer";
 import type { TaskListProps } from "../../components/TaskList";
+import { gemLinksSelector } from "../../state/gem-links";
 import { gemProgressFamily } from "../../state/gem-progress";
-import { routeSelector, scrollToActiveEdgeEffect } from "../../state/route";
+import { pobAtom } from "../../state/pob";
+import {
+  campaignInViewAtom,
+  routeSelector,
+  scrollToActiveEdgeEffect,
+} from "../../state/route";
 import { routeProgressFamily } from "../../state/route-progress";
-import { getPersistent, NO_MIGRATORS, setPersistent } from "../../utility";
+import { searchStringsSelector } from "../../state/search-strings";
+import { urlTreesSelector } from "../../state/tree/url-tree";
+import { interactiveStyles } from "../../styles";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtomCallback } from "jotai/utils";
+import { useCallback, useEffect, useMemo, type ReactNode } from "react";
+import { FaLink } from "react-icons/fa";
+import { FiFileText, FiMap, FiSearch, FiSliders } from "react-icons/fi";
+import { TbHierarchy } from "react-icons/tb";
+import { useNavigate } from "react-router-dom";
 
 /** Where a step's done flag is stored, in route order. */
 interface ProgressRef {
@@ -19,29 +44,13 @@ interface ProgressRef {
   key: string;
 }
 
-const LAYOUT_VERSION = 0;
-const LAYOUT_KEY = "local-layout";
-
-interface Layout {
-  /** Route column share of the width, 0.2–0.8 */
-  split: number;
-  panel: boolean;
-}
-
-const DEFAULT_LAYOUT: Layout = { split: 0.45, panel: true };
-
+/**
+ * The guide on one page: PoB's stats on the left, and Campaign, Tree, Gems, Config,
+ * Notes and Search as foldable sections, with a bar that jumps to each.
+ */
 export default function RoutesContainer() {
   useAtom(scrollToActiveEdgeEffect);
   const route = useAtomValue(routeSelector);
-  const [layout, setLayoutState] = useState<Layout>(
-    () =>
-      getPersistent<Layout>(LAYOUT_KEY, LAYOUT_VERSION, NO_MIGRATORS) ??
-      DEFAULT_LAYOUT,
-  );
-  const setLayout = useCallback((next: Layout, save = true) => {
-    setLayoutState(next);
-    if (save) setPersistent(LAYOUT_KEY, LAYOUT_VERSION, next);
-  }, []);
 
   // Every step's done flag in route order, for shift-click ranges.
   const order = useMemo(() => {
@@ -148,79 +157,150 @@ export default function RoutesContainer() {
   }, [route, markRange]);
 
   return (
-    <div
-      className={classNames(styles.layout, { [styles.noPanel]: !layout.panel })}
-      style={
-        layout.panel
-          ? {
-              gridTemplateColumns: `minmax(0, ${layout.split}fr) auto minmax(0, ${1 - layout.split}fr)`,
-            }
-          : undefined
-      }
-    >
-      <div className={classNames(styles.route)}>{items}</div>
-      {layout.panel && (
-        <Splitter
-          split={layout.split}
-          onSplit={(split, save) => setLayout({ ...layout, split }, save)}
-        />
-      )}
-      <Sidebar
-        expand={layout.panel}
-        onToggleExpand={(panel) => setLayout({ ...layout, panel })}
-      />
-    </div>
+    <PobStatsProvider>
+      <GuidePage campaign={items} />
+    </PobStatsProvider>
   );
 }
 
-interface SplitterProps {
-  split: number;
-  /** Called while dragging (save = false) and once when the drag ends (save = true). */
-  onSplit: (split: number, save: boolean) => void;
+interface PageSectionData {
+  id: string;
+  label: ReactNode;
+  content: ReactNode;
+  bodyClassName?: string;
 }
 
-/** Drag to resize the route column; double-click to reset. */
-function Splitter({ split, onSplit }: SplitterProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [dragSplit, setDragSplit] = useState<number | null>(null);
+function GuidePage({ campaign }: { campaign: ReactNode }) {
+  const code = useAtomValue(pobAtom);
+  const pob = usePobStats();
+  const sets = useLoadoutSets();
+  const urlTrees = useAtomValue(urlTreesSelector);
+  const gemLinks = useAtomValue(gemLinksSelector);
+  const searchStrings = useAtomValue(searchStringsSelector);
+  const xml = pob?.xml ?? null;
+  const notes = useMemo(() => (xml ? buildNotes(xml) : null), [xml]);
+  const showStats = STATS_AVAILABLE && code !== null;
+  useCampaignInView();
 
-  const toSplit = (clientX: number) => {
-    const parent = ref.current?.parentElement;
-    if (!parent) return split;
-    const rect = parent.getBoundingClientRect();
-    const value = (clientX - rect.left) / rect.width;
-    return Math.min(0.8, Math.max(0.2, value));
-  };
-
-  const endDrag = () => {
-    if (dragSplit === null) return;
-    onSplit(dragSplit, true);
-    setDragSplit(null);
-  };
+  const sections: PageSectionData[] = [
+    {
+      id: "campaign",
+      label: <Label icon={<FiMap />} text="Campaign" />,
+      content: campaign,
+    },
+  ];
+  if (urlTrees.length > 0)
+    sections.push({
+      id: "tree",
+      label: <Label icon={<TbHierarchy />} text="Tree" />,
+      content: (
+        <SkillTreeViewer urlTrees={urlTrees} selectedTitle={sets?.tree} />
+      ),
+      bodyClassName: styles.treeBody,
+    });
+  if (gemLinks.length > 0)
+    sections.push({
+      id: "gems",
+      label: <Label icon={<FaLink />} text="Gems" />,
+      content: (
+        <GemLinkViewer gemLinks={gemLinks} selectedTitle={sets?.skills} />
+      ),
+    });
+  if (showStats)
+    sections.push({
+      id: "config",
+      label: <Label icon={<FiSliders />} text="Config" />,
+      content: <ConfigList />,
+    });
+  if (notes !== null)
+    sections.push({
+      id: "notes",
+      label: <Label icon={<FiFileText />} text="Notes" />,
+      content: <BuildNotes notes={notes} />,
+    });
+  if (searchStrings !== null && searchStrings.length > 0)
+    sections.push({
+      id: "search",
+      label: <Label icon={<FiSearch />} text="Search" />,
+      content: <SearchStrings values={searchStrings} />,
+    });
 
   return (
-    <div
-      ref={ref}
-      className={classNames(styles.splitter, {
-        [styles.dragging]: dragSplit !== null,
-      })}
-      role="separator"
-      aria-orientation="vertical"
-      aria-valuenow={Math.round((dragSplit ?? split) * 100)}
-      onPointerDown={(ev) => {
-        ev.currentTarget.setPointerCapture(ev.pointerId);
-        setDragSplit(split);
-      }}
-      onPointerMove={(ev) => {
-        if (dragSplit === null) return;
-        const next = toSplit(ev.clientX);
-        setDragSplit(next);
-        onSplit(next, false);
-      }}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      onLostPointerCapture={endDrag}
-      onDoubleClick={() => onSplit(DEFAULT_LAYOUT.split, true)}
-    />
+    <>
+      <JumpBar targets={sections.map(({ id, label }) => ({ id, label }))} />
+      <div
+        className={classNames(styles.page, {
+          [styles.noSidebar]: !showStats,
+        })}
+      >
+        {showStats && (
+          <aside className={classNames(styles.sidebar)}>
+            <StatsViewer />
+          </aside>
+        )}
+        <div className={classNames(styles.main)}>
+          {code === null && <EmptyHint />}
+          {sections.map((section) => (
+            <PageSection
+              key={section.id}
+              id={section.id}
+              title={section.label}
+              bodyClassName={section.bodyClassName}
+            >
+              {section.content}
+            </PageSection>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Label({ icon, text }: { icon: ReactNode; text: string }) {
+  return (
+    <>
+      <span className={classNames(styles.icon)}>{icon}</span>
+      {text}
+    </>
+  );
+}
+
+/**
+ * Tracks whether Campaign fills the top of the window. Auto-progress only scrolls to
+ * your zone then, so it never pulls you away from a section you jumped to.
+ */
+function useCampaignInView() {
+  const setInView = useSetAtom(campaignInViewAtom);
+  useEffect(() => {
+    const element = document.getElementById(pageSectionId("campaign"));
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      // Only the top 40% of the window counts.
+      { rootMargin: "0px 0px -60% 0px" },
+    );
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      setInView(true);
+    };
+  }, []);
+}
+
+function EmptyHint() {
+  const navigate = useNavigate();
+  return (
+    <div className={classNames(styles.empty)}>
+      <span>No build yet</span>
+      <button
+        className={classNames(
+          styles.emptyButton,
+          interactiveStyles.hoverPrimary,
+        )}
+        onClick={() => navigate("/build")}
+      >
+        Import
+      </button>
+    </div>
   );
 }
