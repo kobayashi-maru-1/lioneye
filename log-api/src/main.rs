@@ -43,9 +43,19 @@ struct Args {
 fn main() -> ExitCode {
     // Started from a terminal: print there. Double-clicked: no console at all.
     let console = attach_parent_console();
-    let _log_guards = init_logging(console);
+    let (_log_guards, log) = init_logging(console);
 
-    let args = Args::parse();
+    // With no console, a bad argument would vanish silently; show it in a box instead.
+    let args = match Args::try_parse() {
+        Ok(args) => args,
+        Err(err) => {
+            use clap::error::ErrorKind;
+            if console || matches!(err.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) {
+                err.exit();
+            }
+            return fail(console, &err.to_string());
+        }
+    };
 
     let runtime = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
         Ok(runtime) => runtime,
@@ -58,6 +68,10 @@ fn main() -> ExitCode {
         Err(msg) => return fail(console, &msg),
     };
 
+    // Only the copy that serves starts a fresh log; a second launch must not wipe it.
+    if let Some(file) = log {
+        let _ = file.set_len(0);
+    }
     info!("Guide: {}", url);
     info!("Log: {}", log_file().display());
 
@@ -188,7 +202,7 @@ fn fail(console: bool, msg: &str) -> ExitCode {
     ExitCode::FAILURE
 }
 
-/// `%LOCALAPPDATA%\exile-leveling\exile-leveling.log` (or the temp folder), replaced on each start.
+/// `%LOCALAPPDATA%\exile-leveling\exile-leveling.log` (or the temp folder), cleared when a copy starts serving.
 fn log_file() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
@@ -196,7 +210,11 @@ fn log_file() -> PathBuf {
     base.join("exile-leveling").join("exile-leveling.log")
 }
 
-fn init_logging(console: bool) -> Vec<tracing_appender::non_blocking::WorkerGuard> {
+/// Returns the writer guards (flush on drop) and a handle for clearing the log once this copy serves.
+/// The file is opened for append, so clearing it later makes new lines start at the top.
+fn init_logging(
+    console: bool,
+) -> (Vec<tracing_appender::non_blocking::WorkerGuard>, Option<std::fs::File>) {
     use tracing_subscriber::fmt::writer::{BoxMakeWriter, MakeWriterExt};
 
     let mut guards = Vec::new();
@@ -204,8 +222,15 @@ fn init_logging(console: bool) -> Vec<tracing_appender::non_blocking::WorkerGuar
         let path = log_file();
         path.parent()
             .and_then(|dir| std::fs::create_dir_all(dir).ok())
-            .and_then(|_| std::fs::File::create(&path).ok())
+            .and_then(|_| {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&path)
+                    .ok()
+            })
     };
+    let clear = file.as_ref().and_then(|file| file.try_clone().ok());
     let file_writer = file.map(|file| {
         let (writer, guard) = tracing_appender::non_blocking(file);
         guards.push(guard);
@@ -228,13 +253,29 @@ fn init_logging(console: bool) -> Vec<tracing_appender::non_blocking::WorkerGuar
         .with_ansi(false)
         .with_writer(writer)
         .init();
-    guards
+    (guards, clear)
 }
 
+/// Attaches to the terminal that started us, if any. Ctrl+C or closing that terminal
+/// then quits through the tray loop, so the icon is removed and the log flushed.
 #[cfg(windows)]
 fn attach_parent_console() -> bool {
-    use windows_sys::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
-    unsafe { AttachConsole(ATTACH_PARENT_PROCESS) != 0 }
+    use windows_sys::Win32::System::Console::{
+        ATTACH_PARENT_PROCESS, AttachConsole, SetConsoleCtrlHandler,
+    };
+    unsafe extern "system" fn on_ctrl(_event: u32) -> windows_sys::core::BOOL {
+        tray::request_quit();
+        // Give the tray loop time to remove the icon before Windows ends the process.
+        std::thread::sleep(Duration::from_millis(500));
+        1
+    }
+    unsafe {
+        if AttachConsole(ATTACH_PARENT_PROCESS) == 0 {
+            return false;
+        }
+        SetConsoleCtrlHandler(Some(on_ctrl), 1);
+    }
+    true
 }
 
 #[cfg(not(windows))]
@@ -244,12 +285,19 @@ fn attach_parent_console() -> bool {
 
 #[cfg(windows)]
 fn show_error(msg: &str) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MB_ICONERROR, MB_OK, MB_SETFOREGROUND, MB_TOPMOST, MessageBoxW,
+    };
     let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
     let text = wide(msg);
     let title = wide("Exile Leveling");
     unsafe {
-        MessageBoxW(std::ptr::null_mut(), text.as_ptr(), title.as_ptr(), MB_OK | MB_ICONERROR);
+        MessageBoxW(
+            std::ptr::null_mut(),
+            text.as_ptr(),
+            title.as_ptr(),
+            MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST,
+        );
     }
 }
 
