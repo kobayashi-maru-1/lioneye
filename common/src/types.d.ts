@@ -81,7 +81,7 @@ export namespace RouteData {
     requiredGem: RequiredGem;
     rewardType: "quest" | "vendor";
     count: number;
-    /** The quest whose reward (or vendor) has the gem, and which of its reward offers. */
+    /** The quest and reward offer that give (or sell) the gem, to name the NPC. */
     questId?: string;
     rewardOfferId?: string;
   }

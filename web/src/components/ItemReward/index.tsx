@@ -47,12 +47,15 @@ interface GemRewardProps {
   requiredGem: RouteData.RequiredGem;
   count: number;
   rewardType?: ItemRewardProps["rewardType"];
-  /** Where the gem comes from, so a step that hands in two quests says which. */
+  /** The quest and reward offer the gem comes from, to name who gives or sells it. */
   questId?: string;
   rewardOfferId?: string;
 }
 
-/** A quest reward names its quest; a vendor gem names the NPC who sells it. */
+/**
+ * The NPC to see: who hands out the quest reward (one quest can pay out from two, as
+ * The Caged Brute does from Tarkleigh and Nessa), or who sells the gem.
+ */
 function gemSource(
   gemId: string,
   rewardType: GemRewardProps["rewardType"],
@@ -60,13 +63,12 @@ function gemSource(
   rewardOfferId: string | undefined,
 ) {
   const quest = questId === undefined ? undefined : Data.Quests[questId];
-  if (!quest) return undefined;
-  if (rewardType === "quest") return quest.name;
   const offer =
     rewardOfferId === undefined
       ? undefined
-      : quest.reward_offers[rewardOfferId];
-  return offer?.vendor[gemId]?.npc;
+      : quest?.reward_offers[rewardOfferId];
+  if (!offer) return undefined;
+  return rewardType === "quest" ? offer.quest_npc : offer.vendor[gemId]?.npc;
 }
 
 export function GemReward({
