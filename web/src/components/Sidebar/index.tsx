@@ -1,5 +1,6 @@
 import { useAtomValue } from "jotai";
 import { gemLinksSelector } from "../../state/gem-links";
+import { pobAtom } from "../../state/pob";
 import { searchStringsSelector } from "../../state/search-strings";
 import { urlTreesSelector } from "../../state/tree/url-tree";
 import { interactiveStyles } from "../../styles";
@@ -7,11 +8,12 @@ import { AutoProgressStatus } from "../AutoProgress";
 import { GemLinkViewer } from "../GemLinkViewer";
 import { SearchStrings } from "../SearchStrings";
 import { SkillTreeViewer } from "../SkillTreeViewer";
+import { STATS_AVAILABLE, StatsViewer } from "../StatsViewer";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useMemo, useState } from "react";
 import React from "react";
-import { FaLink, FaListUl } from "react-icons/fa";
+import { FaChartBar, FaLink, FaListUl } from "react-icons/fa";
 import { FiChevronLeft, FiChevronRight, FiSearch } from "react-icons/fi";
 import { TbHierarchy } from "react-icons/tb";
 import { useNavigate } from "react-router-dom";
@@ -83,7 +85,7 @@ function EmptyHint() {
 }
 
 interface Section {
-  key: "tree" | "gems" | "search";
+  key: "tree" | "gems" | "stats" | "search";
   tab: React.ReactNode;
   content: React.ReactNode;
 }
@@ -92,6 +94,7 @@ function useSections() {
   const searchStrings = useAtomValue(searchStringsSelector);
   const urlTrees = useAtomValue(urlTreesSelector);
   const gemLinks = useAtomValue(gemLinksSelector);
+  const pobCode = useAtomValue(pobAtom);
 
   return useMemo(() => {
     const sections: Section[] = [];
@@ -122,6 +125,19 @@ function useSections() {
       });
     }
 
+    if (STATS_AVAILABLE && pobCode !== null) {
+      sections.push({
+        key: "stats",
+        tab: (
+          <>
+            <FaChartBar className={classNames("inlineIcon")} />
+            Stats
+          </>
+        ),
+        content: <StatsViewer code={pobCode} />,
+      });
+    }
+
     if (searchStrings !== null && searchStrings.length > 0) {
       sections.push({
         key: "search",
@@ -136,7 +152,7 @@ function useSections() {
     }
 
     return sections;
-  }, [urlTrees, gemLinks, searchStrings]);
+  }, [urlTrees, gemLinks, pobCode, searchStrings]);
 }
 
 interface HeaderProps {

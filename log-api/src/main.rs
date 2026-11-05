@@ -10,6 +10,7 @@ use tracing::{error, info, warn};
 #[cfg(windows)]
 mod guide_window;
 mod log_reader;
+mod pob;
 mod server;
 #[cfg(windows)]
 mod tray;
@@ -82,6 +83,7 @@ fn main() -> ExitCode {
     let state = server::AppState {
         lines: lines_tx.clone(),
         status: status_rx.clone(),
+        pob: pob::Engine::start(),
     };
 
     // A guide window left open from an earlier run reconnects by itself; bring it up instead.

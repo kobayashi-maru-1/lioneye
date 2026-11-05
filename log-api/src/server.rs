@@ -1,22 +1,24 @@
 use std::time::Duration;
 
 use axum::{
-    Router,
+    Json, Router,
     extract::{
-        State,
+        DefaultBodyLimit, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::{HeaderMap, StatusCode, Uri, header},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use rust_embed::RustEmbed;
+use serde::Deserialize;
 use tokio::{
     net::TcpListener,
     sync::{broadcast, watch},
 };
 use tracing::info;
 
+use crate::pob;
 use crate::watcher::Status;
 
 /// The built guide (web/dist), compiled into the exe.
@@ -28,12 +30,18 @@ struct Assets;
 pub struct AppState {
     pub lines: broadcast::Sender<String>,
     pub status: watch::Receiver<Status>,
+    pub pob: pob::Engine,
 }
 
 pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/ws", get(ws_handler))
         .route(WHOAMI_PATH, get(|| async { WHOAMI }))
+        // PoB exports of big builds can pass axum's 2 MB default.
+        .route(
+            "/api/pob/stats",
+            post(pob_stats).layer(DefaultBodyLimit::max(32 * 1024 * 1024)),
+        )
         .fallback(static_handler)
         .with_state(state);
 
@@ -118,6 +126,32 @@ async fn client(mut socket: WebSocket, state: AppState) {
         }
     }
     info!("Guide disconnected");
+}
+
+#[derive(Deserialize)]
+struct StatsRequest {
+    /// The build as PoB XML.
+    xml: String,
+    /// Loadout name from an earlier answer; none for the loadout the build was saved on.
+    loadout: Option<String>,
+}
+
+/// PoB's sidebar stats for a loadout of the imported build.
+async fn pob_stats(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<StatsRequest>,
+) -> Response {
+    if !local_origin(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    match state.pob.stats(request.xml, request.loadout).await {
+        Ok(json) => ([(header::CONTENT_TYPE, "application/json")], json).into_response(),
+        Err(pob::StatsError::Superseded) => StatusCode::CONFLICT.into_response(),
+        Err(pob::StatsError::Failed(msg)) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response()
+        }
+    }
 }
 
 async fn static_handler(uri: Uri) -> Response {

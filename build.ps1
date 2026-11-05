@@ -5,6 +5,8 @@
 .DESCRIPTION
   Needs Node.js 22+ and Rust (rustup) on PATH. Output: .\exile-leveling.exe
   -SkipTree reuses tree data from an earlier build (the download is ~7 MB).
+  Each build bundles the latest Path of Building release for the Stats tab
+  (log-api\fetch-pob.ps1; skipped when that release is already downloaded).
 #>
 param(
   [switch]$SkipTree
@@ -12,9 +14,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-foreach ($tool in 'node', 'npm', 'cargo') {
+foreach ($tool in 'node', 'npm', 'cargo', 'git') {
   if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
-    throw "$tool isn't on PATH. Install Node.js 22+ and Rust (https://rustup.rs) first."
+    throw "$tool isn't on PATH. Install Node.js 22+, Rust (https://rustup.rs) and Git first."
   }
 }
 
@@ -42,6 +44,9 @@ try {
   }
 
   Invoke-Step 'Building the guide' { npm -w web run build:desktop }
+
+  Write-Host '==> Downloading Path of Building' -ForegroundColor Cyan
+  & (Join-Path $PSScriptRoot 'log-api\fetch-pob.ps1')
 
   Push-Location log-api
   try {

@@ -44,11 +44,19 @@ your PoB once on the **Build** page.
   The tabs show one at a time; the arrow at the left hides the panel.
 - The tree and gem set follow the act you're in, matched by PoB titles such as
   `Act 2` or `Act 4-6 - 50 pts`. The arrows pick another set until you reach the next act.
+- **Stats** shows Path of Building's sidebar (life, DPS and the rest) for the loadout that
+  matches your act, calculated by the PoB release bundled in the exe. The arrows pick another
+  loadout. The first view after starting takes a few seconds while PoB loads; it unloads
+  after 10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`.
 - Drag the bar between the route and the panel to resize; double-click it to reset.
 
 ## Build
 
-Needs [Node.js 22+](https://nodejs.org) and [Rust](https://rustup.rs).
+Needs [Node.js 22+](https://nodejs.org), [Rust](https://rustup.rs) and Git.
+
+Each build bundles the latest [Path of Building](https://github.com/PathOfBuildingCommunity/PathOfBuilding)
+release (code and game data only, about 5 MB) for the Stats tab; `log-api\fetch-pob.ps1`
+downloads it and skips the download when that release is already there.
 
 ```powershell
 .\build.ps1            # writes .\exile-leveling.exe
@@ -88,4 +96,5 @@ git remote add upstream https://github.com/HeartofPhos/exile-leveling.git
 git remote add upstream-log-api https://github.com/HeartofPhos/exile-log-api.git
 ```
 
-Both projects are MIT licensed; see `LICENSE` and `log-api/LICENSE`.
+Both projects are MIT licensed; see `LICENSE` and `log-api/LICENSE`. Path of Building
+is MIT licensed too; its license ships inside the bundle.

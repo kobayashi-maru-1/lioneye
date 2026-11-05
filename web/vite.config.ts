@@ -12,8 +12,9 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       proxy: {
-        // `npm run dev` talks to a running exe for auto-progress
+        // `npm run dev` talks to a running exe for auto-progress and PoB stats
         "/ws": { target: "ws://127.0.0.1:6754", ws: true },
+        "/api": { target: "http://127.0.0.1:6754" },
       },
     },
     plugins: [

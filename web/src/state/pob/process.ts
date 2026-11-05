@@ -37,11 +37,13 @@ function MapGemId(gemId: string) {
   return gemId;
 }
 
-function decodePathOfBuildingCode(code: string) {
-  const buffer = inflate(decodeBase64Url(code));
+/** A PoB export code as the XML that Path of Building saves. */
+export function pobCodeToXml(code: string) {
+  return new TextDecoder().decode(inflate(decodeBase64Url(code)));
+}
 
-  const decoder = new TextDecoder();
-  const xmlString = decoder.decode(buffer);
+function decodePathOfBuildingCode(code: string) {
+  const xmlString = pobCodeToXml(code);
 
   const parser = new DOMParser();
   const xml = parser.parseFromString(xmlString, "application/xml");
