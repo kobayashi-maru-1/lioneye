@@ -6,9 +6,10 @@
   Gets the latest Path of Building Community release (or -Tag) and writes
   log-api\pob\pob.zip and log-api\pob\version.txt. Only what headless calculation
   needs is kept: Lua code, game data and the latest tree. Art and the timeless
-  jewel tables are left out. Skips the download when that release is already here.
-  Needs git on PATH. build.ps1 runs it on every build; build.rs runs it when the
-  bundle is missing (a fresh checkout, as in GitHub Actions).
+  jewel tables are left out (the exe downloads a jewel's table when a build needs it).
+  Skips the download when that release is already here, and keeps the bundle it has
+  when offline. Needs git on PATH. build.ps1 and build.rs (so a plain cargo build or
+  GitHub Actions gets it too) both run it.
 #>
 param(
   [string]$Tag
@@ -19,23 +20,36 @@ $repo = 'PathOfBuildingCommunity/PathOfBuilding'
 $out = Join-Path $PSScriptRoot 'pob'
 $zip = Join-Path $out 'pob.zip'
 $versionFile = Join-Path $out 'version.txt'
+# Release plus this number, recorded in bundle.txt. Raise the number when the files picked
+# below change, so an existing bundle of the same release is rebuilt.
+$format = 2
+$bundleFile = Join-Path $out 'bundle.txt'
 
 function Invoke-Git {
   & git @args
   if ($LASTEXITCODE -ne 0) { throw "git $($args -join ' ') failed (exit $LASTEXITCODE)" }
 }
 
+$haveBundle = (Test-Path $zip) -and (Test-Path $versionFile) -and (Test-Path $bundleFile)
+
 if (-not $Tag) {
   # Release tags are vMAJOR.MINOR.PATCH; read them with git (no API rate limit).
   $tags = & git ls-remote --tags --refs "https://github.com/$repo.git"
-  if ($LASTEXITCODE -ne 0) { throw "Couldn't list Path of Building's releases (git exit $LASTEXITCODE)" }
+  if ($LASTEXITCODE -ne 0) {
+    if ($haveBundle) {
+      Write-Warning "Couldn't check for a newer Path of Building (offline?). Keeping $((Get-Content $versionFile -Raw).Trim())."
+      return
+    }
+    throw "Couldn't list Path of Building's releases (git exit $LASTEXITCODE)"
+  }
   $Tag = $tags |
     ForEach-Object { if ($_ -match 'refs/tags/(v(\d+)\.(\d+)\.(\d+))$') { [pscustomobject]@{ Tag = $Matches[1]; Version = [version]"$($Matches[2]).$($Matches[3]).$($Matches[4])" } } } |
     Sort-Object Version | Select-Object -Last 1 -ExpandProperty Tag
   if (-not $Tag) { throw "Couldn't find a Path of Building release tag" }
 }
 
-if ((Test-Path $zip) -and (Test-Path $versionFile) -and ((Get-Content $versionFile -Raw).Trim() -eq $Tag)) {
+$bundle = "$Tag format $format"
+if ($haveBundle -and ((Get-Content $bundleFile -Raw).Trim() -eq $bundle)) {
   Write-Host "Path of Building $Tag is already here."
   return
 }
@@ -64,7 +78,9 @@ try {
     '/src/Data/' `
     '!/src/Data/TimelessJewelData/*.zip' `
     '!/src/Data/TimelessJewelData/*.zip.part*' `
-    "/src/TreeData/$tree/*.lua"
+    "/src/TreeData/$tree/*.lua" `
+    '/src/TreeData/legion/*.lua' `
+    '/src/TreeData/3_19/Assets.lua'
 
   # Layout the exe expects: PoB's src folder at the root, its Lua libraries in lua\.
   $stage = Join-Path $work 'stage'
@@ -78,6 +94,7 @@ try {
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   [IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip, [IO.Compression.CompressionLevel]::Optimal, $false)
   Set-Content -Path $versionFile -Value $Tag -NoNewline
+  Set-Content -Path $bundleFile -Value $bundle -NoNewline
   Write-Host ("Wrote {0} ({1:N1} MB)" -f $zip, ((Get-Item $zip).Length / 1MB))
 }
 finally {

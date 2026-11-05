@@ -11,6 +11,8 @@ path = "src/main.rs"
 anyhow = "1.0.104"
 axum = { version = "0.8", features = ["ws"] }
 clap = { version = "4.6", features = ["derive"] }
+# PoB's Inflate (timeless jewel data); already used by zip.
+flate2 = "1"
 mime_guess = "2"
 # Path of Building's calculations (src/pob.rs): LuaJIT built from source, and the bundled PoB archive.
 mlua = { version = "0.10", features = ["luajit", "vendored"] }

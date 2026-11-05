@@ -52,8 +52,6 @@ export function StatsViewer({ code }: { code: string }) {
     setError(null);
     fetchStats(xml, requested, controller.signal)
       .then((stats) => {
-        // null: a newer request replaced this one and will answer instead.
-        if (stats === null) return;
         setAnswer({ xml, stats });
         setLoading(false);
       })
@@ -66,7 +64,9 @@ export function StatsViewer({ code }: { code: string }) {
   }, [xml, requested, attempt]);
 
   if (xml === null)
-    return <p className={classNames(styles.status)}>Build unreadable</p>;
+    return (
+      <p className={classNames(styles.status)}>Build unreadable. Re-import.</p>
+    );
 
   return (
     <div className={classNames(styles.stats)}>
@@ -75,7 +75,7 @@ export function StatsViewer({ code }: { code: string }) {
       )}
       {error !== null && (
         <div className={classNames(styles.status)} title={error}>
-          Stats failed.
+          Stats failed
           <button
             className={classNames(formStyles.formButton, styles.retry)}
             onClick={() => setAttempt((n) => n + 1)}
@@ -87,7 +87,8 @@ export function StatsViewer({ code }: { code: string }) {
       {error === null && stats === null && (
         <p className={classNames(styles.status)}>Calculating</p>
       )}
-      {stats !== null && (
+      {/* After a failed loadout the old rows would sit under the new loadout's name. */}
+      {error === null && stats !== null && (
         <div
           className={classNames(styles.rows, { [styles.stale]: loading })}
           aria-busy={loading}
@@ -131,16 +132,16 @@ async function fetchStats(
   xml: string,
   loadout: string | null,
   signal: AbortSignal,
-): Promise<Stats | null> {
+): Promise<Stats> {
   const response = await fetch(STATS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ xml, loadout }),
     signal,
   });
-  if (response.status === 409) return null;
   if (!response.ok) {
-    throw new Error((await response.text()) || `HTTP ${response.status}`);
+    const text = response.status === 404 ? "" : await response.text();
+    throw new Error(text || "PoB unavailable. Restart the app.");
   }
   const stats = (await response.json()) as Partial<Stats>;
   // PoB's JSON writes an empty list as {}.

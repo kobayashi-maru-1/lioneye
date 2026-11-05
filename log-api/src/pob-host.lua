@@ -1,7 +1,9 @@
 -- Starts Path of Building's own headless mode (HeadlessWrapper.lua) inside exile-leveling.exe
 -- and answers stat requests from the guide. Set by the exe before this runs:
---   host_dir        the unpacked PoB folder (forward slashes)
---   host_log(line)  writes a line to the exe's log
+--   host_dir           the unpacked PoB folder (forward slashes)
+--   host_log(line)     writes a line to the exe's log
+--   host_inflate(data) zlib-inflates data (PoB's Inflate; headless mode has none)
+--   host_fetch(path)   downloads a timeless jewel file (path relative to host_dir); true if it did
 
 local dir = host_dir
 
@@ -21,7 +23,34 @@ local raw = {
 	rename = os.rename,
 }
 loadfile = function(path, ...) return raw.loadfile(abs(path), ...) end
-io.open = function(path, ...) return raw.open(abs(path), ...) end
+
+-- Timeless jewel data isn't bundled (170 MB); the exe downloads a jewel's file the first
+-- time PoB opens it. PoB tries X.zip, then X.zip.part0, part1, ... until one is missing.
+local JEWELS = dir .. "/Data/TimelessJewelData/"
+local fetched = {}
+io.open = function(path, mode, ...)
+	local full = abs(path)
+	local writing = mode ~= nil and mode:find("[wa+]") ~= nil
+	if type(full) == "string" and full:sub(1, #JEWELS) == JEWELS then
+		-- PoB caches the inflated data as X.bin but never reads it back headless (no file search).
+		if writing and full:match("%.bin$") then
+			return nil, "not cached"
+		end
+		local file, err = raw.open(full, mode, ...)
+		if file or writing then
+			return file, err
+		end
+		local name = full:sub(#dir + 2)
+		if fetched[name] == nil then
+			fetched[name] = host_fetch ~= nil and host_fetch(name) or false
+		end
+		if fetched[name] then
+			return raw.open(full, mode, ...)
+		end
+		return file, err
+	end
+	return raw.open(full, mode, ...)
+end
 io.lines = function(path, ...)
 	if path == nil then return raw.lines() end
 	return raw.lines(abs(path), ...)
@@ -65,15 +94,46 @@ dofile = function(path)
 		GetRuntimePath = function() return dir end
 		GetUserPath = function() return dir end
 		GetWorkDir = function() return dir end
+		Inflate = host_inflate or Inflate
 	end
 	local chunk = assert(raw.loadfile(abs(path)))
 	return chunk()
 end
 
+-- PoB catches its own errors and shows them in a popup (launch.promptMsg) instead of raising them.
+-- Returns the popup's error line, without colour codes or keyboard hints, and clears it.
+local function takePromptError()
+	local msg = launch and launch.promptMsg
+	if not msg then
+		return nil
+	end
+	launch.promptMsg = nil
+	msg = msg:gsub("%^x%x%x%x%x%x%x", ""):gsub("%^%d", "")
+	for line in msg:gmatch("[^\n]+") do
+		line = line:match("^%s*(.-)%s*$")
+		if line ~= "" and line ~= "Error:" then
+			return line
+		end
+	end
+	return msg
+end
+
+local function raisePromptError()
+	local msg = takePromptError()
+	if msg then
+		error(msg, 0)
+	end
+end
+
 dofile("HeadlessWrapper.lua")
 if build == nil then
-	error("Path of Building didn't start: " .. lastLine)
+	error("PoB didn't start: " .. (takePromptError() or lastLine), 0)
 end
+-- Dev mode (PoB's update check off) would also save the open build on every switch.
+main.disableDevAutoSave = true
+
+-- Marks an error that leaves PoB usable, so the exe keeps it loaded.
+local KEEP = "[keep] "
 
 local json = require("dkjson")
 local ARRAY = { __jsontype = "array" }
@@ -89,12 +149,38 @@ local function hasTree(version)
 	return false
 end
 
+local function treeName(version)
+	return treeVersions[version] and treeVersions[version].display or version
+end
+
+-- Returns the XML with every spec on a bundled tree, and a note per tree that was swapped.
 local function onBundledTrees(xml)
-	return (xml:gsub('treeVersion="([%w_]+)"', function(version)
-		if version ~= latestTreeVersion and not hasTree(version) then
-			return 'treeVersion="' .. latestTreeVersion .. '"'
+	local swapped = {}
+	local function swap(version)
+		if version == latestTreeVersion or hasTree(version) then
+			return nil
 		end
-	end))
+		swapped[version] = true
+		return latestTreeVersion
+	end
+	-- A spec without treeVersion is on PoB's oldest multi-tree version.
+	xml = xml:gsub("<Spec(%s[^>]*)>", function(attrs)
+		if attrs:find('treeVersion="') then
+			return nil
+		end
+		local version = swap(defaultTreeVersion) or defaultTreeVersion
+		return '<Spec treeVersion="' .. version .. '"' .. attrs .. ">"
+	end)
+	xml = xml:gsub('treeVersion="([%w_]+)"', function(version)
+		local to = swap(version)
+		return to and ('treeVersion="' .. to .. '"') or nil
+	end)
+	local notes = {}
+	for version in pairs(swapped) do
+		notes[#notes + 1] = "^xFFB000Tree " .. treeName(version) .. " calculated on " .. treeName(latestTreeVersion)
+	end
+	table.sort(notes)
+	return xml, notes
 end
 
 local function loadoutControl()
@@ -120,17 +206,27 @@ local function currentLoadout()
 	return value
 end
 
--- Same as picking the loadout in PoB's dropdown.
+-- Same as picking the loadout in PoB's dropdown. Errors leave PoB usable, so they keep it loaded.
 local function selectLoadout(name)
 	local control = loadoutControl()
 	for index, value in ipairs(control.list) do
 		if value == name then
-			control.selFunc(index, value)
+			local ok, err = pcall(control.selFunc, index, value)
+			if not ok then
+				error(KEEP .. "Loadout " .. name .. " didn't load: " .. tostring(err), 0)
+			end
 			runCallback("OnFrame")
-			return currentLoadout() == name
+			local msg = takePromptError()
+			if msg then
+				error(KEEP .. msg, 0)
+			end
+			if currentLoadout() ~= name then
+				error(KEEP .. "Loadout " .. name .. " didn't load. Check its sets in PoB.", 0)
+			end
+			return
 		end
 	end
-	return false
+	error(KEEP .. "No loadout " .. name .. ". Re-import the build.", 0)
 end
 
 -- PoB's sidebar: { label, value } rows, single-text rows (headers, notes) and gaps.
@@ -148,25 +244,37 @@ local function rows()
 	return out
 end
 
+local loadedXml
+local treeNotes = {}
+
 local function warnings()
 	local out = setmetatable({}, ARRAY)
+	for _, line in ipairs(treeNotes) do
+		out[#out + 1] = line
+	end
 	for _, line in ipairs(build.controls.warnings.lines or {}) do
 		out[#out + 1] = line
 	end
 	return out
 end
 
-local loadedXml
-
--- Called by the exe: stats for `loadout` (nil: the loadout the build was saved on), as JSON.
+-- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
+-- when the build is new to PoB, else the loadout picked last.
 function host_stats(xml, loadout)
 	if xml ~= loadedXml then
 		loadedXml = nil
-		loadBuildFromXML(onBundledTrees(xml), "Guide")
+		local bundled
+		bundled, treeNotes = onBundledTrees(xml)
+		takePromptError()
+		loadBuildFromXML(bundled, "Guide")
+		local msg = takePromptError()
+		if msg then
+			error("Build didn't load: " .. msg, 0)
+		end
 		loadedXml = xml
 	end
-	if loadout ~= nil and loadout ~= currentLoadout() and not selectLoadout(loadout) then
-		error("Loadout not found: " .. loadout)
+	if loadout ~= nil and loadout ~= currentLoadout() then
+		selectLoadout(loadout)
 	end
 	return json.encode({
 		loadouts = loadouts(),

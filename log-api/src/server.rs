@@ -145,12 +145,16 @@ async fn pob_stats(
     if !local_origin(&headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
-    match state.pob.stats(request.xml, request.loadout).await {
-        Ok(json) => ([(header::CONTENT_TYPE, "application/json")], json).into_response(),
-        Err(pob::StatsError::Superseded) => StatusCode::CONFLICT.into_response(),
-        Err(pob::StatsError::Failed(msg)) => {
-            (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response()
-        }
+    // Long enough for PoB's first load plus a first-time timeless jewel download.
+    let stats = state.pob.stats(request.xml, request.loadout);
+    match tokio::time::timeout(Duration::from_secs(180), stats).await {
+        Ok(Ok(json)) => ([(header::CONTENT_TYPE, "application/json")], json).into_response(),
+        Ok(Err(msg)) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+        Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "PoB is taking too long. Restart the app.",
+        )
+            .into_response(),
     }
 }
 

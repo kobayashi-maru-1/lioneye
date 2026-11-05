@@ -48,6 +48,8 @@ your PoB once on the **Build** page.
   matches your act, calculated by the PoB release bundled in the exe. The arrows pick another
   loadout. The first view after starting takes a few seconds while PoB loads; it unloads
   after 10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`.
+  A build with a timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub
+  the first time. Specs on an older tree are calculated on the latest one (noted under the stats).
 - Drag the bar between the route and the panel to resize; double-click it to reset.
 
 ## Build

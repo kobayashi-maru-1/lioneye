@@ -7,7 +7,7 @@ import {
 } from "../../state/current-act";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi";
 
 /**
@@ -16,16 +16,31 @@ import { HiChevronLeft, HiChevronRight } from "react-icons/hi";
  */
 export function useFollowAct(titles: string[]) {
   const act = useAtomValue(currentActAtom);
-  const [index, setIndex] = useState(() => indexForAct(titles, act) ?? 0);
   const key = titles.join("\n");
+  const [state, setState] = useState(() => ({
+    act,
+    key,
+    index: indexForAct(titles, act) ?? 0,
+  }));
 
-  useEffect(() => {
+  // Adjusted during render rather than in an effect, so the first render with new
+  // titles already has the right index (the Stats tab would otherwise calculate twice).
+  let current = state;
+  if (state.act !== act || state.key !== key) {
     const followed = indexForAct(titles, act);
-    if (followed !== null) setIndex(followed);
-    else setIndex((prev) => (prev < titles.length ? prev : 0));
-  }, [act, key]);
+    current = {
+      act,
+      key,
+      index: followed ?? (state.index < titles.length ? state.index : 0),
+    };
+    setState(current);
+  }
 
-  const safeIndex = index < titles.length ? index : 0;
+  const setIndex = useCallback(
+    (index: number) => setState((prev) => ({ ...prev, index })),
+    [],
+  );
+  const safeIndex = current.index < titles.length ? current.index : 0;
   return [safeIndex, setIndex] as const;
 }
 
