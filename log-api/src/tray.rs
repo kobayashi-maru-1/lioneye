@@ -48,11 +48,13 @@ fn tooltip(status: &Status) -> &'static str {
 }
 
 /// Shows the icon and runs the window message loop on this thread until Quit or `stopped` fires.
-/// Left-click or Open calls `open`.
+/// Left-click or Open calls `open`. `tick` runs after each round of window messages (at least
+/// every 250 ms) for the in-game bar, whose window lives on this thread too.
 pub fn run(
     mut status: watch::Receiver<Status>,
     stopped: Receiver<()>,
     open: impl Fn(),
+    mut tick: impl FnMut(),
 ) -> anyhow::Result<Exit> {
     let open_item = MenuItem::new("Open", true, None);
     let quit_item = MenuItem::new("Quit", true, None);
@@ -90,6 +92,8 @@ pub fn run(
         if QUIT.load(Ordering::SeqCst) {
             return Ok(Exit::Quit);
         }
+
+        tick();
 
         while let Ok(event) = MenuEvent::receiver().try_recv() {
             if event.id == *quit_item.id() {

@@ -1,0 +1,98 @@
+/* The in-game bar: the guide's jump bar (gold capitals on near-black), as one strip.
+   The window is sized to .bar; the exe's NAVY constant matches the background. */
+:root {
+  color-scheme: dark;
+  --primary: #161616;
+  --border: #2f3b4d;
+  --gold: #af8040;
+  --gold-hover: #c99550;
+  --button: #1f1f1f;
+  --button-border: #2d2d2d;
+}
+
+html,
+body {
+  margin: 0;
+  overflow: hidden;
+  background-color: var(--primary);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  user-select: none;
+}
+
+.bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  padding: 4px;
+  box-sizing: border-box;
+  background-color: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Two columns of dots, as in the mockup. */
+.grip {
+  width: 18px;
+  height: 30px;
+  border-radius: 4px;
+  cursor: grab;
+  background-image: radial-gradient(circle, #7d8490 1.4px, transparent 1.6px);
+  background-size: 7px 7px;
+  background-position: 2px 1px;
+}
+
+.grip:hover {
+  background-color: var(--button);
+}
+
+.buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.button {
+  height: 30px;
+  min-width: 64px;
+  padding: 0 10px;
+  color: var(--gold);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background-color: var(--button);
+  border: 1px solid var(--button-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button:hover {
+  color: var(--gold-hover);
+  border-color: var(--border);
+}
+
+.button:active {
+  background-color: #2a2a2a;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  margin: 0 6px 0 4px;
+  border-radius: 50%;
+  background-color: #2a2a2a;
+}
+
+.offline {
+  background-color: hsl(0, 70%, 55%);
+}
+
+.waiting {
+  background-color: hsl(40, 90%, 55%);
+}
+
+.watching {
+  background-color: hsl(120, 60%, 50%);
+}

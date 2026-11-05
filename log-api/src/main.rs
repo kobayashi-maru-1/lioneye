@@ -10,6 +10,8 @@ use tracing::{error, info, warn};
 #[cfg(windows)]
 mod guide_window;
 mod log_reader;
+#[cfg(windows)]
+mod overlay;
 mod pob;
 mod web_data;
 mod server;
@@ -45,6 +47,14 @@ struct Args {
 }
 
 fn main() -> ExitCode {
+    // Sharp text in the in-game bar on scaled (high-DPI) monitors.
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::UI::HiDpi::{
+            DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
+        };
+        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
     // Started from a terminal: print there. Double-clicked: no console at all.
     let console = attach_parent_console();
     let (_log_guards, log) = init_logging(console);
@@ -81,11 +91,30 @@ fn main() -> ExitCode {
 
     let (lines_tx, _) = broadcast::channel::<String>(256);
     let (status_tx, status_rx) = watch::channel(watcher::Status::Waiting);
+    // The in-game bar's place and settings from the last run.
+    #[cfg(windows)]
+    let saved_overlay = overlay::load();
+    #[cfg(windows)]
+    let overlay_config = saved_overlay.config.clone();
+    #[cfg(not(windows))]
+    let overlay_config = server::OverlayConfig::default();
+    let (overlay_tx, overlay_rx) = watch::channel(overlay_config);
+    // A bar button with no guide open asks the tray thread to open one.
+    let (open_tx, open_rx) = std::sync::mpsc::channel::<()>();
     let state = server::AppState {
         lines: lines_tx.clone(),
         status: status_rx.clone(),
         pob: pob::Engine::start(),
+        overlay: std::sync::Arc::new(overlay_tx),
+        guides: std::sync::Arc::new(server::Guides::new(open_tx)),
     };
+    #[cfg(windows)]
+    let bar = Bar {
+        overlay: overlay::Overlay::new(&url, overlay_rx, &saved_overlay),
+        open_requests: open_rx,
+    };
+    #[cfg(not(windows))]
+    let _ = (overlay_rx, open_rx);
 
     // A guide window left open from an earlier run reconnects by itself; bring it up instead.
     if args.browser != Browser::None {
@@ -104,9 +133,27 @@ fn main() -> ExitCode {
         let _ = done_tx.send(res.map_err(|err| err.to_string()));
     });
 
+    #[cfg(windows)]
+    let code = wait(&args, &url, console, status_rx, done_rx, bar);
+    #[cfg(not(windows))]
     let code = wait(&args, &url, console, status_rx, done_rx);
     runtime.shutdown_timeout(Duration::from_secs(1));
     code
+}
+
+/// The in-game bar and the guide-open requests from its buttons; both run on the tray thread.
+#[cfg(windows)]
+struct Bar {
+    overlay: overlay::Overlay,
+    open_requests: std::sync::mpsc::Receiver<()>,
+}
+
+/// `%LOCALAPPDATA%\exile-leveling` (or the temp folder): the log, caches and saved settings.
+fn data_dir() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("exile-leveling")
 }
 
 /// Binds the address. `Ok(None)` means another copy is already running and was brought up instead.
@@ -156,6 +203,7 @@ fn wait(
     console: bool,
     status: watch::Receiver<watcher::Status>,
     done: std::sync::mpsc::Receiver<Result<(), String>>,
+    mut bar: Bar,
 ) -> ExitCode {
     // Open from the tray always shows a window, even with --browser none.
     let browser = if args.browser == Browser::None { Browser::Edge } else { args.browser };
@@ -169,7 +217,13 @@ fn wait(
     });
 
     info!("Running in the tray. Quit from its menu.");
-    match tray::run(status, stopped_rx, || show_guide(browser, url)) {
+    let tick = || {
+        if bar.open_requests.try_recv().is_ok() {
+            show_guide(browser, url);
+        }
+        bar.overlay.tick();
+    };
+    match tray::run(status, stopped_rx, || show_guide(browser, url), tick) {
         Ok(tray::Exit::Quit) => {
             // The guide is a separate Edge window; Quit closes it too.
             guide_window::close_all();
@@ -216,10 +270,7 @@ fn fail(console: bool, msg: &str) -> ExitCode {
 
 /// `%LOCALAPPDATA%\exile-leveling\exile-leveling.log` (or the temp folder), cleared when a copy starts serving.
 fn log_file() -> PathBuf {
-    let base = std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
-    base.join("exile-leveling").join("exile-leveling.log")
+    data_dir().join("exile-leveling.log")
 }
 
 /// Returns the writer guards (flush on drop) and a handle for clearing the log once this copy serves.

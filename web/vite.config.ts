@@ -9,6 +9,14 @@ export default defineConfig(({ mode }) => {
   const local = mode === "desktop";
   return {
     base: local ? "/" : "/exile-leveling/",
+    // The exe also serves the in-game bar (overlay.html); the hosted site has no exe.
+    build: local
+      ? {
+          rollupOptions: {
+            input: { main: "index.html", overlay: "overlay.html" },
+          },
+        }
+      : undefined,
     server: {
       host: true,
       proxy: {

@@ -29,6 +29,7 @@ import type { TaskListProps } from "../../components/TaskList";
 import { currentActAtom } from "../../state/current-act";
 import { gemLinksSelector } from "../../state/gem-links";
 import { gemProgressFamily } from "../../state/gem-progress";
+import { shownPanelsAtom } from "../../state/overlay";
 import { pobAtom } from "../../state/pob";
 import {
   campaignInViewAtom,
@@ -198,11 +199,13 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
 
   // The app bar's jump buttons, one per panel shown.
   const setTargets = useSetAtom(jumpTargetsAtom);
+  // The in-game bar only gets buttons for these (state/overlay.ts).
+  const setShownPanels = useSetAtom(shownPanelsAtom);
   const targetKey = [gemLinks.length > 0, showStats, urlTrees.length > 0]
     .concat([notes !== null, hasSearch])
     .join();
   useEffect(() => {
-    setTargets([
+    const targets = [
       { id: "campaign", label: "Campaign" },
       ...(showStats ? [{ id: "gear", label: "Gear" }] : []),
       ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
@@ -211,7 +214,9 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
       ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
       ...(notes !== null ? [{ id: "notes", label: "Notes" }] : []),
       ...(hasSearch ? [{ id: "search", label: "Search" }] : []),
-    ]);
+    ];
+    setTargets(targets);
+    setShownPanels(targets.map((target) => target.id));
   }, [targetKey]);
   useEffect(() => () => setTargets([]), []);
 

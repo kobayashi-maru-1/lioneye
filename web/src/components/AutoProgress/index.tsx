@@ -1,7 +1,15 @@
 import { useAtomValue, useSetAtom } from "jotai";
-import { useEffect } from "react";
+import { useAtomCallback } from "jotai/utils";
+import { useCallback, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { bossesKilledBy } from "../../state/boss-kills";
-import { activeEdgeAtom, bossKillAtom } from "../../state/route";
+import {
+  OVERLAY_PANELS,
+  overlaySettingsAtom,
+  shownPanelsAtom,
+} from "../../state/overlay";
+import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
+import { useJumpToSection } from "../PageSection";
 import { autoProgressAtom } from "../../state/auto-progress";
 import { levelLineAtom } from "../../state/level-lines";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
@@ -17,12 +25,21 @@ export function useAutoProgress() {
   const bossKilled = useSetAtom(bossKillAtom);
   const setState = useSetAtom(autoProgressAtom);
 
-  const { readyState } = useWebSocket({
+  const jump = useJumpFromGame();
+
+  const { readyState, sendMessage } = useWebSocket({
     url: AUTO_PROGRESS_URL,
     shouldReconnect: true,
     reconnectInterval: 1000,
     onMessage(event) {
       if (typeof event.data !== "string") return;
+      // A button on the in-game bar.
+      if (event.data.startsWith("jump:")) {
+        jump(event.data.slice("jump:".length));
+        return;
+      }
+      // The bar's settings, for the bar itself.
+      if (event.data.startsWith("overlay:")) return;
       if (event.data.startsWith("status:")) {
         const [status, path] = event.data.slice("status:".length).split("|");
         setState(
@@ -47,6 +64,57 @@ export function useAutoProgress() {
   useEffect(() => {
     if (readyState !== ReadyState.OPEN) setState({ kind: "offline" });
   }, [readyState]);
+
+  // Tell the exe this is a guide page (a bar button with no guide open waits for one),
+  // and send the bar's settings whenever they or the build's panels change.
+  const settings = useAtomValue(overlaySettingsAtom);
+  const shown = useAtomValue(shownPanelsAtom);
+  useEffect(() => {
+    if (readyState === ReadyState.OPEN) sendMessage("guide");
+  }, [readyState]);
+  useEffect(() => {
+    if (readyState !== ReadyState.OPEN) return;
+    const buttons =
+      shown === null
+        ? undefined
+        : OVERLAY_PANELS.filter(
+            (panel) =>
+              settings.panels.includes(panel.id) && shown.includes(panel.id),
+          ).map(({ id, label }) => ({ id, label }));
+    sendMessage(`overlay:${JSON.stringify({ on: settings.on, buttons })}`);
+  }, [readyState, settings, shown]);
+}
+
+/**
+ * Jumps to a panel for the in-game bar: from Settings, back to the guide first. Campaign
+ * goes to your current step rather than the panel's top.
+ */
+function useJumpFromGame() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const jumpToSection = useJumpToSection();
+  const scrollToStep = useAtomCallback(
+    useCallback((get) => {
+      const element = document.getElementById(edgeId(get(activeEdgeAtom)[0]));
+      element?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, []),
+  );
+  return useCallback(
+    (id: string) => {
+      const go = () => {
+        jumpToSection(id);
+        // Once the panel has opened.
+        if (id === "campaign") setTimeout(scrollToStep, 50);
+      };
+      if (pathname === "/") go();
+      else {
+        navigate("/");
+        // The guide page loads lazily; give it a moment to render.
+        setTimeout(go, 400);
+      }
+    },
+    [pathname, navigate, jumpToSection, scrollToStep],
+  );
 }
 
 const LABELS = {

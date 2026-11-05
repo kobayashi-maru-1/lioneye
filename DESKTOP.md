@@ -92,6 +92,23 @@ your PoB once in **Settings** (the ⚙ at the top right).
 - On the hosted site (no exe) there are no stats, gear or config; Tree and Gems follow your act
   with their own arrows.
 
+## In-game bar
+
+- While Path of Exile is the window in front, the exe shows a small bar over the game with a
+  button per guide panel. A button opens that panel in the guide (on your other monitor) and
+  scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
+  guide window comes up without taking it. With no guide open, the button opens one first.
+- Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
+  The dot at its end is the auto-progress state (green: following the log).
+- **Settings** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,
+  Gems, Tree and Notes to start). Panels the build doesn't have are left off.
+- The bar is a page of the guide (`overlay.html`) in WebView2, the engine Edge uses (part of
+  Windows 11; its data is kept in `%LOCALAPPDATA%\exile-leveling\webview2`).
+- PoE must run in **Windowed** or **Windowed Fullscreen** mode: nothing can show over its
+  exclusive **Fullscreen**.
+- To try it without the game, start the exe with `EXILE_LEVELING_OVERLAY_ALWAYS=1` set; the bar
+  then shows over any window.
+
 ## Build
 
 Needs [Node.js 22+](https://nodejs.org), [Rust](https://rustup.rs) and Git.

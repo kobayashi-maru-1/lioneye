@@ -9,8 +9,10 @@ use windows_sys::Win32::System::Threading::{
     OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetClassNameW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
-    IsWindowVisible, PostMessageW, SW_RESTORE, SetForegroundWindow, ShowWindowAsync, WM_CLOSE,
+    EnumWindows, GetClassNameW, GetWindowTextW, GetWindowThreadProcessId, HWND_TOP, IsIconic,
+    IsWindowVisible, PostMessageW, SW_RESTORE, SW_SHOWNOACTIVATE, SWP_ASYNCWINDOWPOS,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetForegroundWindow, SetWindowPos, ShowWindowAsync,
+    WM_CLOSE,
 };
 
 /// The page titles set in web/src/containers/index.tsx; keep in sync.
@@ -102,6 +104,28 @@ pub fn show() -> bool {
         }
     }
     true
+}
+
+/// Brings the open guide window above other windows without focusing it, so the game
+/// keeps focus when a bar button is clicked. Restores it if minimized.
+pub fn raise() {
+    let Some(&hwnd) = find().first() else {
+        return;
+    };
+    unsafe {
+        if IsIconic(hwnd) != 0 {
+            ShowWindowAsync(hwnd, SW_SHOWNOACTIVATE);
+        }
+        SetWindowPos(
+            hwnd,
+            HWND_TOP,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS,
+        );
+    }
 }
 
 /// Asks every guide window to close.

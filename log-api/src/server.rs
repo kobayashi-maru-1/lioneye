@@ -1,4 +1,10 @@
-use std::time::Duration;
+use std::{
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant},
+};
 
 use axum::{
     Json, Router,
@@ -11,7 +17,7 @@ use axum::{
     routing::{get, post},
 };
 use rust_embed::RustEmbed;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::{
     net::TcpListener,
     sync::{broadcast, watch},
@@ -32,6 +38,103 @@ pub struct AppState {
     pub lines: broadcast::Sender<String>,
     pub status: watch::Receiver<Status>,
     pub pob: pob::Engine,
+    /// The in-game bar's settings, from the guide's Settings page (see overlay.rs).
+    pub overlay: Arc<watch::Sender<OverlayConfig>>,
+    pub guides: Arc<Guides>,
+}
+
+/// A button on the in-game bar: the guide panel it jumps to.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OverlayButton {
+    pub id: String,
+    pub label: String,
+}
+
+/// Whether the in-game bar shows, and its buttons in order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OverlayConfig {
+    pub on: bool,
+    pub buttons: Vec<OverlayButton>,
+}
+
+impl Default for OverlayConfig {
+    /// As the guide's Settings default, until the guide first sends its own.
+    fn default() -> Self {
+        let button = |id: &str, label: &str| OverlayButton {
+            id: id.into(),
+            label: label.into(),
+        };
+        Self {
+            on: true,
+            buttons: vec![
+                button("campaign", "Campaign"),
+                button("gear", "Gear"),
+                button("gems", "Gems"),
+                button("tree", "Tree"),
+                button("notes", "Notes"),
+            ],
+        }
+    }
+}
+
+/// What the guide sends: buttons are left out when the page doesn't know which panels the
+/// build has (Settings opened before the guide), and the last ones are kept.
+#[derive(Deserialize)]
+struct OverlayUpdate {
+    on: bool,
+    buttons: Option<Vec<OverlayButton>>,
+}
+
+/// The open guide pages, so a bar button can open one when there's none.
+pub struct Guides {
+    open: AtomicUsize,
+    /// A jump asked for while no guide was open, for the next one that connects.
+    pending: Mutex<Option<(String, Instant)>>,
+    /// Asks the tray thread to open the guide.
+    request_open: std::sync::mpsc::Sender<()>,
+}
+
+/// How long a jump waits for a guide page to open and connect.
+const PENDING_JUMP: Duration = Duration::from_secs(30);
+
+impl Guides {
+    pub fn new(request_open: std::sync::mpsc::Sender<()>) -> Self {
+        Self {
+            open: AtomicUsize::new(0),
+            pending: Mutex::new(None),
+            request_open,
+        }
+    }
+
+    fn take_pending(&self) -> Option<String> {
+        let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
+        pending
+            .take()
+            .filter(|(_, at)| at.elapsed() < PENDING_JUMP)
+            .map(|(id, _)| id)
+    }
+}
+
+/// A panel id from the page: short lowercase words only.
+fn panel_id(id: &str) -> Option<&str> {
+    (!id.is_empty() && id.len() <= 24 && id.bytes().all(|b| b.is_ascii_lowercase() || b == b'-'))
+        .then_some(id)
+}
+
+/// A bar button: tells the open guide pages to jump and brings one up, or opens one.
+async fn jump(state: &AppState, id: &str) {
+    if state.guides.open.load(Ordering::SeqCst) > 0 {
+        let _ = state.lines.send(format!("jump:{id}"));
+        #[cfg(windows)]
+        let _ = tokio::task::spawn_blocking(crate::guide_window::raise).await;
+    } else {
+        *state
+            .guides
+            .pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some((id.to_string(), Instant::now()));
+        let _ = state.guides.request_open.send(());
+    }
 }
 
 pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()> {
@@ -93,16 +196,38 @@ fn local_origin(headers: &HeaderMap) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
-async fn client(mut socket: WebSocket, state: AppState) {
+fn overlay_message(config: &OverlayConfig) -> String {
+    format!(
+        "overlay:{}",
+        serde_json::to_string(config).unwrap_or_default()
+    )
+}
+
+/// One page on the socket: the guide (it says "guide" first) or the in-game bar.
+async fn client(socket: WebSocket, state: AppState) {
+    let mut guide = false;
+    serve_client(socket, &state, &mut guide).await;
+    if guide {
+        state.guides.open.fetch_sub(1, Ordering::SeqCst);
+    }
+    info!("Page disconnected");
+}
+
+async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool) {
     let mut lines = state.lines.subscribe();
     let mut status = state.status.clone();
+    let mut overlay = state.overlay.subscribe();
     let mut ping = tokio::time::interval(Duration::from_secs(5));
 
     let first = status.borrow_and_update().message();
     if socket.send(Message::Text(first.into())).await.is_err() {
         return;
     }
-    info!("Guide connected");
+    let config = overlay_message(&overlay.borrow_and_update());
+    if socket.send(Message::Text(config.into())).await.is_err() {
+        return;
+    }
+    info!("Page connected");
 
     loop {
         tokio::select! {
@@ -118,16 +243,51 @@ async fn client(mut socket: WebSocket, state: AppState) {
                 let text = status.borrow_and_update().message();
                 if socket.send(Message::Text(text.into())).await.is_err() { break; }
             },
+            changed = overlay.changed() => {
+                if changed.is_err() { break; }
+                let text = overlay_message(&overlay.borrow_and_update());
+                if socket.send(Message::Text(text.into())).await.is_err() { break; }
+            },
             _ = ping.tick() => {
                 if socket.send(Message::Ping(Default::default())).await.is_err() { break; }
             },
             incoming = socket.recv() => match incoming {
                 None | Some(Err(_)) | Some(Ok(Message::Close(_))) => break,
+                Some(Ok(Message::Text(text))) => {
+                    let text = text.as_str();
+                    if text == "guide" && !*guide {
+                        *guide = true;
+                        state.guides.open.fetch_add(1, Ordering::SeqCst);
+                        // A bar button opened this guide: do the jump it asked for.
+                        if let Some(id) = state.guides.take_pending() {
+                            let text = format!("jump:{id}");
+                            if socket.send(Message::Text(text.into())).await.is_err() { break; }
+                        }
+                    } else if let Some(json) = text.strip_prefix("overlay:") {
+                        if let Ok(update) = serde_json::from_str::<OverlayUpdate>(json) {
+                            state.overlay.send_if_modified(|config| {
+                                let mut next = config.clone();
+                                next.on = update.on;
+                                if let Some(buttons) = update.buttons {
+                                    next.buttons = buttons
+                                        .into_iter()
+                                        .filter(|b| panel_id(&b.id).is_some() && b.label.len() <= 24)
+                                        .take(12)
+                                        .collect();
+                                }
+                                let changed = next != *config;
+                                *config = next;
+                                changed
+                            });
+                        }
+                    } else if let Some(id) = text.strip_prefix("jump:").and_then(panel_id) {
+                        jump(state, id).await;
+                    }
+                }
                 Some(Ok(_)) => {}
             },
         }
     }
-    info!("Guide disconnected");
 }
 
 #[derive(Deserialize)]

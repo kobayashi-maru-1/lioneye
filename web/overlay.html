@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Exile Leveling Overlay</title>
+  </head>
+  <body>
+    <!-- The in-game bar (exe only): shown by exile-leveling.exe over the game, in WebView2. -->
+    <div id="bar" class="bar">
+      <span id="grip" class="grip" aria-label="Move" title="Move"></span>
+      <span id="buttons" class="buttons"></span>
+      <span
+        id="dot"
+        class="dot"
+        role="status"
+        aria-label="Offline"
+        title="Offline"
+      ></span>
+    </div>
+    <script type="module" src="/src/overlay/main.ts"></script>
+  </body>
+</html>

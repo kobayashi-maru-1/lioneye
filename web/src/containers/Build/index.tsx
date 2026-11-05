@@ -3,6 +3,8 @@ import { BuildImportForm } from "../../components/BuildImportForm";
 import { BuildInfoForm } from "../../components/BuildInfoForm";
 import { ConfigForm } from "../../components/ConfigForm";
 import { GemEditForm } from "../../components/GemEditForm";
+import { OverlayForm } from "../../components/OverlayForm";
+import { STATS_AVAILABLE } from "../../components/PobStats";
 import { SearchStringsEditor } from "../../components/SearchStringsEditor";
 import { buildDataSelector } from "../../state/build-data";
 import { configSelector } from "../../state/config";
@@ -58,6 +60,13 @@ export default function BuildContainer() {
               setRequiredGems(requiredGems);
             }}
           />
+          <hr />
+        </>
+      )}
+      {/* The in-game bar exists only with the exe. */}
+      {STATS_AVAILABLE && (
+        <>
+          <OverlayForm />
           <hr />
         </>
       )}
