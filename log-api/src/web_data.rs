@@ -4,8 +4,9 @@
 
 use std::{
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
+    sync::Mutex,
     time::{Duration, SystemTime},
 };
 
@@ -70,7 +71,7 @@ impl Source {
             Source::TradeStats => "trade-stats.json".into(),
             Source::TradeItems => "trade-items.json".into(),
             Source::Ninja { league, kind } => {
-                format!("ninja-{}-{kind}.json", league.replace(' ', "-"))
+                format!("ninja-{}-{kind}.json", league.replace(' ', "+"))
             }
         }
     }
@@ -101,17 +102,27 @@ pub async fn fetch(source: Source) -> Result<Vec<u8>, String> {
         .map_err(|err| format!("Download failed: {err}"))?
 }
 
+/// One download at a time, so two requests for the same file (a reload, or the guide open
+/// twice) never write it together.
+static DOWNLOADS: Mutex<()> = Mutex::new(());
+
+/// The cached copy if it's younger than MAX_AGE.
+fn fresh(path: &Path) -> Option<Vec<u8>> {
+    let modified = fs::metadata(path).and_then(|meta| meta.modified()).ok()?;
+    let age = SystemTime::now().duration_since(modified).ok()?;
+    if age < MAX_AGE { fs::read(path).ok() } else { None }
+}
+
 fn fetch_blocking(source: &Source) -> Result<Vec<u8>, String> {
     let dir = cache_dir();
     let path = dir.join(source.cache_name());
-    let age = fs::metadata(&path)
-        .and_then(|meta| meta.modified())
-        .ok()
-        .and_then(|modified| SystemTime::now().duration_since(modified).ok());
-    if age.is_some_and(|age| age < MAX_AGE) {
-        if let Ok(bytes) = fs::read(&path) {
-            return Ok(bytes);
-        }
+    if let Some(bytes) = fresh(&path) {
+        return Ok(bytes);
+    }
+    let _guard = DOWNLOADS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    // Another request may have just downloaded it.
+    if let Some(bytes) = fresh(&path) {
+        return Ok(bytes);
     }
 
     let _ = fs::create_dir_all(&dir);
@@ -130,7 +141,16 @@ fn fetch_blocking(source: &Source) -> Result<Vec<u8>, String> {
         curl.creation_flags(CREATE_NO_WINDOW);
     }
     let downloaded = match curl.output() {
-        Ok(out) if out.status.success() => fs::rename(&partial, &path).is_ok(),
+        // Only valid JSON replaces the cache (an error page would be served for 12 hours).
+        Ok(out) if out.status.success() => {
+            let valid = fs::read(&partial).is_ok_and(|bytes| {
+                serde_json::from_slice::<serde::de::IgnoredAny>(&bytes).is_ok()
+            });
+            if !valid {
+                warn!("{url} didn't return JSON");
+            }
+            valid && fs::rename(&partial, &path).is_ok()
+        }
         Ok(out) => {
             warn!("Downloading {url} failed: {}", String::from_utf8_lossy(&out.stderr).trim());
             false

@@ -519,6 +519,7 @@ dependencies = [
  "regex",
  "rust-embed",
  "serde",
+ "serde_json",
  "sysinfo",
  "tokio",
  "tracing",

@@ -9,9 +9,9 @@
 .doll {
   --cell: 2.75rem;
   display: grid;
-  grid-template-columns: calc(var(--cell) * 2) var(--cell) calc(
-      var(--cell) * 2
-    ) var(--cell) calc(var(--cell) * 2);
+  grid-template-columns:
+    calc(var(--cell) * 2) var(--cell) calc(var(--cell) * 2)
+    var(--cell) calc(var(--cell) * 2);
   grid-template-rows: calc(var(--cell) * 2) var(--cell) var(--cell) var(--cell);
   grid-template-areas:
     "w1 . helm amulet w2"

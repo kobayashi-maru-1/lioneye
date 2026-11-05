@@ -45,15 +45,26 @@ interface LeaguesData {
 export function useLeagues() {
   return usePromise(
     () =>
-      getData<LeaguesData>("trade-leagues").then((data) =>
-        data.result.filter((league) => league.realm === "pc").map((l) => l.id),
-      ),
+      getData<LeaguesData>("trade-leagues")
+        .then((data) =>
+          data.result
+            .filter((league) => league.realm === "pc")
+            .map((l) => l.id),
+        )
+        // Offline with nothing cached: Standard still gives Trade links (and art, if cached).
+        .catch(() => ["Standard"]),
     "leagues",
   );
 }
 
 interface NinjaData {
-  lines: { name: string; baseType?: string; icon?: string }[];
+  lines: {
+    name: string;
+    baseType?: string;
+    icon?: string;
+    /** Influence or variant ("Elder/Warlord"); plain bases have none. */
+    variant?: string;
+  }[];
 }
 
 const NINJA_TYPES = [
@@ -82,15 +93,23 @@ export function useArt(league: string | null) {
             ),
           ).then((results) => {
             const art: Art = { uniques: new Map(), bases: new Map() };
+            // Plain bases win over influenced ones (their art has no influence marks).
+            const plain = new Set<string>();
             results.forEach((result, i) => {
               if (result.status !== "fulfilled") return;
               const target =
                 NINJA_TYPES[i] === "BaseType" ? "bases" : "uniques";
               for (const line of result.value.lines ?? []) {
                 if (!line.icon) continue;
-                const key = target === "bases" ? line.baseType : line.name;
-                if (key && !art[target].has(key))
-                  art[target].set(key, line.icon);
+                // The base-type list names the base in `name` (no baseType).
+                const key =
+                  target === "bases" ? (line.baseType ?? line.name) : line.name;
+                if (!key) continue;
+                const isPlain = target === "uniques" || !line.variant;
+                if (art[target].has(key) && (plain.has(key) || !isPlain))
+                  continue;
+                art[target].set(key, line.icon);
+                if (isPlain) plain.add(key);
               }
             });
             return art;

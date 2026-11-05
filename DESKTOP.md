@@ -63,8 +63,11 @@ your PoB once in **Settings** (the ⚙ at the top right).
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.
 - **Gear** shows the loadout's item set as a paper doll (with flasks, weapon swap, abyssal
-  sockets, grafts and the tree's jewels). Item art comes from poe.ninja and the trade data
-  from the trade site, fetched by the exe for the league you pick and cached for 12 hours.
+  sockets, grafts and the jewels in the tree's taken sockets). Item art comes from
+  poe.ninja for the league you pick; bases nobody trades (most leveling bases, flasks) show
+  their name instead. The trade site's stat and item lists drive the Trade buttons. The exe
+  fetches both with curl.exe and caches them in `%LOCALAPPDATA%exile-levelingcache` for
+  12 hours (the cached copy is used offline).
   Hover an item for its mods; its corner button opens a trade search for something like it
   (rare mods at about 80% of their values).
 - Gear, Gems, Config and Tree show the loadout's sets; each has its own dropdown to look at
@@ -77,7 +80,7 @@ your PoB once in **Settings** (the ⚙ at the top right).
   10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`. A build with a
   timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub the first time.
   Specs on an older tree are calculated on the latest one (noted under the stats).
-- On the hosted site (no exe) there are no stats or config; Tree and Gems follow your act
+- On the hosted site (no exe) there are no stats, gear or config; Tree and Gems follow your act
   with their own arrows.
 
 ## Build

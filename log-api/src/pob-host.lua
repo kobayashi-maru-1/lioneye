@@ -616,10 +616,14 @@ local function itemData(item)
 	local function lines(modLines)
 		local out = setmetatable({}, ARRAY)
 		for _, modLine in ipairs(modLines or {}) do
-			if not modLine.disabled and modLine.line and modLine.line ~= ""
-				and item:CheckModLineVariant(modLine) then
+			-- PoB's own formatting: ranges rolled ("+(60-80)" → "+72"), catalysts applied, and
+			-- 0-value lines left out (nil). Its colour codes are dropped; the guide colours lines.
+			local text = not modLine.disabled and modLine.line and modLine.line ~= ""
+				and item:CheckModLineVariant(modLine) and itemLib.formatModLine(modLine)
+			if text then
+				text = text:gsub("%^x%x%x%x%x%x%x", ""):gsub("%^%d", "")
 				out[#out + 1] = {
-					text = modLine.line,
+					text = text,
 					crafted = modLine.crafted or nil,
 					fractured = modLine.fractured or nil,
 				}
@@ -689,7 +693,8 @@ local function gear()
 	for index, spec in ipairs(build.treeTab.specList) do
 		local jewels = setmetatable({}, ARRAY)
 		for nodeId, itemId in pairs(spec.jewels or {}) do
-			if use(itemId) then
+			-- PoB keeps jewels in sockets the tree hasn't taken; only taken ones count.
+			if spec.allocNodes and spec.allocNodes[nodeId] and use(itemId) then
 				jewels[#jewels + 1] = { node = nodeId, item = itemId }
 			end
 		end

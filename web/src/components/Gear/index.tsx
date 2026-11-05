@@ -50,7 +50,8 @@ function itemName(item: GearItem) {
 function artFor(item: GearItem, art: Art | undefined) {
   if (!art) return undefined;
   if (item.rarity === "UNIQUE" || item.rarity === "RELIC") {
-    const unique = art.uniques.get(item.name);
+    // "Foulborn X" uses X's art.
+    const unique = art.uniques.get(item.name.replace(/^Foulborn /, ""));
     if (unique) return unique;
   }
   const base = item.base?.replace(/ \([^)]*\)$/, "");
@@ -196,11 +197,24 @@ function GearView({ gear, setIndex, treeIndex, league }: GearViewProps) {
   );
 }
 
-/** "Weapon 1 Swap" → "Swap 1", "Belt Abyssal Socket 2" → "Abyss 2". */
+/** Short names for the parents of abyssal sockets. */
+const ABYSS_PARENT: Record<string, string> = {
+  "Weapon 1": "W1",
+  "Weapon 2": "W2",
+  "Weapon 1 Swap": "Swap W1",
+  "Weapon 2 Swap": "Swap W2",
+  Helmet: "Helm",
+  "Body Armour": "Body",
+  Gloves: "Gloves",
+  Boots: "Boots",
+  Belt: "Belt",
+};
+
+/** "Weapon 1 Swap" → "Swap 1", "Belt Abyssal Socket 2" → "Belt A2". */
 function shortSlot(slot: string) {
-  return slot
-    .replace(/^Weapon (\d) Swap$/, "Swap $1")
-    .replace(/^.* Abyssal Socket (\d)$/, "Abyss $1");
+  const abyss = /^(.*) Abyssal Socket (\d)$/.exec(slot);
+  if (abyss) return `${ABYSS_PARENT[abyss[1]] ?? abyss[1]} A${abyss[2]}`;
+  return slot.replace(/^Weapon (\d) Swap$/, "Swap $1");
 }
 
 function Group({
@@ -247,6 +261,7 @@ function ItemTile({
       }}
       onPointerEnter={() => onHover(item)}
       onPointerLeave={() => onHover(null)}
+      role="group"
       aria-label={`${slot}: ${name}`}
     >
       {art ? (

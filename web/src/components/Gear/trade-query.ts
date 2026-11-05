@@ -76,6 +76,8 @@ const LOCAL_DEFENCE =
 const LOCAL_WEAPON =
   /(Attack Speed|Accuracy Rating|Critical Strike Chance|Adds # to # \w+ Damage|increased Physical Damage|Leeched as)/;
 function localKind(slot: string, base: string) {
+  // An abyss jewel in a weapon or armour socket has no local stats of its own.
+  if (ABYSSAL.test(slot)) return null;
   if (["Helmet", "Body Armour", "Gloves", "Boots"].includes(slot))
     return LOCAL_DEFENCE;
   if (!slot.startsWith("Weapon")) return null;
@@ -83,6 +85,8 @@ function localKind(slot: string, base: string) {
   if (/Quiver$/.test(base)) return null;
   return LOCAL_WEAPON;
 }
+
+const ABYSSAL = /Abyssal Socket/;
 
 // Drawbacks (flask downsides, trigger costs): required as a mod, never as a target value.
 const DRAWBACK =
@@ -159,7 +163,8 @@ export function tradeUrl(
   league: string,
 ) {
   const query: Record<string, unknown> = { status: { option: "online" } };
-  const name = item.name ?? "";
+  // "Foulborn X" is a variant of the unique X on the trade site.
+  const name = (item.name ?? "").replace(/^Foulborn /, "");
   if (item.rarity === "UNIQUE" || item.rarity === "RELIC") {
     // PoB lets you rename items: keep the known unique name it starts with.
     const unique = index.uniques.find(
@@ -172,12 +177,14 @@ export function tradeUrl(
       item.rarity === "RARE"
         ? (item.base ?? "")
         : item.rarity === "NORMAL"
-          ? name
+          ? (item.base ?? name)
           : (index.bases.find((b) => name.includes(b)) ?? item.base ?? "");
     const base = tradeBase(rawBase);
     const category =
       CATEGORY[slot.replace(/ Swap$/, "")] ??
-      (slot.startsWith("Weapon") && item.rarity === "RARE"
+      (slot.startsWith("Weapon") &&
+      !ABYSSAL.test(slot) &&
+      item.rarity === "RARE"
         ? weaponCategory(base)
         : undefined);
     const typeFilters: Record<string, unknown> = {
