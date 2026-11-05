@@ -109,6 +109,8 @@ export namespace RouteData {
 
   export interface GemLinkGroup {
     title: string;
+    /** The socket group's label in PoB, if it has one. */
+    label?: string;
     primaryGems: GemLink[];
     secondaryGems: GemLink[];
   }

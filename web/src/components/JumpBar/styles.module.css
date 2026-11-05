@@ -2,28 +2,38 @@
 .jumpBar {
   position: sticky;
   top: var(--navbar-height);
-  /* Under the navbar's menu (3), over the sticky act headers (1). */
+  /* Under the navbar's menu (3), over the pinned panel and act headers (1). */
   z-index: 2;
   display: flex;
   align-items: stretch;
   flex-wrap: nowrap;
   overflow-x: auto;
+  scrollbar-width: none;
   height: var(--jumpbar-height);
   margin: 0 calc(var(--size-2) * -1);
   padding: 0 var(--size-2);
-  color: var(--on-secondary);
-  font-weight: var(--font-heavy);
-  background-color: var(--secondary);
-  border-bottom: var(--border-width) solid var(--accent-secondary);
+  background-color: var(--primary);
+  border-bottom: var(--border-width) solid var(--panel-border);
 }
 
+/* pob.codes header links: small gold capitals. */
 .jump {
   display: flex;
   align-items: center;
   flex: none;
+  gap: var(--size-2);
   padding: 0 var(--size-3);
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: var(--font-heavy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.jump:hover {
+  color: #c99550;
 }
 
 .spacer {

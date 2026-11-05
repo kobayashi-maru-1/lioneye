@@ -1,0 +1,16 @@
+.select {
+  min-width: 0;
+  max-width: 16rem;
+  padding: var(--size-1) var(--size-3);
+  font-size: 0.8rem;
+  color: var(--on-primary);
+  background-color: var(--input);
+  border: var(--border-width) solid var(--input-border);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.select:hover {
+  border-color: #3a3a3a;
+}

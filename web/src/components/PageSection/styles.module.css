@@ -1,41 +1,66 @@
+/* pob.codes panel: black card, thin border, gold small-caps title with a chevron. */
 .section {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  padding: 0 var(--size-4) var(--size-2);
+  background-color: var(--panel);
+  border: var(--border-width) solid var(--panel-border);
+  border-radius: var(--border-radius);
   /* Below the navbar and the sticky jump bar when scrolled to. */
   scroll-margin-top: calc(
     var(--navbar-height) + var(--jumpbar-height) + var(--size-3)
   );
 }
 
+/* Pinned under the jump bar while the panel's content scrolls past. */
 .header {
+  position: sticky;
+  top: calc(var(--navbar-height) + var(--jumpbar-height));
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: var(--size-3);
-  width: 100%;
-  padding: var(--size-2) var(--size-3);
-  color: var(--on-secondary);
+  height: var(--panel-header-height);
+  margin: 0 calc(var(--size-4) * -1);
+  padding: 0 var(--size-4);
+  background-color: var(--panel);
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2);
+  min-width: 0;
+  color: var(--gold);
+  font-size: 0.8rem;
   font-weight: var(--font-heavy);
-  background-color: var(--secondary);
-  border: var(--border-width) solid var(--accent-secondary);
-  border-radius: var(--border-radius);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   cursor: pointer;
 }
 
-.header:hover {
-  background-color: var(--highlight-secondary);
+.toggle:hover {
+  color: #c99550;
 }
 
 .title {
   display: flex;
   align-items: center;
-  flex: 1;
   min-width: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  margin-left: auto;
 }
 
 .body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: var(--size-3) 0;
+  padding: var(--size-2) 0 var(--size-3);
 }

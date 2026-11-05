@@ -2,14 +2,15 @@ import type { MainSkillPick } from "../../state/main-skill";
 import { formStyles } from "../../styles";
 import { type SkillState, usePobStats } from "../PobStats";
 import { PobText, stripPob } from "../PobText";
-import { SetPager } from "../SetPager";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { Fragment } from "react";
+
+/** PoB's "Minion:" / "Player:" lines become pob.codes-style headings. */
+const HEADING = /^(minion|player):?$/i;
 
 /**
- * Path of Building's sidebar for the shown loadout: loadout pager, main skill and
- * stats. Reads the page's PobStatsProvider.
+ * Path of Building's sidebar for the shown loadout (picked in the header card): main
+ * skill and stats, in pob.codes' striped rows. Reads the page's PobStatsProvider.
  */
 export function StatsViewer() {
   const pob = usePobStats();
@@ -18,13 +19,11 @@ export function StatsViewer() {
       <p className={classNames(styles.status)}>Build unreadable. Re-import.</p>
     ) : null;
   }
-  const { stats, titles, index, setIndex, loading, error, retry } = pob;
+  const { stats, loading, error, retry } = pob;
 
   return (
     <div className={classNames(styles.stats)}>
-      {titles.length > 0 && (
-        <SetPager titles={titles} index={index} onIndex={setIndex} />
-      )}
+      <h2 className={classNames(styles.heading)}>Stats</h2>
       {stats?.skill && stats.skill.groups.length > 0 && (
         <SkillPicker
           state={stats.skill}
@@ -60,18 +59,24 @@ export function StatsViewer() {
             "gap" in row ? (
               <div key={i} className={classNames(styles.gap)} />
             ) : "text" in row ? (
-              <div key={i} className={classNames(styles.text)}>
-                <PobText text={row.text} />
-              </div>
+              HEADING.test(stripPob(row.text).trim()) ? (
+                <h3 key={i} className={classNames(styles.subheading)}>
+                  {stripPob(row.text).trim().replace(/:$/, "")}
+                </h3>
+              ) : (
+                <div key={i} className={classNames(styles.text)}>
+                  <PobText text={row.text} />
+                </div>
+              )
             ) : (
-              <Fragment key={i}>
-                <div className={classNames(styles.label)}>
+              <div key={i} className={classNames(styles.row)}>
+                <span className={classNames(styles.label)}>
                   <PobText text={row.label} />
-                </div>
-                <div className={classNames(styles.value)}>
+                </span>
+                <span className={classNames(styles.value)}>
                   <PobText text={row.value} />
-                </div>
-              </Fragment>
+                </span>
+              </div>
             ),
           )}
           {stats.warnings.map((warning, i) => (

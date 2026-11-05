@@ -1,44 +1,60 @@
-/* PoB's stats on the left (sticky), the guide's sections on the right. */
+/* pob.codes build page: stats panel on the left (sticky), header card and panels on the right. */
 .page {
-  --sidebar-top: calc(var(--navbar-height) + var(--jumpbar-height) + var(--size-3));
+  --sidebar-top: calc(
+    var(--navbar-height) + var(--jumpbar-height) + var(--size-4)
+  );
   display: grid;
-  grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+  grid-template-columns: 20rem minmax(0, 1fr);
   align-items: start;
-  gap: var(--size-3);
-  padding-top: var(--size-3);
+  gap: var(--size-4);
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding-top: var(--size-4);
 }
 
 .page.noSidebar {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* The stats panel scrolls by itself; its scrollbar is thin (thin-scroll in index.css). */
 .sidebar {
   position: sticky;
   top: var(--sidebar-top);
-  max-height: calc(100vh - var(--sidebar-top) - var(--size-3));
+  max-height: calc(100vh - var(--sidebar-top) - var(--size-4));
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--size-3);
-  background-color: var(--primary);
-  border: var(--border-width) solid var(--accent-primary);
+  padding: var(--size-2) var(--size-4) var(--size-4);
+  background-color: var(--panel);
+  border: var(--border-width) solid var(--panel-border);
   border-radius: var(--border-radius);
 }
 
 .main {
   display: flex;
   flex-direction: column;
-  gap: var(--size-3);
+  gap: var(--size-4);
   min-width: 0;
 }
 
-/* The tree needs a real height to draw in. */
+/* The tree needs a real height to draw in; navy like pob.codes' tree. */
 .treeBody {
   height: min(75vh, 52rem);
 }
 
-.icon {
-  display: inline-flex;
-  margin-right: var(--size-2);
+.tree {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background-color: var(--navy-deep);
+  border-radius: var(--border-radius);
+}
+
+.hint {
+  flex: none;
+  margin: 0 0 var(--size-2);
+  font-size: 0.8rem;
+  color: var(--accent-primary);
 }
 
 .empty {
@@ -46,20 +62,23 @@
   align-items: center;
   justify-content: center;
   gap: var(--size-3);
-  padding: var(--size-3);
-  border: var(--border-width) solid var(--accent-secondary);
+  padding: var(--size-4);
+  background-color: var(--panel);
+  border: var(--border-width) solid var(--panel-border);
   border-radius: var(--border-radius);
 }
 
 .emptyButton {
   font-weight: var(--font-heavy);
   padding: var(--size-1) var(--size-4);
-  border: var(--border-width) solid var(--accent-primary);
+  color: var(--on-secondary);
+  background-color: #1c1c1c;
+  border: var(--border-width) solid #3a3a3a;
   border-radius: var(--border-radius);
   cursor: pointer;
 }
 
-/* Narrow windows: stats above the sections instead of beside them. */
+/* Narrow windows: stats above the panels instead of beside them. */
 @media (max-width: 52rem) {
   .page {
     grid-template-columns: minmax(0, 1fr);
@@ -69,17 +88,4 @@
     position: static;
     max-height: none;
   }
-}
-
-.tree {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.hint {
-  flex: none;
-  margin: 0 0 var(--size-2);
-  font-size: 0.85em;
-  color: var(--accent-primary);
 }

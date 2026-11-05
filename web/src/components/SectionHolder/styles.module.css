@@ -1,42 +1,55 @@
+/* An act: a pob.codes navy card whose header pins under the Campaign panel's header. */
+.act {
+  margin-bottom: var(--size-3);
+  background-color: var(--navy-deep);
+  border: var(--border-width) solid var(--navy-border);
+  border-radius: var(--border-radius);
+}
+
 .sectionbar {
   display: flex;
   flex-direction: column;
   position: sticky;
-  background-color: var(--primary);
-  top: calc(var(--navbar-height) + var(--jumpbar-height));
+  top: calc(
+    var(--navbar-height) + var(--jumpbar-height) + var(--panel-header-height)
+  );
   z-index: 1;
+  background-color: var(--navy);
+  border-radius: var(--border-radius);
 }
 
 .sectionbarHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: auto;
-}
-
-.sectionbar > hr {
-  margin-top: auto;
 }
 
 .header {
   width: 100%;
-  color: var(--on-secondary);
-  font-size: var(--size-5);
-  padding: var(--size-1);
+  padding: var(--size-2) var(--size-4);
+  color: var(--gold);
+  font-size: 0.8rem;
   font-weight: var(--font-heavy);
-  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-align: left;
   cursor: pointer;
+}
+
+.header:hover {
+  color: #c99550;
 }
 
 .title {
   display: flex;
-  align-items: baseline;
-  gap: var(--size-3);
+  align-items: center;
+  gap: var(--size-2);
 }
 
 .progress {
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 400;
+  text-transform: none;
   color: var(--accent-primary);
 }
 

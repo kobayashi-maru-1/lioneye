@@ -1,6 +1,14 @@
+/* pob.codes notes: monospace text in a dark framed box. */
 .notes {
   display: flex;
   flex-direction: column;
+  padding: var(--size-3) var(--size-4);
+  font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  color: #d4d4d4;
+  background-color: #0f0f0f;
+  border: var(--border-width) solid #2e2e2e;
+  border-radius: var(--border-radius);
   user-select: text;
 }
 
@@ -10,5 +18,5 @@
 }
 
 .blank {
-  height: var(--size-3);
+  height: 1.3em;
 }

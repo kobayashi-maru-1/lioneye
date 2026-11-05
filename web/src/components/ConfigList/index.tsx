@@ -1,38 +1,69 @@
-import { usePobStats } from "../PobStats";
+import { type ConfigRow, usePobStats } from "../PobStats";
 import { PobText } from "../PobText";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { Fragment } from "react";
+import { useMemo } from "react";
 
-/** The config options the shown loadout sets in PoB, with PoB's labels. */
-export function ConfigList() {
+interface ConfigListProps {
+  /** The config set's changed options, from PoB; undefined until PoB has answered. */
+  rows?: ConfigRow[];
+}
+
+/** A config set's changed options in pob.codes-style framed boxes, one per PoB section. */
+export function ConfigList({ rows }: ConfigListProps) {
   const pob = usePobStats();
-  const stats = pob?.stats;
+  const sections = useMemo(() => {
+    const sections: {
+      name: string;
+      rows: { label: string; value: string; check?: boolean }[];
+    }[] = [];
+    for (const row of rows ?? []) {
+      if ("section" in row) sections.push({ name: row.section, rows: [] });
+      else {
+        if (sections.length === 0) sections.push({ name: "", rows: [] });
+        sections[sections.length - 1].rows.push(row);
+      }
+    }
+    return sections;
+  }, [rows]);
+
   // Like the stats: no rows from another loadout under a failed one.
   if (pob?.error || pob?.unreadable)
     return <p className={classNames(styles.empty)}>Config unavailable</p>;
-  if (!stats) return <p className={classNames(styles.empty)}>Calculating</p>;
-  if (stats.config.length === 0)
+  if (rows === undefined)
+    return <p className={classNames(styles.empty)}>Calculating</p>;
+  if (sections.length === 0)
     return <p className={classNames(styles.empty)}>PoB defaults</p>;
 
   return (
     <div className={classNames(styles.config)}>
-      {stats.config.map((row, i) =>
-        "section" in row ? (
-          <h3 key={i} className={classNames(styles.section)}>
-            {row.section}
-          </h3>
-        ) : (
-          <Fragment key={i}>
-            <div className={classNames(styles.label)}>
-              <PobText text={row.label} />
+      {sections.map((section, i) => (
+        <fieldset key={i} className={classNames(styles.box)}>
+          {section.name && (
+            <legend className={classNames(styles.legend)}>
+              {section.name}
+            </legend>
+          )}
+          {section.rows.map((row, j) => (
+            <div key={j} className={classNames(styles.row)}>
+              <span className={classNames(styles.label)}>
+                <PobText text={row.label.replace(/[:?]\s*$/, "")} />
+              </span>
+              <span className={classNames(styles.value)}>
+                {row.check ? (
+                  row.value === "Yes" ? (
+                    "✓"
+                  ) : (
+                    "✗"
+                  )
+                ) : (
+                  <PobText text={row.value} />
+                )}
+              </span>
             </div>
-            <div className={classNames(styles.value)}>
-              <PobText text={row.value} />
-            </div>
-          </Fragment>
-        ),
-      )}
+          ))}
+        </fieldset>
+      ))}
     </div>
   );
 }

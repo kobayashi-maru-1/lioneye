@@ -16,12 +16,26 @@
   gap: var(--size-3);
 }
 
+/* pob.codes skill group card: navy, thin blue-grey border. */
 .gemLinkRow {
   display: flex;
   flex-direction: column;
-  padding: var(--size-2) var(--size-3);
-  border: var(--border-width) solid var(--accent-secondary);
+  padding: var(--size-3) var(--size-4);
+  background-color: var(--navy);
+  border: var(--border-width) solid var(--navy-border);
   border-radius: var(--border-radius);
+}
+
+/* The group's PoB label: small grey capitals, one line. */
+.gemLinkLabel {
+  margin-bottom: var(--size-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--accent-primary);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .gemLinkTitleInfo {

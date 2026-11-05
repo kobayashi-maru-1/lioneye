@@ -41,9 +41,17 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
       {activeGemLinks.length > 0 && (
         <div className={classNames(styles.gemLinkSection)}>
           {flattenChildren(
-            activeGemLinks.map(({ primaryGems, secondaryGems }) => (
+            activeGemLinks.map(({ label, primaryGems, secondaryGems }) => (
               <>
                 <div className={classNames(styles.gemLinkRow)}>
+                  {label && (
+                    <div
+                      className={classNames(styles.gemLinkLabel)}
+                      title={label}
+                    >
+                      {label}
+                    </div>
+                  )}
                   {flattenChildren(
                     primaryGems.map((gem) => (
                       <GemLink

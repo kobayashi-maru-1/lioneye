@@ -477,19 +477,33 @@ local configOptions
 
 -- The config options this loadout sets away from PoB's defaults, with PoB's labels,
 -- under their section names: { section } and { label, value } rows.
-local function configRows()
+local function configRows(configSet)
 	configOptions = configOptions or LoadModule("Modules/ConfigOptions")
 	local tab = build.configTab
+	-- PoB's GetDefaultState, for any config set: its placeholder first, then the default.
+	local function defaultState(var, valueType)
+		local placeholder = configSet.placeholder and configSet.placeholder[var]
+		if placeholder ~= nil then
+			return placeholder
+		end
+		if tab.defaultState[var] ~= nil then
+			return tab.defaultState[var]
+		end
+		if valueType == "number" then
+			return 0
+		elseif valueType == "boolean" then
+			return false
+		end
+		return ""
+	end
 	local out = setmetatable({}, ARRAY)
 	local section, lastSection
 	for _, option in ipairs(configOptions) do
 		if option.section then
 			section = option.section
 		elseif option.var and option.label then
-			local value = tab.input[option.var]
-			-- PoB's own test for a changed option (placeholder first, then the default).
-			local unset = value == nil or value == ""
-				or value == tab:GetDefaultState(option.var, type(value))
+			local value = configSet.input[option.var]
+			local unset = value == nil or value == "" or value == defaultState(option.var, type(value))
 			if not unset then
 				local shown
 				if option.type == "check" then
@@ -505,11 +519,88 @@ local function configRows()
 					out[#out + 1] = { section = section }
 					lastSection = section
 				end
-				out[#out + 1] = { label = option.label, value = shown or tostring(value) }
+				out[#out + 1] = {
+					label = option.label,
+					value = shown or tostring(value),
+					check = option.type == "check" or nil,
+				}
 			end
 		end
 	end
 	return out
+end
+
+-- Every tree, skill set, item set and config set (with its changed options), and which of
+-- each the shown loadout uses, for the guide's per-panel set pickers.
+local function setLists()
+	local function titles(order, sets)
+		local out = setmetatable({}, ARRAY)
+		for _, id in ipairs(order) do
+			out[#out + 1] = sets[id].title or "Default"
+		end
+		return out
+	end
+	local function position(order, activeId)
+		for index, id in ipairs(order) do
+			if id == activeId then
+				return index
+			end
+		end
+		return 1
+	end
+	local trees = setmetatable({}, ARRAY)
+	for index, spec in ipairs(build.treeTab.specList) do
+		trees[index] = spec.title or "Default"
+	end
+	local configs = setmetatable({}, ARRAY)
+	for _, id in ipairs(build.configTab.configSetOrderList) do
+		local configSet = build.configTab.configSets[id]
+		configs[#configs + 1] = { title = configSet.title or "Default", rows = configRows(configSet) }
+	end
+	local skills = build.skillsTab
+	local items = build.itemsTab
+	local config = build.configTab
+	return {
+		trees = trees,
+		skills = titles(skills.skillSetOrderList, skills.skillSets),
+		items = titles(items.itemSetOrderList, items.itemSets),
+		configs = configs,
+		active = {
+			tree = build.treeTab.activeSpec,
+			skills = position(skills.skillSetOrderList, skills.activeSkillSetId),
+			items = position(items.itemSetOrderList, items.activeItemSetId),
+			config = position(config.configSetOrderList, config.activeConfigSetId),
+		},
+	}
+end
+
+-- The build's title and headline numbers, for the guide's header card.
+local function headline()
+	local output = build.calcsTab.mainOutput or {}
+	local minion = build.calcsTab.mainEnv and build.calcsTab.mainEnv.minion
+	local minionOutput = minion and minion.output or {}
+	local function positive(value)
+		return type(value) == "number" and value > 0 and value or nil
+	end
+	local _, active = mainActive()
+	local spec = build.spec
+	return {
+		skill = active and active.activeEffect and active.activeEffect.grantedEffect.name,
+		class = spec and spec.curClassName,
+		ascendancy = spec and spec.curAscendClassId ~= 0 and spec.curAscendClassName or nil,
+		level = build.characterLevel,
+		life = output.Life,
+		es = output.EnergyShield,
+		mana = output.Mana,
+		ehp = output.TotalEHP,
+		-- The player's damage, else the minion's (for minion builds).
+		dps = positive(output.FullDPS) or positive(output.CombinedDPS)
+			or positive(minionOutput.FullDPS) or positive(minionOutput.CombinedDPS) or 0,
+		fire = output.FireResist,
+		cold = output.ColdResist,
+		lightning = output.LightningResist,
+		chaos = output.ChaosResist,
+	}
 end
 
 -- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
@@ -548,7 +639,9 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		loadout = currentLoadout(),
 		skill = skillState(picked),
 		sets = setTitles(),
-		config = configRows(),
+		lists = setLists(),
+		headline = headline(),
+		config = configRows(build.configTab.configSets[build.configTab.activeConfigSetId]),
 		rows = rows(),
 		warnings = warnings(),
 	})

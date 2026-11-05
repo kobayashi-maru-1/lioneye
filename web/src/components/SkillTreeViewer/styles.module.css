@@ -13,6 +13,6 @@
   min-height: 10rem;
   border-style: solid;
   border-width: var(--border-width);
-  border-color: var(--accent-primary);
+  border-color: var(--navy-border);
   border-radius: var(--border-radius);
 }

@@ -1,7 +1,8 @@
 .navbar {
   display: flex;
   flex-direction: column;
-  background-color: var(--secondary);
+  background-color: var(--primary);
+  border-bottom: var(--border-width) solid var(--panel-border);
   position: sticky;
   top: 0;
   width: 100%;
@@ -46,9 +47,11 @@
   text-align: right;
 }
 
+/* pob.codes header links: small gold text. */
 .navElement {
-  color: var(--on-secondary);
-  font-weight: var(--font-heavy);
+  color: var(--gold);
+  font-size: 0.9rem;
+  font-weight: 500;
   padding: var(--size-3);
 }
 

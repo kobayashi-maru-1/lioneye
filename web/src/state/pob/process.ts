@@ -109,6 +109,7 @@ function processSkills(
     if (primaryGemIds.length > 0)
       gemLinks.push({
         title: gemLinkTitle,
+        label: skillLabel ? cleanPobText(skillLabel) : undefined,
         primaryGems: primaryGemIds.map((x) =>
           gemIdToGemLink(x, characterClass),
         ),
@@ -119,6 +120,7 @@ function processSkills(
     else if (secondaryGemIds.length > 0)
       gemLinks.push({
         title: gemLinkTitle,
+        label: skillLabel ? cleanPobText(skillLabel) : undefined,
         primaryGems: secondaryGemIds.map((x) =>
           gemIdToGemLink(x, characterClass),
         ),

@@ -1,3 +1,4 @@
+import { BuildHeader } from "../../components/BuildHeader";
 import { BuildNotes, buildNotes } from "../../components/BuildNotes";
 import { ConfigList } from "../../components/ConfigList";
 import { FragmentStep } from "../../components/FragmentStep";
@@ -8,11 +9,14 @@ import {
   PageSection,
   pageSectionId,
   usePageSectionCollapsed,
+  useSetPageSectionCollapsed,
 } from "../../components/PageSection";
+import { PanelSelect } from "../../components/PanelSelect";
 import {
   PobStatsProvider,
   STATS_AVAILABLE,
   useLoadoutSets,
+  usePanelSet,
   usePobStats,
 } from "../../components/PobStats";
 import { SearchStrings } from "../../components/SearchStrings";
@@ -30,22 +34,21 @@ import {
 } from "../../state/route";
 import { routeProgressFamily } from "../../state/route-progress";
 import { searchStringsSelector } from "../../state/search-strings";
-import { urlTreesSelector } from "../../state/tree/url-tree";
+import { type UrlTree, urlTreesSelector } from "../../state/tree/url-tree";
 import { interactiveStyles } from "../../styles";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import type { RouteData } from "common";
+import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
 import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { FaLink } from "react-icons/fa";
-import { FiFileText, FiMap, FiSearch, FiSliders } from "react-icons/fi";
-import { TbHierarchy } from "react-icons/tb";
 import { useNavigate } from "react-router-dom";
 
 /** Where a step's done flag is stored, in route order. */
@@ -173,119 +176,199 @@ export default function RoutesContainer() {
   );
 }
 
-interface PageSectionData {
-  id: string;
-  label: ReactNode;
-  content: ReactNode;
-  bodyClassName?: string;
-}
-
+/**
+ * The page, laid out like a pob.codes build page: PoB's stats on the left; the header
+ * card (title, headline numbers, Loadout) and the panels on the right, Campaign first.
+ */
 function GuidePage({ campaign }: { campaign: ReactNode }) {
   const code = useAtomValue(pobAtom);
   const pob = usePobStats();
-  const sets = useLoadoutSets();
   const urlTrees = useAtomValue(urlTreesSelector);
   const gemLinks = useAtomValue(gemLinksSelector);
   const searchStrings = useAtomValue(searchStringsSelector);
   const xml = pob?.xml ?? null;
   const notes = useMemo(() => (xml ? buildNotes(xml) : null), [xml]);
   const showStats = STATS_AVAILABLE && code !== null;
+  const hasSearch = searchStrings !== null && searchStrings.length > 0;
   useCampaignInView();
+  useFoldCampaignAtEnd();
 
-  const sections: PageSectionData[] = [
-    {
-      id: "campaign",
-      label: <Label icon={<FiMap />} text="Campaign" />,
-      content: campaign,
-    },
+  const targets = [
+    { id: "campaign", label: "Campaign" },
+    ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
+    ...(showStats ? [{ id: "config", label: "Config" }] : []),
+    ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
+    ...(notes !== null ? [{ id: "notes", label: "Notes" }] : []),
+    ...(hasSearch ? [{ id: "search", label: "Search" }] : []),
   ];
-  if (urlTrees.length > 0)
-    sections.push({
-      id: "tree",
-      label: <Label icon={<TbHierarchy />} text="Tree" />,
-      content: (
-        <>
-          <p className={classNames(styles.hint)}>
-            Ctrl+scroll zooms, drag pans
-          </p>
-          {/* Plain scrolling moves the page; the tree zooms only with Ctrl held. */}
-          <div
-            className={classNames(styles.tree)}
-            onWheelCapture={(event) => {
-              if (!event.ctrlKey) event.stopPropagation();
-            }}
-          >
-            <SkillTreeViewer urlTrees={urlTrees} selectedTitle={sets?.tree} />
-          </div>
-        </>
-      ),
-      bodyClassName: styles.treeBody,
-    });
-  if (gemLinks.length > 0)
-    sections.push({
-      id: "gems",
-      label: <Label icon={<FaLink />} text="Gems" />,
-      content: (
-        <GemLinkViewer gemLinks={gemLinks} selectedTitle={sets?.skills} />
-      ),
-    });
-  if (showStats)
-    sections.push({
-      id: "config",
-      label: <Label icon={<FiSliders />} text="Config" />,
-      content: <ConfigList />,
-    });
-  if (notes !== null)
-    sections.push({
-      id: "notes",
-      label: <Label icon={<FiFileText />} text="Notes" />,
-      content: <BuildNotes notes={notes} />,
-    });
-  if (searchStrings !== null && searchStrings.length > 0)
-    sections.push({
-      id: "search",
-      label: <Label icon={<FiSearch />} text="Search" />,
-      content: <SearchStrings values={searchStrings} />,
-    });
 
   return (
     <>
-      <JumpBar targets={sections.map(({ id, label }) => ({ id, label }))} />
+      <JumpBar targets={targets} />
       <div
         className={classNames(styles.page, {
           [styles.noSidebar]: !showStats,
         })}
       >
         {showStats && (
-          <aside className={classNames(styles.sidebar)}>
+          <aside className={classNames(styles.sidebar, "thin-scroll")}>
             <StatsViewer />
           </aside>
         )}
         <div className={classNames(styles.main)}>
           {code === null && <EmptyHint />}
-          {sections.map((section) => (
-            <PageSection
-              key={section.id}
-              id={section.id}
-              title={section.label}
-              bodyClassName={section.bodyClassName}
-            >
-              {section.content}
+          {showStats && <BuildHeader />}
+          <PageSection id="campaign" title="Campaign">
+            {campaign}
+          </PageSection>
+          {gemLinks.length > 0 && <GemsPanel gemLinks={gemLinks} />}
+          {showStats && <ConfigPanel />}
+          {urlTrees.length > 0 && <TreePanel urlTrees={urlTrees} />}
+          {notes !== null && (
+            <PageSection id="notes" title="Notes">
+              <BuildNotes notes={notes} />
             </PageSection>
-          ))}
+          )}
+          {hasSearch && (
+            <PageSection id="search" title="Search">
+              <SearchStrings values={searchStrings} />
+            </PageSection>
+          )}
         </div>
       </div>
     </>
   );
 }
 
-function Label({ icon, text }: { icon: ReactNode; text: string }) {
-  return (
-    <>
-      <span className={classNames(styles.icon)}>{icon}</span>
-      {text}
-    </>
+/** Index of `title` in `titles`, or null (the panel then follows your act). */
+function titleIndex(titles: string[], title: string | undefined) {
+  if (title === undefined) return null;
+  const index = titles.indexOf(title);
+  return index === -1 ? null : index;
+}
+
+function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
+  const sets = useLoadoutSets();
+  const titles = useMemo(
+    () => [...new Set(gemLinks.map((link) => link.title))],
+    [gemLinks],
   );
+  const [index, choose] = usePanelSet(titles, titleIndex(titles, sets?.skills));
+  return (
+    <PageSection
+      id="gems"
+      title="Gems"
+      actions={
+        titles.length > 1 && (
+          <PanelSelect
+            label="Gem set"
+            options={titles}
+            value={index}
+            onChange={choose}
+          />
+        )
+      }
+    >
+      <GemLinkViewer gemLinks={gemLinks} selectedTitle={titles[index]} />
+    </PageSection>
+  );
+}
+
+function ConfigPanel() {
+  const lists = usePobStats()?.stats?.lists ?? null;
+  const titles = useMemo(
+    () => lists?.configs.map((set) => set.title) ?? [],
+    [lists],
+  );
+  const [index, choose] = usePanelSet(
+    titles,
+    lists ? lists.active.config - 1 : null,
+  );
+  return (
+    <PageSection
+      id="config"
+      title="Configs"
+      actions={
+        titles.length > 1 && (
+          <PanelSelect
+            label="Config set"
+            options={titles}
+            value={index}
+            onChange={choose}
+          />
+        )
+      }
+    >
+      <ConfigList
+        rows={lists ? (lists.configs[index]?.rows ?? []) : undefined}
+      />
+    </PageSection>
+  );
+}
+
+function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
+  const sets = useLoadoutSets();
+  const titles = useMemo(() => urlTrees.map((tree) => tree.name), [urlTrees]);
+  const [index, choose] = usePanelSet(titles, titleIndex(titles, sets?.tree));
+  return (
+    <PageSection
+      id="tree"
+      title="Passive Tree"
+      bodyClassName={styles.treeBody}
+      actions={
+        titles.length > 1 && (
+          <PanelSelect
+            label="Tree set"
+            options={titles}
+            value={index}
+            onChange={choose}
+          />
+        )
+      }
+    >
+      <p className={classNames(styles.hint)}>Ctrl+scroll zooms, drag pans</p>
+      {/* Plain scrolling moves the page; the tree zooms only with Ctrl held. */}
+      <div
+        className={classNames(styles.tree)}
+        onWheelCapture={(event) => {
+          if (!event.ctrlKey) event.stopPropagation();
+        }}
+      >
+        <SkillTreeViewer urlTrees={urlTrees} selectedTitle={titles[index]} />
+      </div>
+    </PageSection>
+  );
+}
+
+/**
+ * Folds Campaign once the last act is done (auto-tick finishes it when you leave its
+ * last zone). It stays folded until you open it.
+ */
+function useFoldCampaignAtEnd() {
+  const route = useAtomValue(routeSelector);
+  const endedAtom = useMemo(
+    () =>
+      atom((get) => {
+        const sectionIndex = route.sections.length - 1;
+        const section = route.sections[sectionIndex];
+        if (!section) return false;
+        return section.steps.every((step, stepIndex) =>
+          step.type === "fragment_step"
+            ? get(routeProgressFamily([sectionIndex, stepIndex].toString()))
+            : step.type === "gem_step"
+              ? get(gemProgressFamily(step.requiredGem.id))
+              : true,
+        );
+      }),
+    [route],
+  );
+  const ended = useAtomValue(endedAtom);
+  const setFolded = useSetPageSectionCollapsed("campaign");
+  const wasEnded = useRef(ended);
+  useEffect(() => {
+    if (ended && !wasEnded.current) setFolded(true);
+    wasEnded.current = ended;
+  }, [ended]);
 }
 
 /**

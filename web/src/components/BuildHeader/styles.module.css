@@ -1,0 +1,54 @@
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-3);
+  padding: var(--size-4);
+  background-color: var(--panel);
+  border: var(--border-width) solid var(--panel-border);
+  border-radius: var(--border-radius);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4);
+}
+
+.title {
+  min-width: 0;
+  color: var(--gold);
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.level {
+  color: var(--on-primary);
+}
+
+.loadout {
+  flex: none;
+  max-width: 20rem;
+  font-size: 0.85rem;
+}
+
+.numbers {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--size-5);
+  row-gap: var(--size-2);
+  font-size: 0.95rem;
+}
+
+.number {
+  white-space: nowrap;
+}
+
+.label {
+  margin-right: var(--size-2);
+  color: var(--accent-primary);
+}
+
+.value {
+  font-weight: var(--font-heavy);
+}

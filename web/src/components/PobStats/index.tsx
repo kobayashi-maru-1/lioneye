@@ -1,3 +1,4 @@
+import { currentActAtom } from "../../state/current-act";
 import { type MainSkillPick, mainSkillPickAtom } from "../../state/main-skill";
 import { pobAtom } from "../../state/pob";
 import { pobCodeToXml } from "../../state/pob/process";
@@ -6,6 +7,7 @@ import { useFollowAct } from "../SetPager";
 import { useAtom, useAtomValue } from "jotai";
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -20,7 +22,34 @@ const STATS_URL = "/api/pob/stats";
 export type StatRow =
   { gap: true } | { text: string } | { label: string; value: string };
 
-export type ConfigRow = { section: string } | { label: string; value: string };
+export type ConfigRow =
+  { section: string } | { label: string; value: string; check?: boolean };
+
+/** Every set in the build, and which of each the shown loadout uses (from 1). */
+export interface SetLists {
+  trees: string[];
+  skills: string[];
+  items: string[];
+  configs: { title: string; rows: ConfigRow[] }[];
+  active: { tree: number; skills: number; items: number; config: number };
+}
+
+/** The build's title and headline numbers, for the header card. */
+export interface Headline {
+  skill?: string;
+  class?: string;
+  ascendancy?: string;
+  level?: number;
+  life?: number;
+  es?: number;
+  mana?: number;
+  ehp?: number;
+  dps?: number;
+  fire?: number;
+  cold?: number;
+  lightning?: number;
+  chaos?: number;
+}
 
 /** PoB's main skill selectors for the shown loadout. Indexes are PoB's (from 1). */
 export interface SkillState {
@@ -58,6 +87,8 @@ export interface Stats {
   loadout: string | null;
   skill: SkillState | null;
   sets: SetTitles | null;
+  lists: SetLists | null;
+  headline: Headline | null;
   config: ConfigRow[];
   rows: StatRow[];
   warnings: string[];
@@ -197,6 +228,32 @@ export function useLoadoutSets() {
   );
 }
 
+/**
+ * Which set (of `titles`) a panel shows: the loadout's (`loadoutIndex`), or the one for
+ * your act without loadouts, unless you pick another in the panel. Your pick lasts until
+ * the loadout or the act changes.
+ */
+export function usePanelSet(titles: string[], loadoutIndex: number | null) {
+  const loadout = usePobStats()?.stats?.loadout ?? "";
+  const act = useAtomValue(currentActAtom);
+  const [followIndex] = useFollowAct(titles);
+  const key = `${loadout}|${act ?? ""}|${titles.join("\n")}`;
+  const [override, setOverride] = useState<{
+    key: string;
+    index: number;
+  } | null>(null);
+  const base =
+    loadoutIndex !== null && loadoutIndex >= 0 && loadoutIndex < titles.length
+      ? loadoutIndex
+      : followIndex;
+  const index = override?.key === key ? override.index : base;
+  const choose = useCallback(
+    (index: number) => setOverride({ key, index }),
+    [key],
+  );
+  return [index, choose] as const;
+}
+
 async function fetchStats(
   xml: string,
   loadout: string | null,
@@ -219,6 +276,19 @@ async function fetchStats(
     loadout: stats.loadout ?? null,
     skill: stats.skill ? skillState(stats.skill) : null,
     sets: stats.sets ?? null,
+    lists: stats.lists
+      ? {
+          trees: list(stats.lists.trees),
+          skills: list(stats.lists.skills),
+          items: list(stats.lists.items),
+          configs: list(stats.lists.configs).map((set) => ({
+            title: set.title,
+            rows: list(set.rows),
+          })),
+          active: stats.lists.active,
+        }
+      : null,
+    headline: stats.headline ?? null,
     config: list(stats.config),
     rows: list(stats.rows),
     warnings: list(stats.warnings),

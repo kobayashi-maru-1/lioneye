@@ -1,7 +1,7 @@
 import { buildToggleState } from "../../state/toggle-state";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
 import React, { useCallback } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
@@ -18,6 +18,11 @@ export function usePageSectionCollapsed(id: string) {
   return useAtomValue(pageSectionCollapseFamily(id));
 }
 
+/** Folds (true) or opens a page section. */
+export function useSetPageSectionCollapsed(id: string) {
+  return useSetAtom(pageSectionCollapseFamily(id));
+}
+
 export function pageSectionId(id: string) {
   return `page-${id}`;
 }
@@ -25,14 +30,20 @@ export function pageSectionId(id: string) {
 interface PageSectionProps {
   id: string;
   title: React.ReactNode;
+  /** Shown at the right of the header, e.g. the panel's set dropdown. */
+  actions?: React.ReactNode;
   /** Extra class for the body, e.g. a fixed height for the tree. */
   bodyClassName?: string;
 }
 
-/** A foldable section of the one-page guide, with a header the jump bar scrolls to. */
+/**
+ * A foldable pob.codes-style panel of the one-page guide. Its header stays pinned under
+ * the jump bar while you're inside the panel.
+ */
 export function PageSection({
   id,
   title,
+  actions,
   bodyClassName,
   children,
 }: React.PropsWithChildren<PageSectionProps>) {
@@ -41,14 +52,19 @@ export function PageSection({
 
   return (
     <section id={pageSectionId(id)} className={classNames(styles.section)}>
-      <button
-        className={classNames(styles.header)}
-        aria-expanded={!collapsed}
-        onClick={() => setCollapsed(!collapsed)}
-      >
-        <span className={classNames(styles.title)}>{title}</span>
-        {icon}
-      </button>
+      <div className={classNames(styles.header)}>
+        <button
+          className={classNames(styles.toggle)}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          <span className={classNames(styles.title)}>{title}</span>
+          {icon}
+        </button>
+        {actions && !collapsed && (
+          <div className={classNames(styles.actions)}>{actions}</div>
+        )}
+      </div>
       {!collapsed && (
         <div className={classNames(styles.body, bodyClassName)}>{children}</div>
       )}

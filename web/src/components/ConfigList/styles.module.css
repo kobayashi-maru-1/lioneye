@@ -1,28 +1,42 @@
+/* pob.codes config summary: framed boxes with the section name in the frame. */
 .config {
   display: grid;
-  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
-  column-gap: var(--size-4);
-  row-gap: var(--size-1);
+  grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+  align-items: start;
+  gap: var(--size-3) var(--size-4);
 }
 
-.section {
-  grid-column: 1 / -1;
-  margin-top: var(--size-3);
+.box {
+  min-width: 0;
+  padding: var(--size-2) var(--size-3) var(--size-3);
+  background-color: #1a1a1a;
+  border: var(--border-width) solid var(--accent-primary);
+}
+
+.legend {
+  padding: 0 var(--size-2);
   color: var(--on-secondary);
-  font-weight: var(--font-heavy);
-  border-bottom: var(--border-width) solid var(--accent-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
 }
 
-.section:first-child {
-  margin-top: 0;
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--size-4);
+  font-size: 0.9rem;
 }
 
 .label {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .value {
-  color: var(--on-secondary);
+  flex: none;
+  max-width: 50%;
+  text-align: right;
+  color: var(--gold);
   overflow-wrap: anywhere;
 }
 
