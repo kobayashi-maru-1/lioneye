@@ -23,7 +23,7 @@ tracing-subscriber = "0.3"
 # Tray icon, error message box and console attach (the exe has no console window on Windows).
 [target.'cfg(windows)'.dependencies]
 tray-icon = "0.26"
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Console", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Console", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 
 [profile.release]
 strip = true

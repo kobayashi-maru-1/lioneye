@@ -1,23 +1,56 @@
 //! Finds the guide's Edge app window, so the tray can bring it back or close it with the app.
 //!
 //! An Edge `--app` window is titled with the page title alone ("Exile Leveling",
-//! "Exile Leveling - Build"); normal browser windows end in "Microsoft Edge", so they never match.
+//! "Exile Leveling - Build"). Normal browser windows add a suffix ("- Microsoft Edge",
+//! "- Google Chrome"), so an exact title match plus an msedge.exe check finds only ours.
 
-use windows_sys::Win32::Foundation::{HWND, LPARAM};
+use windows_sys::Win32::Foundation::{CloseHandle, HWND, LPARAM};
+use windows_sys::Win32::System::Threading::{
+    OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetClassNameW, GetWindowTextW, IsIconic, IsWindowVisible, PostMessageW,
-    SW_RESTORE, SetForegroundWindow, ShowWindow, WM_CLOSE,
+    EnumWindows, GetClassNameW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
+    IsWindowVisible, PostMessageW, SW_RESTORE, SetForegroundWindow, ShowWindowAsync, WM_CLOSE,
 };
 
-const TITLE: &str = "Exile Leveling";
+/// The page titles set in web/src/containers/index.tsx; keep in sync.
+const TITLES: [&str; 3] = [
+    "Exile Leveling",
+    "Exile Leveling - Build",
+    "Exile Leveling - Edit Route",
+];
 const CHROMIUM_CLASS: &str = "Chrome_WidgetWin_1";
 
 fn is_guide_title(title: &str) -> bool {
-    title == TITLE || (title.starts_with("Exile Leveling - ") && !title.contains("Microsoft"))
+    TITLES.contains(&title)
 }
 
-fn text(buf: &[u16], len: i32) -> String {
-    String::from_utf16_lossy(&buf[..len.max(0) as usize])
+fn text(buf: &[u16], len: usize) -> String {
+    String::from_utf16_lossy(&buf[..len.min(buf.len())])
+}
+
+/// True when the window belongs to msedge.exe.
+fn is_edge(hwnd: HWND) -> bool {
+    unsafe {
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == 0 {
+            return false;
+        }
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if process.is_null() {
+            return false;
+        }
+        let mut buf = [0u16; 1024];
+        let mut len = buf.len() as u32;
+        let ok = QueryFullProcessImageNameW(process, PROCESS_NAME_WIN32, buf.as_mut_ptr(), &mut len);
+        CloseHandle(process);
+        ok != 0
+            && text(&buf, len as usize)
+                .rsplit('\\')
+                .next()
+                .is_some_and(|exe| exe.eq_ignore_ascii_case("msedge.exe"))
+    }
 }
 
 unsafe extern "system" fn collect(hwnd: HWND, lparam: LPARAM) -> windows_sys::core::BOOL {
@@ -28,13 +61,16 @@ unsafe extern "system" fn collect(hwnd: HWND, lparam: LPARAM) -> windows_sys::co
             return 1;
         }
         let len = GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
-        if text(&buf, len) != CHROMIUM_CLASS {
+        if text(&buf, len.max(0) as usize) != CHROMIUM_CLASS {
             return 1;
         }
         let len = GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
-        if is_guide_title(&text(&buf, len)) {
-            found.push(hwnd);
+        if !is_guide_title(&text(&buf, len.max(0) as usize)) {
+            return 1;
         }
+    }
+    if is_edge(hwnd) {
+        found.push(hwnd);
     }
     1
 }
@@ -55,10 +91,13 @@ pub fn show() -> bool {
         return false;
     };
     unsafe {
+        // Async, so a hung Edge can't stall the tray.
         if IsIconic(hwnd) != 0 {
-            ShowWindow(hwnd, SW_RESTORE);
+            ShowWindowAsync(hwnd, SW_RESTORE);
         }
-        SetForegroundWindow(hwnd);
+        if SetForegroundWindow(hwnd) == 0 {
+            tracing::warn!("Couldn't bring the guide window to the front");
+        }
     }
     true
 }
@@ -80,7 +119,10 @@ mod tests {
     fn matches_app_windows_only() {
         assert!(is_guide_title("Exile Leveling"));
         assert!(is_guide_title("Exile Leveling - Build"));
+        assert!(is_guide_title("Exile Leveling - Edit Route"));
         assert!(!is_guide_title("Exile Leveling - Personal - Microsoft\u{200b} Edge"));
+        assert!(!is_guide_title("Exile Leveling - Google Chrome"));
+        assert!(!is_guide_title("Exile Leveling - Build - Brave"));
         assert!(!is_guide_title("Exile Leveling and 2 more pages - Personal - Microsoft Edge"));
         assert!(!is_guide_title("Path of Exile"));
     }
