@@ -9,7 +9,7 @@ import {
   shownPanelsAtom,
 } from "../../state/overlay";
 import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
-import { useJumpToSection } from "../PageSection";
+import { pageSectionId, useJumpToSection } from "../PageSection";
 import { autoProgressAtom } from "../../state/auto-progress";
 import { levelLineAtom } from "../../state/level-lines";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
@@ -109,8 +109,13 @@ function useJumpFromGame() {
       if (pathname === "/") go();
       else {
         navigate("/");
-        // The guide page loads lazily; give it a moment to render.
-        setTimeout(go, 400);
+        // The guide page loads lazily: jump once its panel is there (up to 5 s).
+        let tries = 0;
+        const wait = () => {
+          if (document.getElementById(pageSectionId(id))) go();
+          else if (++tries < 50) setTimeout(wait, 100);
+        };
+        wait();
       }
     },
     [pathname, navigate, jumpToSection, scrollToStep],

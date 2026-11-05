@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 use tracing::{info, warn};
 use windows_sys::Win32::{
-    Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM},
+    Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
     Graphics::{
         Dwm::{DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute},
         Gdi::{CreateSolidBrush, MONITOR_DEFAULTTONULL, MonitorFromPoint},
@@ -33,14 +33,15 @@ use windows_sys::Win32::{
     UI::{
         HiDpi::GetDpiForWindow,
         Input::KeyboardAndMouse::ReleaseCapture,
+        Shell::{DefSubclassProc, SetWindowSubclass},
         WindowsAndMessaging::{
             CreateWindowExW, DefWindowProcW, GetClassNameW, GetCursorPos, GetForegroundWindow,
             GetSystemMetrics, GetWindowRect, HTCAPTION, HWND_TOPMOST, IDC_ARROW, IsWindow,
             LoadCursorW, MA_NOACTIVATE, PostMessageW, RegisterClassExW, SM_CXSCREEN, SW_HIDE,
             SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
-            SetForegroundWindow, SetWindowPos, ShowWindow, WM_EXITSIZEMOVE, WM_MOUSEACTIVATE,
-            WM_NCLBUTTONDOWN, WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-            WS_POPUP,
+            SetForegroundWindow, SetWindowPos, ShowWindow, WM_DPICHANGED, WM_ENTERSIZEMOVE,
+            WM_EXITSIZEMOVE, WM_MOUSEACTIVATE, WM_NCLBUTTONDOWN, WNDCLASSEXW, WS_EX_NOACTIVATE,
+            WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
         },
     },
 };
@@ -117,6 +118,8 @@ pub struct Overlay {
     failed: bool,
     /// The game window last seen in front, to hand focus back to.
     game: HWND,
+    /// The window in front at the last tick: focus goes back to the game only if it was there.
+    last_front: HWND,
     ipc_tx: mpsc::Sender<Ipc>,
     ipc_rx: mpsc::Receiver<Ipc>,
 }
@@ -133,11 +136,13 @@ impl Overlay {
         Self {
             url: format!("{url}overlay.html"),
             config,
-            position: saved.position,
+            // A spot on a monitor that's gone: start over at the default place.
+            position: saved.position.filter(|&(x, y)| on_screen(x, y)),
             always,
             window: None,
             failed: false,
             game: std::ptr::null_mut(),
+            last_front: std::ptr::null_mut(),
             ipc_tx,
             ipc_rx,
         }
@@ -149,10 +154,11 @@ impl Overlay {
         let own = self.window.as_ref().is_some_and(|w| w.hwnd == front);
         if is_game(front) {
             self.game = front;
-        } else if own && !self.game.is_null() && unsafe { IsWindow(self.game) } != 0 {
-            // WebView2 took focus on a click: give it back to the game.
+        } else if own && is_game(self.last_front) && unsafe { IsWindow(self.game) } != 0 {
+            // WebView2 took focus on a click while you were in the game: give it back.
             unsafe { SetForegroundWindow(self.game) };
         }
+        self.last_front = front;
 
         if self.config.has_changed().unwrap_or(false) {
             self.config.borrow_and_update();
@@ -257,8 +263,11 @@ impl Overlay {
             })
             .build(&Handle(hwnd))
             .map_err(|err| {
-                format!("WebView2 didn't start ({err}). Is the WebView2 runtime installed?")
+                format!("WebView2 didn't start ({err}). Install the WebView2 runtime.")
             })?;
+        // wry focuses WebView2 when a drag starts, which would take focus from the game. A
+        // subclass added after wry's runs first and keeps that message from reaching it.
+        unsafe { SetWindowSubclass(hwnd, Some(keep_focus_on_drag), 1, 0) };
         info!("Overlay ready");
         Ok(Window {
             hwnd,
@@ -268,6 +277,20 @@ impl Overlay {
             visible: false,
         })
     }
+}
+
+unsafe extern "system" fn keep_focus_on_drag(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id: usize,
+    _data: usize,
+) -> LRESULT {
+    if msg == WM_ENTERSIZEMOVE {
+        return 0;
+    }
+    unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
 }
 
 /// True for the game's window.
@@ -295,6 +318,23 @@ unsafe extern "system" fn window_proc(
         WM_MOUSEACTIVATE => MA_NOACTIVATE as LRESULT,
         WM_EXITSIZEMOVE => {
             MOVED.store(true, Ordering::SeqCst);
+            0
+        }
+        // Dragged to a monitor with another scale: take the size Windows suggests for it
+        // (the page's bar is the same size in CSS pixels).
+        WM_DPICHANGED => {
+            let rect = unsafe { &*(lparam as *const RECT) };
+            unsafe {
+                SetWindowPos(
+                    hwnd,
+                    std::ptr::null_mut(),
+                    rect.left,
+                    rect.top,
+                    rect.right - rect.left,
+                    rect.bottom - rect.top,
+                    SWP_NOZORDER | SWP_NOACTIVATE,
+                );
+            }
             0
         }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },

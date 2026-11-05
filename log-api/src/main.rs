@@ -217,10 +217,16 @@ fn wait(
     });
 
     info!("Running in the tray. Quit from its menu.");
+    // Clicks before the new guide connects would each open another window: one is enough.
+    let mut last_open: Option<std::time::Instant> = None;
     let tick = || {
-        if bar.open_requests.try_recv().is_ok() {
+        if bar.open_requests.try_recv().is_ok()
+            && last_open.is_none_or(|t| t.elapsed() >= Duration::from_secs(5))
+        {
+            last_open = Some(std::time::Instant::now());
             show_guide(browser, url);
         }
+        while bar.open_requests.try_recv().is_ok() {}
         bar.overlay.tick();
     };
     match tray::run(status, stopped_rx, || show_guide(browser, url), tick) {

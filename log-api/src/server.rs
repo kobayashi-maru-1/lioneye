@@ -1,8 +1,5 @@
 use std::{
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
-    },
+    sync::{Arc, Mutex, MutexGuard},
     time::{Duration, Instant},
 };
 
@@ -87,31 +84,61 @@ struct OverlayUpdate {
 
 /// The open guide pages, so a bar button can open one when there's none.
 pub struct Guides {
-    open: AtomicUsize,
-    /// A jump asked for while no guide was open, for the next one that connects.
-    pending: Mutex<Option<(String, Instant)>>,
+    /// Under one lock, so a guide connecting while a button is clicked can't miss the jump.
+    state: Mutex<GuideState>,
     /// Asks the tray thread to open the guide.
     request_open: std::sync::mpsc::Sender<()>,
 }
 
+#[derive(Default)]
+struct GuideState {
+    /// Guide pages connected.
+    open: usize,
+    /// A jump asked for while no guide was open, for the next one that connects.
+    pending: Option<(String, Instant)>,
+}
+
 /// How long a jump waits for a guide page to open and connect.
-const PENDING_JUMP: Duration = Duration::from_secs(30);
+const PENDING_JUMP: Duration = Duration::from_secs(15);
 
 impl Guides {
     pub fn new(request_open: std::sync::mpsc::Sender<()>) -> Self {
         Self {
-            open: AtomicUsize::new(0),
-            pending: Mutex::new(None),
+            state: Mutex::new(GuideState::default()),
             request_open,
         }
     }
 
-    fn take_pending(&self) -> Option<String> {
-        let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
-        pending
+    fn lock(&self) -> MutexGuard<'_, GuideState> {
+        self.state.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// A guide page connected: the jump waiting for it, if any.
+    fn connected(&self) -> Option<String> {
+        let mut state = self.lock();
+        state.open += 1;
+        state
+            .pending
             .take()
             .filter(|(_, at)| at.elapsed() < PENDING_JUMP)
             .map(|(id, _)| id)
+    }
+
+    fn disconnected(&self) {
+        let mut state = self.lock();
+        state.open = state.open.saturating_sub(1);
+    }
+
+    /// True when a guide is open; otherwise keeps the jump for the next one to connect.
+    fn open_or_wait(&self, id: &str) -> bool {
+        let mut state = self.lock();
+        if state.open > 0 {
+            state.pending = None;
+            true
+        } else {
+            state.pending = Some((id.to_string(), Instant::now()));
+            false
+        }
     }
 }
 
@@ -123,16 +150,11 @@ fn panel_id(id: &str) -> Option<&str> {
 
 /// A bar button: tells the open guide pages to jump and brings one up, or opens one.
 async fn jump(state: &AppState, id: &str) {
-    if state.guides.open.load(Ordering::SeqCst) > 0 {
+    if state.guides.open_or_wait(id) {
         let _ = state.lines.send(format!("jump:{id}"));
         #[cfg(windows)]
         let _ = tokio::task::spawn_blocking(crate::guide_window::raise).await;
     } else {
-        *state
-            .guides
-            .pending
-            .lock()
-            .unwrap_or_else(|e| e.into_inner()) = Some((id.to_string(), Instant::now()));
         let _ = state.guides.request_open.send(());
     }
 }
@@ -208,7 +230,7 @@ async fn client(socket: WebSocket, state: AppState) {
     let mut guide = false;
     serve_client(socket, &state, &mut guide).await;
     if guide {
-        state.guides.open.fetch_sub(1, Ordering::SeqCst);
+        state.guides.disconnected();
     }
     info!("Page disconnected");
 }
@@ -257,9 +279,8 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                     let text = text.as_str();
                     if text == "guide" && !*guide {
                         *guide = true;
-                        state.guides.open.fetch_add(1, Ordering::SeqCst);
                         // A bar button opened this guide: do the jump it asked for.
-                        if let Some(id) = state.guides.take_pending() {
+                        if let Some(id) = state.guides.connected() {
                             let text = format!("jump:{id}");
                             if socket.send(Message::Text(text.into())).await.is_err() { break; }
                         }
