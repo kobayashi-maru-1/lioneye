@@ -35,9 +35,24 @@ const IDLE: Duration = Duration::from_secs(10 * 60);
 /// pob-host.lua starts errors that leave PoB usable with this, so PoB stays loaded.
 const KEEP: &str = "[keep] ";
 
+/// The guide's remembered main skill: matched by skill gem in each loadout (see pob-host.lua).
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Pick {
+    /// PoB's granted effect id of the active skill, e.g. `SummonRagingSpirit`.
+    pub id: String,
+    /// Socket group label and position it was picked from; break ties between groups.
+    pub label: Option<String>,
+    pub group: Option<i64>,
+    pub part: Option<String>,
+    pub minion: Option<String>,
+    pub minion_skill: Option<String>,
+}
+
 struct Job {
     xml: String,
     loadout: Option<String>,
+    pick: Option<Pick>,
     reply: oneshot::Sender<Result<String, String>>,
 }
 
@@ -57,11 +72,18 @@ impl Engine {
     }
 
     /// PoB's sidebar stats for `loadout` as JSON. None: the loadout the build was saved on
-    /// when the build is new to PoB, else the loadout picked last.
-    pub async fn stats(&self, xml: String, loadout: Option<String>) -> Result<String, String> {
+    /// when the build is new to PoB, else the loadout picked last. No pick: PoB's own main skill.
+    pub async fn stats(
+        &self,
+        xml: String,
+        loadout: Option<String>,
+        pick: Option<Pick>,
+    ) -> Result<String, String> {
         let stopped = || "PoB isn't running. Restart the app.".to_string();
         let (reply, answer) = oneshot::channel();
-        self.jobs.send(Job { xml, loadout, reply }).map_err(|_| stopped())?;
+        self.jobs
+            .send(Job { xml, loadout, pick, reply })
+            .map_err(|_| stopped())?;
         answer.await.map_err(|_| stopped())?
     }
 }
@@ -97,7 +119,7 @@ fn run(jobs: mpsc::Receiver<Job>) {
         let Some(loaded) = pob.as_ref() else { continue };
 
         let started = Instant::now();
-        let result = match loaded.stats(&job.xml, job.loadout.as_deref()) {
+        let result = match loaded.stats(&job.xml, job.loadout.as_deref(), job.pick.as_ref()) {
             Ok(json) => {
                 debug!("PoB stats in {:.2}s", started.elapsed().as_secs_f32());
                 Ok(json)
@@ -171,9 +193,20 @@ impl Pob {
         Ok(Pob { stats, _lua: lua })
     }
 
-    fn stats(&self, xml: &str, loadout: Option<&str>) -> Result<String, String> {
+    fn stats(&self, xml: &str, loadout: Option<&str>, pick: Option<&Pick>) -> Result<String, String> {
+        let pick = pick.map(|p| {
+            (
+                Some(p.id.as_str()),
+                p.label.as_deref(),
+                p.group,
+                p.part.as_deref(),
+                p.minion.as_deref(),
+                p.minion_skill.as_deref(),
+            )
+        });
+        let (id, label, group, part, minion, minion_skill) = pick.unwrap_or_default();
         self.stats
-            .call::<mlua::String>((xml, loadout))
+            .call::<mlua::String>((xml, loadout, id, label, group, part, minion, minion_skill))
             .map(|json| json.to_string_lossy())
             .map_err(|err| message(&err))
     }

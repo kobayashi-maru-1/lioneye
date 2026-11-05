@@ -258,11 +258,168 @@ local function warnings()
 	return out
 end
 
+-- Main skill -----------------------------------------------------------------------------
+-- PoB keeps the main skill as one group number for every loadout, so reordered groups
+-- change the skill. The guide remembers the skill gem instead and sends it as a pick.
+-- Every change made for a pick is undone before the next request, so a loadout without
+-- the picked gem shows exactly PoB's own main skill.
+
+local undo = {}
+
+local function setUndoable(tbl, key, value)
+	if tbl[key] == value then
+		return
+	end
+	undo[#undo + 1] = { tbl, key, tbl[key] }
+	tbl[key] = value
+	build.buildFlag = true
+end
+
+local function undoPicks()
+	for i = #undo, 1, -1 do
+		local entry = undo[i]
+		entry[1][entry[2]] = entry[3]
+		build.buildFlag = true
+	end
+	undo = {}
+end
+
+local function recalc()
+	runCallback("OnFrame")
+	local msg = takePromptError()
+	if msg then
+		error(KEEP .. msg, 0)
+	end
+end
+
+local function mainActive()
+	local group = build.skillsTab.socketGroupList[build.mainSocketGroup]
+	local list = group and group.displaySkillList
+	return group, list and list[group.mainActiveSkill or 1]
+end
+
+local function grantedId(active)
+	return active and active.activeEffect and active.activeEffect.grantedEffect
+		and active.activeEffect.grantedEffect.id
+end
+
+-- Applies a pick ({ id, label, group, part, minion, minionSkill }); false when this
+-- loadout has no group with that skill gem.
+local function applyPick(pick)
+	local best
+	for groupIndex, group in ipairs(build.skillsTab.socketGroupList) do
+		for skillIndex, active in ipairs(group.displaySkillList or {}) do
+			if grantedId(active) == pick.id then
+				-- Enabled groups first, then the label you picked, then the same position.
+				local score = (group.enabled and 4 or 0)
+					+ (group.displayLabel == pick.label and 2 or 0)
+					+ (groupIndex == pick.group and 1 or 0)
+				if best == nil or score > best.score then
+					best = { group = groupIndex, skill = skillIndex, score = score }
+				end
+			end
+		end
+	end
+	if best == nil then
+		return false
+	end
+
+	local group = build.skillsTab.socketGroupList[best.group]
+	setUndoable(build, "mainSocketGroup", best.group)
+	setUndoable(group, "mainActiveSkill", best.skill)
+	local active = group.displaySkillList[best.skill]
+	local effect = active.activeEffect
+	local source = effect.srcInstance
+	if pick.part and effect.grantedEffect.parts then
+		for index, part in ipairs(effect.grantedEffect.parts) do
+			if part.name == pick.part then
+				setUndoable(source, "skillPart", index)
+			end
+		end
+	end
+	if pick.minion then
+		if effect.grantedEffect.minionHasItemSet then
+			for _, itemSetId in ipairs(build.itemsTab.itemSetOrderList) do
+				if (build.itemsTab.itemSets[itemSetId].title or "Default Item Set") == pick.minion then
+					setUndoable(source, "skillMinionItemSet", itemSetId)
+				end
+			end
+		else
+			for _, minionId in ipairs(active.minionList or {}) do
+				local minion = build.data.minions[minionId]
+				if minion and minion.name == pick.minion then
+					setUndoable(source, "skillMinion", minionId)
+				end
+			end
+		end
+	end
+	if build.buildFlag then
+		recalc()
+	end
+
+	-- A minion's skills exist only after a calculation with that minion.
+	if pick.minionSkill then
+		local _, current = mainActive()
+		if current and current.minion then
+			for index, skill in ipairs(current.minion.activeSkillList) do
+				if skill.activeEffect.grantedEffect.name == pick.minionSkill then
+					setUndoable(current.activeEffect.srcInstance, "skillMinionSkill", index)
+					break
+				end
+			end
+		end
+	end
+	return true
+end
+
+local function labels(list)
+	local out = setmetatable({}, ARRAY)
+	for _, entry in ipairs(list) do
+		out[#out + 1] = type(entry) == "table" and (entry.label or "") or tostring(entry)
+	end
+	return out
+end
+
+-- PoB's main skill controls, as the guide shows them.
+local function skillState(picked)
+	local controls = build.controls
+	local group, active = mainActive()
+	local groupSkills = setmetatable({}, ARRAY)
+	for index, socketGroup in ipairs(build.skillsTab.socketGroupList) do
+		local ids = setmetatable({}, ARRAY)
+		for _, skill in ipairs(socketGroup.displaySkillList or {}) do
+			ids[#ids + 1] = grantedId(skill) or ""
+		end
+		groupSkills[index] = ids
+	end
+	local function shown(control)
+		return control.shown == true
+	end
+	return {
+		picked = picked,
+		id = grantedId(active),
+		label = group and group.displayLabel,
+		groups = labels(controls.mainSocketGroup.list),
+		groupSkills = groupSkills,
+		group = controls.mainSocketGroup.selIndex,
+		skills = labels(controls.mainSkill.list),
+		skill = controls.mainSkill.selIndex,
+		parts = shown(controls.mainSkillPart) and labels(controls.mainSkillPart.list) or setmetatable({}, ARRAY),
+		part = shown(controls.mainSkillPart) and controls.mainSkillPart.selIndex or nil,
+		minions = shown(controls.mainSkillMinion) and labels(controls.mainSkillMinion.list) or setmetatable({}, ARRAY),
+		minion = shown(controls.mainSkillMinion) and controls.mainSkillMinion.selIndex or nil,
+		minionSkills = shown(controls.mainSkillMinionSkill) and labels(controls.mainSkillMinionSkill.list) or setmetatable({}, ARRAY),
+		minionSkill = shown(controls.mainSkillMinionSkill) and controls.mainSkillMinionSkill.selIndex or nil,
+	}
+end
+
 -- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
--- when the build is new to PoB, else the loadout picked last.
-function host_stats(xml, loadout)
+-- when the build is new to PoB, else the loadout picked last. `id` and the rest are the
+-- guide's remembered main skill (all nil: PoB's own).
+function host_stats(xml, loadout, id, label, group, part, minion, minionSkill)
 	if xml ~= loadedXml then
 		loadedXml = nil
+		undo = {}
 		local bundled
 		bundled, treeNotes = onBundledTrees(xml)
 		takePromptError()
@@ -272,13 +429,25 @@ function host_stats(xml, loadout)
 			error("Build didn't load: " .. msg, 0)
 		end
 		loadedXml = xml
+	else
+		undoPicks()
 	end
 	if loadout ~= nil and loadout ~= currentLoadout() then
 		selectLoadout(loadout)
 	end
+	local picked
+	if id ~= nil then
+		picked = applyPick({
+			id = id, label = label, group = group, part = part, minion = minion, minionSkill = minionSkill,
+		})
+	end
+	if build.buildFlag then
+		recalc()
+	end
 	return json.encode({
 		loadouts = loadouts(),
 		loadout = currentLoadout(),
+		skill = skillState(picked),
 		rows = rows(),
 		warnings = warnings(),
 	})

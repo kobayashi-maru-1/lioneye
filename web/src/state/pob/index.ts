@@ -12,6 +12,7 @@ import { routeProgressFamily } from "../route-progress";
 import { sectionCollapseFamily } from "../section-collapse";
 import { toast } from "react-toastify";
 import { activeEdgeAtom } from "../route";
+import { mainSkillPickAtom } from "../main-skill";
 
 const POB_CODE_VERSION = 0;
 
@@ -38,6 +39,7 @@ export const pobAtom = atom(
       set(buildTreesSelector, RESET);
       set(gemLinksSelector, RESET);
       set(pobCodeAtom, RESET);
+      set(mainSkillPickAtom, RESET);
       set(activeEdgeAtom, RESET);
 
       set(routeProgressFamily.clear);
@@ -51,6 +53,7 @@ export const pobAtom = atom(
         set(buildTreesSelector, pob.buildTrees);
         set(gemLinksSelector, pob.gemLinks);
         set(pobCodeAtom, value);
+        set(mainSkillPickAtom, RESET);
         set(activeEdgeAtom, RESET);
 
         set(routeProgressFamily.clear);

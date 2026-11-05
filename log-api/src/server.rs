@@ -134,6 +134,8 @@ struct StatsRequest {
     xml: String,
     /// Loadout name from an earlier answer; none for the loadout the build was saved on.
     loadout: Option<String>,
+    /// The guide's remembered main skill; none for PoB's own.
+    pick: Option<pob::Pick>,
 }
 
 /// PoB's sidebar stats for a loadout of the imported build.
@@ -146,7 +148,7 @@ async fn pob_stats(
         return StatusCode::FORBIDDEN.into_response();
     }
     // Long enough for PoB's first load plus a first-time timeless jewel download.
-    let stats = state.pob.stats(request.xml, request.loadout);
+    let stats = state.pob.stats(request.xml, request.loadout, request.pick);
     match tokio::time::timeout(Duration::from_secs(180), stats).await {
         Ok(Ok(json)) => ([(header::CONTENT_TYPE, "application/json")], json).into_response(),
         Ok(Err(msg)) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),

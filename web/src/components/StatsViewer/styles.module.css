@@ -53,3 +53,40 @@
 .retry {
   padding: 0 var(--size-3);
 }
+
+/* Main skill selectors, like PoB's sidebar. */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2);
+  margin-bottom: var(--size-3);
+}
+
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2);
+}
+
+.select {
+  flex: 1;
+  min-width: 0;
+  padding: var(--size-1) var(--size-2);
+  color: var(--on-secondary);
+  background-color: var(--secondary);
+  border: var(--border-width) solid var(--accent-secondary);
+  border-radius: var(--border-radius);
+}
+
+.select:disabled {
+  opacity: 0.7;
+}
+
+.tag {
+  flex: none;
+  font-size: 0.8em;
+  padding: 0 var(--size-2);
+  color: #ffb000;
+  border: var(--border-width) solid #ffb000;
+  border-radius: var(--border-radius);
+}
