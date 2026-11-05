@@ -84,6 +84,21 @@
   object-fit: contain;
 }
 
+/* A flask from its three-frame sheet: each frame is 1:2, the layers stack. */
+.flaskArt {
+  position: relative;
+  display: block;
+  height: 90%;
+  aspect-ratio: 1 / 2;
+}
+
+.flaskLayer {
+  position: absolute;
+  inset: 0;
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+}
+
 .name {
   padding: var(--size-1);
   font-size: 0.65rem;

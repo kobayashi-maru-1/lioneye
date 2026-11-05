@@ -1,5 +1,5 @@
 import { gemLinksSelector } from "../../state/gem-links";
-import { artFor, copyItem, itemName, RARITY_COLOURS } from "../Gear";
+import { artFor, copyItem, ItemArt, itemName, RARITY_COLOURS } from "../Gear";
 import {
   type TradeOptions,
   useArt,
@@ -142,7 +142,7 @@ export function TradeListPanel() {
             return (
               <div key={`${slot}-${i}`} className={classNames(styles.row)}>
                 <span className={classNames(styles.icon)}>
-                  {icon && <img src={icon} alt="" />}
+                  {icon && <ItemArt src={icon} className={styles.art} />}
                 </span>
                 <span className={classNames(styles.text)}>
                   <span className={classNames(styles.title)}>
@@ -163,7 +163,7 @@ export function TradeListPanel() {
                 <button
                   className={classNames(styles.iconButton)}
                   aria-label={`Copy ${itemName(item)}`}
-                  title="Copy item"
+                  title="Copy"
                   onClick={() => copyItem(item)}
                 >
                   <FaRegClipboard aria-hidden />
@@ -174,6 +174,7 @@ export function TradeListPanel() {
                     href={search.url}
                     target="_blank"
                     rel="noreferrer"
+                    aria-label={`Search ${itemName(item)}`}
                   >
                     Search
                   </a>
@@ -226,6 +227,7 @@ export function TradeListPanel() {
                     )}
                     target="_blank"
                     rel="noreferrer"
+                    aria-label={`Search ${gem.name}`}
                   >
                     Search
                   </a>

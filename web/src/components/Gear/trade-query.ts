@@ -138,13 +138,15 @@ function statFilter(
     tries.push([template.replace(/\bless\b/, "more"), -1]);
 
   const local = localKind(slot, base);
+  // A crafted mod also counts when a listing has it as a normal mod, and vice versa.
   const groups = crafted ? ["crafted", "explicit"] : ["explicit"];
   for (const [t, sign] of tries) {
     const variants = local && local.test(t) ? [`${t} (Local)`, t] : [t];
-    for (const group of groups) {
-      for (const variant of variants) {
-        const ids = index.byText[group]?.get(variant);
-        if (!ids) continue;
+    for (const variant of variants) {
+      const ids = groups.flatMap(
+        (group) => index.byText[group]?.get(variant) ?? [],
+      );
+      if (ids.length) {
         let value: StatFilter["value"];
         if (nums.length && !DRAWBACK.test(text)) {
           const average =
@@ -190,6 +192,9 @@ export function tradeSearch(
     );
     if (unique) query.name = unique;
     if (item.base) query.type = tradeBase(item.base);
+    query.filters = {
+      type_filters: { filters: { rarity: { option: "unique" } } },
+    };
   } else {
     const rawBase =
       item.rarity === "RARE"
@@ -198,21 +203,21 @@ export function tradeSearch(
           ? (item.base ?? name)
           : (index.bases.find((b) => name.includes(b)) ?? item.base ?? "");
     const base = tradeBase(rawBase);
+    // Rares search the slot's category; normal and magic items keep their base.
     const category =
-      CATEGORY[slot.replace(/ Swap$/, "")] ??
-      (slot.startsWith("Weapon") &&
-      !ABYSSAL.test(slot) &&
-      item.rarity === "RARE"
-        ? weaponCategory(base)
-        : undefined);
+      item.rarity !== "RARE"
+        ? undefined
+        : (CATEGORY[slot.replace(/ Swap$/, "")] ??
+          (slot.startsWith("Weapon") && !ABYSSAL.test(slot)
+            ? weaponCategory(base)
+            : undefined));
     const typeFilters: Record<string, unknown> = {
       rarity: { option: "nonunique" },
     };
     if (category) typeFilters.category = { option: category };
     else if (base) query.type = base;
     query.filters = { type_filters: { filters: typeFilters } };
-    const and: unknown[] = [];
-    const anyOf: unknown[] = [];
+    const mods: { id: string; value?: StatFilter["value"] }[][] = [];
     const seen = new Set<string>();
     for (const line of item.explicit) {
       total++;
@@ -227,20 +232,27 @@ export function tradeSearch(
       if (!filter || seen.has(filter.ids[0])) continue;
       seen.add(filter.ids[0]);
       matched++;
-      const filters = filter.ids.map((id) =>
-        filter.value ? { id, value: filter.value } : { id },
+      mods.push(
+        filter.ids.map((id) =>
+          filter.value ? { id, value: filter.value } : { id },
+        ),
       );
-      // Same text under several ids: any one of them counts.
-      if (filters.length === 1) and.push(filters[0]);
-      else anyOf.push({ type: "count", value: { min: 1 }, filters });
     }
     const stats: unknown[] = [];
     // A share of the mods is enough ("min % of total mods"); all of them at 100%.
-    const need = Math.max(1, Math.ceil(and.length * options.modShare));
-    if (and.length && need < and.length)
-      stats.push({ type: "count", value: { min: need }, filters: and });
-    else if (and.length) stats.push({ type: "and", filters: and });
-    stats.push(...anyOf);
+    const need = Math.max(1, Math.ceil(mods.length * options.modShare));
+    if (mods.length && need < mods.length) {
+      // Every id of every mod in one count; a mod's ids (same text) rarely occur together.
+      stats.push({ type: "count", value: { min: need }, filters: mods.flat() });
+    } else if (mods.length) {
+      const single = mods
+        .filter((ids) => ids.length === 1)
+        .map((ids) => ids[0]);
+      if (single.length) stats.push({ type: "and", filters: single });
+      // Same text under several ids: any one of them counts.
+      for (const ids of mods.filter((ids) => ids.length > 1))
+        stats.push({ type: "count", value: { min: 1 }, filters: ids });
+    }
     if (stats.length) query.stats = stats;
   }
   return { url: searchUrl(league, query), matched, total };

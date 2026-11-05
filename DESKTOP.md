@@ -70,7 +70,7 @@ your PoB once in **Settings** (the ⚙ at the top right).
   all of them with curl.exe and caches them in `%LOCALAPPDATA%\exile-leveling\cache` for
   12 hours (the cached copy is used offline).
 - Hover an item or gem for its in-game tooltip; click it to pin the tooltip and use its
-  buttons: items have **Copy** (the item text, as PoB's Ctrl+C) and **Trade**; gems have
+  buttons: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
   **W** (the wiki) and **Trade**. Escape, a click elsewhere or a second click unpins it.
 - **Trade List** has a trade search for every item of the loadout's gear and every gem of
   its skill set, as on pob.codes. Pick the league, the search type (**Instant Buyout**,

@@ -24,7 +24,7 @@ import {
 import styles from "./styles.module.css";
 import { type TradeIndex, tradeIndex, tradeUrl } from "./trade-query";
 import classNames from "classnames";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { FaBalanceScale, FaRegClipboard } from "react-icons/fa";
 import { toast } from "react-toastify";
 
@@ -75,7 +75,7 @@ export function artFor(item: GearItem, art: Art | undefined) {
   return base ? art.bases.get(base) : undefined;
 }
 
-/** Copies an item's text (PoB's Ctrl+C format) to the clipboard. */
+/** Copies an item's text, as PoB writes it (pastes into PoB), to the clipboard. */
 export async function copyItem(item: GearItem) {
   try {
     await navigator.clipboard.writeText(item.raw ?? itemName(item));
@@ -262,12 +262,12 @@ export function ItemActions({
 }) {
   return (
     <>
-      <PopoverAction label="Copy item" onClick={() => copyItem(item)}>
+      <PopoverAction label="Copy" onClick={() => copyItem(item)}>
         <FaRegClipboard aria-hidden />
       </PopoverAction>
       {index && league && (
         <PopoverAction
-          label="Trade search"
+          label="Trade"
           href={tradeUrl(index, item, slot, league, options)}
         >
           <FaBalanceScale aria-hidden />
@@ -344,7 +344,7 @@ function ItemTile({
       {...handlers}
     >
       {art ? (
-        <img className={classNames(styles.art)} src={art} alt="" />
+        <ItemArt src={art} className={classNames(styles.art)} />
       ) : (
         <span
           className={classNames(styles.name)}
@@ -355,6 +355,53 @@ function ItemTile({
       )}
       {label && <span className={classNames(styles.label)}>{label}</span>}
     </button>
+  );
+}
+
+/**
+ * An item's art. The game's flask art is a sheet of three frames (glass, back, liquid)
+ * side by side; those are stacked into one flask: back, then liquid, then glass.
+ */
+export function ItemArt({
+  src,
+  className,
+}: {
+  src: string;
+  className?: string;
+}) {
+  const [sheet, setSheet] = useState<{ src: string; ratio: number } | null>(
+    null,
+  );
+  const ratio = sheet?.src === src ? sheet.ratio : null;
+  if (ratio !== null && Math.abs(ratio - 1.5) < 0.05) {
+    const layer = (position: string) => (
+      <span
+        className={classNames(styles.flaskLayer)}
+        style={{
+          backgroundImage: `url("${src}")`,
+          backgroundPosition: position,
+        }}
+      />
+    );
+    return (
+      <span className={classNames(className, styles.flaskArt)} aria-hidden>
+        {layer("50% 0")}
+        {layer("100% 0")}
+        {layer("0 0")}
+      </span>
+    );
+  }
+  return (
+    <img
+      className={className}
+      src={src}
+      alt=""
+      onLoad={(event) => {
+        const img = event.currentTarget;
+        if (img.naturalHeight > 0)
+          setSheet({ src, ratio: img.naturalWidth / img.naturalHeight });
+      }}
+    />
   );
 }
 

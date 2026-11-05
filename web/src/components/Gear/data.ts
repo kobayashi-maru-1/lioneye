@@ -133,12 +133,16 @@ export function useArt(league: string | null) {
               () => null,
             );
             const fromRepoe = new Set<string>();
+            const fromLegacy = new Set<string>();
             for (const base of Object.values(repoe ?? {})) {
               const dds = base.visual_identity?.dds_file;
               if (!base.name || !dds || base.release_state === "unreleased")
                 continue;
+              // The first released entry of a name wins over legacy ones.
+              const released = base.release_state === "released";
               if (fromRepoe.has(base.name)) continue;
-              fromRepoe.add(base.name);
+              if (!released && fromLegacy.has(base.name)) continue;
+              (released ? fromRepoe : fromLegacy).add(base.name);
               art.bases.set(
                 base.name,
                 `${POE_IMAGES}${dds.replace(/\.dds$/i, ".png")}`,

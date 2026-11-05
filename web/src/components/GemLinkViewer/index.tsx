@@ -54,7 +54,7 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
               </PopoverAction>
               {league && (
                 <PopoverAction
-                  label="Trade search"
+                  label="Trade"
                   href={gemTradeUrl(
                     shownGem.name,
                     shown.value.level,

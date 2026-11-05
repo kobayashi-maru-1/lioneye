@@ -88,10 +88,12 @@ function processSkills(
       const attribute = gemElement.attributes.getNamedItem("gemId");
       if (attribute) {
         const gemId = MapGemId(attribute.value);
-        gemProps.set(gemId, {
-          level: number(gemElement.getAttribute("level")),
-          quality: number(gemElement.getAttribute("quality")),
-        });
+        // A Vaal or Awakened gem shows as its normal gem; its level isn't that gem's.
+        if (gemId === (GEM_ID_REMAP[attribute.value] ?? attribute.value))
+          gemProps.set(gemId, {
+            level: number(gemElement.getAttribute("level")),
+            quality: number(gemElement.getAttribute("quality")),
+          });
         const note = cleanPobText(
           recentEmptySkillLabel || parentTitle || skillLabel || "",
         );

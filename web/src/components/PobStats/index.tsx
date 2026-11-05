@@ -104,7 +104,7 @@ export interface GearItem {
   corrupted?: boolean;
   /** What the item requires (attributes after its mods). */
   requires?: { level?: number; str?: number; dex?: number; int?: number };
-  /** The item as text (Ctrl+C format), for Copy. */
+  /** The item as PoB writes it as text, for Copy. */
   raw?: string;
   enchant: ItemLine[];
   implicit: ItemLine[];

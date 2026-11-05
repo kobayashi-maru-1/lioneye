@@ -657,7 +657,7 @@ local function itemData(item)
 			dex = (item.requirements.dexMod or 0) > 0 and item.requirements.dexMod or nil,
 			int = (item.requirements.intMod or 0) > 0 and item.requirements.intMod or nil,
 		},
-		-- The item as text (Ctrl+C format), for the guide's Copy button.
+		-- The item as PoB writes it as text, for the guide's Copy button.
 		raw = item:BuildRaw(),
 		enchant = lines(item.enchantModLines),
 		implicit = lines(item.implicitModLines),

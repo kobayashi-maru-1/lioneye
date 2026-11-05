@@ -74,6 +74,8 @@ export function Popover({
   const place = useCallback(() => {
     const element = ref.current;
     if (!element) return;
+    // The thing it belongs to left the page (another set or act): close.
+    if (!anchor.isConnected) return onClose();
     const a = anchor.getBoundingClientRect();
     const { width, height } = element.getBoundingClientRect();
     const gap = 8;
@@ -88,9 +90,9 @@ export function Popover({
     setPosition((prev) =>
       prev && prev.left === left && prev.top === top ? prev : { left, top },
     );
-  }, [anchor]);
+  }, [anchor, onClose]);
 
-  useLayoutEffect(place, [place, pinned, children]);
+  useLayoutEffect(place);
 
   // Follow the anchor as the page scrolls; a hover popover just closes.
   useEffect(() => {
