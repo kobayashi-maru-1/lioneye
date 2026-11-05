@@ -1,0 +1,163 @@
+.gear {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--size-3);
+}
+
+/* pob.codes paper doll: weapons either side, body in the middle, jewellery around it. */
+.doll {
+  --cell: 2.75rem;
+  display: grid;
+  grid-template-columns: calc(var(--cell) * 2) var(--cell) calc(
+      var(--cell) * 2
+    ) var(--cell) calc(var(--cell) * 2);
+  grid-template-rows: calc(var(--cell) * 2) var(--cell) var(--cell) var(--cell);
+  grid-template-areas:
+    "w1 . helm amulet w2"
+    "w1 r1 body r2 w2"
+    "gloves r3 body . boots"
+    "gloves . belt . boots";
+  gap: var(--size-2);
+}
+
+.helm,
+.body,
+.gloves,
+.boots,
+.belt,
+.amulet,
+.r1,
+.r2,
+.r3 {
+  min-height: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--size-2);
+}
+
+.flask {
+  width: 2.5rem;
+  height: 4.5rem;
+}
+
+.small {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--size-2);
+}
+
+.groupTitle {
+  color: var(--accent-primary);
+  font-size: 0.7rem;
+  font-weight: var(--font-heavy);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* An item: pob.codes navy tile, framed in its rarity colour. */
+.tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: var(--navy);
+  border: var(--border-width) solid;
+  border-radius: var(--border-radius);
+}
+
+.art {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
+.name {
+  padding: var(--size-1);
+  font-size: 0.65rem;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0 var(--size-1);
+  font-size: 0.6rem;
+  color: var(--accent-primary);
+  background-color: rgba(0, 0, 0, 0.6);
+  border-bottom-right-radius: var(--border-radius);
+}
+
+/* Trade: a small corner button, clearer on hover. */
+.trade {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  padding: var(--size-1);
+  font-size: 0.7rem;
+  color: var(--gold) !important;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-top-left-radius: var(--border-radius);
+  opacity: 0.6;
+}
+
+.tile:hover .trade {
+  opacity: 1;
+}
+
+.mods {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-1);
+  font-size: 0.85rem;
+  color: #8888ff;
+}
+
+.meta {
+  color: var(--accent-primary);
+}
+
+.mod {
+  color: #8888ff;
+}
+
+.crafted {
+  color: #b4b4ff;
+}
+
+.fractured {
+  color: #a29162;
+}
+
+.enchant {
+  color: #b8daf2;
+}
+
+.corrupted {
+  color: #d20000;
+}
+
+.base {
+  display: block;
+  color: var(--on-secondary);
+  font-weight: 400;
+}
+
+.status {
+  margin: 0;
+}

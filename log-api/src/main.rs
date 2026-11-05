@@ -11,6 +11,7 @@ use tracing::{error, info, warn};
 mod guide_window;
 mod log_reader;
 mod pob;
+mod web_data;
 mod server;
 #[cfg(windows)]
 mod tray;

@@ -44,7 +44,7 @@ your PoB once in **Settings** (the ⚙ at the top right).
   Others (Hillock, Merveil, Brutus and most Act 1-4 bosses) log nothing when they die;
   their step ticks when you leave the zone.
 - The page is laid out like a pob.codes build page. Panels fold from their gold header bars
-  (click anywhere on the bar): **Campaign**, **Gems**, **Config**, **Tree**, **Notes** and
+  (click anywhere on the bar): **Campaign**, **Gear**, **Gems**, **Config**, **Tree**, **Notes** and
   **Search**. A panel's header (and the act header inside Campaign) stays pinned while
   you're in that panel. Folding a panel or act while you're inside it lands on the next one.
 - An act folds to one line once all its steps are done, and Campaign folds once the last
@@ -62,7 +62,12 @@ your PoB once in **Settings** (the ⚙ at the top right).
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.
-- Gems, Config and Tree show the loadout's sets; each has its own dropdown to look at
+- **Gear** shows the loadout's item set as a paper doll (with flasks, weapon swap, abyssal
+  sockets, grafts and the tree's jewels). Item art comes from poe.ninja and the trade data
+  from the trade site, fetched by the exe for the league you pick and cached for 12 hours.
+  Hover an item for its mods; its corner button opens a trade search for something like it
+  (rare mods at about 80% of their values).
+- Gear, Gems, Config and Tree show the loadout's sets; each has its own dropdown to look at
   another set until the loadout or act changes. **Config** lists only the options a set
   changes from PoB's defaults. On the tree, Ctrl+scroll zooms and dragging pans.
 - At the top of the left column, pick the main skill as in PoB. The pick is remembered by

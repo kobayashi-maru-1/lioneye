@@ -83,6 +83,38 @@ export interface SetTitles {
   config: string;
 }
 
+/** A mod line of an item, as PoB applies it. */
+export interface ItemLine {
+  text: string;
+  crafted?: boolean;
+  fractured?: boolean;
+}
+
+/** An item from the build, as the Gear panel shows it. */
+export interface GearItem {
+  name: string;
+  base?: string;
+  /** NORMAL, MAGIC, RARE, UNIQUE or RELIC. */
+  rarity?: string;
+  type?: string;
+  quality?: number;
+  level?: number;
+  /** "R-G-B B": a dash links sockets, a space separates groups. */
+  sockets?: string;
+  corrupted?: boolean;
+  enchant: ItemLine[];
+  implicit: ItemLine[];
+  explicit: ItemLine[];
+}
+
+/** Every item set's slots (PoB's order), the items by id, and each tree's jewels. */
+export interface Gear {
+  sets: { title: string; slots: { slot: string; item: number }[] }[];
+  items: Record<string, GearItem>;
+  /** Per tree (PoB's order): the jewels socketed in it. */
+  treeJewels: { node: number; item: number }[][];
+}
+
 export interface Stats {
   loadouts: string[];
   loadout: string | null;
@@ -90,6 +122,7 @@ export interface Stats {
   sets: SetTitles | null;
   lists: SetLists | null;
   headline: Headline | null;
+  gear: Gear | null;
   config: ConfigRow[];
   rows: StatRow[];
   warnings: string[];
@@ -303,6 +336,7 @@ async function fetchStats(
         }
       : null,
     headline: stats.headline ?? null,
+    gear: stats.gear ? gearData(stats.gear) : null,
     config: list(stats.config),
     rows: list(stats.rows),
     warnings: list(stats.warnings),
@@ -312,6 +346,24 @@ async function fetchStats(
 // PoB's JSON writes an empty list as {}.
 function list<T>(value: T[] | undefined | object): T[] {
   return Array.isArray(value) ? value : [];
+}
+
+function gearData(gear: Partial<Gear>): Gear {
+  const items: Record<string, GearItem> = {};
+  const raw = gear.items && !Array.isArray(gear.items) ? gear.items : {};
+  for (const [id, item] of Object.entries(raw)) {
+    items[id] = {
+      ...item,
+      enchant: list(item.enchant),
+      implicit: list(item.implicit),
+      explicit: list(item.explicit),
+    };
+  }
+  return {
+    sets: list(gear.sets).map((set) => ({ ...set, slots: list(set.slots) })),
+    items,
+    treeJewels: list(gear.treeJewels).map((jewels) => list(jewels)),
+  };
 }
 
 function skillState(skill: Partial<SkillState>): SkillState {

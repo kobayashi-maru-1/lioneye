@@ -3,7 +3,7 @@ use std::time::Duration;
 use axum::{
     Json, Router,
     extract::{
-        DefaultBodyLimit, State,
+        DefaultBodyLimit, Path, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::{HeaderMap, StatusCode, Uri, header},
@@ -20,6 +20,7 @@ use tracing::info;
 
 use crate::pob;
 use crate::watcher::Status;
+use crate::web_data;
 
 /// The built guide (web/dist), compiled into the exe.
 #[derive(RustEmbed)]
@@ -42,6 +43,7 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
             "/api/pob/stats",
             post(pob_stats).layer(DefaultBodyLimit::max(32 * 1024 * 1024)),
         )
+        .route("/api/data/{name}", get(web_data))
         .fallback(static_handler)
         .with_state(state);
 
@@ -157,6 +159,33 @@ async fn pob_stats(
             "PoB is taking too long. Restart the app.",
         )
             .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct DataQuery {
+    league: Option<String>,
+    #[serde(rename = "type")]
+    kind: Option<String>,
+}
+
+/// Trade site and poe.ninja data for the Gear panel (see web_data.rs), as JSON.
+async fn web_data(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    Query(query): Query<DataQuery>,
+) -> Response {
+    if !local_origin(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let Some(source) =
+        web_data::Source::parse(&name, query.league.as_deref(), query.kind.as_deref())
+    else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    match web_data::fetch(source).await {
+        Ok(json) => ([(header::CONTENT_TYPE, "application/json")], json).into_response(),
+        Err(msg) => (StatusCode::BAD_GATEWAY, msg).into_response(),
     }
 }
 

@@ -609,6 +609,96 @@ local function headline()
 	}
 end
 
+-- Gear ---------------------------------------------------------------------------------
+
+-- One item as the guide shows it: name, base, rarity and the mod lines PoB applies.
+local function itemData(item)
+	local function lines(modLines)
+		local out = setmetatable({}, ARRAY)
+		for _, modLine in ipairs(modLines or {}) do
+			if not modLine.disabled and modLine.line and modLine.line ~= ""
+				and item:CheckModLineVariant(modLine) then
+				out[#out + 1] = {
+					text = modLine.line,
+					crafted = modLine.crafted or nil,
+					fractured = modLine.fractured or nil,
+				}
+			end
+		end
+		return out
+	end
+	-- "R-G-B B": a dash links two sockets, a space separates groups.
+	local sockets = {}
+	local lastGroup
+	for _, socket in ipairs(item.sockets or {}) do
+		if lastGroup ~= nil then
+			sockets[#sockets + 1] = socket.group == lastGroup and "-" or " "
+		end
+		sockets[#sockets + 1] = socket.color
+		lastGroup = socket.group
+	end
+	return {
+		name = item.title or item.name,
+		base = item.baseName,
+		rarity = item.rarity,
+		type = item.type,
+		quality = item.quality,
+		level = item.itemLevel,
+		sockets = #sockets > 0 and table.concat(sockets) or nil,
+		corrupted = item.corrupted or nil,
+		enchant = lines(item.enchantModLines),
+		implicit = lines(item.implicitModLines),
+		explicit = lines(item.explicitModLines),
+	}
+end
+
+local gearCache
+
+-- Every item set's slots (in PoB's slot order), the items they hold, and each tree's
+-- socketed jewels. Items don't change with the loadout, so it's built once per build.
+local function gear()
+	if gearCache then
+		return gearCache
+	end
+	local tab = build.itemsTab
+	local items = {}
+	local function use(itemId)
+		local item = itemId and itemId ~= 0 and tab.items[itemId]
+		if not item then
+			return nil
+		end
+		items[tostring(itemId)] = items[tostring(itemId)] or itemData(item)
+		return itemId
+	end
+	local sets = setmetatable({}, ARRAY)
+	for _, setId in ipairs(tab.itemSetOrderList) do
+		local itemSet = tab.itemSets[setId]
+		local slots = setmetatable({}, ARRAY)
+		for _, slot in ipairs(tab.orderedSlots) do
+			if not slot.nodeId then
+				local entry = itemSet[slot.slotName]
+				local itemId = entry and use(entry.selItemId)
+				if itemId then
+					slots[#slots + 1] = { slot = slot.slotName, item = itemId }
+				end
+			end
+		end
+		sets[#sets + 1] = { title = itemSet.title or "Default", slots = slots }
+	end
+	local treeJewels = setmetatable({}, ARRAY)
+	for index, spec in ipairs(build.treeTab.specList) do
+		local jewels = setmetatable({}, ARRAY)
+		for nodeId, itemId in pairs(spec.jewels or {}) do
+			if use(itemId) then
+				jewels[#jewels + 1] = { node = nodeId, item = itemId }
+			end
+		end
+		treeJewels[index] = jewels
+	end
+	gearCache = { sets = sets, items = items, treeJewels = treeJewels }
+	return gearCache
+end
+
 -- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
 -- when the build is new to PoB, else the loadout picked last. `id` and the rest are the
 -- guide's remembered main skill (all nil: PoB's own).
@@ -616,6 +706,7 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 	if xml ~= loadedXml then
 		loadedXml = nil
 		undo = {}
+		gearCache = nil
 		local bundled
 		bundled, treeNotes = onBundledTrees(xml)
 		takePromptError()
@@ -647,6 +738,7 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		sets = setTitles(),
 		lists = setLists(),
 		headline = headline(),
+		gear = gear(),
 		config = configRows(build.configTab.configSets[build.configTab.activeConfigSetId]),
 		rows = rows(),
 		warnings = warnings(),

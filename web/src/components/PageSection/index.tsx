@@ -59,9 +59,7 @@ export function PageSection({
     setCollapsed(!collapsed);
     if (!collapsed && inside)
       requestAnimationFrame(() =>
-        (section.nextElementSibling ?? section).scrollIntoView({
-          block: "start",
-        }),
+        nextPanel(section).scrollIntoView({ block: "start" }),
       );
   };
 
@@ -98,6 +96,17 @@ export function PageSection({
       )}
     </section>
   );
+}
+
+/**
+ * The panel after this one; for panels side by side (data-panel-row), the one after the row.
+ * Itself when it's the last.
+ */
+function nextPanel(section: HTMLElement): Element {
+  const row = section.parentElement?.hasAttribute("data-panel-row")
+    ? section.parentElement
+    : null;
+  return (row ?? section).nextElementSibling ?? section;
 }
 
 /** Opens a section if it's folded, then scrolls to its header. */

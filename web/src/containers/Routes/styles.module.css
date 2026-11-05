@@ -89,3 +89,11 @@
     max-height: none;
   }
 }
+
+/* Gear and Gems side by side (pob.codes); stacked when the window is narrow. */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  align-items: start;
+  gap: var(--size-4);
+}

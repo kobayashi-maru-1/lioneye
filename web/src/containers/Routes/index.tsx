@@ -2,6 +2,7 @@ import { BuildHeader } from "../../components/BuildHeader";
 import { BuildNotes, buildNotes } from "../../components/BuildNotes";
 import { ConfigList } from "../../components/ConfigList";
 import { FragmentStep } from "../../components/FragmentStep";
+import { GearPanel } from "../../components/Gear";
 import { GemLinkViewer } from "../../components/GemLinkViewer";
 import { GemReward } from "../../components/ItemReward";
 import { jumpTargetsAtom } from "../../components/AppBar";
@@ -202,6 +203,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
   useEffect(() => {
     setTargets([
       { id: "campaign", label: "Campaign" },
+      ...(showStats ? [{ id: "gear", label: "Gear" }] : []),
       ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
       ...(showStats ? [{ id: "config", label: "Config" }] : []),
       ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
@@ -229,7 +231,13 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
           <PageSection id="campaign" title="Campaign" actions={<ActPicker />}>
             {campaign}
           </PageSection>
-          {gemLinks.length > 0 && <GemsPanel gemLinks={gemLinks} />}
+          {/* Gear and Gems side by side, as on pob.codes. */}
+          {(showStats || gemLinks.length > 0) && (
+            <div className={classNames(styles.pair)} data-panel-row>
+              {showStats && <GearPanel />}
+              {gemLinks.length > 0 && <GemsPanel gemLinks={gemLinks} />}
+            </div>
+          )}
           {showStats && <ConfigPanel />}
           {urlTrees.length > 0 && <TreePanel urlTrees={urlTrees} />}
           {notes !== null && (
