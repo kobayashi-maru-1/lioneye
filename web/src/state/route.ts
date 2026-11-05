@@ -133,9 +133,19 @@ export const activeEdgeAtom = atom(
     if (matches !== null) {
       messageAreaId = matches[1];
     }
+    if (messageAreaId === null) return;
 
     if (nextAreaId === messageAreaId) {
       set(activeEdgeIndex, [nextEdgeIndex]);
+      return;
+    }
+
+    // Waypoint jumps and skipped zones: move to the first later visit of this zone.
+    // Towns are visited often, so they only count as the very next stop (above).
+    if (messageAreaId.endsWith("_town")) return;
+    const ahead = edges.indexOf(messageAreaId, nextEdgeIndex + 1);
+    if (ahead !== -1) {
+      set(activeEdgeIndex, [ahead]);
     }
   },
 );
