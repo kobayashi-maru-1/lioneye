@@ -110,6 +110,10 @@ export const routeSelector = atom(async (get) => {
 });
 
 const ACTIVE_EDGE_VERSION = 0;
+/** How many stops ahead a zone change may move the guide (Act 1 doubles back, so the Ledge is 10 past town). */
+const MAX_SKIP = 12;
+/** Zones from this many recent stops are treated as walking back, not progress. */
+const RECENT = 4;
 const activeEdgeIndex = persistentAtom("active-edge", [0], ACTIVE_EDGE_VERSION);
 
 export function edgeId(edgeIndex: number) {
@@ -140,12 +144,17 @@ export const activeEdgeAtom = atom(
       return;
     }
 
-    // Waypoint jumps and skipped zones: move to the first later visit of this zone.
-    // Towns are visited often, so they only count as the very next stop (above).
-    if (messageAreaId.endsWith("_town")) return;
-    const ahead = edges.indexOf(messageAreaId, nextEdgeIndex + 1);
-    if (ahead !== -1) {
-      set(activeEdgeIndex, [ahead]);
+    // Waypoint jumps and skipped zones: move to the next visit of this zone a few stops ahead.
+    // Towns and the labyrinth are visited off-route, so they only count as the very next stop.
+    if (messageAreaId.endsWith("_town") || messageAreaId === "Labyrinth_Airlock") return;
+    // Coming back into the current zone (portal, death) or walking back to a zone
+    // just left (a hub like the Crossroads) isn't progress.
+    const recent = edges.slice(Math.max(0, nextEdgeIndex - RECENT), nextEdgeIndex);
+    if (recent.includes(messageAreaId)) return;
+    const ahead = edges.slice(nextEdgeIndex + 1, nextEdgeIndex + 1 + MAX_SKIP);
+    const offset = ahead.indexOf(messageAreaId);
+    if (offset !== -1) {
+      set(activeEdgeIndex, [nextEdgeIndex + 1 + offset]);
     }
   },
 );
