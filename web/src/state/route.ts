@@ -154,7 +154,7 @@ export const activeEdgeAtom = atom(
     const nextEdgeIndex = activeIndex + 1;
     const nextAreaId = edges[nextEdgeIndex];
 
-    // Moving on ticks the zone just left and the enter-step of the new one.
+    // Moving on ticks the zone just left, including its own "➞ zone" line.
     // Zones skipped in between stay open. Ticks are only added, never removed.
     const isTown = (edge: number) => edges[edge]?.endsWith("_town") ?? false;
     const advance = (to: number) => {
@@ -192,7 +192,8 @@ export const activeEdgeAtom = atom(
           const zone = stepZones.get(step);
           if (zone === undefined) return;
           if (step.type === "fragment_step") {
-            if (step.edgeIndex === to || zones.has(zone))
+            // A zone's own line ("➞ The Climb") belongs to that zone: it ticks when you leave.
+            if (zones.has(zone))
               routeKeys.push([sectionIndex, stepIndex].toString());
           } else if (
             zones.has(zone) &&
