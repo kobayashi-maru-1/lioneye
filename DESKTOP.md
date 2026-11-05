@@ -7,8 +7,9 @@ http://127.0.0.1:6754 and opens it in a borderless Edge app window.
 ## Run
 
 1. Start `exile-leveling.exe`. It runs in the tray (by the clock), with no console window.
-   Click the icon or pick **Open** to open a guide window (after closing one, for example);
-   pick **Quit** to stop. The icon's tooltip shows **Waiting** or **Auto**.
+   Closing the guide window leaves it running there. Click the icon or pick **Open** to bring
+   the window back (or reopen it); pick **Quit** to close the window and stop.
+   The icon's tooltip shows **Waiting** or **Auto**.
    The log is at `%LOCALAPPDATA%\exile-leveling\exile-leveling.log`. Started from a terminal,
    it also prints there; the prompt returns right away, and Ctrl+C in that terminal quits it.
 2. The guide opens in an Edge app window. Drag it to the monitor you want; Edge
@@ -16,7 +17,7 @@ http://127.0.0.1:6754 and opens it in a borderless Edge app window.
 3. Start Path of Exile. The pill at the top right of the panel turns green (**Auto**)
    once the game's log is found, and the route advances as you change zones.
 
-Running the exe again while it's already open just brings up another window.
+Running the exe again while it's already open brings its window to the front.
 
 | Option | Default | What it does |
 | --- | --- | --- |

@@ -7,6 +7,8 @@ use clap::{Parser, ValueEnum};
 use tokio::sync::{broadcast, watch};
 use tracing::{error, info, warn};
 
+#[cfg(windows)]
+mod guide_window;
 mod log_reader;
 mod server;
 #[cfg(windows)]
@@ -82,7 +84,10 @@ fn main() -> ExitCode {
         status: status_rx.clone(),
     };
 
-    open_browser(args.browser, &url);
+    // A guide window left open from an earlier run reconnects by itself; bring it up instead.
+    if args.browser != Browser::None {
+        show_guide(args.browser, &url);
+    }
 
     // Server and watcher run on the runtime's threads; the main thread runs the tray.
     let heart_beat = Duration::from_secs(args.heart_beat.max(1));
@@ -125,7 +130,7 @@ async fn listen(args: &Args) -> Result<Option<(tokio::net::TcpListener, String)>
         Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => {
             if already_running(local).await {
                 info!("Already running on {}, opening it", url);
-                open_browser(args.browser, &url);
+                show_guide(args.browser, &url);
                 return Ok(None);
             }
             Err(format!(
@@ -161,8 +166,12 @@ fn wait(
     });
 
     info!("Running in the tray. Quit from its menu.");
-    match tray::run(status, stopped_rx, || open_browser(browser, url)) {
-        Ok(tray::Exit::Quit) => ExitCode::SUCCESS,
+    match tray::run(status, stopped_rx, || show_guide(browser, url)) {
+        Ok(tray::Exit::Quit) => {
+            // The guide is a separate Edge window; Quit closes it too.
+            guide_window::close_all();
+            ExitCode::SUCCESS
+        }
         Ok(tray::Exit::Stopped) => match result_rx.try_recv() {
             Ok(Err(msg)) => fail(console, &msg),
             _ => ExitCode::SUCCESS,
@@ -323,6 +332,15 @@ async fn already_running(addr: SocketAddr) -> bool {
         tokio::time::timeout(Duration::from_secs(2), check).await,
         Ok(Some(true))
     )
+}
+
+/// Brings back the open guide window (restoring it if minimized), or opens one.
+fn show_guide(browser: Browser, url: &str) {
+    #[cfg(windows)]
+    if guide_window::show() {
+        return;
+    }
+    open_browser(browser, url);
 }
 
 fn open_browser(browser: Browser, url: &str) {
