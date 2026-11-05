@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Leveling Companion</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#050608}
+a{color:#d9b870}a:hover{color:#f2dfa8}
+button{font:inherit}
+button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid #d9b870;outline-offset:2px}
+.trade{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:6px;border:1px solid #3a404c;background:#151820;color:#d9b870;font-size:13px;font-weight:600;text-decoration:none}
+.trade:hover{border-color:#d9b870;color:#f2dfa8;background:#2a2416}
+.cell{display:flex;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;border-radius:6px;border:1px solid #2a3446;background:#0e1522;cursor:pointer;overflow:hidden;min-width:0;min-height:0}
+.cell:hover{background:#15203a}
+.scroll{scrollbar-width:thin;scrollbar-color:#3a404c transparent}
+</style>
+</helmet>
+<div style="width: 5160px; height: 1080px; display: flex; gap: 40px; background: #050608; font-family: Inter, system-ui, sans-serif; color: #e7e3d8;">
+
+  <!-- Game monitor -->
+  <div onMouseMove="{{ dragMove }}" onMouseUp="{{ dragEnd }}" onMouseLeave="{{ dragEnd }}" style="position: relative; width: 2560px; height: 1080px; flex: none; overflow: hidden; background: #0b0c0f; border-radius: 6px;">
+    <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;">
+      <div style="font-family: Cinzel, serif; font-size: 64px; font-weight: 700; color: #4a505c; letter-spacing: 4px;">Path of Exile</div>
+      <div style="font-size: 20px; color: #8a909b;">Windowed Fullscreen · Monitor 1</div>
+    </div>
+    <div style="position: absolute; left: 60px; bottom: 40px; width: 190px; height: 190px; border-radius: 50%; border: 3px solid #5a2a2a; background: #160c0c;"></div>
+    <div style="position: absolute; right: 60px; bottom: 40px; width: 190px; height: 190px; border-radius: 50%; border: 3px solid #23325a; background: #0c1018;"></div>
+    <div style="position: absolute; left: 290px; bottom: 44px; display: flex; gap: 8px;">
+      <div style="width: 44px; height: 84px; border-radius: 6px; border: 2px solid #2a2f39; background: #12151b;"></div>
+      <div style="width: 44px; height: 84px; border-radius: 6px; border: 2px solid #2a2f39; background: #12151b;"></div>
+      <div style="width: 44px; height: 84px; border-radius: 6px; border: 2px solid #2a2f39; background: #12151b;"></div>
+      <div style="width: 44px; height: 84px; border-radius: 6px; border: 2px solid #2a2f39; background: #12151b;"></div>
+      <div style="width: 44px; height: 84px; border-radius: 6px; border: 2px solid #2a2f39; background: #12151b;"></div>
+    </div>
+
+    <!-- Floating overlay strip -->
+    <div style="position: absolute; left: {{ ov.x }}px; top: {{ ov.y }}px; display: flex; align-items: center; gap: 4px; padding: 4px; background: #0d0f13; border: 1px solid #3a404c; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.6);">
+      <button aria-label="Move" title="Move" onMouseDown="{{ dragStart }}" style="width: 28px; height: 44px; display: flex; align-items: center; justify-content: center; border: none; border-radius: 6px; background: transparent; color: #7d8490; cursor: grab; padding: 0;">
+        <svg width="12" height="20" viewBox="0 0 12 20" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="4" r="1.6"></circle><circle cx="9" cy="4" r="1.6"></circle><circle cx="3" cy="10" r="1.6"></circle><circle cx="9" cy="10" r="1.6"></circle><circle cx="3" cy="16" r="1.6"></circle><circle cx="9" cy="16" r="1.6"></circle></g></svg>
+      </button>
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <button title="{{ t.title }}" onClick="{{ t.pick }}" style="height: 44px; min-width: 72px; padding: 0 10px; display: flex; align-items: center; gap: 8px; border-radius: 8px; border: 1px solid {{ t.border }}; background: {{ t.bg }}; color: {{ t.fg }}; cursor: pointer; font-size: 14px; font-weight: 600;">
+          <sc-if value="{{ t.isRoute }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h13M3 12h18M3 18h10"></path><circle cx="20" cy="6" r="1.5"></circle></svg></sc-if>
+          <sc-if value="{{ t.isGear }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"></path></svg></sc-if>
+          <sc-if value="{{ t.isTree }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.5"></circle><circle cx="19" cy="5" r="2.5"></circle><circle cx="19" cy="19" r="2.5"></circle><path d="M7.3 11l9.4-5M7.3 13l9.4 5"></path></svg></sc-if>
+          <sc-if value="{{ t.isNotes }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"></path><path d="M9 12h7M9 16h7M9 8h4"></path></svg></sc-if>
+          <span>{{ t.label }}</span>
+        </button>
+      </sc-for>
+      <span role="img" aria-label="{{ autoLabel }}" title="{{ autoLabel }}" style="width: 10px; height: 10px; margin: 0 8px 0 4px; border-radius: 50%; background: {{ autoDot }};"></span>
+    </div>
+  </div>
+
+  <!-- Companion monitor -->
+  <div style="width: 2560px; height: 1080px; flex: none; display: flex; flex-direction: column; background: #0d0f13; border-radius: 6px; overflow: hidden;">
+
+    <!-- Header -->
+    <div style="height: 72px; flex: none; display: flex; align-items: center; gap: 28px; padding: 0 24px; background: #11141a; border-bottom: 1px solid #272c36;">
+      <div style="display: flex; flex-direction: column; gap: 2px; min-width: 220px;">
+        <div style="font-family: Cinzel, serif; font-size: 19px; font-weight: 700; color: #d9b870;">{{ build.title }}</div>
+        <div style="font-size: 13px; color: #a3a9b4;">{{ build.className }} · {{ build.ascendancy }}</div>
+      </div>
+      <div style="width: 1px; height: 40px; background: #272c36;"></div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <label for="loadout" style="font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4; margin-right: 4px;">Loadout</label>
+        <button aria-label="Previous loadout" onClick="{{ prevLoadout }}" style="width: 40px; height: 40px; border-radius: 8px; border: 1px solid #3a404c; background: #1b1f28; color: #e7e3d8; cursor: pointer; font-size: 18px;">‹</button>
+        <select id="loadout" value="{{ selValue }}" onChange="{{ pickLoadout }}" style="height: 40px; min-width: 220px; padding: 0 12px; border-radius: 8px; border: 1px solid #3a404c; background: #1b1f28; color: #e7e3d8; font-size: 15px; font-weight: 600;">
+          <sc-for list="{{ loadoutOptions }}" as="o" hint-placeholder-count="10">
+            <option value="{{ o.value }}">{{ o.label }}</option>
+          </sc-for>
+        </select>
+        <button aria-label="Next loadout" onClick="{{ nextLoadout }}" style="width: 40px; height: 40px; border-radius: 8px; border: 1px solid #3a404c; background: #1b1f28; color: #e7e3d8; cursor: pointer; font-size: 18px;">›</button>
+        <button aria-pressed="{{ autoPressed }}" onClick="{{ toggleAuto }}" title="Match loadout to act" style="height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 20px; border: 1px solid #3a404c; background: #151820; color: #e7e3d8; cursor: pointer; font-size: 14px; font-weight: 600;">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: {{ autoDot }};"></span>Auto
+        </button>
+      </div>
+      <div style="width: 1px; height: 40px; background: #272c36;"></div>
+      <div style="display: flex; align-items: center; gap: 22px;">
+        <sc-for list="{{ headStats }}" as="st" hint-placeholder-count="8">
+          <div style="display: flex; flex-direction: column; gap: 2px; min-width: 48px;">
+            <span style="font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: {{ st.c }};">{{ st.k }}</span>
+            <span style="font-size: 18px; font-weight: 700; color: #e7e3d8; font-variant-numeric: tabular-nums;">{{ st.v }}</span>
+          </div>
+        </sc-for>
+        <span title="Calculated by PoB's engine in the app" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #3a404c; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #a3a9b4;">PoB</span>
+      </div>
+      <div style="flex: 1;"></div>
+      <nav aria-label="Screens" style="display: flex; align-items: stretch; height: 72px;">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+          <button title="{{ t.title }}" onClick="{{ t.pick }}" style="padding: 0 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: none; border-bottom: 3px solid {{ t.underline }}; background: transparent; color: {{ t.fg }}; cursor: pointer;">
+            <span style="font-size: 16px; font-weight: 600;">{{ t.label }}</span>
+            <span style="font-size: 11px; color: #7d8490;">{{ t.hot }}</span>
+          </button>
+        </sc-for>
+      </nav>
+    </div>
+
+    <!-- Body -->
+    <div style="flex: 1; min-height: 0; padding: 16px; box-sizing: border-box;">
+
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+        <div style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #a3a9b4;">Loading</div>
+      </sc-if>
+      <sc-if value="{{ failed }}" hint-placeholder-val="{{ false }}">
+        <div style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #e0605a;">Build data not loaded. Reload to retry.</div>
+      </sc-if>
+
+      <!-- Route screen -->
+      <sc-if value="{{ isRoute }}" hint-placeholder-val="{{ true }}">
+        <div style="height: 100%; display: grid; grid-template-columns: 640px 760px minmax(0, 1fr); gap: 16px;">
+
+          <section style="min-height: 0; display: flex; flex-direction: column; background: #151820; border: 1px solid #272c36; border-radius: 12px; overflow: hidden;">
+            <div style="height: 56px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid #272c36;">
+              <button aria-label="Previous act" onClick="{{ prevAct }}" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #3a404c; background: #1b1f28; color: #e7e3d8; cursor: pointer; font-size: 18px;">‹</button>
+              <h2 style="margin: 0; font-family: Cinzel, serif; font-size: 20px; color: #d9b870;">Act {{ act }}</h2>
+              <button aria-label="Next act" onClick="{{ nextAct }}" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #3a404c; background: #1b1f28; color: #e7e3d8; cursor: pointer; font-size: 18px;">›</button>
+              <span style="font-size: 14px; color: #e8c872; font-weight: 600; margin-left: 6px;">{{ zoneLabel }}</span>
+              <span style="flex: 1;"></span>
+              <span style="font-size: 14px; color: #a3a9b4; font-variant-numeric: tabular-nums;">{{ progress }}</span>
+            </div>
+            <div class="scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px;">
+              <sc-for list="{{ steps }}" as="s" hint-placeholder-count="12">
+                <button onClick="{{ s.toggle }}" style="display: flex; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 8px; border: 1px solid {{ s.border }}; background: {{ s.bg }}; opacity: {{ s.op }}; color: #e7e3d8; cursor: pointer; font-size: 16px; line-height: 1.45;">
+                  <span style="width: 26px; flex: none; color: #7d8490; font-variant-numeric: tabular-nums;">{{ s.num }}</span>
+                  <span style="flex: 1; min-width: 0;">
+                    <span><sc-for list="{{ s.segs }}" as="g" hint-placeholder-count="3"><span style="color: {{ g.c }};">{{ g.t }}</span></sc-for></span>
+                    <sc-if value="{{ s.hasSubs }}" hint-placeholder-val="{{ false }}">
+                      <sc-for list="{{ s.subs }}" as="sub" hint-placeholder-count="1"><span style="display: block; margin-top: 3px; font-size: 13px; color: #a3a9b4;">{{ sub }}</span></sc-for>
+                    </sc-if>
+                  </span>
+                  <sc-if value="{{ s.done }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6cc070" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M5 12l5 5L20 7"></path></svg></sc-if>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+
+          <section style="min-height: 0; display: flex; flex-direction: column; background: #151820; border: 1px solid #272c36; border-radius: 12px; overflow: hidden;">
+            <div style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid #272c36;">
+              <h2 style="margin: 0; font-family: Cinzel, serif; font-size: 20px; color: #d9b870;">Gems</h2>
+              <span style="font-size: 14px; color: #a3a9b4;">{{ L.skillSet }}</span>
+            </div>
+            <div class="scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+              <sc-for list="{{ skills }}" as="k" hint-placeholder-count="4">
+                <div style="padding: 12px 14px; border-radius: 10px; border: 1px solid #272c36; background: #1b1f28; display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; align-items: baseline; gap: 10px;">
+                    <span style="flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: #e7e3d8;">{{ k.label }}</span>
+                    <span style="font-size: 12px; color: #a3a9b4;">{{ k.slot }}</span>
+                    <span style="padding: 2px 8px; border-radius: 6px; background: #12151b; border: 1px solid #2a2f39; font-size: 12px; font-weight: 700; color: #d9b870;">{{ k.links }}</span>
+                  </div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <sc-for list="{{ k.gems }}" as="g" hint-placeholder-count="4">
+                      <span style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; background: #12151b; border: 1px solid #2a2f39; font-size: 14px; font-weight: {{ g.weight }};">
+                        <span style="width: 10px; height: 10px; border-radius: {{ g.shape }}; background: {{ g.color }};"></span>{{ g.name }}<sc-if value="{{ g.hasLq }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #a3a9b4;">{{ g.lq }}</span></sc-if>
+                      </span>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+
+          <section style="min-height: 0; display: flex; flex-direction: column; background: #151820; border: 1px solid #272c36; border-radius: 12px; overflow: hidden;">
+            <div style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid #272c36;">
+              <h2 style="margin: 0; font-family: Cinzel, serif; font-size: 20px; color: #d9b870;">Tree</h2>
+              <span style="font-size: 14px; color: #a3a9b4;">{{ L.name }} · {{ L.points }} pts</span>
+              <span style="font-size: 14px; font-weight: 700; color: #7fd3ff;">+{{ L.added }}</span>
+              <span style="font-size: 14px; font-weight: 700; color: #e0605a;">−{{ L.removed }}</span>
+              <span style="flex: 1;"></span>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #a3a9b4;"><span style="width: 12px; height: 12px; border-radius: 50%; background: #7fd3ff;"></span>New</span>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #a3a9b4;"><span style="width: 12px; height: 12px; border-radius: 50%; background: #a8874a;"></span>Kept</span>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #a3a9b4;"><span style="width: 12px; height: 12px; border-radius: 50%; border: 2px dashed #e0605a; box-sizing: border-box;"></span>Removed</span>
+            </div>
+            <div style="flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px; background: #0f1116;">
+              <img src="{{ treeUrl }}" alt="{{ treeAlt }}" style="width: 100%; height: 100%; object-fit: contain;">
+            </div>
+            <div style="flex: none; padding: 12px 16px; border-top: 1px solid #272c36; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+              <span style="font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4; margin-right: 4px;">Notables</span>
+              <sc-for list="{{ notableChips }}" as="n" hint-placeholder-count="5">
+                <span style="padding: 4px 10px; border-radius: 6px; background: #12151b; border: 1px solid #2a2f39; font-size: 13px; font-weight: 600; color: {{ n.color }};">{{ n.name }}</span>
+              </sc-for>
+              <sc-if value="{{ noNotables }}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #a3a9b4;">None new</span></sc-if>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- Gear screen -->
+      <sc-if value="{{ isGear }}" hint-placeholder-val="{{ false }}">
+        <div style="height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 16px;">
+          <section style="min-height: 0; display: flex; flex-direction: column; background: #151820; border: 1px solid #272c36; border-radius: 12px; overflow: hidden;">
+            <div style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid #272c36;">
+              <h2 style="margin: 0; font-family: Cinzel, serif; font-size: 20px; color: #d9b870;">Gear</h2>
+              <span style="font-size: 14px; color: #a3a9b4;">{{ L.itemSet }}</span>
+              <sc-if value="{{ hasSwap }}" hint-placeholder-val="{{ false }}">
+                <div role="group" aria-label="Weapons" style="display: flex; margin-left: 8px; border: 1px solid #3a404c; border-radius: 8px; overflow: hidden;">
+                  <button aria-pressed="{{ mainPressed }}" onClick="{{ showMain }}" style="height: 32px; padding: 0 12px; border: 0; background: {{ mainBg }}; color: #e7e3d8; cursor: pointer; font-size: 13px; font-weight: 600;">Main</button>
+                  <button aria-pressed="{{ swapPressed }}" onClick="{{ showSwap }}" style="height: 32px; padding: 0 12px; border: 0; background: {{ swapBg }}; color: #e7e3d8; cursor: pointer; font-size: 13px; font-weight: 600;">Swap</button>
+                </div>
+              </sc-if>
+              <span style="flex: 1;"></span>
+              <label for="league" style="font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4;">League</label>
+              <select id="league" value="{{ league }}" onChange="{{ pickLeague }}" style="height: 36px; min-width: 200px; padding: 0 10px; border-radius: 8px; border: 1px solid #3a404c; background: #1b1f28; color: #e7e3d8; font-size: 14px; font-weight: 600;">
+                <sc-for list="{{ leagueOptions }}" as="lg" hint-placeholder-count="4">
+                  <option value="{{ lg }}">{{ lg }}</option>
+                </sc-for>
+              </select>
+            </div>
+            <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 666px minmax(0, 1fr) 600px; gap: 16px; padding: 16px;">
+
+              <!-- Inventory -->
+              <div style="display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 10px; background: #0f1116; border: 1px solid #272c36;">
+                <div style="display: grid; grid-template-columns: repeat(8, 72px); grid-template-rows: repeat(6, 72px); gap: 8px;">
+                  <sc-for list="{{ doll }}" as="c" hint-placeholder-count="11">
+                    <sc-if value="{{ c.filled }}" hint-placeholder-val="{{ true }}">
+                      <button class="cell" aria-label="{{ c.label }}" aria-pressed="{{ c.pressed }}" onClick="{{ c.pick }}" style="grid-column: {{ c.col }}; grid-row: {{ c.row }}; border-color: {{ c.border }}; box-shadow: {{ c.glow }};">
+                        <sc-if value="{{ c.hasImg }}" hint-placeholder-val="{{ true }}"><img src="{{ c.img }}" alt="" style="max-width: 100%; max-height: 100%; object-fit: contain;"></sc-if>
+                        <sc-if value="{{ c.noImg }}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; color: {{ c.color }};">{{ c.name }}</span></sc-if>
+                      </button>
+                    </sc-if>
+                    <sc-if value="{{ c.empty }}" hint-placeholder-val="{{ false }}">
+                      <div aria-hidden="true" style="grid-column: {{ c.col }}; grid-row: {{ c.row }}; border-radius: 6px; border: 1px dashed #2a303b; background: #0c0f15;"></div>
+                    </sc-if>
+                  </sc-for>
+                </div>
+                <h3 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4;">Flasks</h3>
+                <div style="display: grid; grid-template-columns: repeat(5, 72px); grid-template-rows: 152px; gap: 8px; justify-content: center;">
+                  <sc-for list="{{ flasks }}" as="c" hint-placeholder-count="5">
+                    <sc-if value="{{ c.filled }}" hint-placeholder-val="{{ true }}">
+                      <button class="cell" aria-label="{{ c.label }}" aria-pressed="{{ c.pressed }}" onClick="{{ c.pick }}" style="grid-column: {{ c.col }}; grid-row: 1; border-color: {{ c.border }}; box-shadow: {{ c.glow }};">
+                        <sc-if value="{{ c.hasImg }}" hint-placeholder-val="{{ true }}"><img src="{{ c.img }}" alt="" style="max-width: 100%; max-height: 100%; object-fit: contain;"></sc-if>
+                        <sc-if value="{{ c.noImg }}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; color: {{ c.color }};">{{ c.name }}</span></sc-if>
+                      </button>
+                    </sc-if>
+                    <sc-if value="{{ c.empty }}" hint-placeholder-val="{{ false }}">
+                      <div aria-hidden="true" style="grid-column: {{ c.col }}; grid-row: 1; border-radius: 6px; border: 1px dashed #2a303b; background: #0c0f15;"></div>
+                    </sc-if>
+                  </sc-for>
+                </div>
+              </div>
+
+              <!-- Selected item -->
+              <div class="scroll" style="min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-radius: 10px; background: #1b1f28; border: 1px solid {{ sel.border }};">
+                <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4;">{{ sel.where }}</span>
+                  <div style="display: flex; gap: 18px; align-items: flex-start;">
+                    <sc-if value="{{ sel.hasImg }}" hint-placeholder-val="{{ true }}">
+                      <div style="width: 140px; height: 200px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: #0e1522;"><img src="{{ sel.img }}" alt="" style="max-width: 120px; max-height: 188px; object-fit: contain;"></div>
+                    </sc-if>
+                    <div style="min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                      <span style="font-family: Cinzel, serif; font-size: 22px; font-weight: 700; color: {{ sel.color }};">{{ sel.name }}</span>
+                      <sc-if value="{{ sel.hasBase }}" hint-placeholder-val="{{ true }}"><span style="font-size: 15px; color: #c9c4b8;">{{ sel.base }}</span></sc-if>
+                      <sc-if value="{{ sel.hasSockets }}" hint-placeholder-val="{{ true }}"><span style="font-size: 16px; letter-spacing: 1px;"><sc-for list="{{ sel.sockets }}" as="tk" hint-placeholder-count="5"><span style="color: {{ tk.c }}; font-weight: 700;">{{ tk.t }}</span></sc-for></span></sc-if>
+                      <sc-if value="{{ sel.hasTrade }}" hint-placeholder-val="{{ true }}">
+                        <a class="trade" href="{{ sel.tradeUrl }}" target="_blank" rel="noopener noreferrer" aria-label="{{ sel.tradeLabel }}" style="margin-top: 6px;">Trade<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"></path></svg></a>
+                      </sc-if>
+                    </div>
+                  </div>
+                  <div style="height: 1px; background: #272c36; margin: 4px 0;"></div>
+                  <sc-if value="{{ sel.hasImplicits }}" hint-placeholder-val="{{ true }}">
+                    <sc-for list="{{ sel.implicits }}" as="m" hint-placeholder-count="1"><span style="font-size: 15px; color: #d8d0b8; line-height: 1.4;">{{ m }}</span></sc-for>
+                    <div style="height: 1px; background: #272c36; margin: 2px 0;"></div>
+                  </sc-if>
+                  <sc-for list="{{ sel.mods }}" as="m" hint-placeholder-count="6"><span style="font-size: 15px; color: #a9b8ff; line-height: 1.4;">{{ m }}</span></sc-for>
+                </sc-if>
+                <sc-if value="{{ noGear }}" hint-placeholder-val="{{ false }}"><span style="font-size: 15px; color: #a3a9b4;">No gear</span></sc-if>
+              </div>
+
+              <!-- Jewels, grafts, guardian -->
+              <div class="scroll" style="min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;">
+                <sc-if value="{{ hasJewels }}" hint-placeholder-val="{{ true }}">
+                  <h3 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4;">Jewels</h3>
+                  <div style="display: grid; grid-template-columns: repeat(7, 72px); grid-auto-rows: 72px; gap: 8px;">
+                    <sc-for list="{{ jewels }}" as="c" hint-placeholder-count="7">
+                      <button class="cell" aria-label="{{ c.label }}" aria-pressed="{{ c.pressed }}" onClick="{{ c.pick }}" style="border-color: {{ c.border }}; box-shadow: {{ c.glow }};">
+                        <sc-if value="{{ c.hasImg }}" hint-placeholder-val="{{ true }}"><img src="{{ c.img }}" alt="" style="max-width: 100%; max-height: 100%; object-fit: contain;"></sc-if>
+                        <sc-if value="{{ c.noImg }}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; color: {{ c.color }};">{{ c.name }}</span></sc-if>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ hasGrafts }}" hint-placeholder-val="{{ false }}">
+                  <h3 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4;">Grafts</h3>
+                  <div style="display: grid; grid-template-columns: repeat(7, 72px); grid-auto-rows: 72px; gap: 8px;">
+                    <sc-for list="{{ grafts }}" as="c" hint-placeholder-count="2">
+                      <button class="cell" aria-label="{{ c.label }}" aria-pressed="{{ c.pressed }}" onClick="{{ c.pick }}" style="border-color: {{ c.border }}; box-shadow: {{ c.glow }};">
+                        <sc-if value="{{ c.hasImg }}" hint-placeholder-val="{{ true }}"><img src="{{ c.img }}" alt="" style="max-width: 100%; max-height: 100%; object-fit: contain;"></sc-if>
+                        <sc-if value="{{ c.noImg }}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; color: {{ c.color }};">{{ c.name }}</span></sc-if>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ hasGuardian }}" hint-placeholder-val="{{ true }}">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <h3 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4;">Guardian</h3>
+                    <span style="font-size: 13px; color: #a3a9b4;">{{ guardianTitle }}</span>
+                    <sc-if value="{{ guardianOff }}" hint-placeholder-val="{{ false }}"><span style="padding: 2px 8px; border-radius: 6px; border: 1px solid #3a404c; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #a3a9b4;">Off</span></sc-if>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(7, 72px); grid-auto-rows: 152px; gap: 8px;">
+                    <sc-for list="{{ guardian }}" as="c" hint-placeholder-count="5">
+                      <button class="cell" aria-label="{{ c.label }}" aria-pressed="{{ c.pressed }}" onClick="{{ c.pick }}" style="border-color: {{ c.border }}; box-shadow: {{ c.glow }};">
+                        <sc-if value="{{ c.hasImg }}" hint-placeholder-val="{{ true }}"><img src="{{ c.img }}" alt="" style="max-width: 100%; max-height: 100%; object-fit: contain;"></sc-if>
+                        <sc-if value="{{ c.noImg }}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; color: {{ c.color }};">{{ c.name }}</span></sc-if>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </section>
+          <section style="min-height: 0; display: flex; flex-direction: column; background: #151820; border: 1px solid #272c36; border-radius: 12px; overflow: hidden;">
+            <div style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid #272c36;">
+              <h2 style="margin: 0; font-family: Cinzel, serif; font-size: 20px; color: #d9b870;">Stats</h2>
+              <span title="Calculated by PoB's engine in the app" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #3a404c; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #a3a9b4;">PoB</span>
+            </div>
+            <div class="scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 18px;">
+              <sc-for list="{{ statGroups }}" as="sg" hint-placeholder-count="2">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <h3 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4;">{{ sg.title }}</h3>
+                  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+                    <sc-for list="{{ sg.items }}" as="st" hint-placeholder-count="4">
+                      <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 10px 12px; border-radius: 8px; background: #1b1f28; border: 1px solid #272c36;">
+                        <span style="font-size: 14px; color: {{ st.c }};">{{ st.k }}</span>
+                        <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">{{ st.v }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid #272c36;">
+                <div style="display: flex; justify-content: space-between; font-size: 14px;"><span style="color: #a3a9b4;">Skills</span><span>{{ L.skillSet }}</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px;"><span style="color: #a3a9b4;">Config</span><span>{{ L.configSet }}</span></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- Tree screen -->
+      <sc-if value="{{ isTree }}" hint-placeholder-val="{{ false }}">
+        <div style="height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 16px;">
+          <section style="min-height: 0; display: flex; flex-direction: column; background: #151820; border: 1px solid #272c36; border-radius: 12px; overflow: hidden;">
+            <div style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid #272c36;">
+              <h2 style="margin: 0; font-family: Cinzel, serif; font-size: 20px; color: #d9b870;">Tree</h2>
+              <span style="font-size: 14px; color: #a3a9b4;">{{ L.name }} · {{ L.points }} pts</span>
+              <span style="font-size: 14px; font-weight: 700; color: #7fd3ff;">+{{ L.added }}</span>
+              <span style="font-size: 14px; font-weight: 700; color: #e0605a;">−{{ L.removed }}</span>
+              <span style="flex: 1;"></span>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #a3a9b4;"><span style="width: 12px; height: 12px; border-radius: 50%; background: #7fd3ff;"></span>New</span>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #a3a9b4;"><span style="width: 12px; height: 12px; border-radius: 50%; background: #a8874a;"></span>Kept</span>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #a3a9b4;"><span style="width: 12px; height: 12px; border-radius: 50%; border: 2px dashed #e0605a; box-sizing: border-box;"></span>Removed</span>
+            </div>
+            <div style="flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px; background: #0f1116;">
+              <img src="{{ treeUrl }}" alt="{{ treeAlt }}" style="width: 100%; height: 100%; object-fit: contain;">
+            </div>
+          </section>
+          <section style="min-height: 0; display: flex; flex-direction: column; background: #151820; border: 1px solid #272c36; border-radius: 12px; overflow: hidden;">
+            <div style="height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid #272c36;">
+              <h2 style="margin: 0; font-family: Cinzel, serif; font-size: 20px; color: #d9b870;">Notables</h2>
+            </div>
+            <div class="scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ newNotables }}" as="n" hint-placeholder-count="6">
+                <div style="padding: 10px 12px; border-radius: 8px; background: #1b1f28; border: 1px solid #272c36; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 15px; font-weight: 700; color: {{ n.color }};">{{ n.name }}</span>
+                  <span style="font-size: 13px; color: #c9c4b8; line-height: 1.35;">{{ n.stat }}</span>
+                </div>
+              </sc-for>
+              <sc-if value="{{ noNotables }}" hint-placeholder-val="{{ false }}"><span style="font-size: 14px; color: #a3a9b4; padding: 4px;">None new</span></sc-if>
+              <sc-if value="{{ hasRemoved }}" hint-placeholder-val="{{ false }}">
+                <h3 style="margin: 10px 4px 0; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #a3a9b4;">Removed</h3>
+                <sc-for list="{{ removedNotables }}" as="n" hint-placeholder-count="3">
+                  <div style="padding: 8px 12px; border-radius: 8px; border: 1px dashed #5a2f2f; font-size: 14px; font-weight: 600; color: #e0605a;">{{ n.name }}</div>
+                </sc-for>
+              </sc-if>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- Notes screen -->
+      <sc-if value="{{ isNotes }}" hint-placeholder-val="{{ false }}">
+        <section aria-label="Notes" style="height: 100%; box-sizing: border-box; display: flex; flex-direction: column; background: #151820; border: 1px solid #272c36; border-radius: 12px; overflow: hidden;">
+          <div class="scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: 24px 32px; column-count: 2; column-gap: 48px;">
+            <sc-for list="{{ notes }}" as="p" hint-placeholder-count="4">
+              <p style="margin: 0 0 18px; break-inside: avoid; font-size: 17px; line-height: 1.6; white-space: pre-line; color: #e7e3d8;">{{ p.text }}</p>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":5160,"height":1080}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { data: null, failed: false, screen: 'route', idx: 0, act: 1, auto: true, done: {}, ov: { x: 1960, y: 120 }, drag: null, league: '', selBy: {}, swapBy: {}, images: {} };
+  }
+
+  componentDidMount() {
+    fetch('/_blob/2a35ee100e19040fa8c536fee3164276')
+      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then((data) => this.setState({ data: data }))
+      .catch(() => this.setState({ failed: true }));
+    // Item art loads separately; cells show names until it arrives.
+    fetch('/_blob/962e0f3f46cac6512df567bff56b1e42')
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((images) => this.setState({ images: images }))
+      .catch(() => {});
+  }
+
+  actLoadout(act) {
+    if (act <= 1) return 0;
+    if (act === 2) return 1;
+    if (act === 3) return 2;
+    if (act <= 6) return 3;
+    return 4;
+  }
+
+  setAct(act) {
+    act = Math.max(1, Math.min(10, act));
+    const next = { act: act };
+    if (this.state.auto) next.idx = this.actLoadout(act);
+    this.setState(next);
+  }
+
+  setLoadout(idx) {
+    const n = this.state.data ? this.state.data.loadouts.length : 1;
+    this.setState({ idx: (idx + n) % n, auto: false });
+  }
+
+  toggleStep(act, i, shift) {
+    const list = new Set(this.state.done[act] || []);
+    if (shift) {
+      if (list.has(i)) { Array.from(list).forEach((x) => { if (x >= i) list.delete(x); }); }
+      else { for (let k = 0; k <= i; k++) list.add(k); }
+    } else if (list.has(i)) list.delete(i);
+    else list.add(i);
+    const done = Object.assign({}, this.state.done);
+    done[act] = Array.from(list);
+    this.setState({ done: done });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const d = s.data;
+    const SCREENS = [
+      { key: 'route', label: 'Route', hot: 'Alt+1' },
+      { key: 'gear', label: 'Gear', hot: 'Alt+2' },
+      { key: 'tree', label: 'Tree', hot: 'Alt+3' },
+      { key: 'notes', label: 'Notes', hot: 'Alt+4' },
+    ];
+    const tabs = SCREENS.map((t) => {
+      const active = s.screen === t.key;
+      return Object.assign({}, t, {
+        title: t.label + ' (' + t.hot + ')',
+        bg: active ? '#2a2416' : 'transparent',
+        border: active ? '#d9b870' : 'transparent',
+        underline: active ? '#d9b870' : 'transparent',
+        fg: active ? '#f2dfa8' : '#c9c4b8',
+        isRoute: t.key === 'route', isGear: t.key === 'gear', isTree: t.key === 'tree', isNotes: t.key === 'notes',
+        pick: () => this.setState({ screen: t.key }),
+      });
+    });
+
+    const STAT_COLORS = { Fire: '#e0605a', Cold: '#6ea3e6', Lightning: '#e8c872', Chaos: '#c38ad8', Life: '#e0605a', ES: '#9fb4d9', Mana: '#6ea3e6' };
+    const stat = (k) => ({ k: k, v: '—', c: STAT_COLORS[k] || '#a3a9b4' });
+
+    const vals = {
+      tabs: tabs,
+      ov: s.ov,
+      dragStart: (e) => { e.preventDefault(); this.setState({ drag: { sx: e.clientX, sy: e.clientY, ox: s.ov.x, oy: s.ov.y } }); },
+      dragMove: (e) => {
+        const g = this.state.drag;
+        if (!g) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const scale = rect.width / 2560 || 1;
+        const x = Math.max(0, Math.min(2560 - 400, g.ox + (e.clientX - g.sx) / scale));
+        const y = Math.max(0, Math.min(1080 - 56, g.oy + (e.clientY - g.sy) / scale));
+        this.setState({ ov: { x: Math.round(x), y: Math.round(y) } });
+      },
+      dragEnd: () => { if (this.state.drag) this.setState({ drag: null }); },
+      autoLabel: s.auto ? 'Auto' : 'Manual',
+      autoDot: s.auto ? '#6cc070' : '#7d8490',
+      autoPressed: s.auto ? 'true' : 'false',
+      toggleAuto: () => {
+        const auto = !this.state.auto;
+        this.setState(auto ? { auto: true, idx: this.actLoadout(this.state.act) } : { auto: false });
+      },
+      headStats: ['DPS', 'Life', 'ES', 'Mana', 'Fire', 'Cold', 'Lightning', 'Chaos'].map(stat),
+      statGroups: [
+        { title: 'Offense', items: ['DPS', 'Hit', 'Speed', 'Crit'].map(stat) },
+        { title: 'Defense', items: ['Life', 'ES', 'EHP', 'Block', 'Fire', 'Cold', 'Lightning', 'Chaos'].map(stat) },
+      ],
+      loading: !d && !s.failed,
+      failed: s.failed,
+      isRoute: !!d && s.screen === 'route',
+      isGear: !!d && s.screen === 'gear',
+      isTree: !!d && s.screen === 'tree',
+      isNotes: !!d && s.screen === 'notes',
+      build: { title: 'Leveling', className: '', ascendancy: '' },
+      L: { name: '', points: 0, added: 0, removed: 0, skillSet: '', itemSet: '', configSet: '' },
+      act: s.act, steps: [], skills: [], equip: [], flasks: [], newNotables: [], removedNotables: [], notableChips: [], notes: [],
+      loadoutOptions: [], selValue: '0', zoneLabel: '', progress: '', treeUrl: '', treeAlt: '',
+      noNotables: false, hasRemoved: false, noGear: false, jewels: [], hasJewels: false, leagueOptions: [], league: '',
+      doll: [], grafts: [], hasGrafts: false, guardian: [], hasGuardian: false, guardianTitle: '', guardianOff: false,
+      sel: { border: '#272c36' }, hasSel: false, hasSwap: false,
+      mainPressed: 'true', swapPressed: 'false', mainBg: '#2a2416', swapBg: 'transparent',
+      pickLeague: (e) => this.setState({ league: e.target.value }),
+      showMain: () => this.setState({ swapBy: Object.assign({}, this.state.swapBy, { [this.state.idx]: false }) }),
+      showSwap: () => this.setState({ swapBy: Object.assign({}, this.state.swapBy, { [this.state.idx]: true }) }),
+      prevLoadout: () => this.setLoadout(this.state.idx - 1),
+      nextLoadout: () => this.setLoadout(this.state.idx + 1),
+      pickLoadout: (e) => this.setState({ idx: Number(e.target.value), auto: false }),
+      prevAct: () => this.setAct(this.state.act - 1),
+      nextAct: () => this.setAct(this.state.act + 1),
+    };
+    if (!d) return vals;
+
+    const L = d.loadouts[s.idx];
+    const TREE = {
+      a1: '/_blob/d99e6dcbe18ec183d0185754882721b1', a2: '/_blob/0ba8c5286b25dfaf1d294a531144c4b6',
+      a3: '/_blob/3c767b15427a7a0f98de82c837b909bc', a4: '/_blob/13d6dc2be286289c5be02bb01b69158e',
+      a5: '/_blob/8233da2e9e197850c1c2fa7103c4b590', s1: '/_blob/4d538a84daf0d3e24cc67f481e662f38',
+      h0: '/_blob/57a39347acb870715775134bea967995', h1: '/_blob/467c29cda3db8bafdbf1b64f8640fa4e',
+      h2: '/_blob/963960bf2756685d586a9cc7895fc717', h3: '/_blob/5840799017602061da065a0b391fa6bb',
+    };
+
+    const route = d.route[s.act - 1];
+    const doneSet = new Set(s.done[s.act] || []);
+    let cur = route.steps.findIndex((_, i) => !doneSet.has(i));
+    const steps = route.steps.map((st, i) => {
+      const done = doneSet.has(i);
+      const isCur = i === cur;
+      return {
+        segs: st.segs, subs: st.subs, hasSubs: st.subs.length > 0, num: i + 1, done: done,
+        op: done ? '0.45' : '1',
+        bg: isCur ? '#1f2633' : 'transparent',
+        border: isCur ? '#d9b870' : 'transparent',
+        toggle: (e) => this.toggleStep(s.act, i, !!(e && e.shiftKey)),
+      };
+    });
+    let zone = '';
+    for (let i = Math.max(cur, 0); i >= 0 && !zone; i--) {
+      const seg = (route.steps[i] || { segs: [] }).segs.find((g) => g.c === '#e8c872');
+      if (seg) zone = seg.t;
+    }
+
+    const RARITY = { RARE: '#e8d67a', UNIQUE: '#d48a3e', MAGIC: '#8fa8ff', NORMAL: '#d8d8d8' };
+    const SOCK = { R: '#e0605a', G: '#6cc070', B: '#6ea3e6', W: '#e7e3d8', A: '#7d8490' };
+    const leagueList = d.leagues && d.leagues.length ? d.leagues : ['Standard'];
+    const league = s.league || leagueList[0];
+    const tradeBase = 'https://www.pathofexile.com/trade/search/' + encodeURIComponent(league) + '?q=';
+    const BORDER = { RARE: '#8a7a3a', UNIQUE: '#a8622a', MAGIC: '#3f4f8f', NORMAL: '#4a505c' };
+    const images = s.images || {};
+    // Selection and the Main/Swap choice are kept per loadout.
+    const swapOn = !!(s.swapBy || {})[s.idx];
+    const selWanted = (s.selBy || {})[s.idx] || '';
+
+    // Every item gets an id so a click can select it for the details panel.
+    const entries = [];
+    const add = (it, id, where) => { entries.push({ it: it, id: id, where: where }); return id; };
+    const gear = (L.gear || []).filter((g) => g && g.slot);
+    const isFlask = (g) => g.slot.indexOf('Flask') === 0;
+    const bySlot = {};
+    gear.forEach((g) => { if (g.slot !== 'Jewel' && !isFlask(g)) bySlot[g.slot] = g; });
+    const hasSwap = !!(bySlot['Weapon 1 Swap'] || bySlot['Weapon 2 Swap']);
+    const showSwap = hasSwap && swapOn;
+
+    // Inventory positions: [column, row, width, height] on an 8 x 6 grid.
+    const POS = {
+      'Weapon 1': [1, 1, 2, 4], 'Helmet': [4, 1, 2, 2], 'Weapon 2': [7, 1, 2, 4], 'Body Armour': [4, 3, 2, 3],
+      'Ring 3': [3, 3, 1, 1], 'Ring 1': [3, 4, 1, 1], 'Amulet': [6, 3, 1, 1], 'Ring 2': [6, 4, 1, 1],
+      'Gloves': [1, 5, 2, 2], 'Boots': [7, 5, 2, 2], 'Belt': [4, 6, 2, 1],
+    };
+    const docSlots = Object.keys(POS).filter((k) => k !== 'Ring 3' || bySlot['Ring 3']);
+    docSlots.forEach((k) => {
+      const src = showSwap && (k === 'Weapon 1' || k === 'Weapon 2') ? k + ' Swap' : k;
+      if (bySlot[src]) add(bySlot[src], 'g:' + src, src);
+    });
+    gear.filter(isFlask).forEach((g) => add(g, 'g:' + g.slot, g.slot));
+    // Abyss jewels in weapons follow the weapon set on show.
+    const jewelShown = (g) => !g.host || g.host.indexOf('Weapon') !== 0 || !hasSwap || / Swap$/.test(g.host) === showSwap;
+    gear.filter((g) => g.slot === 'Jewel' && jewelShown(g)).forEach((g, i) => add(g, 'j:' + (g.itemId || i), g.host ? g.host + ' socket' : 'Tree'));
+    gear.filter((g) => g.slot.indexOf('Graft') === 0).forEach((g) => add(g, 'g:' + g.slot, g.slot));
+    const G = L.guardian;
+    if (G) G.gear.forEach((g) => add(g, 'ag:' + g.slot, 'Guardian · ' + g.slot));
+
+    const selId = entries.some((e) => e.id === selWanted) ? selWanted : (entries[0] ? entries[0].id : '');
+    // PoB's default name "New Item" says nothing; use the base instead.
+    const shown = (it) => (it.name === 'New Item' && it.base ? it.base : it.name);
+    const cell = (e) => {
+      const it = e.it;
+      const img = it.img ? images[it.img] || '' : '';
+      const on = e.id === selId;
+      return {
+        label: e.where + ': ' + shown(it), name: shown(it), color: RARITY[it.rarity] || '#d8d8d8',
+        img: img, hasImg: !!img, noImg: !img,
+        border: on ? '#d9b870' : BORDER[it.rarity] || '#2a3446',
+        glow: on ? '0 0 0 2px #d9b870' : 'none',
+        pressed: on ? 'true' : 'false',
+        pick: () => this.setState({ selBy: Object.assign({}, this.state.selBy, { [this.state.idx]: e.id }) }),
+      };
+    };
+    const byId = {};
+    entries.forEach((e) => { byId[e.id] = e; });
+
+    const doll = docSlots.map((k) => {
+      const p = POS[k];
+      const src = showSwap && (k === 'Weapon 1' || k === 'Weapon 2') ? k + ' Swap' : k;
+      const e = byId['g:' + src];
+      const base = { col: p[0] + ' / span ' + p[2], row: p[1] + ' / span ' + p[3] };
+      return e ? Object.assign(cell(e), base, { filled: true, empty: false }) : Object.assign(base, { filled: false, empty: true });
+    });
+    const pickCells = (prefix) => entries.filter((e) => e.id.indexOf(prefix) === 0).map(cell);
+    // Flasks keep their slot position (Flask 3 stays third, matching the hotkeys).
+    const flasks = [1, 2, 3, 4, 5].map((n) => {
+      const e = byId['g:Flask ' + n];
+      return e ? Object.assign(cell(e), { col: n, filled: true, empty: false }) : { col: n, filled: false, empty: true };
+    });
+    const grafts = entries.filter((e) => /^g:Graft/.test(e.id)).map(cell);
+    const jewels = pickCells('j:');
+    const guardian = pickCells('ag:');
+
+    const se = byId[selId];
+    let sel = { border: '#272c36' };
+    if (se) {
+      const it = se.it;
+      const img = it.img ? images[it.img] || '' : '';
+      const sockets = (it.sockets || '').split('').map((ch) => ({ t: ch === '-' ? '–' : ch === ' ' ? ' ' : ch, c: SOCK[ch] || '#7d8490' }));
+      sel = {
+        where: se.where, name: shown(it), base: it.base, hasBase: !!it.base && shown(it) !== it.base,
+        color: RARITY[it.rarity] || '#d8d8d8', border: BORDER[it.rarity] || '#272c36',
+        img: img, hasImg: !!img,
+        sockets: sockets, hasSockets: sockets.length > 0,
+        mods: it.allMods || it.mods || [],
+        implicits: it.implicits || [],
+        hasImplicits: !!(it.implicits && it.implicits.length),
+        tradeUrl: it.trade ? tradeBase + encodeURIComponent(JSON.stringify(it.trade)) : '',
+        hasTrade: !!it.trade,
+        tradeLabel: 'Trade ' + it.name,
+      };
+    }
+
+    const skills = L.skills.map((k) => ({
+      label: k.label || 'Unlabeled',
+      slot: k.slot,
+      links: k.gems.length + 'L',
+      gems: k.gems.map((g) => ({
+        name: g.name, color: g.color,
+        weight: g.support ? '400' : '700',
+        shape: g.support ? '50%' : '2px',
+        lq: g.level + '/' + g.quality,
+        hasLq: g.level > 1 || g.quality > 0,
+      })),
+    }));
+
+    const newNotables = L.newNotables.map((n) => ({ name: n.name, stat: n.stats[0] || '', color: n.kind === 'Keystone' ? '#f2dfa8' : '#7fd3ff' }));
+
+    return Object.assign(vals, {
+      build: d.build,
+      L: L,
+      steps: steps,
+      zoneLabel: zone,
+      progress: doneSet.size + '/' + route.steps.length,
+      skills: skills,
+      doll: doll,
+      flasks: flasks,
+      jewels: jewels,
+      hasJewels: jewels.length > 0,
+      grafts: grafts,
+      hasGrafts: grafts.length > 0,
+      guardian: guardian,
+      hasGuardian: guardian.length > 0,
+      guardianTitle: G ? G.title : '',
+      guardianOff: !!(G && !G.enabled),
+      sel: sel,
+      hasSel: !!se,
+      hasSwap: hasSwap,
+      mainPressed: showSwap ? 'false' : 'true',
+      swapPressed: showSwap ? 'true' : 'false',
+      mainBg: showSwap ? 'transparent' : '#2a2416',
+      swapBg: showSwap ? '#2a2416' : 'transparent',
+      leagueOptions: leagueList,
+      league: league,
+      noGear: entries.length === 0,
+      treeUrl: TREE[L.id] || '',
+      treeAlt: 'Passive tree for ' + L.name,
+      newNotables: newNotables,
+      notableChips: newNotables.slice(0, 10),
+      noNotables: newNotables.length === 0,
+      removedNotables: L.removedNotables,
+      hasRemoved: L.removedNotables.length > 0,
+      notes: d.notes.split(/\n\s*\n/).map((p) => ({ text: p.trim() })).filter((p) => p.text),
+      loadoutOptions: d.loadouts.map((l, i) => ({ value: String(i), label: l.name })),
+      selValue: String(s.idx),
+    });
+  }
+}
+</script>
+</body>
+</html>

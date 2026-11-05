@@ -1,0 +1,14 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-04T15:20:00Z" },
+  "title": "Leveling Companion",
+  "launch": { "view": "focused", "file": "Main.dc.html" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 5160, "h": 1080, "title": "Game + companion", "is_interactive": true },
+    "Design.dc.html": { "x": 0, "y": 1240, "w": 1600, "h": 2600, "title": "Design notes", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "Design.dc.html"],
+  "notes": {},
+  "designSystems": []
+}

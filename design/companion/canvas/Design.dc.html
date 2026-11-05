@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Design notes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#0d0f13}
+.doc{font-family:Inter,system-ui,sans-serif;color:#e7e3d8;font-size:16px;line-height:1.55}
+.doc h1{font-family:Cinzel,serif;font-size:36px;color:#d9b870;margin:0}
+.doc h2{font-family:Cinzel,serif;font-size:22px;color:#d9b870;margin:0 0 12px}
+.doc h3{font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a3a9b4;margin:16px 0 6px}
+.doc p{margin:0 0 10px}
+.doc ul,.doc ol{margin:0 0 10px;padding-left:22px}
+.doc li{margin:3px 0}
+.doc code{font-family:ui-monospace,Consolas,monospace;font-size:14px;background:#1b1f28;border:1px solid #272c36;border-radius:4px;padding:1px 5px}
+.doc a{color:#d9b870}.doc a:hover{color:#f2dfa8}
+.card{background:#151820;border:1px solid #272c36;border-radius:12px;padding:22px 26px;min-width:0}
+.muted{color:#a3a9b4}
+.tag{display:inline-block;padding:2px 10px;border-radius:6px;border:1px solid #3a404c;font-size:12px;font-weight:700;letter-spacing:1px;color:#a3a9b4}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid #272c36;vertical-align:top}
+th{color:#a3a9b4;font-weight:600;font-size:13px;letter-spacing:.5px;text-transform:uppercase}
+</style>
+</helmet>
+<div class="doc" style="box-sizing: border-box; width: 100%; min-height: 100%; padding: 48px 56px; display: flex; flex-direction: column; gap: 24px;">
+
+  <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 16px;">
+    <h1>Leveling Companion</h1>
+    <span class="tag">Parked · 2026-11-05</span>
+  </div>
+  <p class="muted" style="max-width: 1100px;">One reference screen on the second monitor while playing PoE1: the campaign route from poeleveling and the build from Path of Building (pob.codes style), switched by small buttons over the game. Design only; nothing built yet. The interactive demo is the board above this one.</p>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+
+    <!-- Left column -->
+    <div style="flex: 1 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 24px;">
+
+      <section class="card">
+        <h2>Decisions</h2>
+        <table>
+          <tr><th>Topic</th><th>Choice</th></tr>
+          <tr><td>Companion monitor</td><td>2560 × 1080, one screen, minimal scrolling</td></tr>
+          <tr><td>Always visible</td><td>Route steps, gem links and tree together on the Route screen</td></tr>
+          <tr><td>Switching screens</td><td>Floating in-game buttons plus hotkeys (Alt+1–4). Automatic switching later</td></tr>
+          <tr><td>Scope</td><td>PoE1 only, with PoB stats</td></tr>
+          <tr><td>Look</td><td>Own dark game look (Cinzel headings, gold accent)</td></tr>
+          <tr><td>Trade</td><td>Trade button on every item; rare mods searched at about 80% of PoB values</td></tr>
+          <tr><td>Gear view</td><td>In-game inventory layout with item art, details panel, jewels, grafts, Animate Guardian</td></tr>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Screens</h2>
+        <h3>Header (always shown)</h3>
+        <ul>
+          <li>Build name and class, <b>Loadout</b> picker with ‹ › and <b>Auto</b> (match loadout to act)</li>
+          <li>Stats strip: DPS, Life, ES, Mana, resistances (from PoB's engine; "—" in the demo)</li>
+          <li>Tabs: Route, Gear, Tree, Notes with hotkey hints</li>
+        </ul>
+        <h3>Route</h3>
+        <ul>
+          <li>Three columns: the act's steps, gem links (PoB socket groups), the tree</li>
+          <li>Click a step to mark it done; shift-click marks every step before it</li>
+          <li>Tree shows new nodes (cyan), kept (gold), removed (dashed red), plus new notables</li>
+        </ul>
+        <h3>Gear</h3>
+        <ul>
+          <li>Inventory: 8 × 6 grid like the game (weapons, helmet, body, rings, amulet, gloves, boots, belt), flasks 1–5 in their slots</li>
+          <li>Click any item: details panel with art, base, sockets, implicits, mods and <b>Trade</b></li>
+          <li>Right column: Jewels (tree and abyss sockets), Grafts, Guardian (Animate Guardian set, <b>Off</b> when the gem is disabled)</li>
+          <li><b>Main</b> / <b>Swap</b> toggle only when the loadout has swap weapons</li>
+          <li><b>League</b> picker for trade searches; Stats panel beside it</li>
+        </ul>
+        <h3>Tree</h3>
+        <ul><li>Large tree with the new notables and removed nodes listed</li></ul>
+        <h3>Notes</h3>
+        <ul><li>The PoB notes, two columns</li></ul>
+      </section>
+
+      <section class="card">
+        <h2>In-game buttons</h2>
+        <ul>
+          <li>Small strip over the game: grip to move, Route / Gear / Tree / Notes, status dot</li>
+          <li>Clicking a button switches the companion screen on the other monitor</li>
+          <li>Window flags: top-most, no-activate (never takes focus from the game), click-through except the buttons</li>
+          <li>Sends nothing to the game: no key presses, no memory reads. Needs Windowed Fullscreen</li>
+          <li>Hotkeys Alt+1–4 do the same; automatic switching (by zone or event) later</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Open questions</h2>
+        <ul>
+          <li>Rare searches: require every mod, or "at least N of these mods"? Every-mod searches often find nothing (Act 1 life flask, Act 7–10 wand)</li>
+          <li>Should the companion be a new app or new screens inside exile-leveling.exe?</li>
+          <li>Which events switch screens automatically (zone change, level, gem reward)?</li>
+          <li>Show the guardian when its gem is disabled (pob.codes does; the demo marks it Off)?</li>
+        </ul>
+      </section>
+    </div>
+
+    <!-- Right column -->
+    <div style="flex: 1 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 24px;">
+
+      <section class="card">
+        <h2>Reading the PoB file</h2>
+        <ul>
+          <li><b>Loadouts</b> link a tree spec, skill set, item set and config set by a tag in their titles, e.g. <code>{a1}</code> or <code>{a1,a2,a3}</code></li>
+          <li>Colour codes <code>^2</code> and <code>^xRRGGBB</code> are stripped from titles and labels</li>
+          <li>Roll ranges like <code>(50-66)%</code> resolve with the line's <code>{range:x}</code> tag (default 0.5)</li>
+          <li>Unique variants: keep only lines whose <code>{variant:…}</code> includes the selected variant</li>
+          <li>Header lines (Quality, LevelReq, *BasePercentile…) and flags (Corrupted, influence) are not mods</li>
+          <li>Implicits: the first N mod lines after <code>Implicits: N</code>; shown, but not used in trade searches</li>
+          <li>Jewels: tree sockets on allocated nodes, plus <code>&lt;slot&gt; Abyssal Socket N</code>; one card per item</li>
+          <li>Animate Guardian: the gem's <code>skillMinionItemSet</code> names the item set it wears</li>
+          <li><code>&lt;Skill … /&gt;</code> can be self-closing (divider rows); parse it as an empty group</li>
+          <li>Auto loadout: act 1 → Act 1 set, 2 → Act 2, 3 → Act 3, 4–6 → Acts 4-6, 7–10 → Acts 7-10 (from titles)</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Trade searches</h2>
+        <p>Each item opens <code>pathofexile.com/trade/search/&lt;league&gt;?q=&lt;query&gt;</code> in the browser.</p>
+        <ul>
+          <li><b>Uniques:</b> name + base. Renamed items use the known unique name they start with</li>
+          <li><b>Rares, magic:</b> slot category (helmet, ring, wand…) or exact base, plus explicit mods</li>
+          <li><b>Values:</b> minimum about 80% of PoB's; whole numbers under 5 stay exact</li>
+          <li><b>Reduced / less:</b> matched to the increased / more stat with a negative maximum</li>
+          <li><b>Drawbacks</b> (flask downsides, trigger costs): required, no value</li>
+          <li><b>Local stats:</b> defences on armour, attack stats on weapons</li>
+          <li><b>Same text, several ids:</b> grouped as "any one of"</li>
+          <li><b>League:</b> list from the trade API, first entry by default</li>
+        </ul>
+        <h3>Tested against the trade API</h3>
+        <table>
+          <tr><th>Search</th><th>Results</th></tr>
+          <tr><td>Act 1 rare helmet</td><td>126</td></tr>
+          <tr><td>Elegant Hubris (renamed in PoB)</td><td>308</td></tr>
+          <tr><td>HRoC jewel</td><td>174</td></tr>
+          <tr><td>Act 1 Bismuth flask</td><td>2</td></tr>
+          <tr><td>Act 1 Giant Life Flask, Act 7–10 rare wand</td><td>0</td></tr>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Item art</h2>
+        <ul>
+          <li>Images are GGG's, from <code>web.poecdn.com</code>. The URL carries a hash, so it can't be built from the item; a lookup table is needed</li>
+          <li>Source: poe.ninja item data (uniques by name and base, base types, cluster jewels)</li>
+          <li>poe.ninja has no flask or graft bases: one trade listing per base gives its icon</li>
+          <li>Two-Stone Rings: art by colour pair (Ruby = Fire, Sapphire = Cold, Topaz = Lightning)</li>
+          <li>Demo bundles 75 images (1.2 MB). The app should download on first use and cache</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>For the real build</h2>
+        <ul>
+          <li><b>Stats:</b> run PoB's own Lua calc engine (mlua), as PoB Redux does (MIT)</li>
+          <li><b>Overlay:</b> separate small window, Win32 no-activate + top-most</li>
+          <li><b>Route:</b> reuse exile-leveling's routes and log watcher (zone changes move the step)</li>
+          <li><b>Trade API:</b> respect its rate-limit headers; searches open in the browser, not the app</li>
+          <li><b>Not done in the demo:</b> real hotkeys, overlay window, PoB stats, art caching</li>
+        </ul>
+        <h3>References</h3>
+        <ul>
+          <li>pob.codes: gear view model; closed source</li>
+          <li><a href="https://github.com/Dav1dde/pasteofexile">pobb.in (Dav1dde/pasteofexile)</a>: open source, AGPL-3.0, read only (copying code would make our app AGPL)</li>
+          <li><a href="https://github.com/pobredux/pob-redux">PoB Redux</a>: embedded PoB engine</li>
+        </ul>
+        <h3>Where things are</h3>
+        <ul>
+          <li>Demo scripts: branch <code>design/companion</code> in kobayashi-maru-1/poeleveling, folder <code>design/companion</code></li>
+          <li>Sample build: <code>necro-srs-to-hroc-loadouts.xml</code> (local only, not in git)</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1600,"height":2600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
