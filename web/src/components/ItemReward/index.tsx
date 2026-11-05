@@ -47,10 +47,37 @@ interface GemRewardProps {
   requiredGem: RouteData.RequiredGem;
   count: number;
   rewardType?: ItemRewardProps["rewardType"];
+  /** Where the gem comes from, so a step that hands in two quests says which. */
+  questId?: string;
+  rewardOfferId?: string;
 }
 
-export function GemReward({ requiredGem, count, rewardType }: GemRewardProps) {
+/** A quest reward names its quest; a vendor gem names the NPC who sells it. */
+function gemSource(
+  gemId: string,
+  rewardType: GemRewardProps["rewardType"],
+  questId: string | undefined,
+  rewardOfferId: string | undefined,
+) {
+  const quest = questId === undefined ? undefined : Data.Quests[questId];
+  if (!quest) return undefined;
+  if (rewardType === "quest") return quest.name;
+  const offer =
+    rewardOfferId === undefined
+      ? undefined
+      : quest.reward_offers[rewardOfferId];
+  return offer?.vendor[gemId]?.npc;
+}
+
+export function GemReward({
+  requiredGem,
+  count,
+  rewardType,
+  questId,
+  rewardOfferId,
+}: GemRewardProps) {
   const gem = Data.Gems[requiredGem.id];
+  const source = gemSource(requiredGem.id, rewardType, questId, rewardOfferId);
 
   if (!gem)
     return (
@@ -73,6 +100,9 @@ export function GemReward({ requiredGem, count, rewardType }: GemRewardProps) {
             rewardType={rewardType}
             count={count}
           />
+          {source && (
+            <span className={classNames(styles.source)}> · {source}</span>
+          )}
         </>
       }
       right={

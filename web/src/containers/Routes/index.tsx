@@ -155,6 +155,8 @@ export default function RoutesContainer() {
                 requiredGem={step.requiredGem}
                 count={step.count}
                 rewardType={step.rewardType}
+                questId={step.questId}
+                rewardOfferId={step.rewardOfferId}
               />
             ),
           });

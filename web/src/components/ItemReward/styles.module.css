@@ -3,6 +3,11 @@
   font-weight: var(--font-heavy);
 }
 
+/* The quest (Take) or vendor NPC (Buy) a gem comes from. */
+.source {
+  color: var(--accent-primary);
+}
+
 .rewardNote {
   color: var(--on-secondary);
 }

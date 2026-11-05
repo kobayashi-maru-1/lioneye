@@ -28,6 +28,8 @@ export function buildGemSteps(
         requiredGem: requiredGems[questReward],
         rewardType: "quest",
         count: 1,
+        questId: questFragment.questId,
+        rewardOfferId,
       });
   }
 
@@ -50,6 +52,8 @@ export function buildGemSteps(
         requiredGem: requiredGem,
         rewardType: "vendor",
         count: requiredGem.count - (questGems.has(vendorReward) ? 1 : 0),
+        questId: questFragment.questId,
+        rewardOfferId,
       });
     }
   }

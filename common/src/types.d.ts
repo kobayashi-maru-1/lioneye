@@ -81,6 +81,9 @@ export namespace RouteData {
     requiredGem: RequiredGem;
     rewardType: "quest" | "vendor";
     count: number;
+    /** The quest whose reward (or vendor) has the gem, and which of its reward offers. */
+    questId?: string;
+    rewardOfferId?: string;
   }
 
   export interface RouteFile {
