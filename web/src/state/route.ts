@@ -7,6 +7,8 @@ import type { RouteData } from "common";
 import { persistentAtom, transientAtomFamily } from ".";
 import { RESET } from "jotai/utils";
 import { atomEffect, observe } from "jotai-effect";
+import { gemProgressFamily } from "./gem-progress";
+import { routeProgressFamily } from "./route-progress";
 
 const baseRouteSelector = atom(async (get) => {
   const { initializeRouteState, parseRoute } = await import("common");
@@ -128,9 +130,37 @@ export const activeEdgeAtom = atom(
       return;
     }
 
-    const edges = (await get(routeSelector)).edges;
-    const nextEdgeIndex = get(activeEdgeAtom)[0] + 1;
+    const route = await get(routeSelector);
+    const edges = route.edges;
+    const activeIndex = get(activeEdgeAtom)[0];
+    const nextEdgeIndex = activeIndex + 1;
     const nextAreaId = edges[nextEdgeIndex];
+
+    // Moving on means the zone just left is done, and so is entering the new one.
+    // Zones skipped in between stay unticked. Ticks are only added, never removed.
+    const advance = (to: number) => {
+      set(activeEdgeIndex, [to]);
+      const routeKeys: string[] = [];
+      const gemKeys: string[] = [];
+      let zone: number | null = null;
+      route.sections.forEach((section, sectionIndex) =>
+        section.steps.forEach((step, stepIndex) => {
+          if (step.type === "fragment_step" && step.edgeIndex !== null) {
+            // The zone left is included: the route's first step starts in it and is never "entered".
+            if (step.edgeIndex === to || step.edgeIndex === activeIndex)
+              routeKeys.push([sectionIndex, stepIndex].toString());
+            zone = step.edgeIndex;
+            return;
+          }
+          if (zone !== activeIndex) return;
+          if (step.type === "fragment_step")
+            routeKeys.push([sectionIndex, stepIndex].toString());
+          if (step.type === "gem_step") gemKeys.push(step.requiredGem.id);
+        }),
+      );
+      if (routeKeys.length > 0) set(routeProgressFamily.setMany, routeKeys, true);
+      if (gemKeys.length > 0) set(gemProgressFamily.setMany, gemKeys, true);
+    };
 
     let messageAreaId = null;
     const matches = /Generating level \d+ area "(.*?)"/.exec(value);
@@ -140,7 +170,7 @@ export const activeEdgeAtom = atom(
     if (messageAreaId === null) return;
 
     if (nextAreaId === messageAreaId) {
-      set(activeEdgeIndex, [nextEdgeIndex]);
+      advance(nextEdgeIndex);
       return;
     }
 
@@ -154,7 +184,7 @@ export const activeEdgeAtom = atom(
     const ahead = edges.slice(nextEdgeIndex + 1, nextEdgeIndex + 1 + MAX_SKIP);
     const offset = ahead.indexOf(messageAreaId);
     if (offset !== -1) {
-      set(activeEdgeIndex, [nextEdgeIndex + 1 + offset]);
+      advance(nextEdgeIndex + 1 + offset);
     }
   },
 );
