@@ -7,9 +7,10 @@ import { persistentAtom } from ".";
 export interface MainSkillPick {
   /** PoB's id of the active skill, e.g. "SummonRagingSpirit". */
   id: string;
-  /** Socket group label and position it was picked from; break ties between groups. */
+  /** Group label, group position and skill position it was picked from; break ties. */
   label?: string;
   group?: number;
+  skill?: number;
   part?: string;
   minion?: string;
   minionSkill?: string;

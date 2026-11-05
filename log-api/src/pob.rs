@@ -41,9 +41,11 @@ const KEEP: &str = "[keep] ";
 pub struct Pick {
     /// PoB's granted effect id of the active skill, e.g. `SummonRagingSpirit`.
     pub id: String,
-    /// Socket group label and position it was picked from; break ties between groups.
+    /// Socket group label, group position and skill position it was picked from; they
+    /// break ties when a loadout has the gem in more than one place.
     pub label: Option<String>,
     pub group: Option<i64>,
+    pub skill: Option<i64>,
     pub part: Option<String>,
     pub minion: Option<String>,
     pub minion_skill: Option<String>,
@@ -199,14 +201,15 @@ impl Pob {
                 Some(p.id.as_str()),
                 p.label.as_deref(),
                 p.group,
+                p.skill,
                 p.part.as_deref(),
                 p.minion.as_deref(),
                 p.minion_skill.as_deref(),
             )
         });
-        let (id, label, group, part, minion, minion_skill) = pick.unwrap_or_default();
+        let (id, label, group, skill, part, minion, minion_skill) = pick.unwrap_or_default();
         self.stats
-            .call::<mlua::String>((xml, loadout, id, label, group, part, minion, minion_skill))
+            .call::<mlua::String>((xml, loadout, id, label, group, skill, part, minion, minion_skill))
             .map(|json| json.to_string_lossy())
             .map_err(|err| message(&err))
     }

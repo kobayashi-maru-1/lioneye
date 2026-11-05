@@ -24,6 +24,8 @@ interface SkillState {
   groups: string[];
   /** Active skill ids per group, to remember a group you pick by its gem. */
   groupSkills: string[][];
+  /** Each group's own main skill (PoB's choice), the default when you pick that group. */
+  groupMain: number[];
   group?: number;
   skills: string[];
   skill?: number;
@@ -56,9 +58,13 @@ export function StatsViewer({ code }: { code: string }) {
   }, [code]);
 
   // Kept with the build it came from, so a new import never shows the old build's loadouts.
-  const [answer, setAnswer] = useState<{ xml: string; stats: Stats } | null>(
-    null,
-  );
+  // Also kept with the pick it was asked with, so the "PoB pick" tag never describes
+  // an older pick while a new one calculates.
+  const [answer, setAnswer] = useState<{
+    xml: string;
+    pickKey: string;
+    stats: Stats;
+  } | null>(null);
   const stats = answer !== null && answer.xml === xml ? answer.stats : null;
   const loadouts = stats?.loadouts ?? NONE;
   // PoB's names carry its colour codes ("^2Act 1 - 12 pts"); match and show them without.
@@ -83,7 +89,7 @@ export function StatsViewer({ code }: { code: string }) {
     setError(null);
     fetchStats(xml, requested, pick, controller.signal)
       .then((stats) => {
-        setAnswer({ xml, stats });
+        setAnswer({ xml, pickKey, stats });
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -107,7 +113,11 @@ export function StatsViewer({ code }: { code: string }) {
       {stats?.skill && stats.skill.groups.length > 0 && (
         <SkillPicker
           state={stats.skill}
-          fallback={pick !== null && stats.skill.picked === false}
+          fallback={
+            pick !== null &&
+            answer?.pickKey === pickKey &&
+            stats.skill.picked === false
+          }
           disabled={loading}
           onPick={setPick}
         />
@@ -185,15 +195,27 @@ function SkillPicker({ state, fallback, disabled, onPick }: SkillPickerProps) {
         id: state.id,
         label: state.label,
         group: state.group,
+        skill: state.skill,
         part: at(state.parts, state.part),
         minion: at(state.minions, state.minion),
         minionSkill: at(state.minionSkills, state.minionSkill),
       }
     : null;
 
-  const pickGroup = (group: number, skill = 1) => {
-    const id = state.groupSkills[group - 1]?.[skill - 1];
-    if (id) onPick({ id, label: state.groups[group - 1], group });
+  // A group alone picks that group's own main skill, as PoB does.
+  const pickGroup = (
+    group: number,
+    skill = state.groupMain[group - 1] ?? 1,
+  ) => {
+    const ids = state.groupSkills[group - 1] ?? [];
+    const id = ids[skill - 1] ?? ids[0];
+    if (id)
+      onPick({
+        id,
+        label: state.groups[group - 1],
+        group,
+        skill: ids[skill - 1] ? skill : 1,
+      });
   };
 
   return (
@@ -346,6 +368,7 @@ function skillState(skill: Partial<SkillState>): SkillState {
     ...skill,
     groups: list(skill.groups),
     groupSkills: list<string[]>(skill.groupSkills).map((ids) => list(ids)),
+    groupMain: list(skill.groupMain),
     skills: list(skill.skills),
     parts: list(skill.parts),
     minions: list(skill.minions),

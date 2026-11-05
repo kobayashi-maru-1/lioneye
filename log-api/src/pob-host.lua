@@ -303,17 +303,41 @@ local function grantedId(active)
 		and active.activeEffect.grantedEffect.id
 end
 
--- Applies a pick ({ id, label, group, part, minion, minionSkill }); false when this
+-- Active skill ids of a group, in PoB's order. PoB only builds displaySkillList for the
+-- main group and enabled groups; for the others, read the group's active gems.
+local function groupSkillIds(group)
+	local ids = {}
+	for _, active in ipairs(group.displaySkillList or {}) do
+		ids[#ids + 1] = grantedId(active) or ""
+	end
+	if #ids == 0 then
+		for _, gem in ipairs(group.gemList or {}) do
+			local effect = gem.gemData and gem.gemData.grantedEffect or gem.grantedEffect
+			if effect and not effect.support and gem.enabled then
+				ids[#ids + 1] = effect.id
+			end
+		end
+	end
+	return ids
+end
+
+-- Applies a pick ({ id, label, group, skill, part, minion, minionSkill }); false when this
 -- loadout has no group with that skill gem.
 local function applyPick(pick)
+	-- Search PoB's own state for this loadout, not lists left from the previous request.
+	if build.buildFlag then
+		recalc()
+	end
+
 	local best
 	for groupIndex, group in ipairs(build.skillsTab.socketGroupList) do
-		for skillIndex, active in ipairs(group.displaySkillList or {}) do
-			if grantedId(active) == pick.id then
-				-- Enabled groups first, then the label you picked, then the same position.
-				local score = (group.enabled and 4 or 0)
-					+ (group.displayLabel == pick.label and 2 or 0)
-					+ (groupIndex == pick.group and 1 or 0)
+		for skillIndex, id in ipairs(groupSkillIds(group)) do
+			if id == pick.id then
+				-- Enabled groups first, then the label you picked, then the same positions.
+				local score = (group.enabled and 8 or 0)
+					+ (group.displayLabel == pick.label and 4 or 0)
+					+ (groupIndex == pick.group and 2 or 0)
+					+ (skillIndex == pick.skill and 1 or 0)
 				if best == nil or score > best.score then
 					best = { group = groupIndex, skill = skillIndex, score = score }
 				end
@@ -327,7 +351,25 @@ local function applyPick(pick)
 	local group = build.skillsTab.socketGroupList[best.group]
 	setUndoable(build, "mainSocketGroup", best.group)
 	setUndoable(group, "mainActiveSkill", best.skill)
-	local active = group.displaySkillList[best.skill]
+	if build.buildFlag then
+		recalc()
+	end
+	-- A group that wasn't calculated before may list its skills differently from its gems.
+	local _, active = mainActive()
+	if grantedId(active) ~= pick.id then
+		for skillIndex, skill in ipairs(group.displaySkillList or {}) do
+			if grantedId(skill) == pick.id then
+				setUndoable(group, "mainActiveSkill", skillIndex)
+				recalc()
+				break
+			end
+		end
+		_, active = mainActive()
+	end
+	if not active or grantedId(active) ~= pick.id then
+		return true
+	end
+
 	local effect = active.activeEffect
 	local source = effect.srcInstance
 	if pick.part and effect.grantedEffect.parts then
@@ -385,12 +427,10 @@ local function skillState(picked)
 	local controls = build.controls
 	local group, active = mainActive()
 	local groupSkills = setmetatable({}, ARRAY)
+	local groupMain = setmetatable({}, ARRAY)
 	for index, socketGroup in ipairs(build.skillsTab.socketGroupList) do
-		local ids = setmetatable({}, ARRAY)
-		for _, skill in ipairs(socketGroup.displaySkillList or {}) do
-			ids[#ids + 1] = grantedId(skill) or ""
-		end
-		groupSkills[index] = ids
+		groupSkills[index] = setmetatable(groupSkillIds(socketGroup), ARRAY)
+		groupMain[index] = socketGroup.mainActiveSkill or 1
 	end
 	local function shown(control)
 		return control.shown == true
@@ -401,9 +441,11 @@ local function skillState(picked)
 		label = group and group.displayLabel,
 		groups = labels(controls.mainSocketGroup.list),
 		groupSkills = groupSkills,
+		-- Each group's own main skill, the default when you pick that group.
+		groupMain = groupMain,
 		group = controls.mainSocketGroup.selIndex,
-		skills = labels(controls.mainSkill.list),
-		skill = controls.mainSkill.selIndex,
+		skills = shown(controls.mainSkill) and labels(controls.mainSkill.list) or setmetatable({}, ARRAY),
+		skill = shown(controls.mainSkill) and controls.mainSkill.selIndex or nil,
 		parts = shown(controls.mainSkillPart) and labels(controls.mainSkillPart.list) or setmetatable({}, ARRAY),
 		part = shown(controls.mainSkillPart) and controls.mainSkillPart.selIndex or nil,
 		minions = shown(controls.mainSkillMinion) and labels(controls.mainSkillMinion.list) or setmetatable({}, ARRAY),
@@ -416,7 +458,7 @@ end
 -- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
 -- when the build is new to PoB, else the loadout picked last. `id` and the rest are the
 -- guide's remembered main skill (all nil: PoB's own).
-function host_stats(xml, loadout, id, label, group, part, minion, minionSkill)
+function host_stats(xml, loadout, id, label, group, skill, part, minion, minionSkill)
 	if xml ~= loadedXml then
 		loadedXml = nil
 		undo = {}
@@ -438,7 +480,7 @@ function host_stats(xml, loadout, id, label, group, part, minion, minionSkill)
 	local picked
 	if id ~= nil then
 		picked = applyPick({
-			id = id, label = label, group = group, part = part, minion = minion, minionSkill = minionSkill,
+			id = id, label = label, group = group, skill = skill, part = part, minion = minion, minionSkill = minionSkill,
 		})
 	end
 	if build.buildFlag then
