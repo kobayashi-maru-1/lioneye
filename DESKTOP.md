@@ -35,8 +35,9 @@ your PoB once on the **Build** page.
   Shift-click a done step to clear it and every step after it.
 - With the game running, the guide follows your zone changes: the ▶ circle moves to the zone
   you're in, even after a waypoint jump up to 12 stops ahead. Leaving a zone ticks its steps;
-  zones you skip stay open. Portalling back into a zone or returning to one you just left
-  changes nothing. Click a circle to set where you are by hand.
+  zones you skip stay open. After a trip to town, the zone you came from ticks when you leave
+  town for another zone, so selling mid-zone ticks nothing. Portalling back into a zone or
+  returning to one you just left changes nothing. Click a circle to set where you are by hand.
 - An act folds to one line once all its steps are done. Click its header to open it again.
 - The right panel shows the tree, gem links and search strings together (**All**).
   The tabs show one at a time; the arrow at the left hides the panel.

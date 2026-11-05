@@ -10,6 +10,12 @@ import { atomEffect, observe } from "jotai-effect";
 import { gemProgressFamily } from "./gem-progress";
 import { routeProgressFamily } from "./route-progress";
 
+/**
+ * The zone (edge index) a step belongs to: an enter-step belongs to the zone it enters,
+ * any other step to the zone entered before it.
+ */
+const stepZones = new WeakMap<RouteData.Step, number>();
+
 const baseRouteSelector = atom(async (get) => {
   const { initializeRouteState, parseRoute } = await import("common");
 
@@ -40,7 +46,16 @@ const baseRouteSelector = atom(async (get) => {
       break;
   }
 
-  return parseRoute(routeFiles, routeState);
+  const route = parseRoute(routeFiles, routeState);
+  // Record each step's zone while every step is still present (gems-only mode hides enter-steps).
+  let zone = 0;
+  for (const section of route.sections)
+    for (const step of section.steps) {
+      if (step.type === "fragment_step" && step.edgeIndex !== null)
+        zone = step.edgeIndex;
+      stepZones.set(step, zone);
+    }
+  return route;
 });
 
 export const routeSelector = atom(async (get) => {
@@ -101,6 +116,9 @@ export const routeSelector = atom(async (get) => {
           step = baseStep;
         }
 
+        const zone = stepZones.get(baseStep);
+        if (zone !== undefined)
+          for (const added of [step, ...gemSteps]) stepZones.set(added, zone);
         section.steps.push(step, ...gemSteps);
       }
     }
@@ -136,26 +154,52 @@ export const activeEdgeAtom = atom(
     const nextEdgeIndex = activeIndex + 1;
     const nextAreaId = edges[nextEdgeIndex];
 
-    // Moving on means the zone just left is done, and so is entering the new one.
-    // Zones skipped in between stay unticked. Ticks are only added, never removed.
+    // Moving on ticks the zone just left and the enter-step of the new one.
+    // Zones skipped in between stay open. Ticks are only added, never removed.
+    const isTown = (edge: number) => edges[edge]?.endsWith("_town") ?? false;
     const advance = (to: number) => {
       set(activeEdgeIndex, [to]);
+
+      // Arriving in town may be a trip to sell mid-zone, so the zone waits until
+      // you leave town; leaving town then ticks it with the town (and any town before).
+      // The route's final town is never left, so arriving there ticks at once.
+      const zones = new Set<number>();
+      if (!isTown(to) || to === edges.length - 1) {
+        let edge = activeIndex;
+        zones.add(edge);
+        while (edge > 0 && isTown(edge)) zones.add(--edge);
+      }
+      const lastZone = zones.size > 0 ? Math.max(...zones) : -1;
+
+      // A gem can have steps in several zones (quest, then vendor) sharing one flag:
+      // tick it only once its last step is behind you.
+      const gemLastZone = new Map<string, number>();
+      for (const section of route.sections)
+        for (const step of section.steps)
+          if (step.type === "gem_step")
+            gemLastZone.set(
+              step.requiredGem.id,
+              Math.max(
+                gemLastZone.get(step.requiredGem.id) ?? -1,
+                stepZones.get(step) ?? -1,
+              ),
+            );
+
       const routeKeys: string[] = [];
       const gemKeys: string[] = [];
-      let zone: number | null = null;
       route.sections.forEach((section, sectionIndex) =>
         section.steps.forEach((step, stepIndex) => {
-          if (step.type === "fragment_step" && step.edgeIndex !== null) {
-            // The zone left is included: the route's first step starts in it and is never "entered".
-            if (step.edgeIndex === to || step.edgeIndex === activeIndex)
+          const zone = stepZones.get(step);
+          if (zone === undefined) return;
+          if (step.type === "fragment_step") {
+            if (step.edgeIndex === to || zones.has(zone))
               routeKeys.push([sectionIndex, stepIndex].toString());
-            zone = step.edgeIndex;
-            return;
+          } else if (
+            zones.has(zone) &&
+            (gemLastZone.get(step.requiredGem.id) ?? zone) <= lastZone
+          ) {
+            gemKeys.push(step.requiredGem.id);
           }
-          if (zone !== activeIndex) return;
-          if (step.type === "fragment_step")
-            routeKeys.push([sectionIndex, stepIndex].toString());
-          if (step.type === "gem_step") gemKeys.push(step.requiredGem.id);
         }),
       );
       if (routeKeys.length > 0) set(routeProgressFamily.setMany, routeKeys, true);
