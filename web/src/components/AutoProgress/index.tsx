@@ -1,6 +1,7 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect } from "react";
-import { activeEdgeAtom } from "../../state/route";
+import { bossesKilledBy } from "../../state/boss-kills";
+import { activeEdgeAtom, bossKillAtom } from "../../state/route";
 import { autoProgressAtom } from "../../state/auto-progress";
 import { levelLineAtom } from "../../state/level-lines";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
@@ -13,6 +14,7 @@ const AUTO_PROGRESS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${
 export function useAutoProgress() {
   const write = useSetAtom(activeEdgeAtom);
   const takeLevelLine = useSetAtom(levelLineAtom);
+  const bossKilled = useSetAtom(bossKillAtom);
   const setState = useSetAtom(autoProgressAtom);
 
   const { readyState } = useWebSocket({
@@ -30,8 +32,14 @@ export function useAutoProgress() {
         );
         return;
       }
-      // Level-ups set your level; anything else (zone changes) moves the route.
+      // Level-ups set your level, boss death lines tick their step; zone changes move
+      // the route.
       if (takeLevelLine(event.data)) return;
+      const bosses = bossesKilledBy(event.data);
+      if (bosses !== null) {
+        bossKilled(bosses);
+        return;
+      }
       write(event.data);
     },
   });

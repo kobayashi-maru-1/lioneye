@@ -20,6 +20,9 @@ const LEVEL_PATTERN: &str = r"\] : .+ \(\w+\) is now level \d+";
 /// `] Merveil, the Siren: ...` — NPC and boss speech, for ticking boss kills. Chat with a
 /// channel prefix (#, $, @, %, &) is left out; the guide matches exact death lines.
 const SPEECH_PATTERN: &str = r"\] [^:#$@%&\]\s][^:\]]{0,60}: ";
+/// `] : You have been permanently weakened by Kitava's ...` — Kitava's death, a system line.
+const KITAVA_PATTERN: &str = r"\] : You have been permanently weakened by Kitava";
+const PATTERNS: [&str; 4] = [AREA_PATTERN, LEVEL_PATTERN, SPEECH_PATTERN, KITAVA_PATTERN];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -48,7 +51,7 @@ pub async fn run(
     lines: broadcast::Sender<String>,
     status: watch::Sender<Status>,
 ) -> anyhow::Result<()> {
-    let patterns = RegexSet::new([AREA_PATTERN, LEVEL_PATTERN, SPEECH_PATTERN])?;
+    let patterns = RegexSet::new(PATTERNS)?;
     let mut sys = System::new();
     let mut interval = tokio::time::interval(heart_beat);
 
@@ -171,7 +174,7 @@ mod tests {
 
     #[test]
     fn forwards_area_level_and_speech_lines_only() {
-        let patterns = RegexSet::new([AREA_PATTERN, LEVEL_PATTERN, SPEECH_PATTERN]).unwrap();
+        let patterns = RegexSet::new(PATTERNS).unwrap();
         let prefix = "2026/11/05 07:38:21 542259468 cffb065b [INFO Client 52060]";
         let forwarded = |rest: &str| patterns.is_match(&format!("{prefix}{rest}"));
         assert!(forwarded(r#" Generating level 1 area "1_1_1" with seed 1"#));
@@ -181,6 +184,9 @@ mod tests {
         assert!(!forwarded(" #Global: hello"));
         assert!(!forwarded(" @From Someone: wtb"));
         assert!(!forwarded(" $Trader: selling"));
+        assert!(forwarded(
+            " : You have been permanently weakened by Kitava's cruel affliction. You now have -30% to all Resistances."
+        ));
         assert!(!forwarded(" : You have entered The Coast."));
     }
 }

@@ -39,6 +39,10 @@ your PoB once in **Settings** (the ⚙ at the top right).
   zones you skip stay open. After a trip to town, the zone you came from ticks when you leave
   town for another zone, so selling mid-zone ticks nothing. Portalling back into a zone or
   returning to one you just left changes nothing. Click a circle to set where you are by hand.
+- Bosses whose death the game logs tick their step the moment they die: Piety, Gravicius,
+  Dominus, Malachai, Maligaro, Kitava, and the Act 5-10 gods and bosses Sin announces.
+  Others (Hillock, Merveil, Brutus and most Act 1-4 bosses) log nothing when they die;
+  their step ticks when you leave the zone.
 - The page is laid out like a pob.codes build page. Panels fold from their gold header bars
   (click anywhere on the bar): **Campaign**, **Gems**, **Config**, **Tree**, **Notes** and
   **Search**. A panel's header (and the act header inside Campaign) stays pinned while

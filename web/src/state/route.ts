@@ -242,6 +242,41 @@ export const activeEdgeAtom = atom(
   },
 );
 
+/** How far (in stops) a boss's step may be from where you are to tick on its death line. */
+const BOSS_RANGE = 3;
+
+/**
+ * Ticks the step that kills one of `bosses` when the log says it died (state/boss-kills):
+ * the open "kill" step nearest the zone you're in, within BOSS_RANGE stops, so a line that
+ * also plays elsewhere (a map) ticks nothing.
+ */
+export const bossKillAtom = atom(null, async (get, set, bosses: string[]) => {
+  const route = await get(routeSelector);
+  const here = get(activeEdgeIndex)[0];
+  let best: { key: string; distance: number } | null = null;
+  route.sections.forEach((section, sectionIndex) =>
+    section.steps.forEach((step, stepIndex) => {
+      if (step.type !== "fragment_step") return;
+      const kills = step.parts.some(
+        (part) =>
+          typeof part !== "string" &&
+          part.type === "kill" &&
+          bosses.includes(part.value),
+      );
+      if (!kills) return;
+      const key = [sectionIndex, stepIndex].toString();
+      if (get(routeProgressFamily(key))) return;
+      const zone = stepZones.get(step);
+      if (zone === undefined) return;
+      const distance = Math.abs(zone - here);
+      if (distance > BOSS_RANGE) return;
+      if (best === null || distance < best.distance) best = { key, distance };
+    }),
+  );
+  if (best !== null)
+    set(routeProgressFamily((best as { key: string }).key), true);
+});
+
 export const nextEdgeAtom = transientAtomFamily((param: number | null) => {
   if (param === null) return atom(null, () => {});
   return atom(
