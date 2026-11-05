@@ -2,7 +2,8 @@
 .jumpBar {
   position: sticky;
   top: var(--navbar-height);
-  z-index: 3;
+  /* Under the navbar's menu (3), over the sticky act headers (1). */
+  z-index: 2;
   display: flex;
   align-items: stretch;
   flex-wrap: nowrap;

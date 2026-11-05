@@ -11,9 +11,19 @@ export function buildNotes(xml: string): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+const LAST_COLOUR = /\^(x[0-9a-fA-F]{6}|[0-9])(?!.*\^(x[0-9a-fA-F]{6}|[0-9]))/s;
+
 /** PoB notes in PoB's colours, line by line. */
 export function BuildNotes({ notes }: { notes: string }) {
-  const lines = useMemo(() => notes.split(/\r?\n/), [notes]);
+  // PoB draws the notes as one text, so a colour carries on to the following lines.
+  const lines = useMemo(() => {
+    let colour = "";
+    return notes.split(/\r?\n/).map((line) => {
+      const shown = colour + line;
+      colour = LAST_COLOUR.exec(line)?.[0] ?? colour;
+      return shown;
+    });
+  }, [notes]);
   return (
     <div className={classNames(styles.notes)}>
       {lines.map((line, i) =>

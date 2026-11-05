@@ -6,7 +6,11 @@ import { Fragment } from "react";
 
 /** The config options the shown loadout sets in PoB, with PoB's labels. */
 export function ConfigList() {
-  const stats = usePobStats()?.stats;
+  const pob = usePobStats();
+  const stats = pob?.stats;
+  // Like the stats: no rows from another loadout under a failed one.
+  if (pob?.error || pob?.unreadable)
+    return <p className={classNames(styles.empty)}>Config unavailable</p>;
   if (!stats) return <p className={classNames(styles.empty)}>Calculating</p>;
   if (stats.config.length === 0)
     return <p className={classNames(styles.empty)}>PoB defaults</p>;

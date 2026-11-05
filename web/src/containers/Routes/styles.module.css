@@ -70,3 +70,16 @@
     max-height: none;
   }
 }
+
+.tree {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.hint {
+  flex: none;
+  margin: 0 0 var(--size-2);
+  font-size: 0.85em;
+  color: var(--accent-primary);
+}

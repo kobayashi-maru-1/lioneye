@@ -1,7 +1,12 @@
+/* Top-right of the window, clear of the menu bars, wherever the tree or gems sit. */
 .tooltip {
   display: block;
-  position: absolute;
-  transform: translateX(-100%) translateX(calc(-1 * var(--size-2)));
+  position: fixed;
+  top: calc(var(--navbar-height) + var(--jumpbar-height) + var(--size-3));
+  right: var(--size-4);
+  z-index: 4;
+  max-width: min(28rem, 45vw);
+  pointer-events: none;
   overflow: visible;
   background-color: var(--primary);
   border-style: solid;

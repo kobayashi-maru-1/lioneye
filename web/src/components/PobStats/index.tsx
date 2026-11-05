@@ -47,7 +47,8 @@ export interface SkillState {
 /** Titles of the sets PoB uses for the shown loadout, with PoB's colour codes. */
 export interface SetTitles {
   tree: string;
-  skills: string;
+  /** Unset when the skill set has no title: the guide then groups gems by label. */
+  skills?: string;
   items: string;
   config: string;
 }
@@ -176,16 +177,20 @@ export function usePobStats() {
 
 /**
  * Titles (without colour codes) of the tree and skill set PoB uses for the shown
- * loadout, so other sections follow the stats' loadout. Null until PoB has answered.
+ * loadout, so other sections follow the stats' loadout. Null until PoB has answered,
+ * and for builds without PoB loadouts (the sections then follow the act themselves).
  */
 export function useLoadoutSets() {
   const stats = usePobStats()?.stats;
   return useMemo(
     () =>
-      stats?.sets
+      stats?.sets && stats.loadout !== null
         ? {
             tree: stripPob(stats.sets.tree),
-            skills: stripPob(stats.sets.skills),
+            skills:
+              stats.sets.skills === undefined
+                ? undefined
+                : stripPob(stats.sets.skills),
           }
         : null,
     [stats],

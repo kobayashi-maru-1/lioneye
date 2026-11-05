@@ -43,6 +43,8 @@ your PoB once on the **Build** page.
 - The page has foldable sections: **Campaign**, **Tree**, **Gems**, **Config**, **Notes**
   and **Search**. The bar under the menu jumps to each (opening it if folded) and shows the
   auto-progress pill. Auto-progress only scrolls to your zone while Campaign is on screen.
+  Folded sections stay folded next time. On the tree, Ctrl+scroll zooms and dragging pans.
+  **Config** lists only the options the loadout changes from PoB's defaults.
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for the loadout
   that matches your act, matched by PoB titles such as `Act 2` or `Act 4-6 - 50 pts`, and
   calculated by the PoB release bundled in the exe. The arrows pick another loadout until you

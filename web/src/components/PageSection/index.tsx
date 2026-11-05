@@ -1,7 +1,7 @@
 import { buildToggleState } from "../../state/toggle-state";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { useAtomCallback } from "jotai/utils";
 import React, { useCallback } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
@@ -12,6 +12,11 @@ const pageSectionCollapseFamily = buildToggleState(
   PAGE_SECTION_COLLAPSE_VERSION,
   "page-section-collapse",
 );
+
+/** Whether a page section is folded. */
+export function usePageSectionCollapsed(id: string) {
+  return useAtomValue(pageSectionCollapseFamily(id));
+}
 
 export function pageSectionId(id: string) {
   return `page-${id}`;

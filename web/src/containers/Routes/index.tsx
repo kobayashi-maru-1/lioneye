@@ -4,7 +4,11 @@ import { FragmentStep } from "../../components/FragmentStep";
 import { GemLinkViewer } from "../../components/GemLinkViewer";
 import { GemReward } from "../../components/ItemReward";
 import { JumpBar } from "../../components/JumpBar";
-import { PageSection, pageSectionId } from "../../components/PageSection";
+import {
+  PageSection,
+  pageSectionId,
+  usePageSectionCollapsed,
+} from "../../components/PageSection";
 import {
   PobStatsProvider,
   STATS_AVAILABLE,
@@ -32,7 +36,13 @@ import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
-import { useCallback, useEffect, useMemo, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { FaLink } from "react-icons/fa";
 import { FiFileText, FiMap, FiSearch, FiSliders } from "react-icons/fi";
 import { TbHierarchy } from "react-icons/tb";
@@ -194,7 +204,20 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
       id: "tree",
       label: <Label icon={<TbHierarchy />} text="Tree" />,
       content: (
-        <SkillTreeViewer urlTrees={urlTrees} selectedTitle={sets?.tree} />
+        <>
+          <p className={classNames(styles.hint)}>
+            Ctrl+scroll zooms, drag pans
+          </p>
+          {/* Plain scrolling moves the page; the tree zooms only with Ctrl held. */}
+          <div
+            className={classNames(styles.tree)}
+            onWheelCapture={(event) => {
+              if (!event.ctrlKey) event.stopPropagation();
+            }}
+          >
+            <SkillTreeViewer urlTrees={urlTrees} selectedTitle={sets?.tree} />
+          </div>
+        </>
       ),
       bodyClassName: styles.treeBody,
     });
@@ -271,20 +294,24 @@ function Label({ icon, text }: { icon: ReactNode; text: string }) {
  */
 function useCampaignInView() {
   const setInView = useSetAtom(campaignInViewAtom);
+  // Folded, there's no zone to scroll to; a scroll asked for then would never retry.
+  const folded = usePageSectionCollapsed("campaign");
+  const [intersecting, setIntersecting] = useState(true);
   useEffect(() => {
     const element = document.getElementById(pageSectionId("campaign"));
     if (!element) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
+      ([entry]) => setIntersecting(entry.isIntersecting),
       // Only the top 40% of the window counts.
       { rootMargin: "0px 0px -60% 0px" },
     );
     observer.observe(element);
-    return () => {
-      observer.disconnect();
-      setInView(true);
-    };
+    return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    setInView(intersecting && !folded);
+  }, [intersecting, folded]);
+  useEffect(() => () => setInView(true), []);
 }
 
 function EmptyHint() {

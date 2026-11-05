@@ -466,7 +466,8 @@ local function setTitles()
 	local config = build.configTab.configSets[build.configTab.activeConfigSetId]
 	return {
 		tree = tree and tree.title or "Default",
-		skills = skills and skills.title or "Default",
+		-- nil for an untitled skill set: the guide groups its gems by label instead.
+		skills = skills and skills.title or nil,
 		items = items and items.title or "Default",
 		config = config and config.title or "Default",
 	}
@@ -486,14 +487,13 @@ local function configRows()
 			section = option.section
 		elseif option.var and option.label then
 			local value = tab.input[option.var]
-			local default = tab.defaultState[option.var]
-			local unset = value == nil or value == default or value == ""
-				or (option.type == "check" and value == false)
-				or (default == nil and value == 0)
+			-- PoB's own test for a changed option (placeholder first, then the default).
+			local unset = value == nil or value == ""
+				or value == tab:GetDefaultState(option.var, type(value))
 			if not unset then
 				local shown
 				if option.type == "check" then
-					shown = "Yes"
+					shown = value and "Yes" or "No"
 				elseif option.type == "list" then
 					for _, entry in ipairs(option.list or {}) do
 						if entry.val == value then
