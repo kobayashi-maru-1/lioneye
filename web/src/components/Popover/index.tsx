@@ -94,16 +94,22 @@ export function Popover({
 
   useLayoutEffect(place);
 
-  // Follow the anchor as the page scrolls; a hover popover just closes.
+  // Follow the anchor as the page scrolls; a hover popover just closes. Only scrolls that
+  // move the anchor count: on wide screens Campaign's column scrolls by itself.
   useEffect(() => {
-    const onScroll = () => (pinned ? place() : onClose());
+    const onScroll = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Node && !target.contains(anchor)) return;
+      if (pinned) place();
+      else onClose();
+    };
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", place);
     return () => {
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", place);
     };
-  }, [pinned, place, onClose]);
+  }, [pinned, place, onClose, anchor]);
 
   // A pinned popover closes on Escape or a click outside it and its anchor.
   useEffect(() => {

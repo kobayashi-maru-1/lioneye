@@ -198,6 +198,8 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
   const hasSearch = searchStrings !== null && searchStrings.length > 0;
   useCampaignInView();
   useFoldCampaignAtEnd();
+  const campaignColumn = useColumnScroll(0);
+  const panelColumn = useColumnScroll(1);
 
   // The app bar's jump buttons, one per panel shown.
   const setTargets = useSetAtom(jumpTargetsAtom);
@@ -241,6 +243,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
               scrolling by itself. Narrower: one column, as before (styles.columns). */}
           <div className={classNames(styles.columns)}>
             <div
+              ref={campaignColumn}
               className={classNames(styles.column, "thin-scroll")}
               data-panel-column
             >
@@ -253,6 +256,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
               </PageSection>
             </div>
             <div
+              ref={panelColumn}
               className={classNames(styles.column, "thin-scroll")}
               data-panel-column
             >
@@ -438,6 +442,29 @@ function useFoldCampaignAtEnd() {
     if (ended && !wasEnded.current) setFolded(true);
     wasEnded.current = ended;
   }, [ended]);
+}
+
+/** Where each wide-layout column was scrolled, kept while you're on Settings. */
+const columnScroll = [0, 0];
+
+/**
+ * Wide screens: a column scrolls by itself, which the window's scroll restoration doesn't
+ * see. Keeps its place when you leave the guide page and come back. (Narrow, the column
+ * takes no part in layout and the window's restoration does the job.)
+ */
+function useColumnScroll(index: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const column = ref.current;
+    if (!column) return;
+    column.scrollTop = columnScroll[index];
+    const save = () => {
+      columnScroll[index] = column.scrollTop;
+    };
+    column.addEventListener("scroll", save, { passive: true });
+    return () => column.removeEventListener("scroll", save);
+  }, []);
+  return ref;
 }
 
 /**
