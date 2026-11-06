@@ -23,7 +23,7 @@ import {
 import { SearchStrings } from "../../components/SearchStrings";
 import { SectionHolder } from "../../components/SectionHolder";
 import { SkillTreeViewer } from "../../components/SkillTreeViewer";
-import { BuildHealth } from "../../components/BuildHealth";
+import { BuildHealthPanel } from "../../components/BuildHealth";
 import { StatsViewer } from "../../components/StatsViewer";
 import { TradeListPanel } from "../../components/TradeList";
 import type { TaskListProps } from "../../components/TaskList";
@@ -216,6 +216,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
       ...(showStats ? [{ id: "gear", label: "Gear" }] : []),
       ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
       ...(showStats ? [{ id: "trade", label: "Trade" }] : []),
+      ...(showStats ? [{ id: "health", label: "Health" }] : []),
       ...(showStats ? [{ id: "config", label: "Config" }] : []),
       ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
       ...(notes !== null ? [{ id: "notes", label: "Notes" }] : []),
@@ -255,7 +256,6 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
         {showStats && (
           <aside className={classNames(styles.sidebar, "thin-scroll")}>
             <StatsViewer />
-            <BuildHealth />
           </aside>
         )}
         <div className={classNames(styles.main)}>
@@ -298,6 +298,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
                 </div>
               )}
               {showStats && <TradeListPanel />}
+              {showStats && <BuildHealthPanel />}
               {showStats && <ConfigPanel />}
               {urlTrees.length > 0 && <TreePanel urlTrees={urlTrees} />}
               {notes !== null && (

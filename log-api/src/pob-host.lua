@@ -814,192 +814,255 @@ end
 --   permit persons to whom the Software is furnished to do so, subject to the following
 --   conditions: The above copyright notice and this permission notice shall be included in
 --   all copies or substantial portions of the Software.
---   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+--   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+--   INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+--   PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+--   HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+--   CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+--   OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
--- Changed for a leveling guide: every check is scaled to the loadout's level (an Act 2
--- loadout isn't expected to cap resistances), the texts are short, and checks PoB already
--- warns about (skill costs, reservation) are left to PoB's warnings. log-api/redux-watch.ps1
--- notices when Redux changes sanity_check.
+-- Changed here: only the PoE1 checks, run on the shown loadout; text written for Redux's
+-- assistant ("Call set_level", its ladder sample) is left out; each finding names the
+-- guide panel that fixes it. The rules and thresholds are Redux's, unchanged.
+-- log-api/redux-watch.ps1 notices when Redux changes sanity_check
+-- or build_summary.
 
--- Quest passive points by the level an act starts at (PoB's Modules/Build.lua acts table).
-local QUEST_POINTS = {
-	{ 1, 0 }, { 12, 2 }, { 22, 4 }, { 32, 6 }, { 40, 7 }, { 44, 9 },
-	{ 50, 12 }, { 54, 15 }, { 60, 18 }, { 64, 20 }, { 67, 23 },
+-- Quest passive points by the level an act starts at (PoB's Modules/Build.lua acts table,
+-- as Redux's POE1_ACTS).
+local POE1_ACTS = {
+	{ level = 1, questPoints = 0 }, { level = 12, questPoints = 2 }, { level = 22, questPoints = 4 },
+	{ level = 32, questPoints = 6 }, { level = 40, questPoints = 7 }, { level = 44, questPoints = 9 },
+	{ level = 50, questPoints = 12 }, { level = 54, questPoints = 15 }, { level = 60, questPoints = 18 },
+	{ level = 64, questPoints = 20 }, { level = 67, questPoints = 23 },
 }
 
--- The level a loadout's tree is for, worked out from its passive points the way PoB's
--- EstimatePlayerProgress does. PoB keeps one level for the whole build (often a guide's
--- endgame level), so an Act 2 loadout is judged by its own tree, not by that.
-local function levelForPoints(used, extra)
-	local act, level = 0, 1
-	repeat
+-- Redux's questPointsForLevel (PoE1): quest points at the start and end of the act the
+-- level falls in, and the extra points (kill-all bandits counts after Act 2) for each.
+local function questPointsForLevel(level, extra)
+	extra = extra or 0
+	local act = 1
+	while POE1_ACTS[act + 1] and level >= POE1_ACTS[act + 1].level do
 		act = act + 1
-		local bandit = act > 2 and extra or 0
-		level = math.min(math.max(used + 1 - QUEST_POINTS[act][2] - bandit, QUEST_POINTS[act][1]), 100)
-	until act == #QUEST_POINTS or level <= QUEST_POINTS[act + 1][1]
-	return level
+	end
+	local input = build.configTab and build.configTab.input or {}
+	local bandit = input.bandit or build.bandit
+	local killAll = bandit ~= "Oak" and bandit ~= "Kraityn" and bandit ~= "Alira"
+	local function extraAt(a)
+		return extra - ((killAll and a <= 2) and 1 or 0)
+	end
+	local high = math.min(act + 1, #POE1_ACTS)
+	return POE1_ACTS[act].questPoints, POE1_ACTS[high].questPoints, extraAt(act), extraAt(high)
 end
 
--- Ascendancy points by level, by PoB's lab suggestions: Normal from 33, Cruel 55,
--- Merciless 68, Eternal 75.
-local function ascendancyExpected(level)
-	return level >= 75 and 8 or level >= 68 and 6 or level >= 55 and 4 or level >= 33 and 2 or 0
+-- Redux's gemPressClass (PoE1): whether a skill costs a keypress.
+local function pressClass(gemData, activeSkill)
+	local types = activeSkill and activeSkill.skillTypes
+		or (gemData and gemData.grantedEffect and gemData.grantedEffect.skillTypes)
+	if not types then
+		return "active"
+	end
+	if types[SkillType.Triggered] then
+		return "trigger"
+	end
+	if types[SkillType.HasReservation] or types[SkillType.Stance] then
+		return "persistent"
+	end
+	return "active"
 end
 
-local function nextLab(points)
-	return ({ [0] = "Normal Lab", [2] = "Cruel Lab", [4] = "Merciless Lab", [6] = "Eternal Lab" })[points]
-end
-
--- What to look at in the shown loadout, worst first: { severity, message, fix, panel }.
--- severity: high, medium, low. panel: the guide panel that fixes it (gear, tree, gems, config).
-local function healthFindings()
+-- The parts of Redux's build_summary that sanity_check reads.
+local function buildSummary()
 	local o = build.calcsTab.mainOutput or {}
 	local spec = build.spec
-	local out = setmetatable({}, ARRAY)
-	local function number(value)
-		return type(value) == "number" and value == value and value or 0
-	end
-	local used, ascUsed = 0, 0
-	if spec and spec.CountAllocNodes then
-		used, ascUsed = spec:CountAllocNodes()
-		used, ascUsed = used or 0, ascUsed or 0
-	end
-	local level = levelForPoints(used, number(o.ExtraPoints))
-	local function add(severity, message, fix, panel)
-		out[#out + 1] = { severity = severity, message = message, fix = fix, panel = panel }
-	end
+	local used, ascUsed, _, _, ws1, ws2 = spec:CountAllocNodes()
+	used, ascUsed, ws1, ws2 = used or 0, ascUsed or 0, ws1 or 0, ws2 or 0
+	local level = build.characterLevel or 1
+	local questLow, questHigh, extraLow, extraHigh = questPointsForLevel(level, o.ExtraPoints)
 
-	-- Resistances: none expected before Act 5; half-capped through Acts 5-10; capped in maps.
-	local cap = level >= 68 and 75 or level >= 40 and 50 or nil
-	if cap then
-		local low, worst = {}, 75
-		for _, r in ipairs({ { "fire", o.FireResist }, { "cold", o.ColdResist }, { "lightning", o.LightningResist } }) do
-			local value = number(r[2])
-			if value < cap then
-				low[#low + 1] = string.format("%s %.0f%%", r[1], value)
-				worst = math.min(worst, value)
-			end
-		end
-		if #low > 0 then
-			add((cap == 75 and worst < 50) and "high" or "medium",
-				string.format("Resistances below %d%%: %s", cap, table.concat(low, ", ")),
-				"Resistances on rings, amulet, belt, boots, gloves, helmet.", "gear")
+	local calculated = {}
+	local env = build.calcsTab.mainEnv
+	for _, activeSkill in ipairs(env and env.player and env.player.activeSkillList or {}) do
+		local src = activeSkill.activeEffect and activeSkill.activeEffect.srcInstance
+		if src and not calculated[src] then
+			calculated[src] = activeSkill
 		end
 	end
-	local chaosImmune = false
-	for _, node in pairs(spec and spec.allocNodes or {}) do
-		if node.dn == "Chaos Inoculation" then
-			chaosImmune = true
-		end
-	end
-	if level >= 68 and number(o.ChaosResist) < 0 and not chaosImmune then
-		add("low", string.format("Chaos resistance %.0f%%", number(o.ChaosResist)),
-			"Add chaos resistance on gear.", "gear")
-	end
-
-	-- Ascendancy points for the labs done by this level. (Redux's spent-points check is left
-	-- out: the level comes from the points.)
-	if spec then
-		local expected = ascendancyExpected(level)
-		if spec.curAscendClassId == 0 and level >= 33 then
-			add("medium", "No ascendancy chosen", "Pick one at the Normal Lab.", "tree")
-		elseif spec.curAscendClassId ~= 0 and ascUsed < expected then
-			local lab = nextLab(ascUsed - ascUsed % 2)
-			add("medium", string.format("%d of %d ascendancy points", ascUsed, expected),
-				lab and ("Next: " .. lab) or nil, "tree")
-		end
-	end
-
-	-- Flasks: worth carrying from the first towns.
-	if level >= 12 then
-		local empty = 0
-		for i = 1, 5 do
-			local slot = build.itemsTab.slots["Flask " .. i]
-			if slot and (not slot.selItemId or slot.selItemId == 0) then
-				empty = empty + 1
-			end
-		end
-		if empty > 0 then
-			add(empty >= 3 and "medium" or "low", string.format("%d of 5 flask slots empty", empty),
-				"Add life, quicksilver and utility flasks.", "gear")
-		end
-	end
-
-	-- Main skill links, from maps on.
-	local group = build.skillsTab.socketGroupList[build.mainSocketGroup]
-	if level >= 68 and group and not group.source then
-		local actives, supports = 0, 0
+	local active, mainSupports, mainName = 0, 0, nil
+	local skills = {}
+	for gi, group in ipairs(build.skillsTab.socketGroupList) do
+		local supports, picked = 0, {}
 		for _, gem in ipairs(group.gemList or {}) do
-			local effect = gem.gemData and gem.gemData.grantedEffect or gem.grantedEffect
-			if gem.enabled ~= false and effect then
-				if effect.support then supports = supports + 1 else actives = actives + 1 end
+			local gd = gem.gemData
+			if gd and gd.grantedEffect and gd.grantedEffect.support then
+				supports = supports + 1
+			elseif gem.enabled ~= false then
+				picked[#picked + 1] = gem
 			end
 		end
-		local want = level >= 85 and 5 or 4
-		-- A link can't outgrow its item: boots, gloves and helmets hold 4 sockets.
-		local slot = group.slot and build.itemsTab.slots[group.slot]
-		local item = slot and slot.selItemId and build.itemsTab.items[slot.selItemId]
-		local limit = item and item.base and item.base.socketLimit
-		if limit then
-			want = math.min(want, limit - 1)
+		if #picked == 0 and group.source then
+			picked[1] = false
 		end
-		if actives == 1 and supports < want then
-			add(supports < 3 and "high" or "medium", string.format("Main skill has %d supports", supports),
-				string.format("Target: %d supports", want), "gems")
+		local isMain = gi == build.mainSocketGroup
+		local mainIndex = math.max(1, math.min(#picked, group.mainActiveSkill or 1))
+		for pi, gem in ipairs(picked) do
+			local gd = gem and gem.gemData
+			local name = gem and (gd and gd.name or gem.nameSpec) or nil
+			local press = gem and pressClass(gd, calculated[gem]) or nil
+			-- Redux's grantedGemNote: a Tier 0 gem comes with an item (a default attack).
+			local granted = gd and gd.Tier == 0 and not (gd.grantedEffect and gd.grantedEffect.support)
+			if group.source then
+				name = (name and name ~= "") and name or group.displayLabel or "granted"
+				press = "granted"
+			end
+			if name and name ~= "" then
+				if group.enabled ~= false and press == "active" and not granted then
+					active = active + 1
+				end
+				if isMain and pi == mainIndex then
+					mainSupports, mainName = supports, name
+				end
+				skills[#skills + 1] = { group = gi, grantedBy = group.source ~= nil }
+			end
 		end
+	end
+	return {
+		characterLevel = level,
+		ascendancyName = spec.curAscendClassId ~= 0 and spec.curAscendClassName or nil,
+		mainSkill = mainName,
+		mainSkillGroup = build.mainSocketGroup,
+		mainSkillSupports = mainSupports,
+		activeSkills = active,
+		skills = skills,
+		passivePointsSpent = used - math.min(ws1, ws2),
+		pointsAvailableMin = math.max(0, level - 1) + questLow + extraLow,
+		pointsAvailableMax = math.max(0, level - 1) + questHigh + extraHigh,
+		ascendancyPointsUsed = ascUsed,
+		life = o.Life or 0,
+		energyShield = o.EnergyShield or 0,
+		mana = o.Mana or 0,
+		fireResist = o.FireResist or 0,
+		coldResist = o.ColdResist or 0,
+		lightningResist = o.LightningResist or 0,
+		chaosResist = o.ChaosResist or 0,
+		movementSpeedMod = o.MovementSpeedMod or 0,
+	}
+end
+
+-- Redux's sanity_check (PoE1), for the shown loadout: { severity, message, fix, panel },
+-- worst first. panel: the guide panel that fixes it (gear, tree, gems, config).
+local function healthFindings()
+	local o = build.calcsTab.mainOutput or {}
+	local s = buildSummary()
+	local chaosImmune = o.ChaosInoculation == true
+	local manaFirst = math.min(tonumber(o.sharedMindOverMatter) or 0, 100)
+	local findings = setmetatable({}, ARRAY)
+	local function add(severity, panel, message, fix)
+		-- Redux writes messages lower case; shown as a line, they start with a capital.
+		message = message:sub(1, 1):upper() .. message:sub(2)
+		findings[#findings + 1] = { severity = severity, message = message, fix = fix, panel = panel }
 	end
 
-	-- Mind over Matter builds take hits on mana (Redux skips mana-first builds too).
-	local manaFirst = false
-	for _, node in pairs(spec and spec.allocNodes or {}) do
-		if node.dn == "Mind Over Matter" then
-			manaFirst = true
+	local uncapped, worst = {}, 75
+	for _, r in ipairs({ { "fire", s.fireResist }, { "cold", s.coldResist }, { "lightning", s.lightningResist } }) do
+		if r[2] < 75 then
+			uncapped[#uncapped + 1] = string.format("%s %.0f%%", r[1], r[2])
+			worst = math.min(worst, r[2])
 		end
 	end
-	if level >= 30 and number(o.Life) < 500 and number(o.EnergyShield) < 500
-		and not (manaFirst and number(o.Mana) >= 500) then
-		add("high", string.format("Life %.0f, energy shield %.0f", number(o.Life), number(o.EnergyShield)),
-			"Add life on gear and tree.", "gear")
+	if #uncapped > 0 then
+		add(worst < 50 and "high" or "medium", "gear",
+			string.format("below the 75%% cap: %s", table.concat(uncapped, ", ")),
+			"The campaign leaves -60% after Act 10. Resistance suffixes on rings, amulet, belt, boots, gloves and helmet close it; a Purity aura or a resistance flask covers a gap.")
 	end
-	local speed = o.EffectiveMovementSpeedMod or o.MovementSpeedMod
-	if level >= 15 and type(speed) == "number" and speed < 1.15 then
-		add("medium", string.format("Movement speed %+.0f%%", (speed - 1) * 100),
-			"Get boots with movement speed.", "gear")
+	if s.chaosResist < 0 and not chaosImmune then
+		add("low", "gear", string.format("chaos resistance is %.0f%%", s.chaosResist),
+			"Chaos damage bypasses energy shield and hits life directly.")
+	end
+
+	-- Live characters hold one point more than PoB's quest data allows.
+	if s.passivePointsSpent > s.pointsAvailableMax + 1 then
+		add("high", "tree", string.format("%d passive points spent but at level %d the maximum is %d",
+			s.passivePointsSpent, s.characterLevel, s.pointsAvailableMax),
+			"Either the level is unset or the tree is over budget.")
+	elseif s.passivePointsSpent < s.pointsAvailableMin then
+		add("low", "tree", string.format("%d of %d available passive points spent", s.passivePointsSpent, s.pointsAvailableMin),
+			"Unspent points.")
+	end
+	local ascended = s.ascendancyName ~= nil and s.ascendancyName ~= "None"
+	if not ascended and s.characterLevel >= 20 then
+		add("medium", "tree", "no ascendancy chosen",
+			"Ascendancies carry 8 points of build-defining bonuses and are usually the reason to pick a class.")
+	elseif ascended and s.ascendancyPointsUsed < 8 then
+		add("medium", "tree", string.format("%d of 8 ascendancy points allocated", s.ascendancyPointsUsed))
+	end
+
+	local linkSkills, itemSkill = 0, false
+	for _, k in ipairs(s.skills) do
+		if k.group == s.mainSkillGroup then
+			linkSkills = linkSkills + 1
+			itemSkill = itemSkill or k.grantedBy
+		end
+	end
+	-- A link that holds several skills (Bane and its curses) or an item's skill says nothing about supports.
+	if s.mainSkill ~= nil and linkSkills == 1 and not itemSkill
+		and s.characterLevel >= 68 and s.mainSkillSupports < (s.characterLevel >= 85 and 5 or 4) then
+		add(s.mainSkillSupports < 3 and "high" or "medium", "gems",
+			string.format("main skill %s has %d supports", tostring(s.mainSkill), s.mainSkillSupports),
+			"Most ladder characters run their largest link with 5 supports, a 6-link.")
+	end
+	if s.activeSkills > 10 then
+		add("low", "gems", string.format("%d skills need a keypress", s.activeSkills),
+			"Nine in ten builds press 10 skills or fewer. Extra power is usually better spent on an aura, a trigger setup or a guard skill.")
+	end
+
+	-- Flasks are a PoE1 build's cheapest defence and utility.
+	local emptyFlasks = 0
+	for i = 1, 5 do
+		local slot = build.itemsTab.slots["Flask " .. i]
+		if slot and (not slot.selItemId or slot.selItemId == 0) then
+			emptyFlasks = emptyFlasks + 1
+		end
+	end
+	if emptyFlasks > 0 then
+		add(emptyFlasks >= 3 and "medium" or "low", "gear", string.format("%d of 5 flask slots empty", emptyFlasks),
+			"A life flask, a resistance or armour utility flask and a quicksilver flask cover most gaps. Flasks with 'used when' enchants need no keypress.")
 	end
 	local input = build.configTab and build.configTab.input or {}
 	local major, minor = input.pantheonMajorGod, input.pantheonMinorGod
-	if level >= 60 and (major == nil or major == "None") and (minor == nil or minor == "None") then
-		add("low", "No pantheon gods", nil, "config")
+	if s.characterLevel >= 60 and (major == nil or major == "None") and (minor == nil or minor == "None") then
+		add("low", "config", "no pantheon gods chosen",
+			"Pantheon powers are free defences unlocked in the campaign; set them in Config so the calculation includes them.")
+	end
+	if o.ManaCostWarning or o.LifeCostWarning then
+		local pool = o.ManaCostWarning and "mana" or "life"
+		add("high", "gems", string.format("the main skill costs more %s than is left unreserved", pool),
+			"PoB counts the skill as unusable. Drop or swap an aura, move a reservation to the other pool, or add reservation efficiency.")
+	end
+
+	if s.characterLevel >= 30 and s.life < 500 and s.energyShield < 500 and not (manaFirst > 0 and s.mana >= 500) then
+		add("high", "gear", string.format("life %.0f and energy shield %.0f at level %d", s.life, s.energyShield, s.characterLevel),
+			"Both pools are very low for this level.")
+	end
+	-- movementSpeedMod is a multiplier, so 1.0 is no bonus.
+	if s.characterLevel >= 15 and s.movementSpeedMod < 1.15 then
+		add("medium", "gear", string.format("movement speed is %+.0f%%", (s.movementSpeedMod - 1) * 100),
+			"Most ladder characters have at least +30%, counting their flasks as active as PoB does. It shortens the campaign and is a primary avoidance layer.")
 	end
 
 	local rank = { high = 1, medium = 2, low = 3 }
-	table.sort(out, function(a, b)
-		return rank[a.severity] < rank[b.severity]
-	end)
-	return out
-end
-
--- Redux's Defences card: the largest hit of each type you survive, and the rest.
-local function defences()
-	local o = build.calcsTab.mainOutput or {}
-	local function finite(value)
-		return type(value) == "number" and value == value and value ~= math.huge
-			and value ~= -math.huge and value or nil
+	for i, finding in ipairs(findings) do
+		finding.order = i
 	end
-	return {
-		physical = finite(o.PhysicalMaximumHitTaken),
-		fire = finite(o.FireMaximumHitTaken),
-		cold = finite(o.ColdMaximumHitTaken),
-		lightning = finite(o.LightningMaximumHitTaken),
-		chaos = finite(o.ChaosMaximumHitTaken),
-		armour = finite(o.Armour),
-		evasion = finite(o.Evasion),
-		block = finite(o.EffectiveBlockChance or o.BlockChance),
-		spellBlock = finite(o.EffectiveSpellBlockChance or o.SpellBlockChance),
-		lifeRegen = finite(o.LifeRegenRecovery or o.LifeRegen),
-		manaRegen = finite(o.ManaRegenRecovery or o.ManaRegen),
-		movementSpeed = finite(o.EffectiveMovementSpeedMod or o.MovementSpeedMod),
-	}
+	table.sort(findings, function(a, b)
+		if rank[a.severity] ~= rank[b.severity] then
+			return rank[a.severity] < rank[b.severity]
+		end
+		return a.order < b.order
+	end)
+	for _, finding in ipairs(findings) do
+		finding.order = nil
+	end
+	return findings
 end
 
 -- Gem top levels other than 20 (Empower 3, Awakened 5, Portal 1...), by gem item id, for
@@ -1017,7 +1080,7 @@ local function gemMaxLevels()
 	return gemMaxLevelCache
 end
 
--- Runs an extra (Build health, Defenses); an error there is logged and gives `fallback`.
+-- Runs an extra (Build health); an error there is logged and gives `fallback`.
 local function safely(fn, fallback)
 	local ok, result = pcall(fn)
 	if ok then
@@ -1072,7 +1135,6 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		passives = passives(),
 		gemMaxLevels = gemMaxLevels(),
 		health = safely(healthFindings, setmetatable({}, ARRAY)),
-		defences = safely(defences, nil),
 		rows = rows(),
 		warnings = warnings(),
 	})

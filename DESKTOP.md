@@ -78,11 +78,6 @@ once in **Settings** (the ⚙ at the top right).
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.
-- Below it, **Build health** lists what to look at in that loadout, judged for its level:
-  resistances from Act 5 (50%) and maps (75%), passive and ascendancy points (labs at 33,
-  55, 68, 75), flasks, movement speed, life, main skill links and pantheon. **Defenses**
-  shows the largest hit of each type it survives. The checks are ported from
-  [PoB Redux](https://github.com/pobredux/pob-redux) (MIT).
 - **Gear** shows the loadout's item set as a paper doll (with flasks, weapon swap, abyssal
   sockets, grafts and the jewels in the tree's taken sockets). Base art comes from RePoE's
   base item list (every base, flasks included) and unique art from poe.ninja for the league
@@ -92,6 +87,11 @@ once in **Settings** (the ⚙ at the top right).
 - Links out of the guide (trade searches, the wiki, poe.re) open in a normal tab of your
   last-used Edge profile, where you're signed in to the trade site, not in the guide's own
   profile.
+- **Build health** (under the Trade List) lists what to look at in the shown loadout, worst
+  first, each with a link to the panel that fixes it. The checks are
+  [PoB Redux](https://github.com/pobredux/pob-redux)'s (MIT), with its rules unchanged:
+  resistances, passive and ascendancy points, main skill links, skills to press, flasks,
+  pantheon, skill costs, life and movement speed.
 - Hover an item or gem for its in-game tooltip, with its buttons underneath; click it to pin
   the tooltip and use them: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
   **W** (the wiki) and **Trade**. Escape, a click elsewhere or a second click unpins it.

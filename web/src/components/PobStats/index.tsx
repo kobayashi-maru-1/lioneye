@@ -162,23 +162,6 @@ export interface HealthFinding {
   panel?: string;
 }
 
-/** The largest hit of each type the loadout survives, and its other defenses. */
-export interface Defences {
-  physical?: number;
-  fire?: number;
-  cold?: number;
-  lightning?: number;
-  chaos?: number;
-  armour?: number;
-  evasion?: number;
-  block?: number;
-  spellBlock?: number;
-  lifeRegen?: number;
-  manaRegen?: number;
-  /** A multiplier: 1.3 is +30%. */
-  movementSpeed?: number;
-}
-
 export interface Stats {
   loadouts: string[];
   loadout: string | null;
@@ -193,7 +176,6 @@ export interface Stats {
   /** Gem top levels other than 20 (Empower 3, Awakened 5), by gem item id. */
   gemMaxLevels: Record<string, number>;
   health: HealthFinding[];
-  defences: Defences | null;
   rows: StatRow[];
   warnings: string[];
 }
@@ -423,8 +405,6 @@ async function fetchStats(
         ? stats.gemMaxLevels
         : {},
     health: list(stats.health),
-    defences:
-      stats.defences && !Array.isArray(stats.defences) ? stats.defences : null,
     rows: list(stats.rows),
     warnings: list(stats.warnings),
   };

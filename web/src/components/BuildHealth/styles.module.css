@@ -1,8 +1,11 @@
-/* PoB Redux's Build Health and Defenses cards, under the stats. */
-.card {
-  margin-top: var(--size-3);
-  border: var(--border-width) solid var(--panel-border);
-  border-radius: var(--border-radius);
+/* PoB Redux's Build Health: one row per finding, worst first. */
+.summary {
+  color: #8f8f8f;
+  font-size: 0.8rem;
+}
+
+.empty {
+  margin: 0;
 }
 
 .stale {
@@ -10,40 +13,19 @@
   transition: opacity 0.15s;
 }
 
-.heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--size-2);
-  padding: var(--size-2) var(--size-3);
-  color: var(--gold);
-  font-size: 0.8rem;
-  font-weight: var(--font-heavy);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  border-bottom: var(--border-width) solid var(--panel-border);
-}
-
-.summary {
-  color: #8f8f8f;
-  font-size: 0.75rem;
-  font-weight: normal;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
 .findings {
   margin: 0;
   padding: 0;
   list-style: none;
+  border: var(--border-width) solid var(--panel-border);
+  border-radius: var(--border-radius);
 }
 
 .finding {
   display: flex;
   align-items: flex-start;
-  gap: var(--size-2);
-  padding: var(--size-2) var(--size-3);
-  font-size: 0.85rem;
+  gap: var(--size-3);
+  padding: var(--size-3) var(--size-4);
 }
 
 .finding + .finding {
@@ -54,7 +36,7 @@
   flex: none;
   width: 0.5rem;
   height: 0.5rem;
-  margin-top: 0.35rem;
+  margin-top: 0.45rem;
   border-radius: 50%;
 }
 
@@ -73,6 +55,7 @@
 .text {
   display: flex;
   flex-direction: column;
+  gap: var(--size-1);
   flex: 1;
   min-width: 0;
 }
@@ -83,14 +66,14 @@
 
 .fix {
   color: #8f8f8f;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
 }
 
 .link {
   flex: none;
   padding: 0;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: #6f9fff;
   background: none;
   border: none;
@@ -99,56 +82,4 @@
 
 .link:hover {
   text-decoration: underline;
-}
-
-/* Largest hit of each type: a row of five. */
-.hits {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  border-bottom: var(--border-width) solid var(--panel-border);
-}
-
-.hit {
-  display: flex;
-  flex-direction: column;
-  padding: var(--size-2) var(--size-2);
-  min-width: 0;
-}
-
-.hit + .hit {
-  border-left: var(--border-width) solid var(--panel-border);
-}
-
-.hitLabel {
-  font-size: 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hitValue {
-  font-weight: var(--font-heavy);
-  font-size: 0.9rem;
-}
-
-.rows {
-  margin: 0;
-  padding: var(--size-2) var(--size-3);
-  font-size: 0.85rem;
-}
-
-.row {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--size-3);
-  line-height: 1.6;
-}
-
-.row dt {
-  color: var(--accent-primary);
-}
-
-.row dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
 }
