@@ -85,6 +85,9 @@ export function PageSection({
       id={pageSectionId(id)}
       ref={sectionRef}
       className={classNames(styles.section)}
+      // For layouts that give a folded panel's space to its neighbours (Routes styles).
+      data-page-section
+      data-collapsed={collapsed || undefined}
     >
       <div
         ref={headerRef}

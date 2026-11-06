@@ -98,6 +98,11 @@
   gap: var(--size-4);
 }
 
+/* One of the pair folded: its header sits above, and the open one takes the full width. */
+.pair:has(> [data-collapsed]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 /* Campaign's column and the other panels' column. Below the wide breakpoint they take no
    part in layout: the panels stack in .main as one column, scrolled by the window. */
 .columns,
@@ -159,5 +164,31 @@
 
   .column:empty {
     display: none;
+  }
+
+  /* Every panel in a column folded (Campaign, say): that column becomes a strip of its
+     headers across the top, and the other column takes the full width below it. */
+  /* (.stacked and .folded are set by the page: CSS can't nest :has() to tell.) */
+  .columns.stacked {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .columns.stacked > .column:not(.folded) {
+    order: 1;
+  }
+
+  /* The folded column's headers side by side in one strip, not a tall stack. */
+  .columns.stacked > .column.folded {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .columns.stacked > .column.folded > * {
+    flex: 1 1 12rem;
+  }
+
+  .columns.stacked > .column.folded .pair {
+    display: contents;
   }
 }

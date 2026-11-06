@@ -30,6 +30,7 @@ import { currentActAtom } from "../../state/current-act";
 import { gemLinksSelector } from "../../state/gem-links";
 import { gemProgressFamily } from "../../state/gem-progress";
 import { shownPanelsAtom } from "../../state/overlay";
+import { pageSectionCollapseFamily } from "../../state/page-section-collapse";
 import { pobAtom } from "../../state/pob";
 import {
   campaignInViewAtom,
@@ -208,8 +209,8 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
   const targetKey = [gemLinks.length > 0, showStats, urlTrees.length > 0]
     .concat([notes !== null, hasSearch])
     .join();
-  useEffect(() => {
-    const targets = [
+  const targets = useMemo(
+    () => [
       { id: "campaign", label: "Campaign" },
       ...(showStats ? [{ id: "gear", label: "Gear" }] : []),
       ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
@@ -218,11 +219,25 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
       ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
       ...(notes !== null ? [{ id: "notes", label: "Notes" }] : []),
       ...(hasSearch ? [{ id: "search", label: "Search" }] : []),
-    ];
+    ],
+    [targetKey],
+  );
+  useEffect(() => {
     setTargets(targets);
     setShownPanels(targets.map((target) => target.id));
-  }, [targetKey]);
+  }, [targets]);
   useEffect(() => () => setTargets([]), []);
+
+  // Wide screens: a column whose panels are all folded gives its width to the other.
+  const campaignFolded = usePageSectionCollapsed("campaign");
+  const panelsFoldedAtom = useMemo(() => {
+    const ids = targets.map((t) => t.id).filter((id) => id !== "campaign");
+    return atom(
+      (get) =>
+        ids.length > 0 && ids.every((id) => get(pageSectionCollapseFamily(id))),
+    );
+  }, [targets]);
+  const panelsFolded = useAtomValue(panelsFoldedAtom);
 
   return (
     <>
@@ -241,10 +256,16 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
           {showStats && <BuildHeader />}
           {/* Wide screens: Campaign and the other panels side by side, each column
               scrolling by itself. Narrower: one column, as before (styles.columns). */}
-          <div className={classNames(styles.columns)}>
+          <div
+            className={classNames(styles.columns, {
+              [styles.stacked]: campaignFolded || panelsFolded,
+            })}
+          >
             <div
               ref={campaignColumn}
-              className={classNames(styles.column, "thin-scroll")}
+              className={classNames(styles.column, "thin-scroll", {
+                [styles.folded]: campaignFolded,
+              })}
               data-panel-column
             >
               <PageSection
@@ -257,7 +278,9 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
             </div>
             <div
               ref={panelColumn}
-              className={classNames(styles.column, "thin-scroll")}
+              className={classNames(styles.column, "thin-scroll", {
+                [styles.folded]: panelsFolded,
+              })}
               data-panel-column
             >
               {/* Gear and Gems side by side, as on pob.codes. */}
