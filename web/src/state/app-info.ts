@@ -13,6 +13,8 @@ export interface ExeSettings {
 /** The app's and the bundled PoB's versions, and the exe's settings (/api/app). */
 export interface AppInfo {
   version: string;
+  /** The build's commit (short), so builds of one version can be told apart. */
+  commit?: string;
   /** "v2.67.2" */
   pob: string;
   settings: ExeSettings;

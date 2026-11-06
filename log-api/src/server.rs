@@ -226,6 +226,7 @@ async fn app_info(State(state): State<AppState>, headers: HeaderMap) -> Response
     }
     Json(serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
+        "commit": env!("LIONEYE_COMMIT"),
         "pob": pob::version(),
         "settings": state.settings.view(),
     }))

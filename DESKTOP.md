@@ -185,6 +185,11 @@ outside the repo, so a synced folder such as OneDrive doesn't copy it. Set
 Or run **Desktop exe** from the GitHub Actions tab and download the artifact.
 Pushing a tag such as `v1.0.0` attaches the exe to a release.
 
+The footer shows the version and the build's commit (`0.4.1 (1a2b3c4)`). To release: raise
+`version` in `log-api\Cargo.toml` (and its entry in `Cargo.lock`), commit, push a matching
+tag (`v0.4.2`), then add the notes to the release the workflow made. Copies on an older
+version show **Update** in the footer.
+
 For UI work, run the exe, then `npm -w web run dev` and open the address it prints;
 the dev page uses the running exe for auto-progress.
 

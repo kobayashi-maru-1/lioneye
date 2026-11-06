@@ -68,7 +68,10 @@ export function Footer() {
   if (!info) return null;
   return (
     <footer className={classNames(styles.footer)}>
-      <span>Lioneye {info.version}</span>
+      <span title={info.commit ? `Build ${info.commit}` : undefined}>
+        Lioneye {info.version}
+        {info.commit && ` (${info.commit})`}
+      </span>
       <span title="Path of Building Community, bundled">
         PoB {info.pob.replace(/^v/, "")}
       </span>
