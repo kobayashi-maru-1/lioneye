@@ -30,7 +30,7 @@ pub fn open_own(url: &str, place: Option<crate::guide_window::Placement>) -> std
         "--no-first-run".into(),
         "--no-default-browser-check".into(),
     ];
-    if let Some(place) = place {
+    if let Some(place) = place.map(|p| p.for_edge()) {
         args.push(format!("--window-position={},{}", place.x, place.y));
         args.push(format!("--window-size={},{}", place.width, place.height));
         if place.maximized {

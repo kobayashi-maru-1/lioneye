@@ -20,7 +20,8 @@ pub const BROWSERS: [&str; 3] = ["app", "edge", "default"];
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
-    /// The game's Client.txt; None: found from the running game.
+    /// The game's Client.txt, or its folder (then its newest log); None: found from the
+    /// running game.
     pub log_path: Option<PathBuf>,
     /// "app", "edge" or "default"; None: "app".
     pub browser: Option<String>,
@@ -97,13 +98,19 @@ impl AppSettings {
             return Ok(());
         }
         let text = serde_json::to_string_pretty(&next).map_err(|err| err.to_string())?;
-        std::fs::write(&self.path, text).map_err(|err| {
-            warn!("Couldn't save {}: {err}", self.path.display());
-            "Not saved. Try again.".to_string()
-        })?;
+        // Written beside, then renamed over, so a crash never leaves half a file.
+        let temp = self.path.with_extension("json.tmp");
+        std::fs::write(&temp, text)
+            .and_then(|_| std::fs::rename(&temp, &self.path))
+            .map_err(|err| {
+                warn!("Couldn't save {}: {err}", self.path.display());
+                "Not saved. Try again.".to_string()
+            })?;
+        let log_changed = next.log_path != settings.log_path;
         *settings = next;
         info!("Settings: {:?}", *settings);
-        if self.cli_log.is_none() {
+        // Only a new log restarts the watcher.
+        if self.cli_log.is_none() && log_changed {
             self.log_path.send_replace(settings.log_path.clone());
         }
         self.browser
@@ -118,24 +125,13 @@ fn effective_browser(cli: Option<&str>, settings: &Settings) -> String {
         .unwrap_or_else(|| "app".to_string())
 }
 
-/// A log file to read: an existing file, or a game folder holding logs\LatestClient.txt or
-/// logs\Client.txt (the newer of the two).
+/// A log to read: an existing file, or a game folder holding logs\LatestClient.txt or
+/// logs\Client.txt (kept as the folder: the watcher reads the newer of the two).
 fn check_log(path: &Path) -> Result<PathBuf, String> {
-    if path.is_file() {
+    if path.is_file() || crate::watcher::folder_log(path).is_some() {
         return Ok(path.to_path_buf());
     }
-    if path.is_dir() {
-        let found = ["LatestClient.txt", "Client.txt"]
-            .iter()
-            .map(|name| path.join("logs").join(name))
-            .filter_map(|p| Some((std::fs::metadata(&p).ok()?.modified().ok()?, p)))
-            .max_by_key(|(modified, _)| *modified)
-            .map(|(_, p)| p);
-        if let Some(found) = found {
-            return Ok(found);
-        }
-    }
-    Err("Log not found. Pick Client.txt or the game folder.".to_string())
+    Err("Log not found. Enter Client.txt or the game folder.".to_string())
 }
 
 #[cfg(test)]
@@ -157,8 +153,13 @@ mod tests {
         settings
             .update(Change { log_path: Some(folder), browser: Some("edge".into()) })
             .unwrap();
-        assert_eq!(settings.log_path.borrow().as_deref(), Some(log.as_path()));
+        assert_eq!(settings.log_path.borrow().as_deref(), Some(dir.as_path()));
+        assert_eq!(crate::watcher::folder_log(&dir).as_deref(), Some(log.as_path()));
         assert_eq!(*settings.browser.borrow(), "edge");
+        // A browser-only change leaves the watcher alone.
+        let watching = settings.log_path.subscribe();
+        settings.update(Change { log_path: None, browser: Some("default".into()) }).unwrap();
+        assert!(!watching.has_changed().unwrap());
         // Saved: a new start reads it back.
         let again = AppSettings::load(file.clone(), None, None);
         assert_eq!(*again.browser.borrow(), "edge");

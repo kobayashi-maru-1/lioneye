@@ -156,6 +156,35 @@ pub struct Placement {
 }
 
 impl Placement {
+    /// In the scaled pixels Edge's --window-position and --window-size take: this exe is
+    /// DPI aware and sees physical pixels, so at 150% a 1500-pixel window is 1000 for Edge.
+    pub fn for_edge(&self) -> Placement {
+        use windows_sys::Win32::Foundation::RECT;
+        use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromRect};
+        use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+        let rect = RECT {
+            left: self.x,
+            top: self.y,
+            right: self.x + self.width,
+            bottom: self.y + self.height,
+        };
+        let (mut dpi_x, mut dpi_y) = (96u32, 96u32);
+        unsafe {
+            let monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+            if GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) != 0 {
+                dpi_x = 96;
+            }
+        }
+        let scale = |v: i32| (f64::from(v) * 96.0 / f64::from(dpi_x.max(1))).round() as i32;
+        Placement {
+            x: scale(self.x),
+            y: scale(self.y),
+            width: scale(self.width),
+            height: scale(self.height),
+            maximized: self.maximized,
+        }
+    }
+
     /// False when its spot is on no connected monitor (a screen unplugged since).
     pub fn on_screen(&self) -> bool {
         use windows_sys::Win32::Foundation::RECT;

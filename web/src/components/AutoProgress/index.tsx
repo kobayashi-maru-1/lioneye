@@ -14,7 +14,9 @@ import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
 import {
   migrateProfile,
   fingerprint,
+  firstRestore,
   markSynced,
+  markSyncedAs,
   ownWindow,
   pageMode,
   syncedFingerprint,
@@ -50,6 +52,13 @@ export function useAutoProgress() {
       // The exe's copy of the guide's saved data (sent first on connect).
       if (event.data.startsWith("state:")) {
         takeSavedState(event.data.slice("state:".length), sendMessage);
+        return;
+      }
+      // The exe saved an upload: this browser's data is the copy now.
+      if (event.data.startsWith("saved:")) {
+        const saved = event.data.slice("saved:".length);
+        if (uploaded !== "" && saved === fingerprint(uploaded))
+          markSyncedAs(saved);
         return;
       }
       // A window opened only to send its profile's data to the exe does nothing else.
@@ -192,10 +201,13 @@ function takeSavedState(json: string, send: (message: string) => void) {
   const synced = syncedFingerprint();
   // The own window from before fingerprints: its data is the copy's (it uploaded it).
   const behind = synced === null ? !ownWindow : synced !== fingerprint(json);
+  // Started empty: fill it from the copy. Behind (another browser saved since): load the
+  // copy, even an emptied one, so old data never comes back. Once per session at most.
+  const empty = saved === null || Object.keys(saved).length === 0;
   if (
     saved !== null &&
-    Object.keys(saved).length > 0 &&
-    (startedFresh || behind)
+    ((startedFresh && !empty) || (!startedFresh && behind)) &&
+    firstRestore()
   ) {
     try {
       restoreStorage(saved);
@@ -221,8 +233,8 @@ function uploadSavedState(send: (message: string) => void) {
   const snapshot = JSON.stringify(storageSnapshot());
   if (snapshot === uploaded) return;
   uploaded = snapshot;
+  // Counted as synced when the exe answers "saved:" (it may fail to store it).
   send(`state:${snapshot}`);
-  markSynced(snapshot);
 }
 
 /**
@@ -269,7 +281,7 @@ const LABELS = {
 } as const;
 
 const TITLES = {
-  offline: "Auto-progress is off: exile-leveling.exe isn't running.",
+  offline: "Auto-progress is off: lioneye.exe isn't running.",
   waiting: "Auto-progress is waiting for Path of Exile to start.",
   watching: "Auto-progress is following ",
 } as const;

@@ -79,21 +79,23 @@ export function AppSettingsForm() {
       <div className={classNames(formStyles.formRow)}>
         <label>Browser</label>
         <div className={classNames(styles.line)}>
-          <PanelSelect
-            label="Browser"
-            options={BROWSERS.map((browser) => browser.label)}
-            value={Math.max(
-              0,
-              BROWSERS.findIndex(
-                (browser) =>
-                  browser.value ===
-                  (settings.browserFromCommandLine ?? settings.browser),
-              ),
-            )}
-            onChange={(i) => {
-              if (!browserLocked) save({ browser: BROWSERS[i].value });
-            }}
-          />
+          {browserLocked ? (
+            <span>{settings.browserFromCommandLine}</span>
+          ) : (
+            <PanelSelect
+              label="Browser"
+              options={BROWSERS.map((browser) => browser.label)}
+              value={Math.max(
+                0,
+                BROWSERS.findIndex(
+                  (browser) =>
+                    browser.value ===
+                    (settings.browserFromCommandLine ?? settings.browser),
+                ),
+              )}
+              onChange={(i) => save({ browser: BROWSERS[i].value })}
+            />
+          )}
         </div>
         <span className={classNames(styles.note)}>
           {browserLocked

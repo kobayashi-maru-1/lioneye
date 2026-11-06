@@ -69,6 +69,7 @@ pub async fn run(
                 break None;
             }
             let found = match &fixed_path {
+                Some(path) if path.is_dir() => folder_log(path),
                 Some(path) => path.try_exists().ok().filter(|x| *x).map(|_| path.clone()),
                 None => find_running_log(&mut sys),
             };
@@ -153,6 +154,11 @@ fn find_running_log(sys: &mut System) -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// A game folder's log, as set in Settings: its newest LatestClient.txt or Client.txt.
+pub fn folder_log(dir: &Path) -> Option<PathBuf> {
+    first_log(dir)
 }
 
 /// The most recently written of LatestClient.txt and Client.txt in `dir/logs`.

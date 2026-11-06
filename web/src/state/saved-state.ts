@@ -69,12 +69,33 @@ export function syncedFingerprint() {
   return localStorage.getItem(SYNCED_KEY);
 }
 
-export function markSynced(json: string) {
+/** Records the copy this browser now matches, by its fingerprint. */
+export function markSyncedAs(fingerprint: string) {
   try {
-    localStorage.setItem(SYNCED_KEY, fingerprint(json));
+    localStorage.setItem(SYNCED_KEY, fingerprint);
   } catch {
     // Storage full: the next start compares again.
   }
+}
+
+export function markSynced(json: string) {
+  markSyncedAs(fingerprint(json));
+}
+
+const RESTORED_KEY = "exile-leveling-restored";
+
+/**
+ * Once per session: true the first time (and remembers it). A window that loaded the
+ * exe's copy and still looks behind (its fingerprint couldn't be stored) doesn't reload again.
+ */
+export function firstRestore() {
+  try {
+    if (sessionStorage.getItem(RESTORED_KEY) !== null) return false;
+    sessionStorage.setItem(RESTORED_KEY, "1");
+  } catch {
+    // No session storage: allow it, as before.
+  }
+  return true;
 }
 
 /** Everything the guide has stored, as the exe keeps it: key → stored string. */

@@ -37,6 +37,17 @@ pub struct SavedState {
     offers: Mutex<HashMap<String, String>>,
 }
 
+/// The page's fingerprint of a copy (web/src/state/saved-state.ts): FNV-1a over its UTF-16
+/// code units, as hex. Sent back as "saved:<fingerprint>" once a copy is on disk.
+pub fn fingerprint(json: &str) -> String {
+    let mut hash: u32 = 0x811c_9dc5;
+    for unit in json.encode_utf16() {
+        hash ^= u32::from(unit);
+        hash = hash.wrapping_mul(0x0100_0193);
+    }
+    format!("{hash:x}")
+}
+
 /// Storage as the page sends it: key → stored string.
 type Storage = BTreeMap<String, String>;
 
@@ -74,13 +85,14 @@ impl SavedState {
     }
 
     /// Keeps what the guide sent, here and on disk. Ignored when it isn't storage JSON.
-    pub fn save(&self, json: &str) {
+    /// True when the copy holds it now (saved, or it already did).
+    pub fn save(&self, json: &str) -> bool {
         if parse(json).is_none() {
-            return;
+            return false;
         }
         let mut current = self.current.lock().unwrap_or_else(|e| e.into_inner());
         if current.as_deref() == Some(json) {
-            return;
+            return true;
         }
         // Written beside, then renamed over, so a crash never leaves half a file.
         let temp = self.path.with_extension("json.tmp");
@@ -89,8 +101,12 @@ impl SavedState {
             Ok(()) => {
                 *current = Some(json.to_string());
                 info!("Saved the guide's data ({} bytes)", json.len());
+                true
             }
-            Err(err) => warn!("Couldn't save {}: {}", self.path.display(), err),
+            Err(err) => {
+                warn!("Couldn't save {}: {}", self.path.display(), err);
+                false
+            }
         }
     }
 
@@ -169,6 +185,14 @@ mod tests {
         assert!(!SavedState::has_build(&reset));
         assert!(SavedState::rank(&with_build) > SavedState::rank(&further));
         assert!(SavedState::rank(&further) > SavedState::rank(&storage(None, 2)));
+    }
+
+    #[test]
+    fn fingerprints_like_the_page() {
+        // FNV-1a of "" and of a small copy, as web/src/state/saved-state.ts computes them.
+        assert_eq!(super::fingerprint(""), "811c9dc5");
+        assert_eq!(super::fingerprint("{}"), "5465b825");
+        assert_eq!(super::fingerprint("é"), format!("{:x}", (0x811c_9dc5u32 ^ 0xe9).wrapping_mul(0x0100_0193)));
     }
 
     #[test]

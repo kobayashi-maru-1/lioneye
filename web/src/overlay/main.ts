@@ -1,4 +1,4 @@
-// The in-game bar, shown by exile-leveling.exe over the game in a WebView2 window
+// The in-game bar, shown by lioneye.exe over the game in a WebView2 window
 // (log-api/src/overlay.rs). Buttons tell the exe, which tells the guide page to jump to that
 // panel. The exe sends the buttons ("overlay:" messages) from the guide's Settings, and the
 // guide's tooltips ("tips:"): the Gems panel's set and Campaign's next steps.

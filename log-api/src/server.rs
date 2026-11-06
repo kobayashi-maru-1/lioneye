@@ -218,7 +218,9 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
 /// The app's and the bundled PoB's versions, and the exe's settings, for the guide's footer
 /// and Settings page.
 async fn app_info(State(state): State<AppState>, headers: HeaderMap) -> Response {
-    if !local_origin(&headers) {
+    // A GET from the page itself carries no Origin: check the address it was sent to too, so
+    // a site pointed at this PC by name can't read the log path.
+    if !local_origin(&headers) || !local_host(&headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
     Json(serde_json::json!({
@@ -258,6 +260,19 @@ async fn ws_handler(
         return StatusCode::FORBIDDEN.into_response();
     }
     ws.on_upgrade(move |socket| client(socket, state))
+}
+
+/// The request was sent to this PC by address (127.0.0.1, localhost, a LAN IP), not by a
+/// site's name pointed here (DNS rebinding).
+fn local_host(headers: &HeaderMap) -> bool {
+    let Some(host) = headers.get(header::HOST).and_then(|h| h.to_str().ok()) else {
+        return true; // not a browser
+    };
+    let name = match host.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or(""),
+        None => host.split(':').next().unwrap_or(""),
+    };
+    name.eq_ignore_ascii_case("localhost") || name.parse::<std::net::IpAddr>().is_ok()
 }
 
 fn local_origin(headers: &HeaderMap) -> bool {
@@ -419,7 +434,15 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                         // The guide's own window: its data changed. Written off the runtime.
                         let saved = state.saved.clone();
                         let json = json.to_string();
-                        let _ = tokio::task::spawn_blocking(move || saved.save(&json)).await;
+                        let fingerprint = crate::saved_state::fingerprint(&json);
+                        let stored = tokio::task::spawn_blocking(move || saved.save(&json))
+                            .await
+                            .unwrap_or(false);
+                        // The page counts its data as in the exe's copy only once it is.
+                        if stored {
+                            let text = format!("saved:{fingerprint}");
+                            if socket.send(Message::Text(text.into())).await.is_err() { break; }
+                        }
                     } else if let Some(url) = text.strip_prefix("open:") {
                         // A link in the guide's own window (trade, wiki): opened in your
                         // last-used Edge profile instead.
