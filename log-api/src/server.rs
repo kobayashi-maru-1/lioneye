@@ -43,6 +43,8 @@ pub struct AppState {
     pub tips: Arc<watch::Sender<Tips>>,
     /// The guide's saved data, kept by the exe (saved-state.rs).
     pub saved: Arc<crate::saved_state::SavedState>,
+    /// The game log and browser set in the guide's Settings (app-settings.rs).
+    pub settings: Arc<crate::app_settings::AppSettings>,
 }
 
 pub type Tips = std::collections::BTreeMap<String, String>;
@@ -204,11 +206,42 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
             post(pob_stats).layer(DefaultBodyLimit::max(32 * 1024 * 1024)),
         )
         .route("/api/data/{name}", get(web_data))
+        .route("/api/app", get(app_info))
+        .route("/api/settings", post(update_settings))
         .fallback(static_handler)
         .with_state(state);
 
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+/// The app's and the bundled PoB's versions, and the exe's settings, for the guide's footer
+/// and Settings page.
+async fn app_info(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if !local_origin(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    Json(serde_json::json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "pob": pob::version(),
+        "settings": state.settings.view(),
+    }))
+    .into_response()
+}
+
+/// A change from the guide's Settings page; answers the new settings, or why not.
+async fn update_settings(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(change): Json<crate::app_settings::Change>,
+) -> Response {
+    if !local_origin(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    match state.settings.update(change) {
+        Ok(()) => Json(state.settings.view()).into_response(),
+        Err(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
+    }
 }
 
 /// Lets a second copy of the exe tell this one apart from another program on the port.

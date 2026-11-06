@@ -21,7 +21,9 @@
 .sidebar {
   position: sticky;
   top: var(--sidebar-top);
-  max-height: calc(100vh - var(--sidebar-top) - var(--size-4));
+  max-height: calc(
+    100vh - var(--sidebar-top) - var(--size-4) - var(--footer-height)
+  );
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--size-2) var(--size-4) var(--size-4);
@@ -125,8 +127,10 @@
   .page {
     grid-template-rows: minmax(0, 1fr);
     max-width: 3200px;
-    /* The window less the app bar and #root's bottom padding (index.css). */
-    height: calc(100vh - var(--app-bar-height) - var(--size-2));
+    /* The window less the app bar, the footer and #root's bottom padding (index.css). */
+    height: calc(
+      100vh - var(--app-bar-height) - var(--size-2) - var(--footer-height)
+    );
     padding-bottom: var(--size-4);
   }
 

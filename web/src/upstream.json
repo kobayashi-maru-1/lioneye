@@ -1,0 +1,12 @@
+{
+  "exileLeveling": {
+    "repo": "HeartofPhos/exile-leveling",
+    "commit": "b7b2dd0ed62ae25cf55c74085fa64a1f4d7cf4ba",
+    "date": "2026-08-02"
+  },
+  "logApi": {
+    "repo": "HeartofPhos/exile-log-api",
+    "commit": "a0e75c0c8ef4c55cc29b29f5796d365be88157ce",
+    "date": "2026-07-23"
+  }
+}

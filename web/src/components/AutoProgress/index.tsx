@@ -13,7 +13,11 @@ import {
 import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
 import {
   migrateProfile,
+  fingerprint,
+  markSynced,
+  ownWindow,
   pageMode,
+  syncedFingerprint,
   restoreStorage,
   startedFresh,
   storageSnapshot,
@@ -106,7 +110,7 @@ export function useAutoProgress() {
   // Links out of the guide's own window (trade, wiki) open in your last-used Edge
   // profile, where you're signed in, through the exe.
   useEffect(() => {
-    if (!talks || pageMode !== "own") return;
+    if (!talks || !ownWindow) return;
     const onClick = (event: MouseEvent) => {
       if (event.defaultPrevented || (event.button !== 0 && event.button !== 1))
         return;
@@ -164,7 +168,8 @@ let uploaded = "";
 /**
  * The exe's copy of the guide's saved data arrived ("null" before anything was saved):
  * - a window opened to move an old profile's data sends what that profile has;
- * - the guide's own window, started with nothing stored, loads the copy and reloads.
+ * - a window the exe opened loads the copy and reloads when it started with nothing stored,
+ *   or when another browser saved it since this one last did (Settings picks the browser).
  */
 function takeSavedState(json: string, send: (message: string) => void) {
   if (pageMode === "migrate") {
@@ -184,7 +189,14 @@ function takeSavedState(json: string, send: (message: string) => void) {
   } catch {
     saved = null;
   }
-  if (startedFresh && saved !== null && Object.keys(saved).length > 0) {
+  const synced = syncedFingerprint();
+  // The own window from before fingerprints: its data is the copy's (it uploaded it).
+  const behind = synced === null ? !ownWindow : synced !== fingerprint(json);
+  if (
+    saved !== null &&
+    Object.keys(saved).length > 0 &&
+    (startedFresh || behind)
+  ) {
     try {
       restoreStorage(saved);
     } catch {
@@ -192,10 +204,12 @@ function takeSavedState(json: string, send: (message: string) => void) {
       localStorage.clear();
       return;
     }
+    markSynced(json);
     restoring = true;
     location.reload();
     return;
   }
+  if (saved !== null) markSynced(json);
   savedStateReady = true;
 }
 
@@ -208,6 +222,7 @@ function uploadSavedState(send: (message: string) => void) {
   if (snapshot === uploaded) return;
   uploaded = snapshot;
   send(`state:${snapshot}`);
+  markSynced(snapshot);
 }
 
 /**

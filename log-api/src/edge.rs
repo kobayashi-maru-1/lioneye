@@ -23,16 +23,22 @@ pub fn own_profile_dir(url: &str) -> PathBuf {
 
 /// The guide in its own profile: a borderless app window that remembers its place.
 /// "?own" tells the page it's this window (it keeps the exe's copy of its data current).
-pub fn open_own(url: &str) -> std::io::Result<()> {
-    spawn(
-        &msedge_or_default(),
-        &[
-            format!("--user-data-dir={}", own_profile_dir(url).display()),
-            "--no-first-run".into(),
-            "--no-default-browser-check".into(),
-            format!("--app={url}?own"),
-        ],
-    )
+/// `place`: where it was last (Edge saves an app window's place but doesn't restore it).
+pub fn open_own(url: &str, place: Option<crate::guide_window::Placement>) -> std::io::Result<()> {
+    let mut args = vec![
+        format!("--user-data-dir={}", own_profile_dir(url).display()),
+        "--no-first-run".into(),
+        "--no-default-browser-check".into(),
+    ];
+    if let Some(place) = place {
+        args.push(format!("--window-position={},{}", place.x, place.y));
+        args.push(format!("--window-size={},{}", place.width, place.height));
+        if place.maximized {
+            args.push("--start-maximized".into());
+        }
+    }
+    args.push(format!("--app={url}?own"));
+    spawn(&msedge_or_default(), &args)
 }
 
 /// The guide at `url` in one profile of an old setup's browser (guide-move.rs).

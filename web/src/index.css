@@ -40,6 +40,8 @@
   /* The bars above the page, fixed here: the guide's wide-layout columns set the two
      above to 0 so their pinned headers sit at the column top. */
   --app-bar-height: calc(var(--navbar-height) + var(--jumpbar-height));
+  /* The status line at the bottom (Footer): set when it shows, with the exe. */
+  --footer-height: 0px;
 }
 
 *,
@@ -97,7 +99,7 @@ hr {
   min-height: 100vh;
   padding-left: var(--size-2);
   padding-right: var(--size-2);
-  padding-bottom: var(--size-2);
+  padding-bottom: calc(var(--size-2) + var(--footer-height));
 }
 
 .inlineIcon {

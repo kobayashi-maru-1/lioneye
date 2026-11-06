@@ -6,12 +6,18 @@
 
 const params = new URLSearchParams(location.search);
 
-/** Which window this is, from the address the exe opened it with. */
+/**
+ * Which window this is, from the address the exe opened it with. "own": a window the exe
+ * opened, in whichever browser Settings picks; it keeps the exe's copy of the guide's data.
+ */
 export const pageMode: "own" | "migrate" | "other" = params.has("migrate")
   ? "migrate"
   : params.has("own")
     ? "own"
     : "other";
+
+/** The guide's own window ("?own"), not another browser picked in Settings ("?own=edge"). */
+export const ownWindow = params.get("own") === "";
 
 /** In a "migrate" window: the old profile it was opened in ("edge:Default"). */
 export const migrateProfile = params.get("migrate") ?? "";
@@ -38,23 +44,54 @@ export function takeReset() {
   }
 }
 
+/**
+ * The fingerprint of the exe's copy this browser last loaded or uploaded. Another browser
+ * (picked in Settings) may have saved since: then this one loads the exe's copy instead of
+ * sending its older data. Not part of the copy itself.
+ */
+const SYNCED_KEY = "exile-leveling-synced";
+
 /** Nothing was stored when the page started: a new profile, to fill from the exe's copy. */
 export const startedFresh = localStorage.length === 0;
+
+/** A short fingerprint of the copy as sent (FNV-1a). */
+export function fingerprint(json: string) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < json.length; i++) {
+    hash ^= json.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+/** The fingerprint this browser last synced, or null (none yet). */
+export function syncedFingerprint() {
+  return localStorage.getItem(SYNCED_KEY);
+}
+
+export function markSynced(json: string) {
+  try {
+    localStorage.setItem(SYNCED_KEY, fingerprint(json));
+  } catch {
+    // Storage full: the next start compares again.
+  }
+}
 
 /** Everything the guide has stored, as the exe keeps it: key → stored string. */
 export function storageSnapshot(): Record<string, string> {
   const snapshot: Record<string, string> = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key === null) continue;
+    if (key === null || key === SYNCED_KEY) continue;
     const value = localStorage.getItem(key);
     if (value !== null) snapshot[key] = value;
   }
   return snapshot;
 }
 
-/** Fills storage from the exe's copy. */
+/** Replaces storage with the exe's copy. */
 export function restoreStorage(snapshot: Record<string, string>) {
+  localStorage.clear();
   for (const [key, value] of Object.entries(snapshot))
     if (typeof value === "string") localStorage.setItem(key, value);
 }

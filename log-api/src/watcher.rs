@@ -46,9 +46,11 @@ impl Status {
 }
 
 /// Finds the PoE log, tails it, and broadcasts area, level and speech lines. Goes back to waiting
-/// when the game closes so a restart (and a fresh LatestClient.txt) is picked up.
+/// when the game closes so a restart (and a fresh LatestClient.txt) is picked up. `fixed` is
+/// the log set on the command line or in Settings (None: found from the running game); a
+/// change starts over with it.
 pub async fn run(
-    fixed_path: Option<PathBuf>,
+    mut fixed: watch::Receiver<Option<PathBuf>>,
     heart_beat: Duration,
     lines: broadcast::Sender<String>,
     status: watch::Sender<Status>,
@@ -61,16 +63,22 @@ pub async fn run(
         status.send_replace(Status::Waiting);
         info!("Waiting for the Path of Exile client...");
 
+        let fixed_path = fixed.borrow_and_update().clone();
         let log_path = loop {
+            if fixed.has_changed().unwrap_or(false) {
+                break None;
+            }
             let found = match &fixed_path {
                 Some(path) => path.try_exists().ok().filter(|x| *x).map(|_| path.clone()),
                 None => find_running_log(&mut sys),
             };
             if let Some(path) = found {
-                break path;
+                break Some(path);
             }
             interval.tick().await;
         };
+        // The setting changed while waiting: start over with it.
+        let Some(log_path) = log_path else { continue };
 
         info!("Log file: {}", log_path.display());
         status.send_replace(Status::Watching(log_path.clone()));
@@ -87,6 +95,10 @@ pub async fn run(
         let mut ticks: u32 = 0;
         loop {
             interval.tick().await;
+            if fixed.has_changed().unwrap_or(false) {
+                info!("Log setting changed");
+                break;
+            }
             if let Err(err) = reader.read_latest(|line| {
                 let _ = lines.send(line.to_string());
             }) {

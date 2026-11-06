@@ -144,6 +144,113 @@ pub fn close_all() {
     }
 }
 
+/// Where the guide window sits, so it reopens there: Edge saves an `--app` window's place
+/// but doesn't put it back, so the exe keeps it and passes it to Edge (edge::open_own).
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Placement {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub maximized: bool,
+}
+
+impl Placement {
+    /// False when its spot is on no connected monitor (a screen unplugged since).
+    pub fn on_screen(&self) -> bool {
+        use windows_sys::Win32::Foundation::RECT;
+        use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONULL, MonitorFromRect};
+        let rect = RECT {
+            left: self.x,
+            top: self.y,
+            right: self.x + self.width,
+            bottom: self.y + self.height,
+        };
+        self.width >= 200
+            && self.height >= 150
+            && !unsafe { MonitorFromRect(&rect, MONITOR_DEFAULTTONULL) }.is_null()
+    }
+}
+
+/// The open guide window's place; None when none is open or it's minimized.
+fn placement() -> Option<Placement> {
+    use windows_sys::Win32::Foundation::RECT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetWindowPlacement, GetWindowRect, IsZoomed, WINDOWPLACEMENT,
+    };
+    let &hwnd = find().first()?;
+    unsafe {
+        if IsIconic(hwnd) != 0 {
+            return None;
+        }
+        let maximized = IsZoomed(hwnd) != 0;
+        let rect = if maximized {
+            // The size it returns to. Work-area coordinates, the same as the screen's with
+            // the taskbar at the bottom (the usual place).
+            let mut wp: WINDOWPLACEMENT = std::mem::zeroed();
+            wp.length = std::mem::size_of::<WINDOWPLACEMENT>() as u32;
+            if GetWindowPlacement(hwnd, &mut wp) == 0 {
+                return None;
+            }
+            wp.rcNormalPosition
+        } else {
+            let mut rect: RECT = std::mem::zeroed();
+            if GetWindowRect(hwnd, &mut rect) == 0 {
+                return None;
+            }
+            rect
+        };
+        Some(Placement {
+            x: rect.left,
+            y: rect.top,
+            width: rect.right - rect.left,
+            height: rect.bottom - rect.top,
+            maximized,
+        })
+    }
+}
+
+/// Watches the guide window's place (from the tray loop) and keeps the last one on disk.
+pub struct PlacementKeeper {
+    path: std::path::PathBuf,
+    last: Option<Placement>,
+    checked: std::time::Instant,
+}
+
+impl PlacementKeeper {
+    pub fn load(path: std::path::PathBuf) -> Self {
+        let last = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|text| serde_json::from_str(&text).ok());
+        Self {
+            path,
+            last,
+            checked: std::time::Instant::now(),
+        }
+    }
+
+    /// The last place, when it's still on a connected monitor.
+    pub fn last(&self) -> Option<Placement> {
+        self.last.filter(Placement::on_screen)
+    }
+
+    /// Every 2 s: notes where the open window is, and saves it when it moved.
+    pub fn tick(&mut self) {
+        if self.checked.elapsed() < std::time::Duration::from_secs(2) {
+            return;
+        }
+        self.checked = std::time::Instant::now();
+        let Some(now) = placement() else { return };
+        if self.last == Some(now) || !now.on_screen() {
+            return;
+        }
+        self.last = Some(now);
+        if let Ok(text) = serde_json::to_string(&now) {
+            let _ = std::fs::write(&self.path, text);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::is_guide_title;

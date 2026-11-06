@@ -1,8 +1,10 @@
 import { useAtom, useSetAtom } from "jotai";
+import { AppSettingsForm } from "../../components/AppSettingsForm";
 import { BuildImportForm } from "../../components/BuildImportForm";
 import { BuildInfoForm } from "../../components/BuildInfoForm";
 import { ConfigForm } from "../../components/ConfigForm";
 import { GemEditForm } from "../../components/GemEditForm";
+import { Modal } from "../../components/Modal";
 import { OverlayForm } from "../../components/OverlayForm";
 import { STATS_AVAILABLE } from "../../components/PobStats";
 import { SearchStringsEditor } from "../../components/SearchStringsEditor";
@@ -14,7 +16,7 @@ import classNames from "classnames";
 import { RESET, useAtomCallback } from "jotai/utils";
 import { pobAtom } from "../../state/pob";
 import { routeSelector } from "../../state/route";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -23,6 +25,8 @@ export default function BuildContainer() {
   const [buildData, setBuildData] = useAtom(buildDataSelector);
   const [requiredGems, setRequiredGems] = useAtom(requiredGemsSelector);
   const setPob = useSetAtom(pobAtom);
+  // Reset wipes the build and route progress: asked first.
+  const [confirmReset, setConfirmReset] = useState(false);
 
   return (
     <div>
@@ -46,9 +50,7 @@ export default function BuildContainer() {
           onSubmit={(pobCode) => {
             setPob(pobCode);
           }}
-          onReset={() => {
-            setPob(RESET);
-          }}
+          onReset={() => setConfirmReset(true)}
         />
       </div>
       <hr />
@@ -63,19 +65,52 @@ export default function BuildContainer() {
           <hr />
         </>
       )}
-      {/* The in-game bar exists only with the exe. */}
+      {/* The in-game bar, the game log and the browser exist only with the exe. */}
       {STATS_AVAILABLE && (
         <>
           <OverlayForm />
           <hr />
+          <AppSettingsForm />
+          <hr />
         </>
       )}
       <RouteSettings />
+      <Modal
+        size="small"
+        isOpen={confirmReset}
+        onRequestClose={() => setConfirmReset(false)}
+        contentLabel="Reset progress?"
+      >
+        <div className={classNames(formStyles.form)}>
+          <div className={classNames(formStyles.formRow)}>
+            <label>Reset progress?</label>
+          </div>
+          <p>Clears the imported build and your route progress.</p>
+          <div className={classNames(formStyles.groupRight)}>
+            <button
+              className={classNames(formStyles.formButton)}
+              autoFocus
+              onClick={() => setConfirmReset(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className={classNames(formStyles.formButton)}
+              onClick={() => {
+                setConfirmReset(false);
+                setPob(RESET);
+              }}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
 
-/** What the old menu bar held: route editing, the third-party export, the project link. */
+/** Route editing and the export for other tools (the old menu bar's). */
 function RouteSettings() {
   const navigate = useNavigate();
   const exportRoute = useAtomCallback(
@@ -110,16 +145,6 @@ function RouteSettings() {
           onClick={() => exportRoute()}
         >
           Export
-        </button>
-        <button
-          className={classNames(formStyles.formButton)}
-          onClick={() =>
-            window
-              .open("https://github.com/HeartofPhos/exile-leveling", "_blank")
-              ?.focus()
-          }
-        >
-          Open GitHub
         </button>
       </div>
     </div>

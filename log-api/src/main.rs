@@ -7,6 +7,8 @@ use clap::{Parser, ValueEnum};
 use tokio::sync::{broadcast, watch};
 use tracing::{error, info, warn};
 
+#[path = "app-settings.rs"]
+mod app_settings;
 #[cfg(windows)]
 mod edge;
 #[cfg(windows)]
@@ -50,9 +52,45 @@ struct Args {
     /// Seconds between log reads
     #[arg(long, default_value_t = 1)]
     heart_beat: u64,
-    /// How to open the guide on start
-    #[arg(long, value_enum, default_value_t = Browser::App)]
-    browser: Browser,
+    /// How to open the guide. Left out: as set in Settings (else app)
+    #[arg(long, value_enum)]
+    browser: Option<Browser>,
+}
+
+impl Browser {
+    fn name(self) -> &'static str {
+        match self {
+            Browser::App => "app",
+            Browser::Edge => "edge",
+            Browser::Default => "default",
+            Browser::None => "none",
+        }
+    }
+
+    fn from_name(name: &str) -> Browser {
+        match name {
+            "edge" => Browser::Edge,
+            "default" => Browser::Default,
+            "none" => Browser::None,
+            _ => Browser::App,
+        }
+    }
+}
+
+/// The settings file for an address: one per port, like the saved data.
+fn settings_file(url: &str) -> PathBuf {
+    data_dir().join(match url.trim_end_matches('/').rsplit(':').next() {
+        Some("6754") | None => "settings.json".to_string(),
+        Some(port) => format!("settings-{port}.json"),
+    })
+}
+
+fn load_settings(args: &Args, url: &str) -> app_settings::AppSettings {
+    app_settings::AppSettings::load(
+        settings_file(url),
+        args.log_path.clone(),
+        args.browser.map(|b| b.name().to_string()),
+    )
 }
 
 fn main() -> ExitCode {
@@ -117,7 +155,11 @@ fn main() -> ExitCode {
         Some(port) => format!("state-{port}.json"),
     };
     let saved = std::sync::Arc::new(saved_state::SavedState::load(data_dir().join(state_file)));
+    // Settings from the guide's Settings page (game log, browser); the command line wins.
+    let settings = std::sync::Arc::new(load_settings(&args, &url));
+    let browser_now = Browser::from_name(&settings.browser.borrow());
     let state = server::AppState {
+        settings: settings.clone(),
         lines: lines_tx.clone(),
         status: status_rx.clone(),
         pob: pob::Engine::start(),
@@ -131,7 +173,7 @@ fn main() -> ExitCode {
     #[cfg(windows)]
     guide_move::clear_lock(&url);
     #[cfg(windows)]
-    let moving = (args.browser == Browser::App)
+    let moving = (browser_now == Browser::App)
         .then(|| guide_move::GuideMove::needed(&url, saved.exists()))
         .flatten()
         .map(|profiles| guide_move::GuideMove::start(&url, profiles));
@@ -145,18 +187,19 @@ fn main() -> ExitCode {
         open_requests: open_rx,
         moving,
         saved,
+        placement: guide_window::PlacementKeeper::load(placement_file(&url)),
     };
     #[cfg(not(windows))]
     let _ = (overlay_rx, open_rx, saved);
 
     // A guide window left open from an earlier run reconnects by itself; bring it up instead.
-    if opening && args.browser != Browser::None {
-        show_guide(args.browser, &url);
+    if opening && browser_now != Browser::None {
+        show_guide(browser_now, &url);
     }
 
     // Server and watcher run on the runtime's threads; the main thread runs the tray.
     let heart_beat = Duration::from_secs(args.heart_beat.max(1));
-    let log_path = args.log_path.clone();
+    let log_path = settings.log_path.subscribe();
     let (done_tx, done_rx) = std::sync::mpsc::channel::<Result<(), String>>();
     runtime.spawn(async move {
         let res = tokio::select! {
@@ -167,9 +210,9 @@ fn main() -> ExitCode {
     });
 
     #[cfg(windows)]
-    let code = wait(&args, &url, console, status_rx, done_rx, bar);
+    let code = wait(&url, console, status_rx, done_rx, bar, settings);
     #[cfg(not(windows))]
-    let code = wait(&args, &url, console, status_rx, done_rx);
+    let code = wait(&url, console, status_rx, done_rx);
     runtime.shutdown_timeout(Duration::from_secs(1));
     code
 }
@@ -182,6 +225,8 @@ struct Bar {
     /// The one-time move of the guide's data from your Edge profiles, while it runs.
     moving: Option<guide_move::GuideMove>,
     saved: std::sync::Arc<saved_state::SavedState>,
+    /// Where the guide window sits, so it reopens there.
+    placement: guide_window::PlacementKeeper,
 }
 
 /// `%LOCALAPPDATA%\exile-leveling` (or the temp folder): the log, caches and saved settings.
@@ -190,6 +235,15 @@ fn data_dir() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir)
         .join("exile-leveling")
+}
+
+/// Where the guide window was last, one per address like the saved data.
+#[cfg(windows)]
+fn placement_file(url: &str) -> PathBuf {
+    data_dir().join(match url.trim_end_matches('/').rsplit(':').next() {
+        Some("6754") | None => "guide-window.json".to_string(),
+        Some(port) => format!("guide-window-{port}.json"),
+    })
 }
 
 /// Binds the address. `Ok(None)` means another copy is already running and was brought up instead.
@@ -216,7 +270,8 @@ async fn listen(args: &Args) -> Result<Option<(tokio::net::TcpListener, String)>
         Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => {
             if already_running(local).await {
                 info!("Already running on {}, opening it", url);
-                show_guide(args.browser, &url);
+                let browser = Browser::from_name(&load_settings(args, &url).browser.borrow());
+                show_guide(browser, &url);
                 return Ok(None);
             }
             Err(format!(
@@ -234,15 +289,19 @@ async fn listen(args: &Args) -> Result<Option<(tokio::net::TcpListener, String)>
 /// Runs until Quit in the tray, or until the server or watcher stops.
 #[cfg(windows)]
 fn wait(
-    args: &Args,
     url: &str,
     console: bool,
     status: watch::Receiver<watcher::Status>,
     done: std::sync::mpsc::Receiver<Result<(), String>>,
     mut bar: Bar,
+    settings: std::sync::Arc<app_settings::AppSettings>,
 ) -> ExitCode {
-    // Open from the tray always shows a window, even with --browser none.
-    let browser = if args.browser == Browser::None { Browser::App } else { args.browser };
+    // As set now (Settings can change it). Open from the tray always shows a window, even
+    // with --browser none.
+    let browser = move || match Browser::from_name(&settings.browser.borrow()) {
+        Browser::None => Browser::App,
+        browser => browser,
+    };
     let (stopped_tx, stopped_rx) = std::sync::mpsc::channel::<()>();
     let (result_tx, result_rx) = std::sync::mpsc::channel::<Result<(), String>>();
     // Forward the server result so the tray loop wakes up when it stops.
@@ -260,7 +319,7 @@ fn wait(
         if let Some(moving) = &mut bar.moving {
             if moving.tick(&bar.saved) {
                 bar.moving = None;
-                open_browser(browser, url);
+                open_browser(browser(), url);
             }
             while bar.open_requests.try_recv().is_ok() {}
             bar.overlay.tick();
@@ -270,12 +329,13 @@ fn wait(
             && last_open.is_none_or(|t| t.elapsed() >= Duration::from_secs(5))
         {
             last_open = Some(std::time::Instant::now());
-            show_guide(browser, url);
+            show_guide(browser(), url);
         }
         while bar.open_requests.try_recv().is_ok() {}
         bar.overlay.tick();
+        bar.placement.tick();
     };
-    match tray::run(status, stopped_rx, || show_guide(browser, url), tick) {
+    match tray::run(status, stopped_rx, || show_guide(browser(), url), tick) {
         Ok(tray::Exit::Quit) => {
             // The guide is a separate Edge window; Quit closes it too (and drops the lock of
             // a move it stopped, which then runs again next start).
@@ -289,7 +349,7 @@ fn wait(
         },
         Err(err) => {
             // No tray (rare): keep serving until the server stops, as before.
-            warn!("Tray icon unavailable ({err}). End exile-leveling.exe in Task Manager to stop.");
+            warn!("Tray icon unavailable ({err}). End lioneye.exe in Task Manager to stop.");
             match result_rx.recv() {
                 Ok(Err(msg)) => fail(console, &msg),
                 _ => ExitCode::SUCCESS,
@@ -300,7 +360,6 @@ fn wait(
 
 #[cfg(not(windows))]
 fn wait(
-    _args: &Args,
     _url: &str,
     console: bool,
     _status: watch::Receiver<watcher::Status>,
@@ -463,12 +522,15 @@ fn open_browser(browser: Browser, url: &str) {
     let result = match browser {
         Browser::None => return,
         #[cfg(windows)]
-        Browser::App => edge::open_own(url),
+        Browser::App => edge::open_own(
+            url,
+            guide_window::PlacementKeeper::load(placement_file(url)).last(),
+        ),
         #[cfg(windows)]
-        Browser::Edge => edge::open_last_profile(url),
+        Browser::Edge => edge::open_last_profile(&format!("{url}?own=edge")),
         #[cfg(not(windows))]
-        Browser::App | Browser::Edge => spawn_default(url),
-        Browser::Default => spawn_default(url),
+        Browser::App | Browser::Edge => spawn_default(&format!("{url}?own=default")),
+        Browser::Default => spawn_default(&format!("{url}?own=default")),
     };
     if let Err(err) = result {
         warn!("Could not open the guide ({}). Open {} yourself.", err, url);

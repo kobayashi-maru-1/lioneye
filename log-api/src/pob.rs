@@ -226,7 +226,8 @@ fn message(err: &mlua::Error) -> String {
     first.strip_prefix("runtime error: ").unwrap_or(first).to_string()
 }
 
-fn version() -> &'static str {
+/// The bundled PoB release, e.g. "v2.67.2".
+pub fn version() -> &'static str {
     VERSION.trim()
 }
 

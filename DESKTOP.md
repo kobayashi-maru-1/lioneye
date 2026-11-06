@@ -15,17 +15,29 @@ Windows 10 and 11 PC, whichever browser you use).
    The log is at `%LOCALAPPDATA%\exile-leveling\exile-leveling.log`. Started from a terminal,
    it also prints there; the prompt returns right away, and Ctrl+C in that terminal quits it.
 2. The guide opens in its own Edge profile (`%LOCALAPPDATA%\exile-leveling\browser`), apart
-   from the profiles you browse with. Drag it to the monitor you want; it opens there next
-   time. After an update the open window reloads itself when the new exe starts.
+   from the profiles you browse with. Drag it to the monitor you want: the exe notes where it
+   is (`%LOCALAPPDATA%\exile-leveling\guide-window.json`) and reopens it there, at that size
+   (Edge saves an app window's place but doesn't put it back). After an update the open
+   window reloads itself when the new exe starts.
 3. Start Path of Exile. The pill at the top right of the panel turns green (**Auto**)
    once the game's log is found, and the route advances as you change zones.
 
 Running the exe again while it's already open brings its window to the front.
 
+**Settings** → **Game log** and **Browser** set the same as `--log-path` and `--browser`,
+saved in `%LOCALAPPDATA%\exile-leveling\settings.json`; the command line wins when given.
+A new game log applies at once; a new browser when the guide next opens. Whichever browser
+opens it, the guide loads the exe's copy of your data (below) when another browser saved it
+since, so switching never brings back old progress.
+
+The thin line at the bottom shows the app's version, the bundled Path of Building's, and
+the date of the exile-leveling route data merged in, with **Update** when GitHub has a
+newer release.
+
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--browser app\|edge\|default\|none` | `app` | How to open the guide on start: an Edge app window in the guide's own profile (`app`); an Edge app window in your last-used Edge profile, as before 0.3 (`edge`); a normal tab in your default browser (`default`); nothing (`none`) |
-| `--log-path <file>` | found from the game | Use this `Client.txt` / `LatestClient.txt` |
+| `--browser app\|edge\|default\|none` | Settings, else `app` | How to open the guide: an Edge app window in the guide's own profile (`app`); an Edge app window in your last-used Edge profile, as before 0.3 (`edge`); a normal tab in your default browser (`default`); nothing (`none`) |
+| `--log-path <file>` | Settings, else found from the game | Use this `Client.txt` / `LatestClient.txt` |
 | `--address <ip:port>` | `127.0.0.1:6754` | Where to serve. Keep the port the same: progress is saved per address |
 | `--heart-beat <secs>` | `1` | How often the log is read |
 
@@ -148,7 +160,7 @@ downloads it and skips the download when that release is already there. An exe k
 PoB it was built with: build again after a PoB release to pick it up.
 
 Build health is a port of PoB Redux's `sanity_check`. `log-api\redux-watch.ps1` says
-whether Redux changed it since the port (the Redux watch workflow runs it daily and fails
+whether Redux changed it since the port (the Watch workflow runs it daily and fails
 on a change); after porting, `.\log-api\redux-watch.ps1 -Update` records the new version.
 
 ```powershell
@@ -179,8 +191,13 @@ New league data (routes, gems, trees) comes from upstream:
 git fetch upstream
 git merge upstream/main
 git subtree pull --prefix=log-api upstream-log-api main
+.\upstream-watch.ps1 -Update   # records what was merged (the footer's route date)
 .\build.ps1
 ```
+
+`upstream-watch.ps1` (without `-Update`) says whether either upstream has changes not merged
+yet. The **Watch** workflow runs it and `log-api\redux-watch.ps1` daily and fails (GitHub
+emails you) when there's something to merge or port.
 
 After cloning, add the remotes once:
 

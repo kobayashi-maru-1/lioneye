@@ -1,0 +1,41 @@
+/* PoB Redux's thin status line, fixed to the bottom of the window. */
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--size-4);
+  height: var(--footer-height);
+  padding: 0 var(--size-4);
+  font-size: 0.72rem;
+  color: #8f8f8f;
+  background-color: var(--panel);
+  border-top: var(--border-width) solid var(--panel-border);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.footer a {
+  color: #8f8f8f;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--on-primary);
+  text-decoration: underline;
+}
+
+.update {
+  color: var(--gold) !important;
+  font-weight: var(--font-heavy);
+}
+
+/* GitHub and Credits at the right. */
+.links {
+  display: flex;
+  gap: var(--size-4);
+  margin-left: auto;
+}

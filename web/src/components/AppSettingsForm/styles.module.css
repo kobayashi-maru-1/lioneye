@@ -1,0 +1,24 @@
+/* A field and its button on one line. */
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2);
+}
+
+.path {
+  flex: 1;
+  min-width: 0;
+}
+
+.note {
+  margin-top: var(--size-1);
+  color: #8f8f8f;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.error {
+  margin-top: var(--size-1);
+  color: #ff6b6b;
+  font-size: 0.8rem;
+}
