@@ -32,6 +32,8 @@ pub struct OldProfile {
     profile: String,
     /// When its storage files last changed: asked in that order, newest first.
     changed: SystemTime,
+    /// The browser's last-used profile, where 0.1 and 0.2 opened the guide.
+    last_used: bool,
 }
 
 enum Phase {
@@ -170,8 +172,7 @@ impl GuideMove {
         }
     }
 
-    /// Keeps the best answer as the exe's copy (SavedState::rank: an imported build, then
-    /// the furthest along the route, then the most data). Nothing found leaves no copy (the
+    /// Keeps the best answer as the exe's copy. Nothing found leaves no copy (the
     /// own window starts fresh).
     fn finish(&self, saved: &SavedState) {
         let best = self
@@ -179,7 +180,12 @@ impl GuideMove {
             .iter()
             .filter_map(|p| saved.offer_from(&p.id).map(|json| (p, json)))
             .filter(|(_, json)| !SavedState::is_empty(json))
-            .max_by_key(|(_, json)| SavedState::rank(json));
+            // An imported build, then the browser's last-used profile (where the guide
+            // opened before), then the furthest along the route, then the most data.
+            .max_by_key(|(profile, json)| {
+                let (build, zone, size) = SavedState::rank(json);
+                (build, profile.last_used, zone, size)
+            });
         match best {
             Some((profile, json)) => {
                 info!("Moved the guide's data from {}", profile.id);
@@ -238,12 +244,14 @@ fn old_profiles(origin: &str) -> Vec<OldProfile> {
         ),
     ] {
         let Some(browser) = browser else { continue };
-        for profile in profile_dirs(&user_data) {
+        let (profiles, last_used) = profile_dirs(&user_data);
+        for profile in profiles {
             let storage = user_data.join(&profile).join(r"Local Storage\leveldb");
             if let Some(changed) = storage_changed(&storage, needle.as_bytes()) {
                 found.push(OldProfile {
                     id: format!("{name}:{profile}"),
                     browser: browser.clone(),
+                    last_used: last_used.as_deref() == Some(profile.as_str()),
                     profile,
                     changed,
                 });
@@ -254,16 +262,18 @@ fn old_profiles(origin: &str) -> Vec<OldProfile> {
     found
 }
 
-/// A browser's profile folders, from its Local State.
-fn profile_dirs(user_data: &Path) -> Vec<String> {
+/// A browser's profile folders, and its last-used one, from its Local State.
+fn profile_dirs(user_data: &Path) -> (Vec<String>, Option<String>) {
     let state: serde_json::Value = std::fs::read_to_string(user_data.join("Local State"))
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default();
-    state["profile"]["info_cache"]
+    let profiles = state["profile"]["info_cache"]
         .as_object()
         .map(|cache| cache.keys().cloned().collect())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    let last_used = state["profile"]["last_used"].as_str().map(str::to_string);
+    (profiles, last_used)
 }
 
 /// When a profile's storage files holding the guide's address last changed; None when
