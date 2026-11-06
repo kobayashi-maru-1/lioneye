@@ -66,6 +66,7 @@ export function BuildCodeForm({ onImport, onReset }: BuildCodeFormProps) {
       } else if (value === loaded) {
         // The same build: nothing to replace.
         setText("");
+        toast.info("Already loaded");
       } else if (code !== null) {
         setReplacing(value);
       } else {

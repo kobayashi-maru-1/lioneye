@@ -133,6 +133,17 @@ a:visited {
   border-radius: var(--border-radius);
 }
 
+/* The route editor: the whole window below the bar (less the footer), its editor growing. */
+.page-fill {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  height: calc(
+    100vh - var(--app-bar-height) - var(--size-4) - var(--size-2) -
+      var(--footer-height)
+  );
+}
+
 /* Thin, quiet scrollbars: they show there's more; the wheel does the scrolling. */
 .thin-scroll {
   scrollbar-width: thin;

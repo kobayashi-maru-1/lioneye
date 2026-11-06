@@ -64,7 +64,7 @@ export function App() {
                 <Page
                   title="Lioneye - Edit Route"
                   component={
-                    <div className="page-narrow">
+                    <div className="page-narrow page-fill">
                       <EditRouteContainer />
                     </div>
                   }

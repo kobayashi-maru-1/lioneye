@@ -10,6 +10,7 @@ import { STATS_AVAILABLE } from "../../components/PobStats";
 import { SearchStringsEditor } from "../../components/SearchStringsEditor";
 import {
   type SettingsTab as Tab,
+  gemListOpenAtom,
   settingsTabAtom,
 } from "../../state/settings-tab";
 import { buildDataSelector } from "../../state/build-data";
@@ -21,16 +22,19 @@ import classNames from "classnames";
 import { RESET, useAtomCallback } from "jotai/utils";
 import { pobAtom } from "../../state/pob";
 import { routeSelector } from "../../state/route";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-/** Build: your PoB and search strings. Route: what the campaign shows. App: the exe's own. */
+/**
+ * App: the exe's own (first, where Settings opens). Build: your PoB and search strings.
+ * Route: what the campaign shows.
+ */
 const TABS: { id: Tab; label: string }[] = [
-  { id: "build", label: "Build" },
-  { id: "route", label: "Route" },
   // The in-game bar, the game log and the browser exist only with the exe.
   ...(STATS_AVAILABLE ? [{ id: "app" as Tab, label: "App" }] : []),
+  { id: "build", label: "Build" },
+  { id: "route", label: "Route" },
 ];
 
 export default function BuildContainer() {
@@ -40,8 +44,15 @@ export default function BuildContainer() {
   const setPob = useSetAtom(pobAtom);
   // Reset wipes the build and route progress: asked first.
   const [confirmReset, setConfirmReset] = useState(false);
-  const [savedTab, setTab] = useAtom(settingsTabAtom);
-  const tab = TABS.some((t) => t.id === savedTab) ? savedTab : "build";
+  // Opens on the first tab, or the one a link asked for (once).
+  const [requested, setRequested] = useAtom(settingsTabAtom);
+  const [tab, setTab] = useState<Tab>(() =>
+    requested && TABS.some((t) => t.id === requested) ? requested : TABS[0].id,
+  );
+  useEffect(() => {
+    if (requested !== null) setRequested(null);
+  }, []);
+  const [gemsOpen, setGemsOpen] = useAtom(gemListOpenAtom);
 
   return (
     <div>
@@ -57,7 +68,7 @@ export default function BuildContainer() {
             id={`settings-tab-${id}`}
             aria-controls="settings-panel"
             aria-selected={tab === id}
-            className={classNames(formStyles.formButton, styles.tab, {
+            className={classNames(styles.tab, {
               [styles.active]: tab === id,
             })}
             onClick={() => setTab(id)}
@@ -105,8 +116,15 @@ export default function BuildContainer() {
             {requiredGems.length > 0 && (
               <>
                 <hr />
-                {/* Long: folded until you want to reorder or remove gems. */}
-                <details className={classNames(styles.gems)}>
+                {/* Long: open until you fold it, then as you left it. */}
+                <details
+                  className={classNames(styles.gems)}
+                  open={gemsOpen}
+                  onToggle={(event) => {
+                    const open = event.currentTarget.open;
+                    if (open !== gemsOpen) setGemsOpen(open);
+                  }}
+                >
                   <summary>Gems ({requiredGems.length})</summary>
                   <GemEditForm
                     requiredGems={requiredGems}

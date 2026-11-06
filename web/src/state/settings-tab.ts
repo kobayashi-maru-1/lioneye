@@ -1,10 +1,17 @@
 import { persistentAtom } from ".";
+import { atom } from "jotai";
 
-export type SettingsTab = "build" | "route" | "app";
+export type SettingsTab = "app" | "build" | "route";
 
-/** The Settings tab you were on, so Settings opens there again. */
-export const settingsTabAtom = persistentAtom<SettingsTab>(
-  "settings-tab",
-  "build",
+/**
+ * A tab a link asks Settings to open on (the guide's empty Import opens Build), used once.
+ * Otherwise Settings opens on its first tab.
+ */
+export const settingsTabAtom = atom<SettingsTab | null>(null);
+
+/** The Route tab's gem list: open until you fold it, then as you left it. */
+export const gemListOpenAtom = persistentAtom<boolean>(
+  "settings-gems-open",
+  true,
   0,
 );

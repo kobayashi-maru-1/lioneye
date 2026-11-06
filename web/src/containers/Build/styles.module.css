@@ -1,12 +1,31 @@
-/* Settings: Build, Route and App tabs. */
+/* Settings: App, Build and Route tabs, in the top bar's gold capitals. */
 .tabs {
   display: flex;
   gap: var(--size-2);
-  padding: var(--size-3) var(--size-3) 0;
+  padding: 0 var(--size-3);
+  border-bottom: var(--border-width) solid var(--panel-border);
+}
+
+.tab {
+  padding: var(--size-3) var(--size-3) var(--size-2);
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: var(--font-heavy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: calc(-1 * var(--border-width));
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: #c99550;
 }
 
 .tab.active {
-  border-color: var(--gold);
+  border-bottom-color: var(--gold);
 }
 
 /* The gem list, folded under its count. */
