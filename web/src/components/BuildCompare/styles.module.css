@@ -85,7 +85,7 @@
 
 .tag {
   display: inline-block;
-  min-width: 3.5rem;
+  min-width: 4rem;
   margin-right: var(--size-2);
   color: #8f8f8f;
   font-size: 0.85rem;
@@ -103,12 +103,12 @@
   flex-wrap: wrap;
   column-gap: var(--size-5);
   row-gap: var(--size-1);
-  padding-left: calc(3.5rem + var(--size-2));
+  padding-left: calc(4rem + var(--size-2));
   font-size: 0.9rem;
 }
 
 .note {
-  padding-left: calc(3.5rem + var(--size-2));
+  padding-left: calc(4rem + var(--size-2));
   color: #8f8f8f;
 }
 

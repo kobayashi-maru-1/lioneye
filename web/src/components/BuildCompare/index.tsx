@@ -48,7 +48,7 @@ const KIND_TITLES: Record<PassiveKind, string> = {
   Normal: "Small passives",
 };
 
-/** Your build, calculated by the exe's PoB, kept with the code it came from. */
+/** The pasted build (Build 1), calculated by the exe's PoB, kept with its code. */
 interface Yours {
   code: string;
   stats?: Stats;
@@ -56,8 +56,8 @@ interface Yours {
 }
 
 /**
- * pob.codes' "Compare my PoB": paste your character's PoB code or a build link, and see
- * what differs from the guide's shown loadout. Your build is calculated by the same PoB.
+ * pob.codes' "Compare my PoB": paste any build's PoB code or link (Build 1) and see
+ * what differs from the guide's shown loadout (Build 2). Both are calculated by the same PoB.
  */
 export function BuildCompare({ buttonClassName }: { buttonClassName: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -94,7 +94,7 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
       : undefined;
   const loadoutTitle = guide?.loadout ? stripPob(guide.loadout) : undefined;
 
-  // Your build's stats, for the saved code.
+  // The pasted build's stats, for the saved code.
   useEffect(() => {
     if (code === null) return;
     let xml: string;
@@ -164,8 +164,8 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
             className={classNames(formStyles.formInput, styles.code)}
             spellCheck={false}
             autoFocus
-            placeholder="Your PoB code or link"
-            aria-label="Your PoB code or link"
+            placeholder="PoB code or link"
+            aria-label="PoB code or link"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
           />
@@ -195,7 +195,7 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
           <div className={classNames(styles.builds)}>
             <div className={classNames(styles.buildList)}>
               <BuildRow
-                tag="You"
+                tag="Build 1"
                 stats={ready?.stats}
                 note={
                   ready?.error ??
@@ -203,7 +203,7 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
                 }
               />
               <BuildRow
-                tag="Guide"
+                tag="Build 2"
                 stats={guide ?? undefined}
                 loadout={loadoutTitle}
                 note={guideNote}
@@ -345,8 +345,8 @@ function StatsTable({ diffs }: { diffs: ReturnType<typeof statDiffs> }) {
       <thead>
         <tr>
           <th>Stat</th>
-          <th>You</th>
-          <th>Guide</th>
+          <th>Build 1</th>
+          <th>Build 2</th>
           <th>Diff</th>
         </tr>
       </thead>
@@ -379,8 +379,8 @@ function PassivesTable({ diffs }: { diffs: PassiveDiff[] }) {
       <thead>
         <tr>
           <th>Passive</th>
-          <th>You</th>
-          <th>Guide</th>
+          <th>Build 1</th>
+          <th>Build 2</th>
         </tr>
       </thead>
       {PASSIVE_KINDS.map((kind) => {
@@ -420,8 +420,8 @@ function SkillsTable({ diffs }: { diffs: ReturnType<typeof skillDiffs> }) {
       <thead>
         <tr>
           <th>Skill</th>
-          <th>You</th>
-          <th>Guide</th>
+          <th>Build 1</th>
+          <th>Build 2</th>
         </tr>
       </thead>
       <tbody>
@@ -477,8 +477,8 @@ function ItemsTable({ diffs }: { diffs: ItemDiff[] }) {
       <thead>
         <tr>
           <th>Slot</th>
-          <th>You</th>
-          <th>Guide</th>
+          <th>Build 1</th>
+          <th>Build 2</th>
         </tr>
       </thead>
       <tbody>

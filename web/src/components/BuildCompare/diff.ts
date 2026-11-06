@@ -8,7 +8,8 @@ import type {
 } from "../PobStats";
 import { stripPob } from "../PobText";
 
-// What differs between your build ("yours") and the guide's shown loadout ("guide").
+// What differs between the pasted build ("yours" here: Build 1) and the guide's shown loadout
+// ("guide": Build 2). The pasted build may be anyone's.
 
 /** A sidebar stat whose value differs. */
 export interface StatDiff {
@@ -53,7 +54,7 @@ export function leadingNumber(value: string | undefined) {
 export function statDiffs(yours: Stats, guide: Stats): StatDiff[] {
   const mine = statValues(yours.rows);
   const theirs = statValues(guide.rows);
-  // The guide's order, then stats only your build shows.
+  // The guide's order, then stats only the pasted build shows.
   const labels = [
     ...theirs.keys(),
     ...[...mine.keys()].filter((l) => !theirs.has(l)),
@@ -194,7 +195,7 @@ export interface SkillDiff {
   name: string;
   yours?: SkillGroup;
   guide?: SkillGroup;
-  /** Gems in the guide's group that yours lacks. */
+  /** Gems in the guide's group that the pasted build's lacks. */
   missing: string[];
   /** Gems in your group that the guide's lacks. */
   extra: string[];
