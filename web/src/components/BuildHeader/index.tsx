@@ -1,9 +1,22 @@
 import { characterLevelAtom } from "../../state/character-level";
+import { pobAtom } from "../../state/pob";
 import { PanelSelect } from "../PanelSelect";
 import { type Headline, usePobStats } from "../PobStats";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useAtomValue } from "jotai";
+import { FaRegClipboard } from "react-icons/fa";
+import { toast } from "react-toastify";
+
+/** The imported build's PoB code to the clipboard, as pob.codes' Copy does. */
+async function copyCode(code: string) {
+  try {
+    await navigator.clipboard.writeText(code);
+    toast.success("Code copied");
+  } catch {
+    toast.error("Copy failed. Try again.");
+  }
+}
 
 /** Whole numbers from 100 up, one decimal below, with thousands separators. */
 function format(value: number) {
@@ -20,6 +33,7 @@ export function BuildHeader() {
   const pob = usePobStats();
   // Your level from the game log; the title keeps the level PoB calculates at.
   const characterLevel = useAtomValue(characterLevelAtom);
+  const code = useAtomValue(pobAtom);
   if (pob === null || pob.stats === null) return null;
   const { titles, index, setIndex, error, loading } = pob;
   const headline = pob.stats.headline ?? {};
@@ -38,15 +52,27 @@ export function BuildHeader() {
             </span>
           )}
         </h1>
-        {titles.length > 0 && (
-          <PanelSelect
-            className={classNames(styles.loadout)}
-            label="Loadout"
-            options={titles}
-            value={index}
-            onChange={setIndex}
-          />
-        )}
+        <div className={classNames(styles.tools)}>
+          {code !== null && (
+            <button
+              className={classNames(styles.copy)}
+              title="Copy the PoB code"
+              onClick={() => copyCode(code)}
+            >
+              <FaRegClipboard aria-hidden />
+              Copy code
+            </button>
+          )}
+          {titles.length > 0 && (
+            <PanelSelect
+              className={classNames(styles.loadout)}
+              label="Loadout"
+              options={titles}
+              value={index}
+              onChange={setIndex}
+            />
+          )}
+        </div>
       </div>
       {/* Your level is from the log, so it shows even when PoB's numbers can't. */}
       {!numbersShown && characterLevel !== null && (
