@@ -19,6 +19,11 @@ interface SkillTreeViewerProps {
   urlTrees: UrlTree.Data[];
   /** Show this tree (by position) instead of following the act; the pager then hides. */
   selectedIndex?: number;
+  /**
+   * Compare with these nodes (your character's) instead of the loadout before: taken ones
+   * show as active, the loadout's others as added (to take), yours it lacks as removed.
+   */
+  against?: string[] | null;
 }
 
 interface RenderData {
@@ -33,6 +38,7 @@ interface RenderData {
 export function SkillTreeViewer({
   urlTrees,
   selectedIndex: chosenIndex,
+  against,
 }: SkillTreeViewerProps) {
   const svgDivRef = useRef<HTMLDivElement>(null);
   const titles = useMemo(() => urlTrees.map((x) => x.name), [urlTrees]);
@@ -52,7 +58,21 @@ export function SkillTreeViewer({
 
       const currentTree = urlTrees[curIndex];
       let previousTree: UrlTree.Data;
-      if (curIndex != 0) previousTree = urlTrees[curIndex - 1];
+      if (against) {
+        // Your character: its masteries count as the loadout's (the log doesn't say which).
+        const yours = new Set(against);
+        previousTree = {
+          name: currentTree.name,
+          version: currentTree.version,
+          ascendancy: currentTree.ascendancy,
+          nodes: against,
+          masteries: Object.fromEntries(
+            Object.entries(currentTree.masteries).filter(([node]) =>
+              yours.has(node),
+            ),
+          ),
+        };
+      } else if (curIndex != 0) previousTree = urlTrees[curIndex - 1];
       else {
         previousTree = {
           name: currentTree.name,
@@ -136,7 +156,7 @@ export function SkillTreeViewer({
     }
 
     fn();
-  }, [urlTrees, curIndex]);
+  }, [urlTrees, curIndex, against]);
 
   useEffect(() => {
     if (svgDivRef.current === null) return;

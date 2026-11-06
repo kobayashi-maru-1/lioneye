@@ -8,6 +8,10 @@ import { GemReward } from "../../components/ItemReward";
 import { jumpTargetsAtom } from "../../components/AppBar";
 import { settingsTabAtom } from "../../state/settings-tab";
 import {
+  characterNodesNowAtom,
+  treeCompareAtom,
+} from "../../state/character";
+import {
   PageSection,
   pageSectionId,
   usePageSectionCollapsed,
@@ -449,27 +453,52 @@ function ConfigPanel() {
   );
 }
 
+/** The Tree panel's Compare choices: the loadout before, or your character (from the log). */
+const TREE_COMPARE = [
+  { value: "previous", label: "Last loadout" },
+  { value: "character", label: "Character" },
+] as const;
+
 function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   const sets = useLoadoutSets();
   const titles = useMemo(() => urlTrees.map((tree) => tree.name), [urlTrees]);
   const [index, choose] = usePanelSet(titles, titleIndex(titles, sets?.tree));
+  // Your character's tree, once the exe has read it from the game's log.
+  const character = useAtomValue(characterNodesNowAtom);
+  const [compare, setCompare] = useAtom(treeCompareAtom);
+  const against =
+    compare === "character" && character ? character.nodes : null;
   return (
     <PageSection
       id="tree"
       title="Tree"
       bodyClassName={styles.treeBody}
       actions={
-        titles.length > 1 && (
-          <PanelSelect
-            label="Tree set"
-            options={titles}
-            value={index}
-            onChange={choose}
-          />
-        )
+        <>
+          {character && (
+            <PanelSelect
+              label="Compare"
+              options={TREE_COMPARE.map((option) => option.label)}
+              value={TREE_COMPARE.findIndex((o) => o.value === compare)}
+              onChange={(i) => setCompare(TREE_COMPARE[i].value)}
+            />
+          )}
+          {titles.length > 1 && (
+            <PanelSelect
+              label="Tree set"
+              options={titles}
+              value={index}
+              onChange={choose}
+            />
+          )}
+        </>
       }
     >
-      <p className={classNames(styles.hint)}>Ctrl+scroll zooms, drag pans</p>
+      <p className={classNames(styles.hint)}>
+        {against
+          ? `${character?.name}: green to take, red off the guide`
+          : "Ctrl+scroll zooms, drag pans"}
+      </p>
       {/* Plain scrolling moves the page; the tree zooms only with Ctrl held. */}
       <div
         className={classNames(styles.tree)}
@@ -477,7 +506,11 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
           if (!event.ctrlKey) event.stopPropagation();
         }}
       >
-        <SkillTreeViewer urlTrees={urlTrees} selectedIndex={index} />
+        <SkillTreeViewer
+          urlTrees={urlTrees}
+          selectedIndex={index}
+          against={against}
+        />
       </div>
     </PageSection>
   );

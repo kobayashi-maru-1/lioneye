@@ -1,6 +1,6 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { bossesKilledBy } from "../../state/boss-kills";
 import {
@@ -27,6 +27,11 @@ import {
 } from "../../state/saved-state";
 import { pageSectionId, useJumpToSection } from "../PageSection";
 import { autoProgressAtom } from "../../state/auto-progress";
+import {
+  characterLogAtom,
+  fetchCharacterLog,
+  isCharacterLine,
+} from "../../state/character";
 import { levelLineAtom } from "../../state/level-lines";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
 import classNames from "classnames";
@@ -40,6 +45,17 @@ export function useAutoProgress() {
   const takeLevelLine = useSetAtom(levelLineAtom);
   const bossKilled = useSetAtom(bossKillAtom);
   const setState = useSetAtom(autoProgressAtom);
+  // Your character, read back from the game's log by the exe: when the log is found, and
+  // after lines that change it (points taken, /passives, who is playing), batched.
+  const setCharacter = useSetAtom(characterLogAtom);
+  const characterTimer = useRef<number | undefined>(undefined);
+  const refreshCharacter = useCallback(() => {
+    window.clearTimeout(characterTimer.current);
+    characterTimer.current = window.setTimeout(
+      () => fetchCharacterLog().then(setCharacter),
+      1000,
+    );
+  }, [setCharacter]);
 
   const jump = useJumpFromGame();
 
@@ -79,6 +95,8 @@ export function useAutoProgress() {
         return;
       if (event.data.startsWith("status:")) {
         const [status, path] = event.data.slice("status:".length).split("|");
+        // The game's log found (again): read the character back from it.
+        if (status === "watching") refreshCharacter();
         setState(
           status === "watching"
             ? { kind: "watching", path: path ?? "" }
@@ -86,6 +104,7 @@ export function useAutoProgress() {
         );
         return;
       }
+      if (isCharacterLine(event.data)) refreshCharacter();
       // Level-ups set your level, boss death lines tick their step; zone changes move
       // the route.
       if (takeLevelLine(event.data)) return;

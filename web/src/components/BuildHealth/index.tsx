@@ -1,9 +1,14 @@
+import { buildDataSelector } from "../../state/build-data";
+import { characterLogAtom } from "../../state/character";
+import { currentActAtom } from "../../state/current-act";
 import { jumpTargetsAtom } from "../AppBar";
 import { PageSection, useJumpToSection } from "../PageSection";
 import { type HealthFinding, usePobStats } from "../PobStats";
 import styles from "./styles.module.css";
 import classNames from "classnames";
+import { Data } from "common";
 import { useAtomValue } from "jotai";
+import { useMemo } from "react";
 
 /** The panel each finding's link jumps to. */
 const PANELS: Record<string, string> = {
@@ -11,7 +16,38 @@ const PANELS: Record<string, string> = {
   tree: "Tree",
   gems: "Gems",
   config: "Config",
+  campaign: "Campaign",
 };
+
+/** Quests by the name "/passives" lists them under. */
+const QUESTS_BY_NAME = new Map(
+  Object.values(Data.Quests).map((quest) => [quest.name, quest]),
+);
+
+/**
+ * Passive quests your character left behind: in your latest "/passives" list with no
+ * point, from an act you've finished. The bandit quest only counts when you kill all three.
+ */
+function missedQuestPoints(
+  quests: [string, number][],
+  act: number | null,
+  bandit: string,
+): HealthFinding[] {
+  if (act === null) return [];
+  const missed: HealthFinding[] = [];
+  for (const [name, points] of quests) {
+    const quest = QUESTS_BY_NAME.get(name);
+    if (points > 0 || quest === undefined || Number(quest.act) >= act) continue;
+    if (name === "Deal with the Bandits" && bandit !== "None") continue;
+    missed.push({
+      severity: "medium",
+      message: `Missed quest point: ${name}`,
+      fix: `Act ${quest.act}. Go back and finish it.`,
+      panel: "campaign",
+    });
+  }
+  return missed;
+}
 
 /**
  * PoB Redux's Build Health for the shown loadout: what to look at, with Redux's own rules
@@ -25,7 +61,20 @@ export function BuildHealthPanel() {
   const targets = useAtomValue(jumpTargetsAtom);
   const present = new Set(targets.map((target) => target.id));
   // Never the old loadout's findings under the new loadout's name.
-  const health = stats !== null && !pob?.error ? stats.health : null;
+  const pobHealth = stats !== null && !pob?.error ? stats.health : null;
+  // Missed quest points from your character's "/passives" list, read from the game's log.
+  const character = useAtomValue(characterLogAtom);
+  const act = useAtomValue(currentActAtom);
+  const bandit = useAtomValue(buildDataSelector).bandit;
+  const missed = useMemo(
+    () =>
+      character?.quests ? missedQuestPoints(character.quests, act, bandit) : [],
+    [character?.quests, act, bandit],
+  );
+  const health =
+    pobHealth === null && missed.length === 0
+      ? null
+      : [...missed, ...(pobHealth ?? [])];
 
   return (
     <PageSection
@@ -61,6 +110,11 @@ export function BuildHealthPanel() {
             ))}
           </ul>
         )
+      )}
+      {character && !character.quests && (
+        <p className={classNames(styles.note)}>
+          Type /passives in game to check quest points.
+        </p>
       )}
     </PageSection>
   );

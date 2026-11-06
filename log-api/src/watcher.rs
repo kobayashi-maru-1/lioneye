@@ -24,7 +24,21 @@ const SPEECH_PATTERN: &str =
     r"\] (?:Sin|Piety|Gravicius|Dominus|Malachai|Maligaro, the Inquisitor): ";
 /// `] : You have been permanently weakened by Kitava's ...` — Kitava's death, a system line.
 const KITAVA_PATTERN: &str = r"\] : You have been permanently weakened by Kitava";
-const PATTERNS: [&str; 4] = [AREA_PATTERN, LEVEL_PATTERN, SPEECH_PATTERN, KITAVA_PATTERN];
+/// `] Successfully allocated passive skill id: dexterity869, name: Dexterity` — your tree.
+const ALLOCATED_PATTERN: &str = r"] Successfully allocated passive skill id: ";
+/// `/passives` in game: `] : 22 Passive Skill Points from quests:` then `] : (1 from <quest>)`.
+const QUESTS_PATTERN: &str = r"] : (?:d+ Passive Skill Points from quests:|(d+ from [^)]+)$)";
+/// `] : KobayashiSRS has been slain.` — tells which character is playing (deaths).
+const SLAIN_PATTERN: &str = r"] : S+ has been slain.$";
+const PATTERNS: [&str; 7] = [
+    AREA_PATTERN,
+    LEVEL_PATTERN,
+    SPEECH_PATTERN,
+    KITAVA_PATTERN,
+    ALLOCATED_PATTERN,
+    QUESTS_PATTERN,
+    SLAIN_PATTERN,
+];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -211,5 +225,10 @@ mod tests {
             " : You have been permanently weakened by Kitava's cruel affliction. You now have -30% to all Resistances."
         ));
         assert!(!forwarded(" : You have entered The Coast."));
+        assert!(forwarded(" Successfully allocated passive skill id: dexterity869, name: Dexterity"));
+        assert!(forwarded(" : 22 Passive Skill Points from quests:"));
+        assert!(forwarded(" : (0 from The Dweller of the Deep)"));
+        assert!(forwarded(" : KobayashiSRS has been slain."));
+        assert!(!forwarded(" #Bob: (1 from chat)"));
     }
 }

@@ -108,6 +108,12 @@ once in **Settings** (the ⚙ at the top right).
   resistances, passive and ascendancy points, main skill links, skills to press, flasks,
   pantheon, skill costs, life, movement speed, attribute requirements, gem errors and
   reduced-requirement affixes. Like Redux, it uses the build's level from PoB.
+- Your character, from the game's log: the exe reads back the latest character's passive
+  points (every "Successfully allocated passive skill" line since its level 2, while it was
+  the one playing; refunds aren't logged) and its latest `/passives` list. Node ids map to
+  the tree through RePoE's passive data. **Tree** → **Compare** → **Character** shows the
+  loadout against your tree (green: to take; red: not in the guide). Type `/passives` in
+  game and **Build health** lists quest points missed in finished acts.
 - Hover an item or gem for its in-game tooltip, with its buttons underneath; click it to pin
   the tooltip and use them: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
   **W** (the wiki) and **Trade**. Escape, a click elsewhere or a second click unpins it.

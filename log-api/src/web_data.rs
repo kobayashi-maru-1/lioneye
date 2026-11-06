@@ -1,7 +1,7 @@
 //! Public game data the Gear panel needs, fetched for the guide (the page can't call
 //! these sites itself) and cached on disk: the trade site's leagues, stat list and item
-//! list (for Trade buttons), poe.ninja's item lists (unique art) and RePoE's base item
-//! list (base art).
+//! list (for Trade buttons), poe.ninja's item lists (unique art), RePoE's base item
+//! list (base art) and RePoE's passive tree (the game log's node ids, for the Tree panel).
 
 use std::{
     fs,
@@ -34,6 +34,9 @@ pub enum Source {
     TradeItems,
     /// RePoE's base item list: each base's art path on GGG's image server.
     RepoeBases,
+    /// RePoE's passive tree, kept as id → node: the game log names a node by its id
+    /// ("dexterity869"), the tree and PoB by its number (13009).
+    RepoePassives,
     Ninja { league: String, kind: String },
 }
 
@@ -45,6 +48,7 @@ impl Source {
             "trade-stats" => Some(Source::TradeStats),
             "trade-items" => Some(Source::TradeItems),
             "repoe-bases" => Some(Source::RepoeBases),
+            "repoe-passives" => Some(Source::RepoePassives),
             "ninja" => {
                 let league = league.filter(|l| is_league(l))?;
                 let kind = kind.filter(|k| NINJA_TYPES.contains(k))?;
@@ -63,6 +67,9 @@ impl Source {
             Source::TradeStats => "https://www.pathofexile.com/api/trade/data/stats".into(),
             Source::TradeItems => "https://www.pathofexile.com/api/trade/data/items".into(),
             Source::RepoeBases => "https://repoe-fork.github.io/base_items.json".into(),
+            Source::RepoePassives => {
+                "https://repoe-fork.github.io/passive_skill_trees/Default.json".into()
+            }
             Source::Ninja { league, kind } => format!(
                 "https://poe.ninja/poe1/api/economy/stash/current/item/overview?league={}&type={kind}",
                 league.replace(' ', "%20")
@@ -76,6 +83,7 @@ impl Source {
             Source::TradeStats => "trade-stats.json".into(),
             Source::TradeItems => "trade-items.json".into(),
             Source::RepoeBases => "repoe-bases.json".into(),
+            Source::RepoePassives => "repoe-passives.json".into(),
             Source::Ninja { league, kind } => {
                 format!("ninja-{}-{kind}.json", league.replace(' ', "+"))
             }
@@ -149,9 +157,16 @@ fn fetch_blocking(source: &Source) -> Result<Vec<u8>, String> {
     let downloaded = match curl.output() {
         // Only valid JSON replaces the cache (an error page would be served for 12 hours).
         Ok(out) if out.status.success() => {
-            let valid = fs::read(&partial).is_ok_and(|bytes| {
-                serde_json::from_slice::<serde::de::IgnoredAny>(&bytes).is_ok()
-            });
+            let valid = match source {
+                // 2 MB of tree for a 70 KB lookup: kept trimmed.
+                Source::RepoePassives => fs::read(&partial)
+                    .ok()
+                    .and_then(|bytes| passive_ids(&bytes))
+                    .is_some_and(|ids| fs::write(&partial, ids).is_ok()),
+                _ => fs::read(&partial).is_ok_and(|bytes| {
+                    serde_json::from_slice::<serde::de::IgnoredAny>(&bytes).is_ok()
+                }),
+            };
             if !valid {
                 warn!("{url} didn't return JSON");
             }
@@ -175,6 +190,17 @@ fn fetch_blocking(source: &Source) -> Result<Vec<u8>, String> {
     fs::read(&path).map_err(|_| "Download failed. Check your connection.".to_string())
 }
 
+/// RePoE's tree as {"dexterity869": 13009, ...}: each passive's id and its node number.
+fn passive_ids(tree: &[u8]) -> Option<Vec<u8>> {
+    let tree: serde_json::Value = serde_json::from_slice(tree).ok()?;
+    let passives = tree.get("passives")?.as_object()?;
+    let ids: serde_json::Map<String, serde_json::Value> = passives
+        .values()
+        .filter_map(|p| Some((p.get("id")?.as_str()?.to_string(), p.get("hash")?.clone())))
+        .collect();
+    (!ids.is_empty()).then(|| serde_json::to_vec(&ids).ok()).flatten()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,10 +209,19 @@ mod tests {
     fn only_known_sources_and_safe_leagues() {
         assert!(Source::parse("trade-stats", None, None).is_some());
         assert!(Source::parse("repoe-bases", None, None).is_some());
+        assert!(Source::parse("repoe-passives", None, None).is_some());
         assert!(Source::parse("ninja", Some("Hardcore Mirage"), Some("BaseType")).is_some());
         assert!(Source::parse("ninja", Some("Mirage&x=1"), Some("BaseType")).is_none());
         assert!(Source::parse("ninja", Some("Mirage"), Some("Currency")).is_none());
         assert!(Source::parse("ninja", None, Some("BaseType")).is_none());
         assert!(Source::parse("anything", None, None).is_none());
+    }
+
+    #[test]
+    fn keeps_passive_ids_only() {
+        let tree = br#"{"passives":{"13009":{"id":"dexterity869","hash":13009,"name":"Dexterity"},"x":{"name":"no id"}}}"#;
+        let ids: serde_json::Value = serde_json::from_slice(&passive_ids(tree).unwrap()).unwrap();
+        assert_eq!(ids, serde_json::json!({"dexterity869": 13009}));
+        assert!(passive_ids(b"{}").is_none());
     }
 }

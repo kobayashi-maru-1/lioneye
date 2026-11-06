@@ -83,3 +83,10 @@
 .link:hover {
   text-decoration: underline;
 }
+
+/* What to do to get more checks (/passives). */
+.note {
+  margin: var(--size-2) 0 0;
+  color: #8f8f8f;
+  font-size: 0.85rem;
+}

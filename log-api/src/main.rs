@@ -9,6 +9,8 @@ use tracing::{error, info, warn};
 
 #[path = "app-settings.rs"]
 mod app_settings;
+#[path = "character-log.rs"]
+mod character_log;
 #[cfg(windows)]
 mod edge;
 #[cfg(windows)]

@@ -207,6 +207,7 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
         )
         .route("/api/data/{name}", get(web_data))
         .route("/api/app", get(app_info))
+        .route("/api/character", get(character))
         .route("/api/settings", post(update_settings))
         .fallback(static_handler)
         .with_state(state);
@@ -229,6 +230,24 @@ async fn app_info(State(state): State<AppState>, headers: HeaderMap) -> Response
         "settings": state.settings.view(),
     }))
     .into_response()
+}
+
+/// Your character's passive points and quest points, read back from the game's log
+/// (character-log.rs); null before the game's log is found or when it names no character.
+async fn character(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if !local_origin(&headers) || !local_host(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let path = match &*state.status.borrow() {
+        Status::Watching(path) => path.clone(),
+        Status::Waiting => return Json(serde_json::Value::Null).into_response(),
+    };
+    match tokio::task::spawn_blocking(move || crate::character_log::scan(&path)).await {
+        Ok(Ok(Some(log))) => Json(log).into_response(),
+        Ok(Ok(None)) => Json(serde_json::Value::Null).into_response(),
+        Ok(Err(err)) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Log not read: {err}")).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 }
 
 /// A change from the guide's Settings page; answers the new settings, or why not.
