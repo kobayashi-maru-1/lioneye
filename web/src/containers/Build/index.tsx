@@ -8,10 +8,12 @@ import { Modal } from "../../components/Modal";
 import { OverlayForm } from "../../components/OverlayForm";
 import { STATS_AVAILABLE } from "../../components/PobStats";
 import { SearchStringsEditor } from "../../components/SearchStringsEditor";
+import { persistentAtom } from "../../state";
 import { buildDataSelector } from "../../state/build-data";
 import { configSelector } from "../../state/config";
 import { requiredGemsSelector } from "../../state/gem";
 import { formStyles } from "../../styles";
+import styles from "./styles.module.css";
 import classNames from "classnames";
 import { RESET, useAtomCallback } from "jotai/utils";
 import { pobAtom } from "../../state/pob";
@@ -20,6 +22,19 @@ import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
+type Tab = "build" | "route" | "app";
+
+/** Build: your PoB and search strings. Route: what the campaign shows. App: the exe's own. */
+const TABS: { id: Tab; label: string }[] = [
+  { id: "build", label: "Build" },
+  { id: "route", label: "Route" },
+  // The in-game bar, the game log and the browser exist only with the exe.
+  ...(STATS_AVAILABLE ? [{ id: "app" as Tab, label: "App" }] : []),
+];
+
+/** The tab you were on, so Settings opens there again. */
+const settingsTabAtom = persistentAtom<Tab>("settings-tab", "build", 0);
+
 export default function BuildContainer() {
   const [config, setConfig] = useAtom(configSelector);
   const [buildData, setBuildData] = useAtom(buildDataSelector);
@@ -27,54 +42,86 @@ export default function BuildContainer() {
   const setPob = useSetAtom(pobAtom);
   // Reset wipes the build and route progress: asked first.
   const [confirmReset, setConfirmReset] = useState(false);
+  const [savedTab, setTab] = useAtom(settingsTabAtom);
+  const tab = TABS.some((t) => t.id === savedTab) ? savedTab : "build";
 
   return (
     <div>
-      <BuildInfoForm
-        buildData={buildData}
-        onSubmit={(buildData) => {
-          setBuildData(buildData);
-        }}
-      />
-      <hr />
-      <ConfigForm
-        config={config}
-        onSubmit={(config) => {
-          setConfig(config);
-        }}
-      />
-      <hr />
-      <div className={classNames(formStyles.form)}>
-        <SearchStringsEditor />
-        <BuildImportForm
-          onSubmit={(pobCode) => {
-            setPob(pobCode);
-          }}
-          onReset={() => setConfirmReset(true)}
-        />
+      <div className={classNames(styles.tabs)} role="tablist">
+        {TABS.map(({ id, label }) => (
+          <button
+            key={id}
+            role="tab"
+            id={`settings-tab-${id}`}
+            aria-controls="settings-panel"
+            aria-selected={tab === id}
+            className={classNames(formStyles.formButton, styles.tab, {
+              [styles.active]: tab === id,
+            })}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-      <hr />
-      {requiredGems.length > 0 && (
-        <>
-          <GemEditForm
-            requiredGems={requiredGems}
-            onUpdate={(requiredGems) => {
-              setRequiredGems(requiredGems);
-            }}
-          />
-          <hr />
-        </>
-      )}
-      {/* The in-game bar, the game log and the browser exist only with the exe. */}
-      {STATS_AVAILABLE && (
-        <>
-          <OverlayForm />
-          <hr />
-          <AppSettingsForm />
-          <hr />
-        </>
-      )}
-      <RouteSettings />
+      <div
+        id="settings-panel"
+        role="tabpanel"
+        aria-labelledby={`settings-tab-${tab}`}
+      >
+        {tab === "build" && (
+          <div className={classNames(formStyles.form)}>
+            <BuildImportForm
+              onSubmit={(pobCode) => {
+                setPob(pobCode);
+              }}
+              onReset={() => setConfirmReset(true)}
+            />
+            <SearchStringsEditor />
+          </div>
+        )}
+        {tab === "route" && (
+          <>
+            <RouteActions />
+            <hr />
+            <BuildInfoForm
+              buildData={buildData}
+              onSubmit={(buildData) => {
+                setBuildData(buildData);
+              }}
+            />
+            <hr />
+            <ConfigForm
+              config={config}
+              onSubmit={(config) => {
+                setConfig(config);
+              }}
+            />
+            {requiredGems.length > 0 && (
+              <>
+                <hr />
+                {/* Long: folded until you want to reorder or remove gems. */}
+                <details className={classNames(styles.gems)}>
+                  <summary>Gems ({requiredGems.length})</summary>
+                  <GemEditForm
+                    requiredGems={requiredGems}
+                    onUpdate={(requiredGems) => {
+                      setRequiredGems(requiredGems);
+                    }}
+                  />
+                </details>
+              </>
+            )}
+          </>
+        )}
+        {tab === "app" && (
+          <>
+            <OverlayForm />
+            <hr />
+            <AppSettingsForm />
+          </>
+        )}
+      </div>
       <Modal
         size="small"
         isOpen={confirmReset}
@@ -111,7 +158,7 @@ export default function BuildContainer() {
 }
 
 /** Route editing and the export for other tools (the old menu bar's). */
-function RouteSettings() {
+function RouteActions() {
   const navigate = useNavigate();
   const exportRoute = useAtomCallback(
     useCallback(async (get) => {
@@ -129,9 +176,6 @@ function RouteSettings() {
 
   return (
     <div className={classNames(formStyles.form)}>
-      <div className={classNames(formStyles.formRow)}>
-        <label>Route</label>
-      </div>
       <div className={classNames(formStyles.groupLeft)}>
         <button
           className={classNames(formStyles.formButton)}

@@ -1,0 +1,28 @@
+/* Settings: Build, Route and App tabs. */
+.tabs {
+  display: flex;
+  gap: var(--size-2);
+  padding: var(--size-3) var(--size-3) 0;
+}
+
+.tab.active {
+  border-color: var(--gold);
+}
+
+/* The gem list, folded under its count. */
+.gems {
+  padding: var(--size-3);
+}
+
+.gems > summary {
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: var(--font-heavy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.gems[open] > summary {
+  margin-bottom: var(--size-3);
+}
