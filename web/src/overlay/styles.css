@@ -28,9 +28,13 @@ body {
   width: max-content;
 }
 
-/* Bar in the lower half of the screen: the tooltip opens above it. */
+/* Bar in the lower half of the screen: the tooltip opens above it. Pinned to the window's
+   bottom, so the bar stays put on screen while the window grows or shrinks upwards. */
 .frame.up {
   flex-direction: column-reverse;
+  position: fixed;
+  bottom: 0;
+  left: 0;
 }
 
 /* The Gems panel's links, small: what to socket, at a glance. */

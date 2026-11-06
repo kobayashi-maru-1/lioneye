@@ -88,7 +88,7 @@ export function useAutoProgress() {
   // The Gems panel's set, for the bar's Gems tooltip.
   const gems = useAtomValue(overlayGemsAtom);
   useEffect(() => {
-    if (readyState === ReadyState.OPEN)
+    if (readyState === ReadyState.OPEN && gems !== undefined)
       sendMessage(`gems:${JSON.stringify(gems)}`);
   }, [readyState, gems]);
 }

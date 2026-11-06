@@ -227,6 +227,11 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
     setShownPanels(targets.map((target) => target.id));
   }, [targets]);
   useEffect(() => () => setTargets([]), []);
+  // No gem links, so no Gems panel to set the bar's Gems tooltip: clear the last build's.
+  const setOverlayGems = useSetAtom(overlayGemsAtom);
+  useEffect(() => {
+    if (gemLinks.length === 0) setOverlayGems(null);
+  }, [gemLinks.length === 0]);
 
   // Wide screens: a column whose panels are all folded gives its width to the other.
   const campaignFolded = usePageSectionCollapsed("campaign");

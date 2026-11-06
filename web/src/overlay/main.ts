@@ -82,7 +82,20 @@ function el(tag: string, className: string, ...children: (Node | string)[]) {
 }
 
 function renderTip() {
-  if (gems === null || gems.groups.length === 0) {
+  try {
+    renderGems();
+  } catch {
+    // Not a gem set (a malformed message): say so rather than never opening.
+    tip.replaceChildren(el("div", "tipEmpty", "No gems"));
+  }
+}
+
+function renderGems() {
+  if (
+    gems === null ||
+    !Array.isArray(gems.groups) ||
+    gems.groups.length === 0
+  ) {
     tip.replaceChildren(el("div", "tipEmpty", "No gems"));
     return;
   }
@@ -112,10 +125,17 @@ function renderTip() {
 }
 
 function openTip() {
+  // Already open (back on Gems from the tooltip): the window holds the tooltip too, so
+  // working out the side again would move the bar.
+  if (!tip.hidden) {
+    renderTip();
+    return;
+  }
   // Above the bar when it sits in the lower half of its screen, so it stays on screen.
   const screenTop = (screen as Screen & { availTop?: number }).availTop ?? 0;
-  up =
-    window.screenY + bar.offsetHeight / 2 > screenTop + screen.availHeight / 2;
+  const barMiddle =
+    window.screenY + bar.getBoundingClientRect().top + bar.offsetHeight / 2;
+  up = barMiddle > screenTop + screen.availHeight / 2;
   frame.classList.toggle("up", up);
   renderTip();
   tip.hidden = false;

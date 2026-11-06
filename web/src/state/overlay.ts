@@ -49,5 +49,9 @@ export interface OverlayGems {
   groups: { label?: string; gems: OverlayGem[] }[];
 }
 
-/** Set by the Gems panel; null without gem links. Sent to the exe for the bar. */
-export const overlayGemsAtom = atom<OverlayGems | null>(null);
+/**
+ * Set by the Gems panel and sent to the exe for the bar; null when the build has no gem
+ * links. Undefined until the Gems panel has shown (a guide opened on Settings), so that
+ * page doesn't clear the set another guide page sent.
+ */
+export const overlayGemsAtom = atom<OverlayGems | null | undefined>(undefined);
