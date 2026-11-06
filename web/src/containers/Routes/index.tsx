@@ -254,8 +254,8 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
       >
         {showStats && (
           <aside className={classNames(styles.sidebar, "thin-scroll")}>
-            <BuildHealth />
             <StatsViewer />
+            <BuildHealth />
           </aside>
         )}
         <div className={classNames(styles.main)}>

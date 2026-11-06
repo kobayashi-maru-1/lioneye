@@ -24,7 +24,12 @@ export type StatRow =
   { gap: true } | { text: string } | { label: string; value: string };
 
 export type ConfigRow =
-  { section: string } | { label: string; value: string; check?: boolean };
+  | { section: string }
+  | { label: string; value: string; check?: boolean }
+  /** A Custom Modifiers group's title, when there's more than one group. */
+  | { group: string }
+  /** A Custom Modifiers line as typed; `off`: PoB doesn't apply it. */
+  | { mod: string; off?: boolean };
 
 /** Every set in the build, and which of each the shown loadout uses (from 1). */
 export interface SetLists {

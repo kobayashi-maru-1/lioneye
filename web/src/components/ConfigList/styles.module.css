@@ -43,3 +43,22 @@
 .empty {
   margin: 0;
 }
+
+/* Custom Modifiers: one mod per line, as typed in PoB. */
+.mod {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* A line PoB doesn't apply. */
+.skipped {
+  color: #8f8f8f;
+}
+
+.group {
+  margin-top: var(--size-2);
+  color: var(--gold);
+  font-size: 0.82rem;
+  font-weight: var(--font-heavy);
+}

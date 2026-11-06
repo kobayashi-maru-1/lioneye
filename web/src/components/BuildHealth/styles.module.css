@@ -1,6 +1,6 @@
-/* PoB Redux's Build Health and Defenses cards, at the top of the stats column. */
+/* PoB Redux's Build Health and Defenses cards, under the stats. */
 .card {
-  margin-bottom: var(--size-3);
+  margin-top: var(--size-3);
   border: var(--border-width) solid var(--panel-border);
   border-radius: var(--border-radius);
 }

@@ -527,6 +527,36 @@ local function configRows(configSet)
 			end
 		end
 	end
+	-- Custom Modifiers: each mod group's lines as typed, `off` where PoB doesn't apply the
+	-- line (it can't read it, e.g. a "#" note, or its group is turned off). Groups get
+	-- titles only when there's more than one.
+	local blocks = configSet.customModsList or {}
+	if #blocks == 0 and configSet.input.customMods then
+		blocks = { { title = "Default", enabled = true, text = configSet.input.customMods } }
+	end
+	local started = false
+	for _, block in ipairs(blocks) do
+		local text = block.text or ""
+		if text:match("%S") then
+			if not started then
+				out[#out + 1] = { section = "Custom Modifiers" }
+				started = true
+			end
+			if #blocks > 1 or block.enabled == false then
+				out[#out + 1] = {
+					group = (block.title or "Group") .. (block.enabled == false and " (off)" or ""),
+				}
+			end
+			for line in text:gmatch("[^\r\n]+") do
+				if line:match("%S") then
+					-- As PoB's ConfigTab:BuildModList reads it.
+					local mods, extra = modLib.parseMod(StripEscapes(line):match("^%s*(.-)%s*$"))
+					local applied = block.enabled ~= false and mods ~= nil and not extra
+					out[#out + 1] = { mod = line, off = not applied or nil }
+				end
+			end
+		end
+	end
 	return out
 end
 

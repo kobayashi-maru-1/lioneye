@@ -54,7 +54,7 @@ interface PopoverProps {
   anchor: HTMLElement;
   pinned: boolean;
   onClose: () => void;
-  /** Shown under the content while pinned (Copy, Trade, Wiki...). */
+  /** Shown under the content (Copy, Trade, Wiki...); usable once pinned. */
   actions?: React.ReactNode;
   className?: string;
 }
@@ -141,8 +141,11 @@ export function Popover({
       role={pinned ? "dialog" : "tooltip"}
     >
       {children}
-      {pinned && actions && (
-        <div className={classNames(styles.actions)}>{actions}</div>
+      {/* Shown on hover too, so you know clicking pins them within reach. */}
+      {actions && (
+        <div className={classNames(styles.actions)} inert={!pinned}>
+          {actions}
+        </div>
       )}
     </div>
   );

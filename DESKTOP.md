@@ -78,7 +78,7 @@ once in **Settings** (the ⚙ at the top right).
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.
-- Above it, **Build health** lists what to look at in that loadout, judged for its level:
+- Below it, **Build health** lists what to look at in that loadout, judged for its level:
   resistances from Act 5 (50%) and maps (75%), passive and ascendancy points (labs at 33,
   55, 68, 75), flasks, movement speed, life, main skill links and pantheon. **Defenses**
   shows the largest hit of each type it survives. The checks are ported from
@@ -92,8 +92,8 @@ once in **Settings** (the ⚙ at the top right).
 - Links out of the guide (trade searches, the wiki, poe.re) open in a normal tab of your
   last-used Edge profile, where you're signed in to the trade site, not in the guide's own
   profile.
-- Hover an item or gem for its in-game tooltip; click it to pin the tooltip and use its
-  buttons: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
+- Hover an item or gem for its in-game tooltip, with its buttons underneath; click it to pin
+  the tooltip and use them: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
   **W** (the wiki) and **Trade**. Escape, a click elsewhere or a second click unpins it.
 - **Trade List** has a trade search for every item of the loadout's gear and every gem of
   its skill set, as on pob.codes. Pick the league, the search type (**Instant Buyout**,
@@ -104,7 +104,8 @@ once in **Settings** (the ⚙ at the top right).
   them after you import the build again.
 - Gear, Gems, Config and Tree show the loadout's sets; each has its own dropdown to look at
   another set until the loadout or act changes. **Config** lists only the options a set
-  changes from PoB's defaults. On the tree, Ctrl+scroll zooms and dragging pans.
+  changes from PoB's defaults, and its Custom Modifiers (lines PoB doesn't apply, such as
+  `#` notes, are dimmed). On the tree, Ctrl+scroll zooms and dragging pans.
 - At the top of the left column, pick the main skill as in PoB. The pick is remembered by
   skill gem, so the same skill stays selected in every loadout that has it; loadouts without
   it show PoB's own pick, tagged **PoB pick**. Importing a build clears the pick.
