@@ -8,6 +8,8 @@ export const NEXT_DEPTH = 3;
 export interface TreeTip {
   /** The tree data version (common/data/tree/<version>.json). */
   version: string;
+  /** The tree set's name, as PoB has it (colour codes and all). */
+  set: string;
   ascendancy?: string;
   /** Your points (blue). */
   have: string[];
@@ -89,6 +91,7 @@ export function treeTip(
   }
   return {
     version: tree.version,
+    set: tree.name,
     ascendancy: tree.ascendancy?.id,
     have,
     next: [...next],

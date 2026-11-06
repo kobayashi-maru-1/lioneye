@@ -342,15 +342,14 @@ export function usePanelSet(titles: string[], loadoutIndex: number | null) {
     loadoutIndex !== null && loadoutIndex >= 0 && loadoutIndex < titles.length
       ? loadoutIndex
       : followIndex;
-  const index =
-    current.index !== null && current.index < titles.length
-      ? current.index
-      : base;
+  const picked = current.index !== null && current.index < titles.length;
+  const index = picked ? current.index! : base;
   const choose = useCallback(
     (index: number) => setOverride({ key, index }),
     [key],
   );
-  return [index, choose] as const;
+  // `picked`: you chose this set in the panel.
+  return [index, choose, picked] as const;
 }
 
 /** PoB's stats for a build as saved (its own loadout and main skill), e.g. for Compare. */

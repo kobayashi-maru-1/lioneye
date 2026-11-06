@@ -32,7 +32,8 @@ import { BuildHealthPanel } from "../../components/BuildHealth";
 import { StatsViewer } from "../../components/StatsViewer";
 import { TradeListPanel } from "../../components/TradeList";
 import type { TaskListProps } from "../../components/TaskList";
-import { currentActAtom } from "../../state/current-act";
+import { currentActAtom, displaySetName } from "../../state/current-act";
+import { stripPob } from "../../components/PobText";
 import { gemLinksSelector } from "../../state/gem-links";
 import { gemProgressFamily } from "../../state/gem-progress";
 import {
@@ -51,6 +52,7 @@ import { routeProgressFamily } from "../../state/route-progress";
 import { searchStringsSelector } from "../../state/search-strings";
 import { TREE_DATA_LOOKUP } from "../../state/tree";
 import { treeTip } from "../../state/tree/next-points";
+import { lookAhead, treeProgressAtom } from "../../state/tree/progress";
 import { type UrlTree, urlTreesSelector } from "../../state/tree/url-tree";
 import { interactiveStyles } from "../../styles";
 import styles from "./styles.module.css";
@@ -468,7 +470,15 @@ const TREE_COMPARE = [
 function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   const sets = useLoadoutSets();
   const titles = useMemo(() => urlTrees.map((tree) => tree.name), [urlTrees]);
-  const [index, choose] = usePanelSet(titles, titleIndex(titles, sets?.tree));
+  const [panelIndex, choose, picked] = usePanelSet(
+    titles,
+    titleIndex(titles, sets?.tree),
+  );
+  // Your set's tree finished before your level reaches the next set: the next one you
+  // haven't finished, unless you picked a set here.
+  const progress = useAtomValue(treeProgressAtom);
+  const index = picked ? panelIndex : lookAhead(titles, panelIndex, progress);
+  const ahead = index !== panelIndex;
   // Your character's tree, once the exe has read it from the game's log.
   const character = useAtomValue(characterNodesNowAtom);
   const [compare, setCompare] = useAtom(treeCompareAtom);
@@ -502,6 +512,7 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
       }
     >
       <p className={classNames(styles.hint)}>
+        {ahead && `${displaySetName(stripPob(titles[panelIndex]))} done · `}
         {against
           ? `${character?.name}: green to take, red off the guide`
           : "Ctrl+scroll zooms, drag pans"}

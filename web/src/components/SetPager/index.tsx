@@ -2,11 +2,14 @@ import { useAtomValue } from "jotai";
 import { formStyles } from "../../styles";
 import { characterLevelAtom } from "../../state/character-level";
 import {
+  actRange,
   currentActAtom,
   displaySetName,
   indexForAct,
   indexForLevel,
+  levelRange,
 } from "../../state/current-act";
+import { progressIndex, treeProgressAtom } from "../../state/tree/progress";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useCallback, useState } from "react";
@@ -15,21 +18,32 @@ import { HiChevronLeft, HiChevronRight } from "react-icons/hi";
 /**
  * Picks the set (loadout, tree or gem links) for where you are: by your level when the
  * titles name levels ("Lvl 30") and the log has shown one, else by the act you're in
- * ("Act 2"). Picking another overrides it until the set your level or act points to
- * changes (a level-up that doesn't change it keeps your pick).
+ * ("Act 2"). Titles that name neither ("Early", "27 points") follow your tree: the first
+ * set whose tree you haven't finished (from the log). Picking another overrides it until
+ * the set your level, act or tree points to changes (a level-up that doesn't change it
+ * keeps your pick).
  */
 export function useFollowAct(titles: string[]) {
   const act = useAtomValue(currentActAtom);
   const level = useAtomValue(characterLevelAtom)?.level ?? null;
+  const progress = useAtomValue(treeProgressAtom);
   const key = titles.join("\n");
   const levelIndex = indexForLevel(titles, level);
-  const follow = () => levelIndex ?? indexForAct(titles, act);
+  const named = titles.some(
+    (title) => levelRange(title) !== null || actRange(title) !== null,
+  );
+  const fresh = named ? null : progressIndex(titles, progress);
   const [state, setState] = useState(() => ({
     act,
     levelIndex,
+    treeIndex: fresh,
     key,
-    index: follow() ?? 0,
+    index: levelIndex ?? indexForAct(titles, act) ?? fresh ?? 0,
   }));
+  // A moment without your tree (the log couldn't be read) keeps the set it pointed to, so
+  // a set you picked isn't reset when it comes back.
+  const treeIndex = fresh ?? (state.key === key ? state.treeIndex : null);
+  const follow = () => levelIndex ?? indexForAct(titles, act) ?? treeIndex;
 
   // Adjusted during render rather than in an effect, so the first render with new
   // titles already has the right index (the Stats tab would otherwise calculate twice).
@@ -37,12 +51,14 @@ export function useFollowAct(titles: string[]) {
   if (
     state.act !== act ||
     state.levelIndex !== levelIndex ||
+    state.treeIndex !== treeIndex ||
     state.key !== key
   ) {
     const followed = follow();
     current = {
       act,
       levelIndex,
+      treeIndex,
       key,
       index: followed ?? (state.index < titles.length ? state.index : 0),
     };

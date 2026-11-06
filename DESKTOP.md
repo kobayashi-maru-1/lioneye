@@ -80,8 +80,17 @@ once in **Settings** (the ⚙ at the top right).
 - The card at the top shows the build (skill, ascendancy, PoB's level), your level from the
   game log (**Char lvl**), its headline numbers and the **Loadout** dropdown. The loadout follows your
   level when PoB titles name levels (`Lvl 30`, `Level 12-28`), else your act (`Act 2`,
-  `Act 4-6 - 50 pts`); pick another until your level or act changes. A zone's suggested
+  `Act 4-6 - 50 pts`). When no title names a level or act (`Early`, `27 points`), it
+  follows your tree: the set after the last one whose main-tree points you all have (from
+  the game's log; matched by name, else by position when the counts match; the last set
+  once all are done). Pick another until your level, act or tree moves on. A zone's suggested
   level (`12+`) turns red while you're below it.
+- When you have every main-tree point of the shown tree set, the **Tree** panel (and the
+  in-game Tree tooltip) shows the next set you haven't finished, with "… done" in its
+  hint. Stats, gear and gems stay on the loadout's set. Picking a set in the panel turns
+  this off until the loadout, act or level set changes. Masteries and ascendancy points
+  don't count toward finishing a set. Refunds aren't in the log, so a point you refunded
+  still counts as taken.
 - The card's clipboard button copies the build's PoB code. **Compare** works like pob.codes'
   "Compare my PoB": paste any build's PoB code (your character imported in PoB, a
   streamer's, a poe.ninja player's) or a pobb.in, poe.ninja, pastebin or maxroll link. The
@@ -148,7 +157,8 @@ once in **Settings** (the ⚙ at the top right).
   guide window comes up without taking it. With no guide open, the button opens one first.
 - Hover **Gems** for the Gems panel's links (the set it shows for your loadout),
   **Campaign** for your next 3 steps, or **Tree** for the tree zoomed to your next points
-  (for the set the Tree panel shows): yours blue, the guide's points up to 3 away from yours
+  (for the set the Tree panel shows, named under the title):
+  yours blue, the guide's points up to 3 away from yours
   along its paths bright green, its later ones dim green. Your points come from the game's
   log; before the log has any, the set before stands in for them (for the first set, all
   its points are next). The tooltip opens below the bar, or above it when the bar is in the

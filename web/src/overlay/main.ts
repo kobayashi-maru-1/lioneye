@@ -223,6 +223,15 @@ function renderGems() {
 
 const TREE_TITLE = "Next points";
 
+/** "^2Lvl 13-24 {2}" → "Lvl 13-24": PoB colour codes and loadout links aren't for reading. */
+function setName(name: unknown) {
+  return typeof name === "string"
+    ? name
+        .replace(/\^(x[0-9a-fA-F]{6}|[0-9])/g, "")
+        .replace(/\s*\{[^}]*\}\s*$/, "")
+    : "";
+}
+
 /** The whole tree, drawn once per tree version and zoomed to each tooltip's area. */
 interface TreeView {
   version: string;
@@ -301,7 +310,13 @@ function drawTree(view: TreeView, data: TreeTip) {
   view.css.textContent = treeStyle(data, view.skillTree, view.compiled);
   const { x, y, w, h } = data.view;
   view.box.querySelector("svg")?.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
-  tip.replaceChildren(head(TREE_TITLE), view.css, view.box);
+  const name = setName(data.set);
+  tip.replaceChildren(
+    head(TREE_TITLE),
+    ...(name ? [el("div", "tipLabel", name)] : []),
+    view.css,
+    view.box,
+  );
 }
 
 /**
