@@ -146,9 +146,16 @@ once in **Settings** (the ⚙ at the top right).
   button per guide panel. A button opens that panel in the guide (on your other monitor) and
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
-- Hover **Gems** for the Gems panel's links (the set it shows for your loadout), or
-  **Campaign** for your next 3 steps. The tooltip opens below the bar, or above it when the
-  bar is in the lower half of the screen. Both need the guide open.
+- Hover **Gems** for the Gems panel's links (the set it shows for your loadout),
+  **Campaign** for your next 3 steps, or **Tree** for the tree zoomed to your next points
+  (for the set the Tree panel shows): yours blue, the guide's points up to 3 away from yours
+  along its paths bright green, its later ones dim green. Your points come from the game's
+  log; before the log has any, the set before stands in for them (for the first set, all
+  its points are next). The tooltip opens below the bar, or above it when the bar is in the
+  lower half of the screen. All need the guide open.
+- The pin at the top right of **Campaign** or **Tree** keeps that tooltip open while you
+  play (one at a time, kept after a restart). Hovering another button shows its tooltip
+  until the pointer leaves the bar and its tooltip.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
 - **Settings** → **App** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,
@@ -168,6 +175,11 @@ Each build bundles the latest [Path of Building](https://github.com/PathOfBuildi
 release (code and game data only, about 5 MB) for the Stats tab; `log-api\fetch-pob.ps1`
 downloads it and skips the download when that release is already there. An exe keeps the
 PoB it was built with: build again after a PoB release to pick it up.
+
+PoB loads on the first stats request and stays loaded while a guide is open, so loadout
+switches stay quick; it's unloaded (freeing about 500 MB) 10-20 minutes after the last
+guide closes. Each calculation is logged ("PoB stats for … in 0.8s", with "PoB loaded
+first" when it had to load).
 
 Build health is a port of PoB Redux's `sanity_check`. `log-api\redux-watch.ps1` says
 whether Redux changed it since the port (the Watch workflow runs it daily and fails

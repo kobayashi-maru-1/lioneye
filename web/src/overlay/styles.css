@@ -66,6 +66,50 @@ body {
   text-transform: uppercase;
 }
 
+/* Campaign and Tree: the title with the pin at its right. */
+.tipHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.tipHead .tipTitle {
+  margin-bottom: 0;
+}
+
+.pin {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: #6b7686;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pin:hover {
+  color: var(--gold-hover);
+  border-color: var(--border);
+}
+
+.pin.on {
+  color: var(--gold);
+}
+
+/* Tree: the guide's tree zoomed to your next points. */
+.tipTree {
+  width: 380px;
+  height: 240px;
+  background-color: #11161f;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
 .tipGroup {
   padding: 4px 6px;
   background-color: #171e2a;

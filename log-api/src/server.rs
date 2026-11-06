@@ -166,6 +166,11 @@ impl Guides {
         state.open = state.open.saturating_sub(1);
     }
 
+    /// Whether any guide page is connected (PoB stays loaded for it).
+    pub fn any_open(&self) -> bool {
+        self.lock().open > 0
+    }
+
     /// True when a guide is open; otherwise keeps the jump for the next one to connect.
     fn open_or_wait(&self, id: &str) -> bool {
         let mut state = self.lock();

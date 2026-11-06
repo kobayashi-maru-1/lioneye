@@ -25,6 +25,17 @@ const ANCHOR = {
   y: 0.5,
 };
 
+/**
+ * How far one wheel event zooms (log2 of the scale). d3's default multiplies by 10 with
+ * Ctrl held (it takes Ctrl+wheel for a pinch), and the Tree zooms with Ctrl+wheel: a mouse
+ * notch would jump about 4x. Here a notch (100 pixels, or 3 lines) is about 1.1x.
+ */
+function wheelDelta(event: WheelEvent) {
+  if (event.deltaMode === 1) return -event.deltaY * 0.05; // lines
+  if (event.deltaMode === 2) return -event.deltaY; // pages
+  return -event.deltaY * 0.0015;
+}
+
 function containRect(viewport: Size, worldFocus: Rect) {
   const scaleX = viewport.width / worldFocus.width;
   const scaleY = viewport.height / worldFocus.height;
@@ -64,7 +75,13 @@ export function Viewport({
 
     const zoom = d3
       .zoom<HTMLDivElement, unknown>()
-      .on("zoom", ({ transform }) => {
+      .wheelDelta(wheelDelta)
+      .on("zoom", ({ transform, sourceEvent }) => {
+        // Wheel steps glide; dragging and fitting follow at once.
+        worldSelection.style(
+          "transition",
+          sourceEvent?.type === "wheel" ? "transform 120ms ease-out" : "none",
+        );
         worldSelection.style(
           "transform",
           `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`,

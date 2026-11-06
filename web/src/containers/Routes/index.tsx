@@ -35,7 +35,11 @@ import type { TaskListProps } from "../../components/TaskList";
 import { currentActAtom } from "../../state/current-act";
 import { gemLinksSelector } from "../../state/gem-links";
 import { gemProgressFamily } from "../../state/gem-progress";
-import { overlayGemsAtom, shownPanelsAtom } from "../../state/overlay";
+import {
+  overlayGemsAtom,
+  overlayTreeAtom,
+  shownPanelsAtom,
+} from "../../state/overlay";
 import { pageSectionCollapseFamily } from "../../state/page-section-collapse";
 import { pobAtom } from "../../state/pob";
 import {
@@ -45,6 +49,8 @@ import {
 } from "../../state/route";
 import { routeProgressFamily } from "../../state/route-progress";
 import { searchStringsSelector } from "../../state/search-strings";
+import { TREE_DATA_LOOKUP } from "../../state/tree";
+import { treeTip } from "../../state/tree/next-points";
 import { type UrlTree, urlTreesSelector } from "../../state/tree/url-tree";
 import { interactiveStyles } from "../../styles";
 import styles from "./styles.module.css";
@@ -468,6 +474,7 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   const [compare, setCompare] = useAtom(treeCompareAtom);
   const against =
     compare === "character" && character ? character.nodes : null;
+  useTreeTip(urlTrees, index, character?.nodes ?? null);
   return (
     <PageSection
       id="tree"
@@ -514,6 +521,30 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
       </div>
     </PageSection>
   );
+}
+
+/**
+ * The in-game bar's Tree tooltip for the set the Tree panel shows: the guide's next points
+ * from your character's tree (from the log), else from the set before (none for the first).
+ */
+function useTreeTip(
+  urlTrees: UrlTree.Data[],
+  index: number,
+  character: string[] | null,
+) {
+  const setTip = useSetAtom(overlayTreeAtom);
+  useEffect(() => {
+    const tree = urlTrees[index];
+    if (!tree) return;
+    let live = true;
+    const have = character ?? urlTrees[index - 1]?.nodes ?? [];
+    TREE_DATA_LOOKUP[tree.version]?.then(([skillTree]) => {
+      if (live) setTip(treeTip(tree, have, skillTree));
+    });
+    return () => {
+      live = false;
+    };
+  }, [urlTrees, index, character]);
 }
 
 /**

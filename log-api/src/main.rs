@@ -160,13 +160,15 @@ fn main() -> ExitCode {
     // Settings from the guide's Settings page (game log, browser); the command line wins.
     let settings = std::sync::Arc::new(load_settings(&args, &url));
     let browser_now = Browser::from_name(&settings.browser.borrow());
+    let guides = std::sync::Arc::new(server::Guides::new(open_tx));
+    let guides_open = guides.clone();
     let state = server::AppState {
         settings: settings.clone(),
         lines: lines_tx.clone(),
         status: status_rx.clone(),
-        pob: pob::Engine::start(),
+        pob: pob::Engine::start(move || guides_open.any_open()),
         overlay: std::sync::Arc::new(overlay_tx),
-        guides: std::sync::Arc::new(server::Guides::new(open_tx)),
+        guides,
         tips: std::sync::Arc::new(watch::channel(server::Tips::new()).0),
         saved: saved.clone(),
     };

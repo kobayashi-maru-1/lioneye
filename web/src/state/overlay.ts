@@ -1,5 +1,6 @@
 import { persistentAtom } from ".";
 import type { StepPart } from "./step-text";
+import type { TreeTip } from "./tree/next-points";
 import { atom } from "jotai";
 
 /** Every guide panel that can have a button on the in-game bar, in page order. */
@@ -56,6 +57,12 @@ export interface OverlayGems {
  * page doesn't clear the set another guide page sent.
  */
 export const overlayGemsAtom = atom<OverlayGems | null | undefined>(undefined);
+
+/**
+ * Set by the Tree panel for the bar's Tree tooltip: your tree and the guide's next points
+ * for the set the panel shows. Undefined until the panel has worked it out.
+ */
+export const overlayTreeAtom = atom<TreeTip | undefined>(undefined);
 
 /** How many upcoming steps the bar's Campaign tooltip shows. */
 export const CAMPAIGN_TIP_STEPS = 3;

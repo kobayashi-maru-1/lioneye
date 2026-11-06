@@ -8,6 +8,7 @@ import {
   overlayCampaignAtom,
   overlayGemsAtom,
   overlaySettingsAtom,
+  overlayTreeAtom,
   shownPanelsAtom,
 } from "../../state/overlay";
 import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
@@ -181,7 +182,7 @@ export function useAutoProgress() {
           ).map(({ id, label }) => ({ id, label }));
     sendMessage(`overlay:${JSON.stringify({ on: settings.on, buttons })}`);
   }, [talks, settings, shown]);
-  // The bar's tooltips: the Gems panel's set and Campaign's next steps.
+  // The bar's tooltips: the Gems panel's set, Campaign's next steps, the Tree's next points.
   const gems = useAtomValue(overlayGemsAtom);
   useEffect(() => {
     if (talks && gems !== undefined)
@@ -192,6 +193,11 @@ export function useAutoProgress() {
     if (talks && campaign !== undefined)
       sendMessage(`tip:campaign:${JSON.stringify(campaign)}`);
   }, [talks, campaign]);
+  const tree = useAtomValue(overlayTreeAtom);
+  useEffect(() => {
+    if (talks && tree !== undefined)
+      sendMessage(`tip:tree:${JSON.stringify(tree)}`);
+  }, [talks, tree]);
 }
 
 /** The exe's build this page was served by (its first "build:" message). */

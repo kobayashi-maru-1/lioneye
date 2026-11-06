@@ -30,7 +30,9 @@ const REPO: &str = "PathOfBuildingCommunity/PathOfBuilding";
 const HOST: &str = include_str!("pob-host.lua");
 /// Path to a pob-host.lua to use instead of the built-in one (development only).
 const HOST_OVERRIDE: &str = "EXILE_LEVELING_POB_HOST";
-/// Frees PoB's memory (about 500 MB) when the guide hasn't asked for stats in this long.
+/// Frees PoB's memory (about 500 MB) when no guide has been open and asking for stats for
+/// this long. While a guide is open PoB stays loaded: loading it again costs a loadout
+/// switch 5-10 s (PoB, the build and its timeless jewel data).
 const IDLE: Duration = Duration::from_secs(10 * 60);
 /// pob-host.lua starts errors that leave PoB usable with this, so PoB stays loaded.
 const KEEP: &str = "[keep] ";
@@ -65,9 +67,10 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn start() -> Engine {
+    /// `keep`: whether PoB should stay loaded though idle (a guide page is open).
+    pub fn start(keep: impl Fn() -> bool + Send + 'static) -> Engine {
         let (jobs, rx) = mpsc::channel();
-        if let Err(err) = thread::Builder::new().name("pob".into()).spawn(move || run(rx)) {
+        if let Err(err) = thread::Builder::new().name("pob".into()).spawn(move || run(rx, keep)) {
             error!("Couldn't start the PoB thread: {err}");
         }
         Engine { jobs }
@@ -90,12 +93,15 @@ impl Engine {
     }
 }
 
-fn run(jobs: mpsc::Receiver<Job>) {
+fn run(jobs: mpsc::Receiver<Job>, keep: impl Fn() -> bool) {
     let mut pob: Option<Pob> = None;
     loop {
         let job = match jobs.recv_timeout(IDLE) {
             Ok(job) => job,
             Err(RecvTimeoutError::Timeout) => {
+                if keep() {
+                    continue;
+                }
                 if pob.take().is_some() {
                     info!("PoB unloaded (idle)");
                 }
@@ -108,7 +114,9 @@ fn run(jobs: mpsc::Receiver<Job>) {
             continue;
         }
 
-        if pob.is_none() {
+        let cold = pob.is_none();
+        let started = Instant::now();
+        if cold {
             match Pob::load() {
                 Ok(loaded) => pob = Some(loaded),
                 Err(msg) => {
@@ -120,10 +128,15 @@ fn run(jobs: mpsc::Receiver<Job>) {
         }
         let Some(loaded) = pob.as_ref() else { continue };
 
-        let started = Instant::now();
         let result = match loaded.stats(&job.xml, job.loadout.as_deref(), job.pick.as_ref()) {
             Ok(json) => {
-                debug!("PoB stats in {:.2}s", started.elapsed().as_secs_f32());
+                // Logged so a slow loadout switch can be told apart from a slow page.
+                info!(
+                    "PoB stats for {} in {:.1}s{}",
+                    job.loadout.as_deref().unwrap_or("the saved loadout"),
+                    started.elapsed().as_secs_f32(),
+                    if cold { " (PoB loaded first)" } else { "" }
+                );
                 Ok(json)
             }
             Err(msg) => match msg.strip_prefix(KEEP) {
