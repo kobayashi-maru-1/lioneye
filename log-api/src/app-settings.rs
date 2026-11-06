@@ -162,7 +162,8 @@ mod tests {
         assert!(!watching.has_changed().unwrap());
         // Saved: a new start reads it back.
         let again = AppSettings::load(file.clone(), None, None);
-        assert_eq!(*again.browser.borrow(), "edge");
+        assert_eq!(*again.browser.borrow(), "default");
+        assert_eq!(again.log_path.borrow().as_deref(), Some(dir.as_path()));
 
         assert!(settings.update(Change { log_path: Some("C:/nope/x.txt".into()), browser: None }).is_err());
         assert!(settings.update(Change { log_path: None, browser: Some("opera".into()) }).is_err());
