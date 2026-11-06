@@ -98,9 +98,13 @@
   gap: var(--size-4);
 }
 
-/* One of the pair folded: its header sits above, and the open one takes the full width. */
+/* One of the pair folded: its header sits above (order), and the open one takes the full width. */
 .pair:has(> [data-collapsed]) {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.pair > [data-collapsed] {
+  order: -1;
 }
 
 /* Campaign's column and the other panels' column. Below the wide breakpoint they take no
@@ -182,9 +186,12 @@
   .columns.stacked > .column.folded {
     flex-direction: row;
     flex-wrap: wrap;
+    /* Both columns folded: the strip in the tall row stays a strip. */
+    align-content: flex-start;
   }
 
-  .columns.stacked > .column.folded > * {
+  .columns.stacked > .column.folded > *,
+  .columns.stacked > .column.folded .pair > * {
     flex: 1 1 12rem;
   }
 

@@ -144,11 +144,15 @@ export function useJumpToSection() {
   return useAtomCallback(
     useCallback((_get, set, id: string) => {
       set(pageSectionCollapseFamily(id), false);
-      // After the open section has rendered.
+      // After the open section has rendered, which for a jump from the in-game bar (not a
+      // click here) can take a frame longer: on wide screens opening a panel can also
+      // change the columns.
       requestAnimationFrame(() =>
-        document
-          .getElementById(pageSectionId(id))
-          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        requestAnimationFrame(() =>
+          document
+            .getElementById(pageSectionId(id))
+            ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        ),
       );
     }, []),
   );
