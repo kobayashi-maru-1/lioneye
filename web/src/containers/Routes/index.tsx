@@ -221,9 +221,9 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
       ...(showStats ? [{ id: "gear", label: "Gear" }] : []),
       ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
       ...(showStats ? [{ id: "trade", label: "Trade" }] : []),
-      ...(showStats ? [{ id: "config", label: "Config" }] : []),
       ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
       ...(showStats ? [{ id: "health", label: "Health" }] : []),
+      ...(showStats ? [{ id: "config", label: "Config" }] : []),
       ...(notes !== null ? [{ id: "notes", label: "Notes" }] : []),
       ...(hasSearch ? [{ id: "search", label: "Search" }] : []),
     ],
@@ -303,9 +303,9 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
                 </div>
               )}
               {showStats && <TradeListPanel />}
-              {showStats && <ConfigPanel />}
               {urlTrees.length > 0 && <TreePanel urlTrees={urlTrees} />}
               {showStats && <BuildHealthPanel />}
+              {showStats && <ConfigPanel />}
               {notes !== null && (
                 <PageSection id="notes" title="Notes">
                   <BuildNotes notes={notes} />
