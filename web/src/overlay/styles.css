@@ -1,5 +1,5 @@
 /* The in-game bar: the guide's jump bar (gold capitals on near-black), as one strip.
-   The window is sized to .frame (the bar, plus the Gems tooltip while it's open); the
+   The window is sized to .frame (the bar, plus a tooltip while one is open); the
    exe's NAVY constant matches the background. */
 :root {
   color-scheme: dark;
@@ -28,8 +28,8 @@ body {
   width: max-content;
 }
 
-/* Bar in the lower half of the screen: the tooltip opens above it. Pinned to the window's
-   bottom, so the bar stays put on screen while the window grows or shrinks upwards. */
+/* Flipped: the tooltip opens above the bar. Pinned to the window's bottom, so the bar
+   stays put on screen while the window grows or shrinks upwards. */
 .frame.up {
   flex-direction: column-reverse;
   position: fixed;
@@ -57,6 +57,18 @@ body {
   display: none;
 }
 
+/* Above the bar the title row is last: a tooltip taller than the cap loses its far (top)
+   end, never the row next to the bar. */
+.frame.up .tip:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.frame.up .tip > * {
+  flex: none;
+}
+
 .tipTitle {
   margin-bottom: 4px;
   color: var(--gold);
@@ -66,20 +78,37 @@ body {
   text-transform: uppercase;
 }
 
-/* Campaign and Tree: the title with the pin at its right. */
+/* Every tooltip's title row, on the edge next to the bar: the pin at the left (near the
+   grip), the title, the flip at the right. */
 .tipHead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 4px;
 }
 
-.tipHead .tipTitle {
+.frame.up .tipHead {
+  margin-top: 4px;
   margin-bottom: 0;
 }
 
-.pin {
+.tipHead .tipTitle {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The Tree's set name beside its title, quieter. */
+.tipSub {
+  color: #8a96a8;
+  font-weight: 400;
+}
+
+.icon {
+  flex: none;
   display: grid;
   place-items: center;
   width: 20px;
@@ -92,12 +121,12 @@ body {
   cursor: pointer;
 }
 
-.pin:hover {
+.icon:hover {
   color: var(--gold-hover);
   border-color: var(--border);
 }
 
-.pin.on {
+.icon.on {
   color: var(--gold);
 }
 

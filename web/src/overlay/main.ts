@@ -62,30 +62,75 @@ let tips: Record<string, unknown> = {};
 let tipsArrived = false;
 /** The button whose tooltip is open. */
 let openId: string | null = null;
-/** The tooltip the pointer (or the pin) asks for last: a side flip reopens only that. */
-let wanted: string | null = null;
-/** The tooltip opens above the bar (bar in the lower half of the screen). */
+/** The open tooltip is above the bar (the side it opened on). */
 let up = false;
 
-/** Buttons with a tooltip: Gems (the Gems panel's links), Campaign (the next steps), Tree. */
+/**
+ * Buttons with a tooltip: Gems (the Gems panel's links), Campaign (the next steps), Tree.
+ * Every tooltip gets the pin and the flip.
+ */
 const TIPS: Record<string, () => void> = {
   gems: renderGems,
   campaign: renderCampaign,
   tree: renderTree,
 };
 
-/** Tooltips that can be pinned open; one at a time, kept across restarts. */
-const PINNABLE = new Set(["campaign", "tree"]);
+/** One tooltip can be pinned open, kept across restarts. */
 const PIN_KEY = "overlay-pin";
 let pinned: string | null = readPin();
 
 function readPin() {
   try {
     const id = localStorage.getItem(PIN_KEY);
-    return id !== null && PINNABLE.has(id) ? id : null;
+    return id !== null && id in TIPS ? id : null;
   } catch {
     return null;
   }
+}
+
+/** Tooltips open above the bar: the flip's choice, kept across restarts (below at first). */
+const SIDE_KEY = "overlay-side";
+let above = readSide();
+
+function readSide() {
+  try {
+    return localStorage.getItem(SIDE_KEY) === "above";
+  } catch {
+    return false;
+  }
+}
+
+/** A flip in progress: hovers wait until the window has shrunk to the bar. */
+let flipping = false;
+/**
+ * The bar alone has been sized once. Until then no tooltip opens: the exe places the
+ * window at the saved spot by the bar's own size, and a tooltip opening above first
+ * would shift the bar.
+ */
+let sized = false;
+
+/**
+ * The flip: tooltips open on the other side. The tooltip closes first, so the window
+ * shrinks to the bar (sent with the old side) before anything grows on the new side and
+ * the bar stays put. Then the pinned tooltip reopens there; an unpinned one stays closed
+ * (the pointer is no longer over it).
+ */
+function flipSide() {
+  above = !above;
+  try {
+    localStorage.setItem(SIDE_KEY, above ? "above" : "below");
+  } catch {
+    // Not kept: this side until the bar reloads.
+  }
+  closeTip();
+  flipping = true;
+  // Two frames: the shrink goes out with the first frame's resize observation.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      flipping = false;
+      rest();
+    }),
+  );
 }
 
 function setPin(id: string | null) {
@@ -139,21 +184,54 @@ function el(tag: string, className: string, ...children: (Node | string)[]) {
 
 const PIN_ICON =
   '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M10.5 1.5l4 4-1.5.5-2.5 2.5.5 3-1.5 1.5-2.5-2.5-4 4-.5-.5 4-4-2.5-2.5L5 6l3 .5L10.5 4z" fill="currentColor"/></svg>';
+const FLIP_ICON =
+  '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M5 1.5l3.5 3.5H6v6H4V5H1.5zM11 14.5L7.5 11H10V5h2v6h2.5z" fill="currentColor"/></svg>';
 
-/** A tooltip's title, with the pin for Campaign and Tree. */
-function head(title: string) {
+function iconButton(icon: string, label: string, className: string) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.innerHTML = icon;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  return button;
+}
+
+/**
+ * A tooltip's title row: the pin at its left (near the bar's grip), the flip at its right.
+ * It sits on the edge next to the bar: on top below the bar, at the bottom above it.
+ */
+function head(title: string, sub = "") {
   const id = openId;
-  if (id === null || !PINNABLE.has(id)) return el("div", "tipTitle", title);
-  const on = pinned === id;
-  const pin = document.createElement("button");
-  pin.type = "button";
-  pin.className = on ? "pin on" : "pin";
-  pin.innerHTML = PIN_ICON;
+  const on = id !== null && pinned === id;
+  const pin = iconButton(PIN_ICON, "Pin", on ? "icon on" : "icon");
+  // Screen readers say "Pin, pressed"; the hover label says what a click does.
   pin.title = on ? "Unpin" : "Pin";
-  pin.setAttribute("aria-label", pin.title);
   pin.setAttribute("aria-pressed", String(on));
-  pin.addEventListener("click", () => setPin(on ? null : id));
-  return el("div", "tipHead", el("div", "tipTitle", title), pin);
+  pin.addEventListener("click", () => {
+    if (id !== null) setPin(on ? null : id);
+  });
+  const flip = iconButton(FLIP_ICON, up ? "Show below" : "Show above", "icon");
+  flip.addEventListener("click", flipSide);
+  // `sub` (the Tree's set name) shares the row, so it stays by the title on either side.
+  const text = el(
+    "div",
+    "tipTitle",
+    title,
+    ...(sub ? [el("span", "tipSub", ` · ${sub}`)] : []),
+  );
+  // The whole title on hover when a long one is cut short.
+  text.title = sub ? `${title} · ${sub}` : title;
+  return el("div", "tipHead", pin, text, flip);
+}
+
+/** Fills the tooltip: the title row on the bar's side, then the content. */
+function fill(title: string, ...content: Node[]) {
+  fillWith(head(title), content);
+}
+
+function fillWith(row: HTMLElement, content: Node[]) {
+  tip.replaceChildren(...(up ? [...content, row] : [row, ...content]));
 }
 
 function renderTip() {
@@ -162,18 +240,18 @@ function renderTip() {
     TIPS[openId]?.();
   } catch {
     // A malformed message: say so rather than never opening.
-    tip.replaceChildren(head(""), el("div", "tipEmpty", "Not available"));
+    fill("", el("div", "tipEmpty", "Not available"));
   }
 }
 
 function renderCampaign() {
   const steps = tips.campaign as Step[] | undefined;
   if (!Array.isArray(steps) || steps.length === 0) {
-    tip.replaceChildren(head("Next"), el("div", "tipEmpty", "No steps"));
+    fill("Next", el("div", "tipEmpty", "No steps"));
     return;
   }
-  tip.replaceChildren(
-    head("Next"),
+  fill(
+    "Next",
     ...steps.map((step) =>
       el(
         "div",
@@ -193,11 +271,11 @@ function renderGems() {
     !Array.isArray(gems.groups) ||
     gems.groups.length === 0
   ) {
-    tip.replaceChildren(el("div", "tipEmpty", "No gems"));
+    fill("Gems", el("div", "tipEmpty", "No gems"));
     return;
   }
-  tip.replaceChildren(
-    el("div", "tipTitle", gems.title),
+  fill(
+    gems.title,
     ...gems.groups.map((group) =>
       el(
         "div",
@@ -252,18 +330,18 @@ function renderTree() {
       : undefined;
   const token = ++treeRender;
   if (!data || !lookup) {
-    tip.replaceChildren(head(TREE_TITLE), el("div", "tipEmpty", "No tree"));
+    fill(TREE_TITLE, el("div", "tipEmpty", "No tree"));
     return;
   }
   if (data.next.length === 0) {
-    tip.replaceChildren(head(TREE_TITLE), el("div", "tipEmpty", "Tree done"));
+    fill(TREE_TITLE, el("div", "tipEmpty", "Tree done"));
     return;
   }
   if (treeView?.version === data.version) {
     drawTree(treeView, data);
     return;
   }
-  tip.replaceChildren(head(TREE_TITLE), el("div", "tipEmpty", "Loading"));
+  fill(TREE_TITLE, el("div", "tipEmpty", "Loading"));
   lookup.then(
     ([skillTree, , svg, , compiled]) => {
       if (token !== treeRender || openId !== "tree") return;
@@ -280,18 +358,12 @@ function renderTree() {
         drawTree(treeView, data);
       } catch {
         // A malformed tip: renderTip's catch can't see this one.
-        tip.replaceChildren(
-          head(TREE_TITLE),
-          el("div", "tipEmpty", "Not available"),
-        );
+        fill(TREE_TITLE, el("div", "tipEmpty", "Not available"));
       }
     },
     () => {
       if (token === treeRender && openId === "tree")
-        tip.replaceChildren(
-          head(TREE_TITLE),
-          el("div", "tipEmpty", "Not available"),
-        );
+        fill(TREE_TITLE, el("div", "tipEmpty", "Not available"));
     },
   );
 }
@@ -301,22 +373,20 @@ let drawnTree = "";
 
 function drawTree(view: TreeView, data: TreeTip) {
   const key = JSON.stringify(data);
+  const row = tip.querySelector(".tipHead");
+  const name = setName(data.set);
   if (key === drawnTree && view.box.parentNode === tip) {
-    // Same picture: only the title (the pin) may have changed.
-    tip.firstChild?.replaceWith(head(TREE_TITLE));
+    // Same picture: only the title row (the pin, or its side after a flip) may change.
+    row?.remove();
+    if (up) tip.append(head(TREE_TITLE, name));
+    else tip.prepend(head(TREE_TITLE, name));
     return;
   }
   drawnTree = key;
   view.css.textContent = treeStyle(data, view.skillTree, view.compiled);
   const { x, y, w, h } = data.view;
   view.box.querySelector("svg")?.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
-  const name = setName(data.set);
-  tip.replaceChildren(
-    head(TREE_TITLE),
-    ...(name ? [el("div", "tipLabel", name)] : []),
-    view.css,
-    view.box,
-  );
+  fillWith(head(TREE_TITLE, name), [view.css, view.box]);
 }
 
 /**
@@ -369,35 +439,17 @@ function treeStyle(
   });
 }
 
-/** Which side the tooltip goes: above the bar when it sits in the lower half of its screen. */
-function sideUp() {
-  const screenTop = (screen as Screen & { availTop?: number }).availTop ?? 0;
-  const barMiddle =
-    window.screenY + bar.getBoundingClientRect().top + bar.offsetHeight / 2;
-  return barMiddle > screenTop + screen.availHeight / 2;
-}
-
 function openTip(id: string) {
-  wanted = id;
-  // Already open (back on the button from the tooltip, or another button with one): only
-  // re-render, unless the bar was dragged to the other half of the screen since. Then
-  // shrink to the bar first, so the window grows from the bar's new side.
-  if (!tip.hidden && sideUp() !== up) {
-    closeTip();
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        if (tip.hidden && wanted === id) openTip(id);
-      }),
-    );
-    return;
-  }
-  if (!tip.hidden && openId === id) return; // Already showing it.
+  if (flipping || !sized) return;
+  // Already open (back on the button from the tooltip, or another button with one).
+  if (!tip.hidden && openId === id) return;
   openId = id;
   if (!tip.hidden) {
     renderTip();
     return;
   }
-  up = sideUp();
+  // The side the flip chose; the window grows that way from the bar.
+  up = above;
   frame.classList.toggle("up", up);
   renderTip();
   tip.hidden = false;
@@ -410,8 +462,8 @@ function closeTip() {
 
 /** Nothing hovered: back to the pinned tooltip, else closed. */
 function rest() {
+  if (flipping || !sized) return;
   const id = pinnedShown();
-  wanted = id;
   if (id === null) closeTip();
   else openTip(id);
 }
@@ -478,9 +530,17 @@ grip.addEventListener("pointerdown", (event) => {
 // The window fits the bar and the tooltip; with the tooltip above, it grows upwards.
 new ResizeObserver(() => {
   const { width, height } = frame.getBoundingClientRect();
+  // The bar's own height too: with a tooltip above, the exe saves the bar's place, not
+  // the tooltip's top.
+  const barHeight = Math.ceil(bar.getBoundingClientRect().height);
   window.ipc?.postMessage(
-    `size:${Math.ceil(width)},${Math.ceil(height)}${up ? ",up" : ""}`,
+    `size:${Math.ceil(width)},${Math.ceil(height)},${up ? "up" : ""},${barHeight}`,
   );
+  // The bar alone has gone out: now a pinned tooltip may open.
+  if (!sized) {
+    sized = true;
+    rest();
+  }
 }).observe(frame);
 
 document.addEventListener("contextmenu", (event) => event.preventDefault());

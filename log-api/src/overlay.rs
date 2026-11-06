@@ -94,9 +94,9 @@ fn save(saved: &Saved) {
 }
 
 enum Ipc {
-    /// The page's size in CSS pixels; `up`: it grew upwards (the Gems tooltip opens above a
-    /// bar in the lower half of the screen), so the bottom edge stays put.
-    Size { width: f64, height: f64, up: bool },
+    /// The page's size in CSS pixels; `up`: it grew upwards (a tooltip open above the bar),
+    /// so the bottom edge stays put; `bar`: the bar's own height, when the page sends it.
+    Size { width: f64, height: f64, up: bool, bar: Option<f64> },
 }
 
 struct Window {
@@ -123,6 +123,9 @@ pub struct Overlay {
     last_front: HWND,
     ipc_tx: mpsc::Sender<Ipc>,
     ipc_rx: mpsc::Receiver<Ipc>,
+    /// The bar's height (CSS pixels) while a tooltip is open above it: the window's top is
+    /// then the tooltip's, and the bar's place is that far above the bottom.
+    above: Option<f64>,
 }
 
 impl Overlay {
@@ -146,6 +149,7 @@ impl Overlay {
             last_front: std::ptr::null_mut(),
             ipc_tx,
             ipc_rx,
+            above: None,
         }
     }
 
@@ -169,7 +173,16 @@ impl Overlay {
             if let Some(window) = &self.window {
                 let mut rect = unsafe { std::mem::zeroed() };
                 if unsafe { GetWindowRect(window.hwnd, &mut rect) } != 0 {
-                    self.position = Some((rect.left, rect.top));
+                    // The bar's top, also with a (pinned) tooltip open above it: the page
+                    // starts with the bar alone, at the saved place.
+                    let top = match self.above {
+                        Some(bar) => {
+                            let scale = unsafe { GetDpiForWindow(window.hwnd) }.max(96) as f64 / 96.0;
+                            rect.bottom - (bar * scale).ceil() as i32
+                        }
+                        None => rect.top,
+                    };
+                    self.position = Some((rect.left, top));
                     self.persist();
                 }
             }
@@ -189,7 +202,8 @@ impl Overlay {
 
         while let Ok(message) = self.ipc_rx.try_recv() {
             match message {
-                Ipc::Size { width, height, up } => {
+                Ipc::Size { width, height, up, bar } => {
+                    self.above = if up { bar } else { None };
                     if let Some(window) = &mut self.window {
                         resize(window.hwnd, width, height, up);
                         if !window.sized {
@@ -254,7 +268,8 @@ impl Overlay {
                 if body == "drag" {
                     start_drag(target as HWND);
                 } else if let Some(size) = body.strip_prefix("size:") {
-                    // "width,height" or "width,height,up".
+                    // "width,height", "width,height,up", or either with the bar's height
+                    // after ("width,height,,22", "width,height,up,22").
                     let parts: Vec<&str> = size.split(',').map(str::trim).collect();
                     let number = |i: usize| parts.get(i).and_then(|n| n.parse::<f64>().ok());
                     if let (Some(width), Some(height)) = (number(0), number(1)) {
@@ -263,6 +278,7 @@ impl Overlay {
                                 width: width.min(2000.0),
                                 height: height.min(1200.0),
                                 up: parts.get(2) == Some(&"up"),
+                                bar: number(3).filter(|b| b.is_finite() && *b > 0.0 && *b <= height),
                             });
                         }
                     }

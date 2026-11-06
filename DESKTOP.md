@@ -157,15 +157,17 @@ once in **Settings** (the ⚙ at the top right).
   guide window comes up without taking it. With no guide open, the button opens one first.
 - Hover **Gems** for the Gems panel's links (the set it shows for your loadout),
   **Campaign** for your next 3 steps, or **Tree** for the tree zoomed to your next points
-  (for the set the Tree panel shows, named under the title):
+  (for the set the Tree panel shows, named beside the title):
   yours blue, the guide's points up to 3 away from yours
   along its paths bright green, its later ones dim green. Your points come from the game's
   log; before the log has any, the set before stands in for them (for the first set, all
-  its points are next). The tooltip opens below the bar, or above it when the bar is in the
-  lower half of the screen. All need the guide open.
-- The pin at the top right of **Campaign** or **Tree** keeps that tooltip open while you
-  play (one at a time, kept after a restart). Hovering another button shows its tooltip
-  until the pointer leaves the bar and its tooltip.
+  its points are next). All need the guide open.
+- Every tooltip's title row sits on its edge next to the bar, with two icons: the pin at
+  its left keeps that tooltip open while you play (one at a time, kept after a restart),
+  and the flip (**Show above** / **Show below**) at its right moves tooltips to the other
+  side of the bar (below to start, kept after a restart; the bar stays put). A pinned
+  tooltip moves at once; otherwise the next one opens on the new side. Hovering another button shows its tooltip until
+  the pointer leaves the bar and its tooltip.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
 - **Settings** → **App** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,
