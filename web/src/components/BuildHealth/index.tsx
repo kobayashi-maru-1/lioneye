@@ -1,8 +1,10 @@
+import { jumpTargetsAtom } from "../AppBar";
 import { format } from "../BuildHeader/headline";
 import { useJumpToSection } from "../PageSection";
 import { type Defences, type HealthFinding, usePobStats } from "../PobStats";
 import styles from "./styles.module.css";
 import classNames from "classnames";
+import { useAtomValue } from "jotai";
 
 /** The panel each finding's link jumps to. */
 const PANELS: Record<string, string> = {
@@ -20,6 +22,9 @@ export function BuildHealth() {
   const pob = usePobStats();
   const stats = pob?.stats ?? null;
   const jump = useJumpToSection();
+  // Only panels on the page (a build's Tree or Gems panel can be missing).
+  const targets = useAtomValue(jumpTargetsAtom);
+  const present = new Set(targets.map((target) => target.id));
   // Never the old loadout's findings under the new loadout's name.
   if (stats === null || pob?.error) return null;
   const { health, defences } = stats;
@@ -36,7 +41,13 @@ export function BuildHealth() {
         {health.length > 0 && (
           <ul className={classNames(styles.findings)}>
             {health.map((finding, i) => (
-              <Finding key={i} finding={finding} onJump={jump} />
+              <Finding
+                key={i}
+                finding={finding}
+                onJump={
+                  finding.panel && present.has(finding.panel) ? jump : undefined
+                }
+              />
             ))}
           </ul>
         )}
@@ -51,14 +62,14 @@ function Finding({
   onJump,
 }: {
   finding: HealthFinding;
-  onJump: (id: string) => void;
+  onJump?: (id: string) => void;
 }) {
-  const panel = finding.panel ? PANELS[finding.panel] : undefined;
+  const panel = onJump && finding.panel ? PANELS[finding.panel] : undefined;
   return (
     <li className={classNames(styles.finding)}>
       <span
         className={classNames(styles.dot, styles[finding.severity])}
-        aria-label={finding.severity}
+        aria-label={`${finding.severity} severity`}
         role="img"
       />
       <span className={classNames(styles.text)}>
@@ -70,7 +81,7 @@ function Finding({
       {panel && finding.panel && (
         <button
           className={classNames(styles.link)}
-          onClick={() => onJump(finding.panel!)}
+          onClick={() => onJump?.(finding.panel!)}
         >
           {panel} →
         </button>
@@ -124,7 +135,7 @@ function DefencesCard({ defences }: { defences: Defences }) {
     <section className={classNames(styles.card)}>
       <h2 className={classNames(styles.heading)}>
         Defenses
-        <span className={classNames(styles.summary)}>Max hit taken</span>
+        <span className={classNames(styles.summary)}>Max hit</span>
       </h2>
       <div className={classNames(styles.hits)}>
         {HITS.map(({ key, label, colour }) => (

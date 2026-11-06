@@ -1,7 +1,9 @@
 {
   "repo": "pobredux/pob-redux",
   "file": "crates/pob-engine/lua/bridge.lua",
-  "function": "sanity_check",
   "commit": "3e656e2bf7494eb99ab5d7695c5617720ad8988d",
-  "sha256": "64cfc4ed97be511e7b76f43fe460fd7f366b4d5613296314d6b553f394d30397"
+  "functions": {
+    "sanity_check": "64cfc4ed97be511e7b76f43fe460fd7f366b4d5613296314d6b553f394d30397",
+    "build_summary": "8512e3a9247da4987081ae0b5b9e0ee52359cf22ba7772cc610b793fdfe18c19"
+  }
 }

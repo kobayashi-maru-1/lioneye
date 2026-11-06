@@ -797,15 +797,17 @@ local QUEST_POINTS = {
 	{ 50, 12 }, { 54, 15 }, { 60, 18 }, { 64, 20 }, { 67, 23 },
 }
 
--- Passive points a character of `level` has (level - 1, quest points, bandits after Act 2).
-local function pointsAvailable(level, extra)
-	local quest, act = 0, 0
-	for index, entry in ipairs(QUEST_POINTS) do
-		if level >= entry[1] then
-			quest, act = entry[2], index
-		end
-	end
-	return level - 1 + quest + (act > 2 and extra or 0)
+-- The level a loadout's tree is for, worked out from its passive points the way PoB's
+-- EstimatePlayerProgress does. PoB keeps one level for the whole build (often a guide's
+-- endgame level), so an Act 2 loadout is judged by its own tree, not by that.
+local function levelForPoints(used, extra)
+	local act, level = 0, 1
+	repeat
+		act = act + 1
+		local bandit = act > 2 and extra or 0
+		level = math.min(math.max(used + 1 - QUEST_POINTS[act][2] - bandit, QUEST_POINTS[act][1]), 100)
+	until act == #QUEST_POINTS or level <= QUEST_POINTS[act + 1][1]
+	return level
 end
 
 -- Ascendancy points by level, by PoB's lab suggestions: Normal from 33, Cruel 55,
@@ -822,14 +824,19 @@ end
 -- severity: high, medium, low. panel: the guide panel that fixes it (gear, tree, gems, config).
 local function healthFindings()
 	local o = build.calcsTab.mainOutput or {}
-	local level = build.characterLevel or 1
 	local spec = build.spec
 	local out = setmetatable({}, ARRAY)
-	local function add(severity, message, fix, panel)
-		out[#out + 1] = { severity = severity, message = message, fix = fix, panel = panel }
-	end
 	local function number(value)
 		return type(value) == "number" and value == value and value or 0
+	end
+	local used, ascUsed = 0, 0
+	if spec and spec.CountAllocNodes then
+		used, ascUsed = spec:CountAllocNodes()
+		used, ascUsed = used or 0, ascUsed or 0
+	end
+	local level = levelForPoints(used, number(o.ExtraPoints))
+	local function add(severity, message, fix, panel)
+		out[#out + 1] = { severity = severity, message = message, fix = fix, panel = panel }
 	end
 
 	-- Resistances: none expected before Act 5; half-capped through Acts 5-10; capped in maps.
@@ -845,7 +852,7 @@ local function healthFindings()
 		end
 		if #low > 0 then
 			add((cap == 75 and worst < 50) and "high" or "medium",
-				string.format("Below %d%%: %s", cap, table.concat(low, ", ")),
+				string.format("Resistances below %d%%: %s", cap, table.concat(low, ", ")),
 				"Resistances on rings, amulet, belt, boots, gloves, helmet.", "gear")
 		end
 	end
@@ -857,25 +864,19 @@ local function healthFindings()
 	end
 	if level >= 68 and number(o.ChaosResist) < 0 and not chaosImmune then
 		add("low", string.format("Chaos resistance %.0f%%", number(o.ChaosResist)),
-			"Chaos damage bypasses energy shield.", "gear")
+			"Add chaos resistance on gear.", "gear")
 	end
 
-	-- Passive points for the loadout's level.
-	if spec and spec.CountAllocNodes then
-		local used, ascUsed = spec:CountAllocNodes()
-		local available = pointsAvailable(level, number(o.ExtraPoints))
-		if used > available + 1 then
-			add("high", string.format("%d passive points at level %d (max %d)", used, level, available),
-				"Set the loadout's level, or trim the tree.", "tree")
-		elseif used < available - 1 then
-			add("low", string.format("%d of %d passive points spent", used, available), nil, "tree")
-		end
+	-- Ascendancy points for the labs done by this level. (Redux's spent-points check is left
+	-- out: the level comes from the points.)
+	if spec then
 		local expected = ascendancyExpected(level)
 		if spec.curAscendClassId == 0 and level >= 33 then
 			add("medium", "No ascendancy chosen", "Pick one at the Normal Lab.", "tree")
-		elseif spec.curAscendClassId ~= 0 and (ascUsed or 0) < expected then
-			add("medium", string.format("%d of %d ascendancy points", ascUsed or 0, expected),
-				nextLab(ascUsed - ascUsed % 2) and ("Next: " .. nextLab(ascUsed - ascUsed % 2)) or nil, "tree")
+		elseif spec.curAscendClassId ~= 0 and ascUsed < expected then
+			local lab = nextLab(ascUsed - ascUsed % 2)
+			add("medium", string.format("%d of %d ascendancy points", ascUsed, expected),
+				lab and ("Next: " .. lab) or nil, "tree")
 		end
 	end
 
@@ -890,7 +891,7 @@ local function healthFindings()
 		end
 		if empty > 0 then
 			add(empty >= 3 and "medium" or "low", string.format("%d of 5 flask slots empty", empty),
-				"Life, utility and quicksilver flasks cover most gaps.", "gear")
+				"Add life, quicksilver and utility flasks.", "gear")
 		end
 	end
 
@@ -914,23 +915,31 @@ local function healthFindings()
 		end
 		if actives == 1 and supports < want then
 			add(supports < 3 and "high" or "medium", string.format("Main skill has %d supports", supports),
-				string.format("Most builds run %d at this level.", want), "gems")
+				string.format("Target: %d supports", want), "gems")
 		end
 	end
 
-	if level >= 30 and number(o.Life) < 500 and number(o.EnergyShield) < 500 then
+	-- Mind over Matter builds take hits on mana (Redux skips mana-first builds too).
+	local manaFirst = false
+	for _, node in pairs(spec and spec.allocNodes or {}) do
+		if node.dn == "Mind Over Matter" then
+			manaFirst = true
+		end
+	end
+	if level >= 30 and number(o.Life) < 500 and number(o.EnergyShield) < 500
+		and not (manaFirst and number(o.Mana) >= 500) then
 		add("high", string.format("Life %.0f, energy shield %.0f", number(o.Life), number(o.EnergyShield)),
-			"Both pools are low for this level.", "gear")
+			"Add life on gear and tree.", "gear")
 	end
 	local speed = o.EffectiveMovementSpeedMod or o.MovementSpeedMod
 	if level >= 15 and type(speed) == "number" and speed < 1.15 then
 		add("medium", string.format("Movement speed %+.0f%%", (speed - 1) * 100),
-			"Boots with movement speed shorten the campaign.", "gear")
+			"Get boots with movement speed.", "gear")
 	end
 	local input = build.configTab and build.configTab.input or {}
 	local major, minor = input.pantheonMajorGod, input.pantheonMinorGod
 	if level >= 60 and (major == nil or major == "None") and (minor == nil or minor == "None") then
-		add("low", "No pantheon gods", "Set them in Config.", "config")
+		add("low", "No pantheon gods", nil, "config")
 	end
 
 	local rank = { high = 1, medium = 2, low = 3 }
@@ -978,6 +987,16 @@ local function gemMaxLevels()
 	return gemMaxLevelCache
 end
 
+-- Runs an extra (Build health, Defenses); an error there is logged and gives `fallback`.
+local function safely(fn, fallback)
+	local ok, result = pcall(fn)
+	if ok then
+		return result
+	end
+	host_log("Build health failed: " .. tostring(result))
+	return fallback
+end
+
 -- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
 -- when the build is new to PoB, else the loadout picked last. `id` and the rest are the
 -- guide's remembered main skill (all nil: PoB's own).
@@ -1022,8 +1041,8 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		skills = skillGroups(),
 		passives = passives(),
 		gemMaxLevels = gemMaxLevels(),
-		health = healthFindings(),
-		defences = defences(),
+		health = safely(healthFindings, setmetatable({}, ARRAY)),
+		defences = safely(defences, nil),
 		rows = rows(),
 		warnings = warnings(),
 	})
