@@ -727,9 +727,6 @@ local function skillGroups()
 				or (effect and effect.name)
 			if name then
 				gems[#gems + 1] = {
-					-- The gem's item id and normal top level, for the Trade List's Max level.
-					id = gem.gemData and gem.gemData.gameId,
-					maxLevel = gem.gemData and gem.gemData.naturalMaxLevel,
 					name = name,
 					support = effect and effect.support or nil,
 					enabled = gem.enabled ~= false,
@@ -775,6 +772,21 @@ local function passives()
 	return out
 end
 
+-- Gem top levels other than 20 (Empower 3, Awakened 5, Portal 1...), by gem item id, for
+-- the Trade List's Max gem level. The same for every build, so built once.
+local gemMaxLevelCache
+local function gemMaxLevels()
+	if not gemMaxLevelCache then
+		gemMaxLevelCache = {}
+		for _, gem in pairs(data.gems) do
+			if gem.gameId and gem.naturalMaxLevel and gem.naturalMaxLevel ~= 20 then
+				gemMaxLevelCache[gem.gameId] = gem.naturalMaxLevel
+			end
+		end
+	end
+	return gemMaxLevelCache
+end
+
 -- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
 -- when the build is new to PoB, else the loadout picked last. `id` and the rest are the
 -- guide's remembered main skill (all nil: PoB's own).
@@ -818,6 +830,7 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		config = configRows(build.configTab.configSets[build.configTab.activeConfigSetId]),
 		skills = skillGroups(),
 		passives = passives(),
+		gemMaxLevels = gemMaxLevels(),
 		rows = rows(),
 		warnings = warnings(),
 	})

@@ -9,7 +9,7 @@ import {
 } from "../Gear";
 import {
   type GemLevelOverride,
-  gemMaxLevels,
+  gemMaxLevel,
   type TradeOptions,
   useArt,
   useTradeData,
@@ -82,8 +82,7 @@ export function TradeListPanel() {
   const art = useArt(league);
   const trade = useTradeData();
   const popover = usePopover<Shown>();
-  const skills = stats?.skills;
-  const maxLevels = useMemo(() => gemMaxLevels(skills), [skills]);
+  const maxLevels = stats?.gemMaxLevels;
   const index = useMemo(
     () => (trade ? tradeIndex(trade.stats, trade.items) : null),
     [trade],
@@ -112,10 +111,12 @@ export function TradeListPanel() {
   }, [gemLinks, sets?.skills]);
 
   const percent = (value: number) => `${Math.round(value * 100)}%`;
+  // The nearest stop, so a value saved off the 5% grid still shows.
   const share = (value: number) =>
-    Math.max(
+    SHARES.reduce(
+      (best, stop, i) =>
+        Math.abs(stop - value) < Math.abs(SHARES[best] - value) ? i : best,
       0,
-      SHARES.findIndex((stop) => Math.abs(stop - value) < 0.001),
     );
   const shown = popover.state;
 
@@ -215,11 +216,16 @@ export function TradeListPanel() {
             const unique = item.rarity === "UNIQUE" || item.rarity === "RELIC";
             const icon = artFor(item, art);
             return (
-              <div key={`${slot}-${i}`} className={classNames(styles.row)}>
+              <div
+                key={`${slot}-${id}-${i}`}
+                className={classNames(styles.row)}
+              >
                 <button
                   className={classNames(styles.hover)}
-                  aria-label={`${itemName(item)} details`}
-                  {...popover.bind({ kind: "item", item }, `item-${slot}-${i}`)}
+                  {...popover.bind(
+                    { kind: "item", item },
+                    `item-${slot}-${id}-${i}`,
+                  )}
                 >
                   <span className={classNames(styles.icon)}>
                     {icon && <ItemArt src={icon} className={styles.art} />}
@@ -279,7 +285,6 @@ export function TradeListPanel() {
               <div key={link.id} className={classNames(styles.row)}>
                 <button
                   className={classNames(styles.hover)}
-                  aria-label={`${gem.name} details`}
                   {...popover.bind({ kind: "gem", link }, `gem-${link.id}`)}
                 >
                   <span className={classNames(styles.icon)}>
@@ -315,7 +320,7 @@ export function TradeListPanel() {
                       link.quality,
                       league,
                       options,
-                      maxLevels.get(link.id),
+                      gemMaxLevel(maxLevels, link.id),
                     )}
                     target="_blank"
                     rel="noreferrer"

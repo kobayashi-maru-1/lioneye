@@ -269,7 +269,6 @@ export function tradeUrl(
   return tradeSearch(index, item, slot, league, options).url;
 }
 
-/** A trade search for a gem at (at least) the build's level and quality. */
 /**
  * A gem search. The build's level and quality are minimums, unless the trade options
  * override them: level 1 (exactly), the gem's top level (`maxLevel`, 20 when unknown) or one

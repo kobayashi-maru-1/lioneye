@@ -1,5 +1,4 @@
 import { persistentAtom } from "../../state";
-import type { SkillGroup } from "../PobStats";
 import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 
@@ -221,11 +220,10 @@ export function useTradeOptions() {
   return useAtom(tradeOptionsAtom);
 }
 
-/** Each gem's top level (by gem id), from PoB's gem data for the shown skill set. */
-export function gemMaxLevels(skills: SkillGroup[] | undefined) {
-  const levels = new Map<string, number>();
-  for (const group of skills ?? [])
-    for (const gem of group.gems)
-      if (gem.id && gem.maxLevel) levels.set(gem.id, gem.maxLevel);
-  return levels;
+/** A gem's top level without corruption, from PoB's gem data (20 unless listed). */
+export function gemMaxLevel(
+  levels: Record<string, number> | undefined,
+  gemId: string,
+) {
+  return levels?.[gemId] ?? 20;
 }

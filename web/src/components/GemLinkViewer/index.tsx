@@ -1,4 +1,4 @@
-import { gemMaxLevels, useTradeLeague, useTradeOptions } from "../Gear/data";
+import { gemMaxLevel, useTradeLeague, useTradeOptions } from "../Gear/data";
 import { gemTradeUrl, wikiUrl } from "../Gear/trade-query";
 import { GemCost } from "../GemCost";
 import { InlineFakeBlock } from "../InlineFakeBlock";
@@ -35,8 +35,7 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
   const popover = usePopover<RouteData.GemLink>();
   const { league } = useTradeLeague();
   const [options] = useTradeOptions();
-  const skills = usePobStats()?.stats?.skills;
-  const maxLevels = useMemo(() => gemMaxLevels(skills), [skills]);
+  const maxLevels = usePobStats()?.stats?.gemMaxLevels;
 
   const activeGemLinks: RouteData.GemLinkGroup[] = gemLinks.filter(
     (link) => link.title === gemSections[curIndex],
@@ -64,7 +63,7 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
                     shown.value.quality,
                     league,
                     options,
-                    maxLevels.get(shown.value.id),
+                    gemMaxLevel(maxLevels, shown.value.id),
                   )}
                 >
                   <FaBalanceScale aria-hidden />

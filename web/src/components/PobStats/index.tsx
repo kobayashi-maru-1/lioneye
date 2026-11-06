@@ -121,10 +121,6 @@ export interface Gear {
 
 /** A gem in a socket group of the shown skill set. */
 export interface SkillGem {
-  /** The gem's item id ("Metadata/Items/Gems/SkillGemFireball"). */
-  id?: string;
-  /** The level it reaches without corruption (20; 3 for Empower, 5 for Awakened). */
-  maxLevel?: number;
   name: string;
   support?: boolean;
   enabled: boolean;
@@ -163,6 +159,8 @@ export interface Stats {
   config: ConfigRow[];
   skills: SkillGroup[];
   passives: Passive[];
+  /** Gem top levels other than 20 (Empower 3, Awakened 5), by gem item id. */
+  gemMaxLevels: Record<string, number>;
   rows: StatRow[];
   warnings: string[];
 }
@@ -387,6 +385,10 @@ async function fetchStats(
       gems: list(group.gems),
     })),
     passives: list(stats.passives),
+    gemMaxLevels:
+      stats.gemMaxLevels && !Array.isArray(stats.gemMaxLevels)
+        ? stats.gemMaxLevels
+        : {},
     rows: list(stats.rows),
     warnings: list(stats.warnings),
   };
