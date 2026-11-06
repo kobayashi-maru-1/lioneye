@@ -29,21 +29,14 @@ import type { TaskListProps } from "../../components/TaskList";
 import { currentActAtom } from "../../state/current-act";
 import { gemLinksSelector } from "../../state/gem-links";
 import { gemProgressFamily } from "../../state/gem-progress";
-import {
-  CAMPAIGN_TIP_STEPS,
-  overlayCampaignAtom,
-  overlayGemsAtom,
-  shownPanelsAtom,
-} from "../../state/overlay";
+import { overlayGemsAtom, shownPanelsAtom } from "../../state/overlay";
 import { pageSectionCollapseFamily } from "../../state/page-section-collapse";
 import { pobAtom } from "../../state/pob";
 import {
-  activeEdgeAtom,
   campaignInViewAtom,
   routeSelector,
   scrollToActiveEdgeEffect,
 } from "../../state/route";
-import { type StepPart, stepParts } from "../../state/step-text";
 import { routeProgressFamily } from "../../state/route-progress";
 import { searchStringsSelector } from "../../state/search-strings";
 import { type UrlTree, urlTreesSelector } from "../../state/tree/url-tree";
@@ -76,7 +69,6 @@ interface ProgressRef {
 export default function RoutesContainer() {
   useAtom(scrollToActiveEdgeEffect);
   const route = useAtomValue(routeSelector);
-  useCampaignTip(route);
 
   // Every step's done flag in route order, for shift-click ranges.
   const order = useMemo(() => {
@@ -516,50 +508,6 @@ function useFoldCampaignAtEnd() {
     if (ended && !wasEnded.current) setFolded(true);
     wasEnded.current = ended;
   }, [ended]);
-}
-
-/**
- * The next few unfinished steps after your current zone's own line, as text, for the
- * in-game bar's Campaign tooltip. Follows zone changes and ticked steps.
- */
-function useCampaignTip(route: RouteData.Route) {
-  const nextStepsAtom = useMemo(
-    () =>
-      atom((get) => {
-        const active = get(activeEdgeAtom)[0];
-        // Before your zone's line is found (a new route), start from the top.
-        const hasActive = route.sections.some((section) =>
-          section.steps.some(
-            (step) =>
-              step.type === "fragment_step" && step.edgeIndex === active,
-          ),
-        );
-        let started = !hasActive;
-        const steps: StepPart[][] = [];
-        for (const [sectionIndex, section] of route.sections.entries()) {
-          for (const [stepIndex, step] of section.steps.entries()) {
-            if (!started) {
-              // Your zone's own line ("➞ The Coast") is where you are, not next.
-              if (step.type === "fragment_step" && step.edgeIndex === active)
-                started = true;
-              continue;
-            }
-            const done =
-              step.type === "fragment_step"
-                ? get(routeProgressFamily([sectionIndex, stepIndex].toString()))
-                : get(gemProgressFamily(step.requiredGem.id));
-            if (done) continue;
-            steps.push(stepParts(step));
-            if (steps.length === CAMPAIGN_TIP_STEPS) return steps;
-          }
-        }
-        return steps;
-      }),
-    [route],
-  );
-  const nextSteps = useAtomValue(nextStepsAtom);
-  const setTip = useSetAtom(overlayCampaignAtom);
-  useEffect(() => setTip(nextSteps), [nextSteps]);
 }
 
 /** Where each wide-layout column was scrolled, kept while you're on Settings. */

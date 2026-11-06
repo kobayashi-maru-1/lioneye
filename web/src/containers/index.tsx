@@ -2,6 +2,7 @@ import { ErrorFallback } from "../components/ErrorFallback";
 import { Loading } from "../components/Loading";
 import { useAutoProgress } from "../components/AutoProgress";
 import { AppBar } from "../components/AppBar";
+import { CampaignTip } from "../components/CampaignTip";
 import { pipe } from "../utility";
 import { withBlank } from "../utility/withBlank";
 import { withScrollRestoration } from "../utility/withScrollRestoration";
@@ -24,6 +25,10 @@ export function App() {
   return (
     <>
       <AppBar />
+      {/* The in-game bar's Campaign tooltip, kept current on every page. */}
+      <Suspense fallback={null}>
+        <CampaignTip />
+      </Suspense>
       <Suspense fallback={<Loading />}>
         <ErrorBoundary FallbackComponent={ErrorFallback}>
           <Routes>

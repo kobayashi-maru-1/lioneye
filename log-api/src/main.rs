@@ -409,8 +409,19 @@ fn show_guide(browser: Browser, url: &str) {
 fn open_browser(browser: Browser, url: &str) {
     let result = match browser {
         Browser::None => return,
-        Browser::App if default_is_chrome() => spawn_app_window("chrome", url),
-        Browser::App | Browser::Edge => spawn_edge(url),
+        // Chrome when it's the default and installed; Edge if that fails or it isn't.
+        Browser::App => match default_chrome() {
+            Some(chrome) => std::process::Command::new(chrome)
+                .arg(format!("--app={url}"))
+                .spawn()
+                .map(|_| ())
+                .or_else(|err| {
+                    warn!("Couldn't start Chrome ({err}); using Edge");
+                    spawn_edge(url)
+                }),
+            None => spawn_edge(url),
+        },
+        Browser::Edge => spawn_edge(url),
         Browser::Default => spawn_default(url),
     };
     if let Err(err) = result {
@@ -435,20 +446,24 @@ fn spawn_app_window(browser: &str, url: &str) -> std::io::Result<()> {
         .map(|_| ())
 }
 
-/// True when Chrome is the default web browser (Windows' choice for https links).
+/// A registry string value (`name` None: the key's default value).
 #[cfg(windows)]
-fn default_is_chrome() -> bool {
-    use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW};
+fn registry_string(
+    root: windows_sys::Win32::System::Registry::HKEY,
+    key: &str,
+    name: Option<&str>,
+) -> Option<String> {
+    use windows_sys::Win32::System::Registry::{RRF_RT_REG_SZ, RegGetValueW};
     let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
-    let key = wide(r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice");
-    let name = wide("ProgId");
-    let mut buf = [0u16; 128];
+    let key = wide(key);
+    let name = name.map(wide);
+    let mut buf = [0u16; 1024];
     let mut size = std::mem::size_of_val(&buf) as u32;
     let status = unsafe {
         RegGetValueW(
-            HKEY_CURRENT_USER,
+            root,
             key.as_ptr(),
-            name.as_ptr(),
+            name.as_ref().map_or(std::ptr::null(), |n| n.as_ptr()),
             RRF_RT_REG_SZ,
             std::ptr::null_mut(),
             buf.as_mut_ptr().cast(),
@@ -456,16 +471,37 @@ fn default_is_chrome() -> bool {
         )
     };
     if status != 0 {
-        return false;
+        return None;
     }
     let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
-    // Chrome's ProgId is "ChromeHTML" (also for Beta, Dev and Canary).
-    String::from_utf16_lossy(&buf[..len]).starts_with("ChromeHTML")
+    Some(String::from_utf16_lossy(&buf[..len]))
+}
+
+/// Chrome's program, when Chrome is the default web browser (Windows' choice for https
+/// links) and is still installed.
+#[cfg(windows)]
+fn default_chrome() -> Option<PathBuf> {
+    use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    let prog_id = registry_string(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice",
+        Some("ProgId"),
+    )?;
+    // Stable Chrome's ProgId; Beta, Dev and Canary use others and get Edge.
+    if !prog_id.starts_with("ChromeHTML") {
+        return None;
+    }
+    let app_path = r"Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
+    [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE]
+        .into_iter()
+        .filter_map(|root| registry_string(root, app_path, None))
+        .map(PathBuf::from)
+        .find(|path| path.is_file())
 }
 
 #[cfg(not(windows))]
-fn default_is_chrome() -> bool {
-    false
+fn default_chrome() -> Option<PathBuf> {
+    None
 }
 
 #[cfg(not(windows))]
