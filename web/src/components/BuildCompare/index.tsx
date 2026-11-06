@@ -4,6 +4,7 @@ import { formStyles } from "../../styles";
 import { fetchStringOrUrl } from "../../utility";
 import { BuildTitle, HeadlineNumbers, format } from "../BuildHeader/headline";
 import { URL_REWRITERS } from "../BuildImportForm";
+import { stripPob } from "../PobText";
 import { RARITY_COLOURS, itemName } from "../Gear";
 import { Modal } from "../Modal";
 import {
@@ -44,7 +45,7 @@ const KIND_TITLES: Record<PassiveKind, string> = {
   Ascendancy: "Ascendancy",
   Mastery: "Masteries",
   Socket: "Sockets",
-  Normal: "Small",
+  Normal: "Small passives",
 };
 
 /** Your build, calculated by the exe's PoB, kept with the code it came from. */
@@ -80,10 +81,18 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
   const [importError, setImportError] = useState<string | null>(null);
   const [yours, setYours] = useState<Yours | null>(null);
   const [tab, setTab] = useState<Tab>("stats");
-  // The guide's shown loadout (the header's Loadout picker).
+  // Asks PoB again for the same code (after a failure, or the same code pasted again).
+  const [attempt, setAttempt] = useState(0);
+  // The guide's shown loadout (the header's Loadout picker), once PoB has answered for it.
   const pob = usePobStats();
   const guide = pob?.stats ?? null;
-  const loadoutTitle = pob?.titles[pob.index];
+  const guideReady = guide !== null && !pob?.loading && !pob?.error;
+  const guideNote = pob?.error
+    ? "Not calculated. Pick the loadout again."
+    : !guideReady
+      ? "Calculating…"
+      : undefined;
+  const loadoutTitle = guide?.loadout ? stripPob(guide.loadout) : undefined;
 
   // Your build's stats, for the saved code.
   useEffect(() => {
@@ -92,7 +101,7 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
     try {
       xml = pobCodeToXml(code);
     } catch {
-      setYours({ code, error: "Code not read. Paste a PoB code." });
+      setYours({ code, error: "Code not read. Choose Change." });
       return;
     }
     const controller = new AbortController();
@@ -101,13 +110,11 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
       .then((stats) => setYours({ code, stats }))
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
-        setYours({
-          code,
-          error: err instanceof Error ? err.message : String(err),
-        });
+        console.warn("Compare: PoB failed", err);
+        setYours({ code, error: "Not calculated. Retry or restart the app." });
       });
     return () => controller.abort();
-  }, [code]);
+  }, [code, attempt]);
 
   const submit = async () => {
     const text = draft.trim();
@@ -123,6 +130,7 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
         return;
       }
       setCode(value);
+      setAttempt((n) => n + 1);
       setEditing(false);
       setDraft("");
     } catch {
@@ -198,8 +206,17 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
                 tag="Guide"
                 stats={guide ?? undefined}
                 loadout={loadoutTitle}
+                note={guideNote}
               />
             </div>
+            {ready?.error && (
+              <button
+                className={classNames(formStyles.formButton)}
+                onClick={() => setAttempt((n) => n + 1)}
+              >
+                Retry
+              </button>
+            )}
             <button
               className={classNames(formStyles.formButton)}
               onClick={() => {
@@ -207,10 +224,10 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
                 setEditing(true);
               }}
             >
-              New
+              Change
             </button>
           </div>
-          {ready?.stats && guide && (
+          {ready?.stats && guide && guideReady && (
             <Differences
               yours={ready.stats}
               guide={guide}
@@ -286,7 +303,10 @@ function Differences({
           <button
             key={id}
             role="tab"
+            id={`compare-tab-${id}`}
+            aria-controls="compare-panel"
             aria-selected={tab === id}
+            aria-label={`${label}, ${diffs[id].length}`}
             className={classNames(formStyles.formButton, styles.tab, {
               [styles.active]: tab === id,
             })}
@@ -297,7 +317,12 @@ function Differences({
           </button>
         ))}
       </div>
-      <div className={classNames(styles.panel)} role="tabpanel">
+      <div
+        className={classNames(styles.panel)}
+        role="tabpanel"
+        id="compare-panel"
+        aria-labelledby={`compare-tab-${tab}`}
+      >
         {diffs[tab].length === 0 ? (
           <div className={classNames(styles.note)}>No differences</div>
         ) : tab === "stats" ? (
@@ -436,6 +461,9 @@ function Gems({ group, marked }: { group?: SkillGroup; marked: string[] }) {
               })}
             >
               {gem.name}
+              {at >= 0 && (
+                <span className={classNames(styles.hidden)}> (only here)</span>
+              )}
             </li>
           );
         })}
@@ -496,6 +524,13 @@ function ItemCell({
       >
         {itemName(item)}
       </div>
+      {(item.sockets || item.corrupted) && (
+        <div className={classNames(styles.meta)}>
+          {[item.sockets, item.corrupted ? "Corrupted" : undefined]
+            .filter(Boolean)
+            .join(" · ")}
+        </div>
+      )}
       {only.length > 0 && (
         <>
           <div className={classNames(styles.subhead)}>Only here</div>

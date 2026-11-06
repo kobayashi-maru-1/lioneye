@@ -19,12 +19,22 @@ export interface StatDiff {
   diff?: number;
 }
 
-/** "Total Life:" → "Total Life"; repeated labels get " (2)", " (3)". */
+/**
+ * "Total Life:" → "Total Life". PoB lists a minion's stats under "Minion:" with the
+ * player's labels, so those get "Minion " in front. Other repeats get " (2)", " (3)".
+ */
 function statValues(rows: StatRow[]) {
   const values = new Map<string, string>();
+  let section = "";
   for (const row of rows) {
+    if ("text" in row) {
+      const header = stripPob(row.text).trim();
+      if (header === "Minion:") section = "Minion ";
+      else if (header === "Player:") section = "";
+      continue;
+    }
     if (!("label" in row)) continue;
-    const base = stripPob(row.label).trim().replace(/:$/, "");
+    const base = section + stripPob(row.label).trim().replace(/:$/, "");
     let label = base;
     for (let n = 2; values.has(label); n++) label = `${base} (${n})`;
     values.set(label, stripPob(row.value).trim());
@@ -128,19 +138,46 @@ export function itemDiff(
   return { slot, yours, guide, onlyYours, onlyGuide, rolls };
 }
 
+/** Same item: name, base, sockets and links, quality, corruption and every mod. */
 function sameItem(diff: ItemDiff) {
+  const { yours, guide } = diff;
   return (
-    diff.yours?.name === diff.guide?.name &&
-    diff.yours?.base === diff.guide?.base &&
+    yours?.name === guide?.name &&
+    yours?.base === guide?.base &&
+    yours?.sockets === guide?.sockets &&
+    (yours?.quality ?? 0) === (guide?.quality ?? 0) &&
+    !!yours?.corrupted === !!guide?.corrupted &&
     diff.onlyYours.length === 0 &&
     diff.onlyGuide.length === 0 &&
     diff.rolls.length === 0
   );
 }
 
+/** Slots whose items may sit either way round: matched by item when swapped. */
+const SWAPPABLE: [string, string][] = [["Ring 1", "Ring 2"]];
+
 export function itemDiffs(yours: Stats, guide: Stats): ItemDiff[] {
   const mine = equipped(yours);
   const theirs = equipped(guide);
+  for (const [a, b] of SWAPPABLE) {
+    const straight = [
+      itemDiff(a, mine.get(a), theirs.get(a)),
+      itemDiff(b, mine.get(b), theirs.get(b)),
+    ];
+    const crossed = [
+      itemDiff(a, mine.get(b), theirs.get(a)),
+      itemDiff(b, mine.get(a), theirs.get(b)),
+    ];
+    const matches = (diffs: ItemDiff[]) => diffs.filter(sameItem).length;
+    if (matches(crossed) > matches(straight)) {
+      const first = mine.get(a);
+      const second = mine.get(b);
+      if (second) mine.set(a, second);
+      else mine.delete(a);
+      if (first) mine.set(b, first);
+      else mine.delete(b);
+    }
+  }
   const slots = [
     ...theirs.keys(),
     ...[...mine.keys()].filter((s) => !theirs.has(s)),
@@ -153,7 +190,7 @@ export function itemDiffs(yours: Stats, guide: Stats): ItemDiff[] {
 // Skills ------------------------------------------------------------------------------
 
 export interface SkillDiff {
-  /** The group's main skill gem (or its first gem). */
+  /** The group's active gems (or its first gem), in name order. */
   name: string;
   yours?: SkillGroup;
   guide?: SkillGroup;
@@ -167,16 +204,28 @@ function gemNames(group: SkillGroup | undefined) {
   return group?.gems.filter((gem) => gem.enabled).map((gem) => gem.name) ?? [];
 }
 
-function mainGem(group: SkillGroup) {
+/** A group's active (non-support) gems, or its first gem when all are supports. */
+function activeGems(group: SkillGroup) {
   const gems = group.gems.filter((gem) => gem.enabled);
-  return (gems.find((gem) => !gem.support) ?? gems[0])?.name;
+  const active = gems.filter((gem) => !gem.support).map((gem) => gem.name);
+  return active.length > 0 ? active : gems.slice(0, 1).map((gem) => gem.name);
+}
+
+/** "Clarity + Herald of Ash": gem order in PoB means nothing, so names are sorted. */
+function groupName(group: SkillGroup) {
+  return [...activeGems(group)].sort().join(" + ");
 }
 
 /** Enabled, socketed groups (granted skills come with items and show under Items). */
 function compared(groups: SkillGroup[]) {
   return groups.filter(
-    (group) => group.enabled && !group.granted && mainGem(group) !== undefined,
+    (group) => group.enabled && !group.granted && activeGems(group).length > 0,
   );
+}
+
+/** Gems two groups share, counting repeats. */
+function shared(a: string[], b: string[]) {
+  return a.length - without(a, b).length;
 }
 
 /** What's in `a` and not in `b`, counting repeats. */
@@ -194,11 +243,21 @@ export function skillDiffs(yours: Stats, guide: Stats): SkillDiff[] {
   const mine = compared(yours.skills);
   const out: SkillDiff[] = [];
   for (const group of compared(guide.skills)) {
-    const name = mainGem(group)!;
-    const at = mine.findIndex((g) => mainGem(g) === name);
+    // Your group sharing an active gem with it and the most gems overall.
+    const active = activeGems(group);
+    let at = -1;
+    let best = 0;
+    mine.forEach((candidate, index) => {
+      if (shared(activeGems(candidate), active) === 0) return;
+      const score = shared(gemNames(candidate), gemNames(group));
+      if (score > best) {
+        best = score;
+        at = index;
+      }
+    });
     const match = at >= 0 ? mine.splice(at, 1)[0] : undefined;
     out.push({
-      name,
+      name: groupName(group),
       yours: match,
       guide: group,
       missing: without(gemNames(group), gemNames(match)),
@@ -207,7 +266,7 @@ export function skillDiffs(yours: Stats, guide: Stats): SkillDiff[] {
   }
   for (const group of mine) {
     out.push({
-      name: mainGem(group)!,
+      name: groupName(group),
       yours: group,
       missing: [],
       extra: gemNames(group),

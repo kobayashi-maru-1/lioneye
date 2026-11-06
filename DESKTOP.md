@@ -72,7 +72,7 @@ once in **Settings** (the ⚙ at the top right).
   pobb.in, poe.ninja, pastebin or maxroll link. The same bundled PoB calculates it, and the
   Stats, Passives, Skills and Items tabs list what differs from the shown loadout. Passives
   match by name, so a build on another tree version still lines up. The last code is
-  remembered; **New** pastes another. PoB holds one build at a time, so the guide's next
+  remembered; **Change** pastes another. PoB holds one build at a time, so the guide's next
   loadout change takes a few seconds longer after a compare.
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows

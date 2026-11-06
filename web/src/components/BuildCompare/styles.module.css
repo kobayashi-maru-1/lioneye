@@ -218,3 +218,19 @@
   font-weight: var(--font-heavy);
   text-transform: uppercase;
 }
+
+/* Sockets and links ("R-G-B B"), corruption. */
+.meta {
+  color: #8f8f8f;
+  font-size: 0.85rem;
+}
+
+/* Read by screen readers only. */
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
