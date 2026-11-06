@@ -11,6 +11,12 @@ import {
   shownPanelsAtom,
 } from "../../state/overlay";
 import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
+import {
+  pageMode,
+  restoreStorage,
+  startedFresh,
+  storageSnapshot,
+} from "../../state/saved-state";
 import { pageSectionId, useJumpToSection } from "../PageSection";
 import { autoProgressAtom } from "../../state/auto-progress";
 import { levelLineAtom } from "../../state/level-lines";
@@ -35,6 +41,13 @@ export function useAutoProgress() {
     reconnectInterval: 1000,
     onMessage(event) {
       if (typeof event.data !== "string") return;
+      // The exe's copy of the guide's saved data (sent first on connect).
+      if (event.data.startsWith("state:")) {
+        takeSavedState(event.data.slice("state:".length), sendMessage);
+        return;
+      }
+      // A window opened only to send its profile's data to the exe does nothing else.
+      if (pageMode === "migrate") return;
       // A button on the in-game bar.
       if (event.data.startsWith("jump:")) {
         jump(event.data.slice("jump:".length));
@@ -78,11 +91,18 @@ export function useAutoProgress() {
   // and send the bar's settings whenever they or the build's panels change.
   const settings = useAtomValue(overlaySettingsAtom);
   const shown = useAtomValue(shownPanelsAtom);
+  const talks = readyState === ReadyState.OPEN && pageMode !== "migrate";
   useEffect(() => {
-    if (readyState === ReadyState.OPEN) sendMessage("guide");
-  }, [readyState]);
+    if (talks) sendMessage("guide");
+  }, [talks]);
+  // The guide's own window keeps the exe's copy of its data current.
   useEffect(() => {
-    if (readyState !== ReadyState.OPEN) return;
+    if (!talks || pageMode !== "own") return;
+    const timer = setInterval(() => uploadSavedState(sendMessage), 5000);
+    return () => clearInterval(timer);
+  }, [talks]);
+  useEffect(() => {
+    if (!talks) return;
     const buttons =
       shown === null
         ? undefined
@@ -91,22 +111,60 @@ export function useAutoProgress() {
               settings.panels.includes(panel.id) && shown.includes(panel.id),
           ).map(({ id, label }) => ({ id, label }));
     sendMessage(`overlay:${JSON.stringify({ on: settings.on, buttons })}`);
-  }, [readyState, settings, shown]);
+  }, [talks, settings, shown]);
   // The bar's tooltips: the Gems panel's set and Campaign's next steps.
   const gems = useAtomValue(overlayGemsAtom);
   useEffect(() => {
-    if (readyState === ReadyState.OPEN && gems !== undefined)
+    if (talks && gems !== undefined)
       sendMessage(`tip:gems:${JSON.stringify(gems)}`);
-  }, [readyState, gems]);
+  }, [talks, gems]);
   const campaign = useAtomValue(overlayCampaignAtom);
   useEffect(() => {
-    if (readyState === ReadyState.OPEN && campaign !== undefined)
+    if (talks && campaign !== undefined)
       sendMessage(`tip:campaign:${JSON.stringify(campaign)}`);
-  }, [readyState, campaign]);
+  }, [talks, campaign]);
 }
 
 /** The exe's build this page was served by (its first "build:" message). */
 let seenBuild: string | null = null;
+
+/** The own window has the exe's copy (and restored it if it started fresh): it may upload. */
+let savedStateReady = false;
+/** What was last uploaded, so only changes are sent. */
+let uploaded = "";
+
+/**
+ * The exe's copy of the guide's saved data arrived ("null" before anything was saved):
+ * - a window opened to move an old profile's data sends what that profile has;
+ * - the guide's own window, started with nothing stored, loads the copy and reloads.
+ */
+function takeSavedState(json: string, send: (message: string) => void) {
+  if (pageMode === "migrate") {
+    send(`state-offer:${JSON.stringify(storageSnapshot())}`);
+    return;
+  }
+  if (pageMode !== "own" || savedStateReady) return;
+  let saved: Record<string, string> | null = null;
+  try {
+    saved = JSON.parse(json) as Record<string, string> | null;
+  } catch {
+    saved = null;
+  }
+  if (startedFresh && saved !== null && Object.keys(saved).length > 0) {
+    restoreStorage(saved);
+    location.reload();
+    return;
+  }
+  savedStateReady = true;
+}
+
+function uploadSavedState(send: (message: string) => void) {
+  if (!savedStateReady) return;
+  const snapshot = JSON.stringify(storageSnapshot());
+  if (snapshot === uploaded) return;
+  uploaded = snapshot;
+  send(`state:${snapshot}`);
+}
 
 /**
  * Jumps to a panel for the in-game bar: from Settings, back to the guide first. Campaign

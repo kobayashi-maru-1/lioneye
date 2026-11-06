@@ -41,6 +41,8 @@ pub struct AppState {
     /// Tooltips for the in-game bar's buttons, from the guide: panel id → JSON (the Gems
     /// panel's set, Campaign's next steps). Passed on to the bar as is.
     pub tips: Arc<watch::Sender<Tips>>,
+    /// The guide's saved data, kept by the exe (saved_state.rs).
+    pub saved: Arc<crate::saved_state::SavedState>,
 }
 
 pub type Tips = std::collections::BTreeMap<String, String>;
@@ -294,6 +296,13 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
     if socket.send(Message::Text(all.into())).await.is_err() {
         return;
     }
+    if socket
+        .send(Message::Text(state.saved.message().into()))
+        .await
+        .is_err()
+    {
+        return;
+    }
     info!("Page connected");
 
     loop {
@@ -371,6 +380,14 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                                 true
                             });
                         }
+                    } else if let Some(json) = text.strip_prefix("state:") {
+                        // The guide's own window: its data changed. Written off the runtime.
+                        let saved = state.saved.clone();
+                        let json = json.to_string();
+                        let _ = tokio::task::spawn_blocking(move || saved.save(&json)).await;
+                    } else if let Some(json) = text.strip_prefix("state-offer:") {
+                        // A window opened in an old Edge profile, for the one-time move.
+                        state.saved.offer(json);
                     }
                 }
                 Some(Ok(_)) => {}

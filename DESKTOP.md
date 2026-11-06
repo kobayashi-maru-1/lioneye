@@ -2,8 +2,8 @@
 
 One Windows program, `exile-leveling.exe`, that runs the leveling guide and the
 auto-progress log watcher together. It serves the guide at
-http://127.0.0.1:6754 and opens it in a borderless app window: Chrome when it's your
-default browser, otherwise Edge (part of every Windows 10 and 11 PC).
+http://127.0.0.1:6754 and opens it in a borderless Edge app window (Edge is part of every
+Windows 10 and 11 PC, whichever browser you use).
 
 ## Run
 
@@ -13,9 +13,9 @@ default browser, otherwise Edge (part of every Windows 10 and 11 PC).
    The icon's tooltip shows **Waiting** or **Auto**.
    The log is at `%LOCALAPPDATA%\exile-leveling\exile-leveling.log`. Started from a terminal,
    it also prints there; the prompt returns right away, and Ctrl+C in that terminal quits it.
-2. The guide opens in an app window (Chrome or Edge, as above). Drag it to the monitor you
-   want; the browser remembers its size and place next time. After an update the open
-   window reloads itself when the new exe starts.
+2. The guide opens in its own Edge profile (`%LOCALAPPDATA%\exile-leveling\browser`), apart
+   from the profiles you browse with. Drag it to the monitor you want; it opens there next
+   time. After an update the open window reloads itself when the new exe starts.
 3. Start Path of Exile. The pill at the top right of the panel turns green (**Auto**)
    once the game's log is found, and the route advances as you change zones.
 
@@ -23,14 +23,17 @@ Running the exe again while it's already open brings its window to the front.
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--browser app\|edge\|default\|none` | `app` | How to open the guide on start: an app window in Chrome if it's the default browser, else Edge (`app`); always Edge (`edge`); a normal tab (`default`); nothing (`none`) |
+| `--browser app\|edge\|default\|none` | `app` | How to open the guide on start: an Edge app window in the guide's own profile (`app`); an Edge app window in your last-used Edge profile, as before 0.3 (`edge`); a normal tab in your default browser (`default`); nothing (`none`) |
 | `--log-path <file>` | found from the game | Use this `Client.txt` / `LatestClient.txt` |
 | `--address <ip:port>` | `127.0.0.1:6754` | Where to serve. Keep the port the same: progress is saved per address |
 | `--heart-beat <secs>` | `1` | How often the log is read |
 
-Progress, your imported build and layout are saved in the browser the guide opens in
-(Chrome or Edge) for `127.0.0.1:6754`; changing your default browser starts them fresh. Builds imported on the hosted site don't carry over, so import
-your PoB once in **Settings** (the ⚙ at the top right).
+Progress, your imported build and layout are saved in the guide's window, and the exe keeps
+a copy in `%LOCALAPPDATA%\exile-leveling\state.json`: a new or reset guide profile picks up
+from it. The first start after updating from 0.2 or earlier moves them from your Edge
+profiles: the guide opens briefly in each, and the most complete (the one with an imported
+build first) is kept. Builds imported on the hosted site don't carry over, so import your
+PoB once in **Settings** (the ⚙ at the top right).
 
 ## Using the guide
 

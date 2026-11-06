@@ -8,11 +8,16 @@ use tokio::sync::{broadcast, watch};
 use tracing::{error, info, warn};
 
 #[cfg(windows)]
+mod edge;
+#[cfg(windows)]
+mod guide_move;
+#[cfg(windows)]
 mod guide_window;
 mod log_reader;
 #[cfg(windows)]
 mod overlay;
 mod pob;
+mod saved_state;
 mod web_data;
 mod server;
 #[cfg(windows)]
@@ -21,9 +26,9 @@ mod watcher;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
 enum Browser {
-    /// Borderless app window in Chrome when it's your default browser, else in Edge
+    /// Borderless Edge app window in the guide's own profile (remembers its place and data)
     App,
-    /// Borderless Microsoft Edge app window (remembers its size and position)
+    /// Borderless Edge app window in your last-used Edge profile (as before 0.3)
     Edge,
     /// Your default browser, in a normal tab
     Default,
@@ -103,6 +108,8 @@ fn main() -> ExitCode {
     let (overlay_tx, overlay_rx) = watch::channel(overlay_config);
     // A bar button with no guide open asks the tray thread to open one.
     let (open_tx, open_rx) = std::sync::mpsc::channel::<()>();
+    // The guide's saved data, kept by the exe for the guide's own browser profile.
+    let saved = std::sync::Arc::new(saved_state::SavedState::load(data_dir().join("state.json")));
     let state = server::AppState {
         lines: lines_tx.clone(),
         status: status_rx.clone(),
@@ -110,17 +117,28 @@ fn main() -> ExitCode {
         overlay: std::sync::Arc::new(overlay_tx),
         guides: std::sync::Arc::new(server::Guides::new(open_tx)),
         tips: std::sync::Arc::new(watch::channel(server::Tips::new()).0),
+        saved: saved.clone(),
     };
+    // First run since the guide got its own profile: move its data from your Edge profiles.
+    #[cfg(windows)]
+    let moving = (args.browser == Browser::App && guide_move::GuideMove::needed(&saved))
+        .then(|| guide_move::GuideMove::start(&url));
+    #[cfg(windows)]
+    let opening = moving.is_none();
+    #[cfg(not(windows))]
+    let opening = true;
     #[cfg(windows)]
     let bar = Bar {
         overlay: overlay::Overlay::new(&url, overlay_rx, &saved_overlay),
         open_requests: open_rx,
+        moving,
+        saved,
     };
     #[cfg(not(windows))]
-    let _ = (overlay_rx, open_rx);
+    let _ = (overlay_rx, open_rx, saved);
 
     // A guide window left open from an earlier run reconnects by itself; bring it up instead.
-    if args.browser != Browser::None {
+    if opening && args.browser != Browser::None {
         show_guide(args.browser, &url);
     }
 
@@ -149,6 +167,9 @@ fn main() -> ExitCode {
 struct Bar {
     overlay: overlay::Overlay,
     open_requests: std::sync::mpsc::Receiver<()>,
+    /// The one-time move of the guide's data from your Edge profiles, while it runs.
+    moving: Option<guide_move::GuideMove>,
+    saved: std::sync::Arc<saved_state::SavedState>,
 }
 
 /// `%LOCALAPPDATA%\exile-leveling` (or the temp folder): the log, caches and saved settings.
@@ -223,6 +244,16 @@ fn wait(
     // Clicks before the new guide connects would each open another window: one is enough.
     let mut last_open: Option<std::time::Instant> = None;
     let tick = || {
+        // While the guide's data is moving, its windows come and go: no other opening.
+        if let Some(moving) = &mut bar.moving {
+            if moving.tick(&bar.saved) {
+                bar.moving = None;
+                open_browser(browser, url);
+            }
+            while bar.open_requests.try_recv().is_ok() {}
+            bar.overlay.tick();
+            return;
+        }
         if bar.open_requests.try_recv().is_ok()
             && last_open.is_none_or(|t| t.elapsed() >= Duration::from_secs(5))
         {
@@ -409,104 +440,17 @@ fn show_guide(browser: Browser, url: &str) {
 fn open_browser(browser: Browser, url: &str) {
     let result = match browser {
         Browser::None => return,
-        // Chrome when it's the default and installed; Edge if that fails or it isn't.
-        Browser::App => match default_chrome() {
-            Some(chrome) => std::process::Command::new(chrome)
-                .arg(format!("--app={url}"))
-                .spawn()
-                .map(|_| ())
-                .or_else(|err| {
-                    warn!("Couldn't start Chrome ({err}); using Edge");
-                    spawn_edge(url)
-                }),
-            None => spawn_edge(url),
-        },
-        Browser::Edge => spawn_edge(url),
+        #[cfg(windows)]
+        Browser::App => edge::open_own(url),
+        #[cfg(windows)]
+        Browser::Edge => edge::open_last_profile(url),
+        #[cfg(not(windows))]
+        Browser::App | Browser::Edge => spawn_default(url),
         Browser::Default => spawn_default(url),
     };
     if let Err(err) = result {
         warn!("Could not open the guide ({}). Open {} yourself.", err, url);
     }
-}
-
-#[cfg(windows)]
-fn spawn_edge(url: &str) -> std::io::Result<()> {
-    spawn_app_window("msedge", url)
-}
-
-/// A borderless app window of a Chromium browser ("msedge", "chrome") showing the guide.
-#[cfg(windows)]
-fn spawn_app_window(browser: &str, url: &str) -> std::io::Result<()> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    std::process::Command::new("cmd")
-        .args(["/C", "start", "", browser, &format!("--app={url}")])
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn()
-        .map(|_| ())
-}
-
-/// A registry string value (`name` None: the key's default value).
-#[cfg(windows)]
-fn registry_string(
-    root: windows_sys::Win32::System::Registry::HKEY,
-    key: &str,
-    name: Option<&str>,
-) -> Option<String> {
-    use windows_sys::Win32::System::Registry::{RRF_RT_REG_SZ, RegGetValueW};
-    let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
-    let key = wide(key);
-    let name = name.map(wide);
-    let mut buf = [0u16; 1024];
-    let mut size = std::mem::size_of_val(&buf) as u32;
-    let status = unsafe {
-        RegGetValueW(
-            root,
-            key.as_ptr(),
-            name.as_ref().map_or(std::ptr::null(), |n| n.as_ptr()),
-            RRF_RT_REG_SZ,
-            std::ptr::null_mut(),
-            buf.as_mut_ptr().cast(),
-            &mut size,
-        )
-    };
-    if status != 0 {
-        return None;
-    }
-    let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
-    Some(String::from_utf16_lossy(&buf[..len]))
-}
-
-/// Chrome's program, when Chrome is the default web browser (Windows' choice for https
-/// links) and is still installed.
-#[cfg(windows)]
-fn default_chrome() -> Option<PathBuf> {
-    use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
-    let prog_id = registry_string(
-        HKEY_CURRENT_USER,
-        r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice",
-        Some("ProgId"),
-    )?;
-    // Stable Chrome's ProgId; Beta, Dev and Canary use others and get Edge.
-    if !prog_id.starts_with("ChromeHTML") {
-        return None;
-    }
-    let app_path = r"Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
-    [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE]
-        .into_iter()
-        .filter_map(|root| registry_string(root, app_path, None))
-        .map(PathBuf::from)
-        .find(|path| path.is_file())
-}
-
-#[cfg(not(windows))]
-fn default_chrome() -> Option<PathBuf> {
-    None
-}
-
-#[cfg(not(windows))]
-fn spawn_app_window(_browser: &str, url: &str) -> std::io::Result<()> {
-    spawn_default(url)
 }
 
 #[cfg(windows)]
@@ -520,10 +464,6 @@ fn spawn_default(url: &str) -> std::io::Result<()> {
         .map(|_| ())
 }
 
-#[cfg(not(windows))]
-fn spawn_edge(url: &str) -> std::io::Result<()> {
-    spawn_default(url)
-}
 
 #[cfg(not(windows))]
 fn spawn_default(url: &str) -> std::io::Result<()> {

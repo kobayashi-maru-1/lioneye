@@ -1,3 +1,5 @@
+// First: notes whether storage was empty before anything writes to it.
+import "./state/saved-state";
 import { App } from "./containers";
 import "./index.css";
 import React, { Suspense } from "react";
