@@ -3,7 +3,13 @@
   "file": "crates/pob-engine/lua/bridge.lua",
   "commit": "3e656e2bf7494eb99ab5d7695c5617720ad8988d",
   "functions": {
-    "sanity_check": "64cfc4ed97be511e7b76f43fe460fd7f366b4d5613296314d6b553f394d30397",
-    "build_summary": "8512e3a9247da4987081ae0b5b9e0ee52359cf22ba7772cc610b793fdfe18c19"
+    "sanity_check": "29105b354dd50ad9aa494a7eb41ec43e93926d868a1fefade51205d299a588ee",
+    "build_summary": "8512e3a9247da4987081ae0b5b9e0ee52359cf22ba7772cc610b793fdfe18c19",
+    "POE1_ACTS": "b87a27adddb2e77920f29c4298fee3034dd041753e2c85d341ff8e1275f62a99",
+    "questPointsForLevel": "e6de4d42a2e482d33b588468bcf08286e6b35c3cfcd3566f92f7926d4d2e6542",
+    "gemPressClass": "67c5610925948c7dc07a3f6d1d0c5e13d731e64664d54a86e7b7d95102c25ab0",
+    "grantedGemNote": "b60f7e7f2e579d25242a4e61ed30b09b2f6d41896b046dff2a8737d03cf7a7b2",
+    "requirementSummary": "784869f72c9133285663b003c87ca1f09b35104ecaa64e4eb7639fcee5af4487",
+    "keystoneProfile": "c8ede0605ae1d8dc1384be7653db5cb15f5087596fbe6045ffe90cd8162edafe"
   }
 }

@@ -823,9 +823,9 @@ end
 --
 -- Changed here: only the PoE1 checks, run on the shown loadout; text written for Redux's
 -- assistant ("Call set_level", its ladder sample) is left out; each finding names the
--- guide panel that fixes it. The rules and thresholds are Redux's, unchanged.
--- log-api/redux-watch.ps1 notices when Redux changes sanity_check
--- or build_summary.
+-- guide panel that fixes it. The rules, thresholds and order are Redux's, unchanged.
+-- log-api/redux-watch.ps1 notices when Redux changes sanity_check or the helpers ported
+-- with it.
 
 -- Quest passive points by the level an act starts at (PoB's Modules/Build.lua acts table,
 -- as Redux's POE1_ACTS).
@@ -868,6 +868,32 @@ local function pressClass(gemData, activeSkill)
 		return "persistent"
 	end
 	return "active"
+end
+
+-- Redux's requirementSummary: each attribute's need (the highest single source), what the
+-- build has, and where the need comes from.
+local function requirementSummary()
+	local o = build.calcsTab.mainOutput or {}
+	local out = {}
+	for _, attr in ipairs({ "Str", "Dex", "Int" }) do
+		local need = o["Req" .. attr] or 0
+		local have = o[attr] or 0
+		local src = o["Req" .. attr .. "Item"]
+		local from = nil
+		if type(src) == "table" then
+			if src.source == "Item" and src.sourceItem then
+				from = string.format("item %s (%s)", src.sourceItem.name or "?", src.sourceSlot or "")
+			elseif src.source == "Gem" and src.sourceGem then
+				from = string.format("gem %s %d", src.sourceGem.nameSpec or "?", src.sourceGem.level or 0)
+			elseif src.source == "Support Gems" then
+				from = string.format("%d %s support gems (5 each, one shared source)", math.floor((src[attr] or 0) / 5), attr)
+			else
+				from = tostring(src.source)
+			end
+		end
+		out[attr:lower()] = { need = need, have = have, met = have >= need, from = from }
+	end
+	return out
 end
 
 -- The parts of Redux's build_summary that sanity_check reads.
@@ -945,6 +971,7 @@ local function buildSummary()
 		lightningResist = o.LightningResist or 0,
 		chaosResist = o.ChaosResist or 0,
 		movementSpeedMod = o.MovementSpeedMod or 0,
+		requirements = requirementSummary(),
 	}
 end
 
@@ -956,10 +983,17 @@ local function healthFindings()
 	local chaosImmune = o.ChaosInoculation == true
 	local manaFirst = math.min(tonumber(o.sharedMindOverMatter) or 0, 100)
 	local findings = setmetatable({}, ARRAY)
-	local function add(severity, panel, message, fix)
+	-- Redux's area for each finding (it orders findings within a severity) and the guide
+	-- panel that fixes it.
+	local PANEL = {
+		resistances = "gear", ["passive points"] = "tree", ascendancy = "tree", supports = "gems",
+		buttons = "gems", flasks = "gear", pantheon = "config", reservation = "gems",
+		survivability = "gear", movement = "gear", requirements = "gear", gear = "gear", gems = "gems",
+	}
+	local function add(severity, area, message, fix)
 		-- Redux writes messages lower case; shown as a line, they start with a capital.
 		message = message:sub(1, 1):upper() .. message:sub(2)
-		findings[#findings + 1] = { severity = severity, message = message, fix = fix, panel = panel }
+		findings[#findings + 1] = { severity = severity, area = area, message = message, fix = fix, panel = PANEL[area] }
 	end
 
 	local uncapped, worst = {}, 75
@@ -970,30 +1004,30 @@ local function healthFindings()
 		end
 	end
 	if #uncapped > 0 then
-		add(worst < 50 and "high" or "medium", "gear",
+		add(worst < 50 and "high" or "medium", "resistances",
 			string.format("below the 75%% cap: %s", table.concat(uncapped, ", ")),
 			"The campaign leaves -60% after Act 10. Resistance suffixes on rings, amulet, belt, boots, gloves and helmet close it; a Purity aura or a resistance flask covers a gap.")
 	end
 	if s.chaosResist < 0 and not chaosImmune then
-		add("low", "gear", string.format("chaos resistance is %.0f%%", s.chaosResist),
+		add("low", "resistances", string.format("chaos resistance is %.0f%%", s.chaosResist),
 			"Chaos damage bypasses energy shield and hits life directly.")
 	end
 
 	-- Live characters hold one point more than PoB's quest data allows.
 	if s.passivePointsSpent > s.pointsAvailableMax + 1 then
-		add("high", "tree", string.format("%d passive points spent but at level %d the maximum is %d",
+		add("high", "passive points", string.format("%d passive points spent but at level %d the maximum is %d",
 			s.passivePointsSpent, s.characterLevel, s.pointsAvailableMax),
 			"Either the level is unset or the tree is over budget.")
 	elseif s.passivePointsSpent < s.pointsAvailableMin then
-		add("low", "tree", string.format("%d of %d available passive points spent", s.passivePointsSpent, s.pointsAvailableMin),
+		add("low", "passive points", string.format("%d of %d available passive points spent", s.passivePointsSpent, s.pointsAvailableMin),
 			"Unspent points.")
 	end
 	local ascended = s.ascendancyName ~= nil and s.ascendancyName ~= "None"
 	if not ascended and s.characterLevel >= 20 then
-		add("medium", "tree", "no ascendancy chosen",
+		add("medium", "ascendancy", "no ascendancy chosen",
 			"Ascendancies carry 8 points of build-defining bonuses and are usually the reason to pick a class.")
 	elseif ascended and s.ascendancyPointsUsed < 8 then
-		add("medium", "tree", string.format("%d of 8 ascendancy points allocated", s.ascendancyPointsUsed))
+		add("medium", "ascendancy", string.format("%d of 8 ascendancy points allocated", s.ascendancyPointsUsed))
 	end
 
 	local linkSkills, itemSkill = 0, false
@@ -1006,12 +1040,12 @@ local function healthFindings()
 	-- A link that holds several skills (Bane and its curses) or an item's skill says nothing about supports.
 	if s.mainSkill ~= nil and linkSkills == 1 and not itemSkill
 		and s.characterLevel >= 68 and s.mainSkillSupports < (s.characterLevel >= 85 and 5 or 4) then
-		add(s.mainSkillSupports < 3 and "high" or "medium", "gems",
+		add(s.mainSkillSupports < 3 and "high" or "medium", "supports",
 			string.format("main skill %s has %d supports", tostring(s.mainSkill), s.mainSkillSupports),
 			"Most ladder characters run their largest link with 5 supports, a 6-link.")
 	end
 	if s.activeSkills > 10 then
-		add("low", "gems", string.format("%d skills need a keypress", s.activeSkills),
+		add("low", "buttons", string.format("%d skills need a keypress", s.activeSkills),
 			"Nine in ten builds press 10 skills or fewer. Extra power is usually better spent on an aura, a trigger setup or a guard skill.")
 	end
 
@@ -1024,43 +1058,81 @@ local function healthFindings()
 		end
 	end
 	if emptyFlasks > 0 then
-		add(emptyFlasks >= 3 and "medium" or "low", "gear", string.format("%d of 5 flask slots empty", emptyFlasks),
+		add(emptyFlasks >= 3 and "medium" or "low", "flasks", string.format("%d of 5 flask slots empty", emptyFlasks),
 			"A life flask, a resistance or armour utility flask and a quicksilver flask cover most gaps. Flasks with 'used when' enchants need no keypress.")
 	end
 	local input = build.configTab and build.configTab.input or {}
 	local major, minor = input.pantheonMajorGod, input.pantheonMinorGod
 	if s.characterLevel >= 60 and (major == nil or major == "None") and (minor == nil or minor == "None") then
-		add("low", "config", "no pantheon gods chosen",
-			"Pantheon powers are free defences unlocked in the campaign; set them in Config so the calculation includes them.")
+		add("low", "pantheon", "no pantheon gods chosen",
+			"Pantheon powers are free defences unlocked in the campaign; set them on the Config tab so the calculation includes them.")
 	end
 	if o.ManaCostWarning or o.LifeCostWarning then
 		local pool = o.ManaCostWarning and "mana" or "life"
-		add("high", "gems", string.format("the main skill costs more %s than is left unreserved", pool),
+		add("high", "reservation", string.format("the main skill costs more %s than is left unreserved", pool),
 			"PoB counts the skill as unusable. Drop or swap an aura, move a reservation to the other pool, or add reservation efficiency.")
 	end
 
 	if s.characterLevel >= 30 and s.life < 500 and s.energyShield < 500 and not (manaFirst > 0 and s.mana >= 500) then
-		add("high", "gear", string.format("life %.0f and energy shield %.0f at level %d", s.life, s.energyShield, s.characterLevel),
+		add("high", "survivability", string.format("life %.0f and energy shield %.0f at level %d", s.life, s.energyShield, s.characterLevel),
 			"Both pools are very low for this level.")
 	end
 	-- movementSpeedMod is a multiplier, so 1.0 is no bonus.
 	if s.characterLevel >= 15 and s.movementSpeedMod < 1.15 then
-		add("medium", "gear", string.format("movement speed is %+.0f%%", (s.movementSpeedMod - 1) * 100),
+		add("medium", "movement", string.format("movement speed is %+.0f%%", (s.movementSpeedMod - 1) * 100),
 			"Most ladder characters have at least +30%, counting their flasks as active as PoB does. It shortens the campaign and is a primary avoidance layer.")
 	end
 
-	local rank = { high = 1, medium = 2, low = 3 }
-	for i, finding in ipairs(findings) do
-		finding.order = i
-	end
-	table.sort(findings, function(a, b)
-		if rank[a.severity] ~= rank[b.severity] then
-			return rank[a.severity] < rank[b.severity]
+	for _, attr in ipairs({ "str", "dex", "int" }) do
+		local r = s.requirements[attr]
+		if r and not r.met then
+			add("high", "requirements", string.format("%s %d needed, %d available (from %s)", attr, r.need, r.have, r.from or "?"),
+				"The requirement is the highest single source, not a sum. Meet it with attribute travel nodes, an attribute affix, or a lower gem level; or swap the binding item or gem.")
 		end
-		return a.order < b.order
+	end
+
+	-- Affixes that spend a slot on nothing the build can use.
+	local deadLines = {}
+	for slotName, slot in pairs(build.itemsTab.slots) do
+		local item = slot.selItemId and slot.selItemId ~= 0 and build.itemsTab.items[slot.selItemId]
+		if item and not slot.nodeId then
+			for _, mod in ipairs(item.explicitModLines or {}) do
+				local line = (mod.line or ""):lower()
+				if line:find("reduced attribute requirements", 1, true) then
+					deadLines[#deadLines + 1] = string.format("%s (%s): %s", item.name or "?", slotName, (mod.line:gsub("^{.-}", "")))
+				end
+			end
+		end
+	end
+	if #deadLines > 0 then
+		add("low", "gear", string.format("%d affix(es) spent on reduced attribute requirements: %s", #deadLines, table.concat(deadLines, "; ")),
+			"Usually a dead affix: the same suffix slot could carry resistance, life or an attribute, which meets the requirement and adds something. Keep it only when the item is otherwise the best available and nothing else would meet the requirement.")
+	end
+
+	-- Attribute shortfalls surface as per-gem errors from PoB itself.
+	local gemErrors = {}
+	for _, group in ipairs(build.skillsTab.socketGroupList) do
+		for _, gem in ipairs(group.gemList or {}) do
+			if gem.errMsg then
+				gemErrors[#gemErrors + 1] = (gem.nameSpec or "gem") .. ": " .. tostring(gem.errMsg)
+			end
+		end
+	end
+	if #gemErrors > 0 then
+		add("high", "gems", string.format("%d gem problem(s): %s", #gemErrors, table.concat(gemErrors, "; ")),
+			"Usually an unmet attribute requirement or a missing weapon type.")
+	end
+
+	-- Redux's order: by severity, then by area name.
+	local order = { high = 1, medium = 2, low = 3 }
+	table.sort(findings, function(a, b)
+		if order[a.severity] ~= order[b.severity] then
+			return order[a.severity] < order[b.severity]
+		end
+		return a.area < b.area
 	end)
 	for _, finding in ipairs(findings) do
-		finding.order = nil
+		finding.area = nil
 	end
 	return findings
 end

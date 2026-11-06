@@ -91,7 +91,8 @@ once in **Settings** (the ⚙ at the top right).
   first, each with a link to the panel that fixes it. The checks are
   [PoB Redux](https://github.com/pobredux/pob-redux)'s (MIT), with its rules unchanged:
   resistances, passive and ascendancy points, main skill links, skills to press, flasks,
-  pantheon, skill costs, life and movement speed.
+  pantheon, skill costs, life, movement speed, attribute requirements, gem errors and
+  reduced-requirement affixes. Like Redux, it uses the build's level from PoB.
 - Hover an item or gem for its in-game tooltip, with its buttons underneath; click it to pin
   the tooltip and use them: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
   **W** (the wiki) and **Trade**. Escape, a click elsewhere or a second click unpins it.
