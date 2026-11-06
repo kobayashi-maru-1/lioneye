@@ -12,12 +12,13 @@ interface CodeEditorProps {
   grammar: Grammar;
   value: string;
   onValueChange: (value: string) => void;
+  placeholder?: string;
 }
 
 export const CodeEditor = React.forwardRef<
   HTMLDivElement,
   CodeEditorProps & React.HTMLAttributes<HTMLDivElement>
->(({ grammar, value, onValueChange, className, ...rest }, ref) => {
+>(({ grammar, value, onValueChange, className, placeholder, ...rest }, ref) => {
   return (
     <div
       ref={ref}
@@ -31,6 +32,7 @@ export const CodeEditor = React.forwardRef<
         textareaClassName={classNames(styles.editorTextArea)}
         value={value}
         onValueChange={onValueChange}
+        placeholder={placeholder}
       />
     </div>
   );

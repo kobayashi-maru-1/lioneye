@@ -33,14 +33,15 @@ function readable(code: string) {
  */
 export function BuildCodeForm({ onImport, onReset }: BuildCodeFormProps) {
   const code = useAtomValue(pobAtom);
-  const [text, setText] = useState(code ?? "");
+  // Empty, with the loaded code as its placeholder: paste a new one without clearing it.
+  const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   /** A new code waiting for "Replace build?". */
   const [replacing, setReplacing] = useState<string | null>(null);
-  // A new build loaded (or reset) elsewhere: show it.
+  // A new build loaded (or reset): its code shows as the placeholder.
   useEffect(() => {
-    setText(code ?? "");
+    setText("");
     setError(null);
   }, [code]);
 
@@ -49,7 +50,7 @@ export function BuildCodeForm({ onImport, onReset }: BuildCodeFormProps) {
 
   const apply = (value: string) => {
     onImport(value);
-    setText(value);
+    setText("");
     toast.success("Build imported");
   };
 
@@ -64,7 +65,7 @@ export function BuildCodeForm({ onImport, onReset }: BuildCodeFormProps) {
         setError("Code not read. Paste a PoB code or link.");
       } else if (value === loaded) {
         // The same build: nothing to replace.
-        setText(value);
+        setText("");
       } else if (code !== null) {
         setReplacing(value);
       } else {
@@ -98,7 +99,7 @@ export function BuildCodeForm({ onImport, onReset }: BuildCodeFormProps) {
         id="pob-code"
         className={classNames(formStyles.formInput, styles.code)}
         spellCheck={false}
-        placeholder="PoB code or link"
+        placeholder={code ?? "PoB code or link"}
         value={text}
         aria-invalid={error !== null}
         aria-describedby={error ? "pob-code-error" : undefined}

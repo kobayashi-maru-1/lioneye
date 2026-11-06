@@ -26,6 +26,7 @@ export function SearchStringsEditor() {
       <CodeEditor
         className={classNames(styles.input)}
         grammar={SearchStringGrammar}
+        placeholder={"# MS boots\nnne|rint"}
         value={searchStrings?.join("\n") || ""}
         onValueChange={(value) => {
           if (value.length == 0) setSearchStrings(null);
