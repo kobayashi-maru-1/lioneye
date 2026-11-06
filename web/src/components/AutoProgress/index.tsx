@@ -103,6 +103,31 @@ export function useAutoProgress() {
     const timer = setInterval(() => uploadSavedState(sendMessage), 5000);
     return () => clearInterval(timer);
   }, [talks]);
+  // Links out of the guide's own window (trade, wiki) open in your last-used Edge
+  // profile, where you're signed in, through the exe.
+  useEffect(() => {
+    if (!talks || pageMode !== "own") return;
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || (event.button !== 0 && event.button !== 1))
+        return;
+      const link =
+        event.target instanceof Element
+          ? event.target.closest<HTMLAnchorElement>("a[href]:not([download])")
+          : null;
+      if (!link) return;
+      const url = new URL(link.href, location.href);
+      if (url.origin === location.origin) return;
+      if (url.protocol !== "https:" && url.protocol !== "http:") return;
+      event.preventDefault();
+      sendMessage(`open:${url.href}`);
+    };
+    document.addEventListener("click", onClick);
+    document.addEventListener("auxclick", onClick);
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("auxclick", onClick);
+    };
+  }, [talks]);
   useEffect(() => {
     if (!talks) return;
     const buttons =

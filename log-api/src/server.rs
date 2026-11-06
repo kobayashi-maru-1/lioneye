@@ -385,6 +385,21 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                         let saved = state.saved.clone();
                         let json = json.to_string();
                         let _ = tokio::task::spawn_blocking(move || saved.save(&json)).await;
+                    } else if let Some(url) = text.strip_prefix("open:") {
+                        // A link in the guide's own window (trade, wiki): opened in your
+                        // last-used Edge profile instead.
+                        #[cfg(not(windows))]
+                        let _ = url;
+                        #[cfg(windows)]
+                        if crate::edge::is_web_link(url) {
+                            let url = url.to_string();
+                            let _ = tokio::task::spawn_blocking(move || {
+                                if let Err(err) = crate::edge::open_link(&url) {
+                                    tracing::warn!("Couldn't open {url}: {err}");
+                                }
+                            })
+                            .await;
+                        }
                     } else if let Some(json) = text.strip_prefix("state-offer:") {
                         // A window opened in an old Edge profile, for the one-time move.
                         state.saved.offer(json);

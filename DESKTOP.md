@@ -84,6 +84,9 @@ once in **Settings** (the ⚙ at the top right).
   you pick. The trade site's stat and item lists drive the trade searches. The exe fetches
   all of them with curl.exe and caches them in `%LOCALAPPDATA%\exile-leveling\cache` for
   12 hours (the cached copy is used offline).
+- Links out of the guide (trade searches, the wiki, poe.re) open in a normal tab of your
+  last-used Edge profile, where you're signed in to the trade site, not in the guide's own
+  profile.
 - Hover an item or gem for its in-game tooltip; click it to pin the tooltip and use its
   buttons: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
   **W** (the wiki) and **Trade**. Escape, a click elsewhere or a second click unpins it.

@@ -51,6 +51,20 @@ pub fn open_last_profile(url: &str) -> std::io::Result<()> {
     spawn(&msedge_or_default(), &[format!("--app={url}")])
 }
 
+/// A web page from the guide (trade search, wiki) in a normal tab of your last-used Edge
+/// profile, where you're signed in to the trade site, not in the guide's own profile.
+pub fn open_link(url: &str) -> std::io::Result<()> {
+    spawn(&msedge_or_default(), &[url.to_string()])
+}
+
+/// True for an http(s) address with nothing Edge could read as a switch or a second
+/// address (it's passed to msedge.exe as an argument).
+pub fn is_web_link(url: &str) -> bool {
+    (url.starts_with("https://") || url.starts_with("http://"))
+        && url.len() <= 8192
+        && !url.chars().any(|c| c.is_whitespace() || c.is_control() || c == '"')
+}
+
 fn spawn(browser: &Path, args: &[String]) -> std::io::Result<()> {
     std::process::Command::new(browser)
         .args(args)
@@ -111,4 +125,20 @@ fn registry_string(root: HKEY, key: &str, name: Option<&str>) -> Option<String> 
     }
     let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
     Some(String::from_utf16_lossy(&buf[..len]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_web_link;
+
+    #[test]
+    fn web_links_only() {
+        assert!(is_web_link("https://www.pathofexile.com/trade/search/Mirage?q=%7B%7D"));
+        assert!(is_web_link("http://example.com/"));
+        assert!(!is_web_link("file:///C:/Windows/System32/calc.exe"));
+        assert!(!is_web_link("--app=https://example.com"));
+        assert!(!is_web_link("https://a.com/ --flag"));
+        assert!(!is_web_link("https://a.com/\"x"));
+        assert!(!is_web_link("https://a.com/\nx"));
+    }
 }

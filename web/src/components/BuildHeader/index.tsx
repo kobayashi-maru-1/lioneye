@@ -14,7 +14,7 @@ import { toast } from "react-toastify";
 async function copyCode(code: string) {
   try {
     await navigator.clipboard.writeText(code);
-    toast.success("Code copied");
+    toast.success("PoB copied");
   } catch {
     toast.error("Copy failed. Try again.");
   }
@@ -46,8 +46,8 @@ export function BuildHeader() {
           {code !== null && (
             <button
               className={classNames(styles.tool)}
-              title="Copy code"
-              aria-label="Copy code"
+              title="Copy PoB"
+              aria-label="Copy PoB"
               onClick={() => copyCode(code)}
             >
               <FaRegClipboard aria-hidden />
