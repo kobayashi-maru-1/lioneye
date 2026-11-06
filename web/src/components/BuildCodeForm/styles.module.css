@@ -19,6 +19,6 @@
 }
 
 /* The loaded code as placeholder: dim, so it doesn't read as typed text. */
-.code::placeholder {
+.loaded::placeholder {
   color: #5f5f5f;
 }

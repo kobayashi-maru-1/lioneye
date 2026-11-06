@@ -28,7 +28,7 @@
   border-bottom-color: var(--gold);
 }
 
-/* The gem list, folded under its count. */
+/* The gem list under its count: open until folded, then as left. */
 .gems {
   padding: var(--size-3);
 }

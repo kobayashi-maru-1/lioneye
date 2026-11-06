@@ -46,7 +46,8 @@ export function BuildCodeForm({ onImport, onReset }: BuildCodeFormProps) {
   }, [code]);
 
   const loaded = (code ?? "").trim();
-  const changed = text.trim() !== "" && text.trim() !== loaded;
+  // Anything pasted: Import says "Already loaded" for the loaded build itself.
+  const changed = text.trim() !== "";
 
   const apply = (value: string) => {
     onImport(value);
@@ -98,7 +99,9 @@ export function BuildCodeForm({ onImport, onReset }: BuildCodeFormProps) {
       <label htmlFor="pob-code">PoB code</label>
       <textarea
         id="pob-code"
-        className={classNames(formStyles.formInput, styles.code)}
+        className={classNames(formStyles.formInput, styles.code, {
+          [styles.loaded]: code !== null,
+        })}
         spellCheck={false}
         placeholder={code ?? "PoB code or link"}
         value={text}
