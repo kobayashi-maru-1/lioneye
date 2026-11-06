@@ -3,6 +3,7 @@
 //! An `--app` window is titled with the page title alone ("Exile Leveling",
 //! "Exile Leveling - Build"). Normal browser windows add a suffix ("- Microsoft Edge",
 //! "- Google Chrome"), so an exact title match plus an msedge.exe check finds only ours.
+//! chrome.exe windows count too: the move from 0.2 opens the guide in Chrome profiles.
 
 use windows_sys::Win32::Foundation::{CloseHandle, HWND, LPARAM};
 use windows_sys::Win32::System::Threading::{
@@ -33,7 +34,7 @@ fn text(buf: &[u16], len: usize) -> String {
     String::from_utf16_lossy(&buf[..len.min(buf.len())])
 }
 
-/// True when the window belongs to msedge.exe.
+/// True when the window belongs to msedge.exe (or chrome.exe, for the move from 0.2).
 fn is_edge(hwnd: HWND) -> bool {
     unsafe {
         let mut pid = 0u32;
@@ -53,7 +54,9 @@ fn is_edge(hwnd: HWND) -> bool {
             && text(&buf, len as usize)
                 .rsplit('\\')
                 .next()
-                .is_some_and(|exe| exe.eq_ignore_ascii_case("msedge.exe"))
+                .is_some_and(|exe| {
+                    exe.eq_ignore_ascii_case("msedge.exe") || exe.eq_ignore_ascii_case("chrome.exe")
+                })
     }
 }
 

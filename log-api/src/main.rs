@@ -127,9 +127,12 @@ fn main() -> ExitCode {
         saved: saved.clone(),
     };
     // First run since the guide got its own profile: move its data from the old profiles.
+    // A lock left by a copy stopped mid-move is stale: only one copy serves an address.
+    #[cfg(windows)]
+    guide_move::clear_lock(&url);
     #[cfg(windows)]
     let moving = (args.browser == Browser::App)
-        .then(|| guide_move::GuideMove::needed(&url))
+        .then(|| guide_move::GuideMove::needed(&url, saved.exists()))
         .flatten()
         .map(|profiles| guide_move::GuideMove::start(&url, profiles));
     #[cfg(windows)]
@@ -274,8 +277,10 @@ fn wait(
     };
     match tray::run(status, stopped_rx, || show_guide(browser, url), tick) {
         Ok(tray::Exit::Quit) => {
-            // The guide is a separate Edge window; Quit closes it too.
+            // The guide is a separate Edge window; Quit closes it too (and drops the lock of
+            // a move it stopped, which then runs again next start).
             guide_window::close_all();
+            guide_move::clear_lock(url);
             ExitCode::SUCCESS
         }
         Ok(tray::Exit::Stopped) => match result_rx.try_recv() {
@@ -443,7 +448,7 @@ fn show_guide(browser: Browser, url: &str) {
     {
         // The guide's data is moving (this or another copy of the exe): its windows come
         // and go, and the own window opens when it's done.
-        if guide_move::in_progress() {
+        if guide_move::in_progress(url) {
             info!("The guide's data is moving; it opens when that's done");
             return;
         }

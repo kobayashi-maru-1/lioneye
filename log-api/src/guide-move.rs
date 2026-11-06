@@ -30,7 +30,7 @@ pub struct OldProfile {
     pub id: String,
     browser: PathBuf,
     profile: String,
-    /// When its storage last changed: the newest wins (old_profiles sorts by it).
+    /// When its storage files last changed: asked in that order, newest first.
     changed: SystemTime,
 }
 
@@ -53,13 +53,37 @@ fn moved_dir() -> PathBuf {
     crate::data_dir().join("moved")
 }
 
-fn lock_file() -> PathBuf {
-    crate::data_dir().join("moving")
+/// "" for the usual address, "-6799" for a test run on another port: each address moves
+/// (and locks) on its own.
+fn port_suffix(url: &str) -> String {
+    match origin(url).rsplit(':').next() {
+        Some("6754") | None => String::new(),
+        Some(port) => format!("-{port}"),
+    }
+}
+
+fn lock_file(url: &str) -> PathBuf {
+    crate::data_dir().join(format!("moving{}", port_suffix(url)))
+}
+
+fn done_file(url: &str) -> PathBuf {
+    moved_dir().join(format!("done{}", port_suffix(url)))
+}
+
+fn mark_done(url: &str) {
+    let _ = std::fs::create_dir_all(moved_dir());
+    let _ = std::fs::write(done_file(url), "");
 }
 
 /// True while a move is running (in this or another copy of the exe): don't open the guide.
-pub fn in_progress() -> bool {
-    lock_file().exists()
+pub fn in_progress(url: &str) -> bool {
+    lock_file(url).exists()
+}
+
+/// Removes a lock left by a copy stopped mid-move (at start, and on Quit). Only one copy
+/// serves an address, so a lock for it at start is always stale.
+pub fn clear_lock(url: &str) {
+    let _ = std::fs::remove_file(lock_file(url));
 }
 
 /// "http://127.0.0.1:6754/" → "http://127.0.0.1:6754", as browsers key storage.
@@ -68,16 +92,23 @@ fn origin(url: &str) -> &str {
 }
 
 impl GuideMove {
-    /// The old profiles to move from, when the move hasn't been done yet: none for a new
-    /// user, or for a test run on another port (no profile has that address).
-    pub fn needed(url: &str) -> Option<Vec<OldProfile>> {
-        // A stale lock from a copy that was stopped mid-move: start over.
-        let _ = std::fs::remove_file(lock_file());
-        if moved_dir().join("done").exists() {
+    /// The old profiles to move from, when the move hasn't been done yet. Done (and never
+    /// looked at again) when the exe already has a copy, or no profile holds the address:
+    /// a new user, or a test run on another port.
+    pub fn needed(url: &str, has_copy: bool) -> Option<Vec<OldProfile>> {
+        if done_file(url).exists() {
             return None;
         }
-        let profiles = old_profiles(origin(url));
-        (!profiles.is_empty()).then_some(profiles)
+        let profiles = if has_copy {
+            Vec::new()
+        } else {
+            old_profiles(origin(url))
+        };
+        if profiles.is_empty() {
+            mark_done(url);
+            return None;
+        }
+        Some(profiles)
     }
 
     /// Closes the guide windows open from the old setup and starts with the first profile.
@@ -85,7 +116,7 @@ impl GuideMove {
         let ids: Vec<&str> = profiles.iter().map(|p| p.id.as_str()).collect();
         info!("Moving the guide's data from {}", ids.join(", "));
         let _ = std::fs::create_dir_all(moved_dir());
-        let _ = std::fs::write(lock_file(), "");
+        let _ = std::fs::write(lock_file(url), "");
         guide_window::close_all();
         Self {
             url: url.to_string(),
@@ -139,28 +170,25 @@ impl GuideMove {
         }
     }
 
-    /// Keeps the best answer as the exe's copy: the most recently changed profile that has
-    /// an imported build, else the most recently changed with any data. Nothing found leaves
-    /// no copy (the own window starts fresh).
+    /// Keeps the best answer as the exe's copy (SavedState::rank: an imported build, then
+    /// the furthest along the route, then the most data). Nothing found leaves no copy (the
+    /// own window starts fresh).
     fn finish(&self, saved: &SavedState) {
-        let answers: Vec<(&OldProfile, String)> = self
+        let best = self
             .profiles
             .iter()
             .filter_map(|p| saved.offer_from(&p.id).map(|json| (p, json)))
-            .collect();
-        let best = answers
-            .iter()
-            .find(|(_, json)| SavedState::has_build(json))
-            .or_else(|| answers.iter().find(|(_, json)| !SavedState::is_empty(json)));
+            .filter(|(_, json)| !SavedState::is_empty(json))
+            .max_by_key(|(_, json)| SavedState::rank(json));
         match best {
             Some((profile, json)) => {
                 info!("Moved the guide's data from {}", profile.id);
-                saved.save(json);
+                saved.save(&json);
             }
-            None => info!("No guide data to move"),
+            None => warn!("No guide data to move (see the moved folder for each profile's)"),
         }
-        let _ = std::fs::write(moved_dir().join("done"), "");
-        let _ = std::fs::remove_file(lock_file());
+        mark_done(&self.url);
+        clear_lock(&self.url);
     }
 }
 
@@ -188,8 +216,11 @@ fn encode(id: &str) -> String {
 }
 
 /// Edge's and Chrome's profiles whose storage holds the guide's address, newest first.
+/// A profile that only once had it (since cleared) may be listed too: it answers empty.
 fn old_profiles(origin: &str) -> Vec<OldProfile> {
-    let needle = format!("_{origin}\0");
+    // The bare host and port: storage files compress keys, so the full "_http://…" key
+    // prefix isn't always written out.
+    let needle = origin.trim_start_matches("http://").to_string();
     let local = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_default();
