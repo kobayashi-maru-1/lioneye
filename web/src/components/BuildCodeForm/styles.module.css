@@ -1,0 +1,19 @@
+/* The build's code: long, so a few lines that scroll. */
+.code {
+  width: 100%;
+  height: 7rem;
+  resize: vertical;
+  font-family: monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.error {
+  margin-top: var(--size-1);
+  color: #ff6b6b;
+  font-size: 0.8rem;
+}
+
+.buttons {
+  margin-top: var(--size-2);
+}

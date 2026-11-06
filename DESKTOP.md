@@ -72,7 +72,7 @@ once in **Settings** (the ⚙ at the top right).
   act is done. Nothing reopens on its own: a folded act or panel stays folded until you
   click it (or use the bar). Importing a build opens Campaign again.
 - The one bar at the top jumps to each panel and holds the auto-progress pill and ⚙
-  **Settings**, in three tabs: **Build** (import, reset, search strings), **Route** (Edit
+  **Settings**, in three tabs: **Build** (the loaded PoB code: paste a code or link and **Import**, **Copy**, **Reset**; search strings), **Route** (Edit
   route, Export, class, bandits, League Start, Library, Gems Only, hints, and the gem list,
   folded) and **App** (Overlay, Game log, Browser). The
   Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while

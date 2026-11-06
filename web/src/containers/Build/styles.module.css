@@ -26,3 +26,9 @@
 .gems[open] > summary {
   margin-bottom: var(--size-3);
 }
+
+.hint {
+  margin-top: calc(-1 * var(--size-2));
+  color: #8f8f8f;
+  font-size: 0.8rem;
+}

@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from "jotai";
 import { AppSettingsForm } from "../../components/AppSettingsForm";
-import { BuildImportForm } from "../../components/BuildImportForm";
+import { BuildCodeForm } from "../../components/BuildCodeForm";
 import { BuildInfoForm } from "../../components/BuildInfoForm";
 import { ConfigForm } from "../../components/ConfigForm";
 import { GemEditForm } from "../../components/GemEditForm";
@@ -73,13 +73,16 @@ export default function BuildContainer() {
       >
         {tab === "build" && (
           <div className={classNames(formStyles.form)}>
-            <BuildImportForm
-              onSubmit={(pobCode) => {
+            <BuildCodeForm
+              onImport={(pobCode) => {
                 setPob(pobCode);
               }}
               onReset={() => setConfirmReset(true)}
             />
             <SearchStringsEditor />
+            <span className={classNames(styles.hint)}>
+              A # line names the string below it.
+            </span>
           </div>
         )}
         {tab === "route" && (
