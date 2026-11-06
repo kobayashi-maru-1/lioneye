@@ -26,7 +26,7 @@
   color: #8f8f8f;
 }
 
-/* Copy code and the Loadout picker, at the right of the title. */
+/* Compare, Copy and the Loadout picker, at the right of the title. */
 .tools {
   display: flex;
   align-items: center;
@@ -34,22 +34,24 @@
   flex: none;
 }
 
-.copy {
+/* pob.codes' header buttons: dark, thin border, light text. */
+.tool {
   display: inline-flex;
   align-items: center;
   gap: var(--size-2);
+  min-height: 2rem;
   padding: var(--size-1) var(--size-3);
   font-size: 0.85rem;
   font-weight: var(--font-heavy);
-  color: var(--on-secondary);
-  background-color: var(--input);
-  border: var(--border-width) solid var(--input-border);
+  color: #dad5cd;
+  background-color: #1c1a17;
+  border: var(--border-width) solid #3d372f;
   border-radius: var(--border-radius);
   cursor: pointer;
 }
 
-.copy:hover {
-  border-color: var(--accent-primary);
+.tool:hover {
+  background-color: #26221c;
 }
 
 .loadout {

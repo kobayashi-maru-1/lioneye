@@ -9,7 +9,7 @@ import classNames from "classnames";
 import { useState } from "react";
 import { toast } from "react-toastify";
 
-const URL_REWRITERS: UrlRewriter[] = [
+export const URL_REWRITERS: UrlRewriter[] = [
   (url) => {
     const match = /pastebin\.com\/(.+)$/.exec(url);
     if (!match) return null;

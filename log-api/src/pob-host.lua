@@ -713,6 +713,65 @@ local function gear()
 	return gearCache
 end
 
+-- Compare --------------------------------------------------------------------------------
+
+-- The shown skill set's socket groups and their gems, for the guide's Compare.
+local function skillGroups()
+	local out = setmetatable({}, ARRAY)
+	for _, group in ipairs(build.skillsTab.socketGroupList) do
+		local gems = setmetatable({}, ARRAY)
+		for _, gem in ipairs(group.gemList or {}) do
+			local effect = gem.gemData and gem.gemData.grantedEffect or gem.grantedEffect
+			local name = gem.gemData and gem.gemData.name
+				or (gem.nameSpec ~= nil and gem.nameSpec ~= "" and gem.nameSpec)
+				or (effect and effect.name)
+			if name then
+				gems[#gems + 1] = {
+					name = name,
+					support = effect and effect.support or nil,
+					enabled = gem.enabled ~= false,
+					level = gem.level,
+					quality = gem.quality,
+				}
+			end
+		end
+		if #gems > 0 then
+			out[#out + 1] = {
+				label = group.displayLabel or group.label,
+				slot = group.slot,
+				enabled = group.enabled ~= false,
+				-- Granted by an item or a passive, not socketed.
+				granted = group.source ~= nil or nil,
+				gems = gems,
+			}
+		end
+	end
+	return out
+end
+
+-- The shown tree's allocated passives (masteries with the effect picked), for Compare.
+local function passives()
+	local out = setmetatable({}, ARRAY)
+	local spec = build.spec
+	for _, node in pairs(spec and spec.allocNodes or {}) do
+		if node.type ~= "ClassStart" and node.type ~= "AscendClassStart" and node.dn then
+			out[#out + 1] = {
+				name = node.dn,
+				type = node.type,
+				ascendancy = node.ascendancyName,
+				effect = node.type == "Mastery" and table.concat(node.sd or {}, " / ") or nil,
+			}
+		end
+	end
+	table.sort(out, function(a, b)
+		if a.name ~= b.name then
+			return a.name < b.name
+		end
+		return (a.effect or "") < (b.effect or "")
+	end)
+	return out
+end
+
 -- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
 -- when the build is new to PoB, else the loadout picked last. `id` and the rest are the
 -- guide's remembered main skill (all nil: PoB's own).
@@ -754,6 +813,8 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		headline = headline(),
 		gear = gear(),
 		config = configRows(build.configTab.configSets[build.configTab.activeConfigSetId]),
+		skills = skillGroups(),
+		passives = passives(),
 		rows = rows(),
 		warnings = warnings(),
 	})

@@ -119,6 +119,35 @@ export interface Gear {
   treeJewels: { node: number; item: number }[][];
 }
 
+/** A gem in a socket group of the shown skill set. */
+export interface SkillGem {
+  name: string;
+  support?: boolean;
+  enabled: boolean;
+  level?: number;
+  quality?: number;
+}
+
+/** A socket group of the shown skill set. */
+export interface SkillGroup {
+  label?: string;
+  slot?: string;
+  enabled: boolean;
+  /** Granted by an item or a passive, not socketed. */
+  granted?: boolean;
+  gems: SkillGem[];
+}
+
+/** An allocated passive of the shown tree. */
+export interface Passive {
+  name: string;
+  /** Normal, Notable, Keystone, Mastery or Socket. */
+  type?: string;
+  ascendancy?: string;
+  /** A mastery's picked effect. */
+  effect?: string;
+}
+
 export interface Stats {
   loadouts: string[];
   loadout: string | null;
@@ -128,6 +157,8 @@ export interface Stats {
   headline: Headline | null;
   gear: Gear | null;
   config: ConfigRow[];
+  skills: SkillGroup[];
+  passives: Passive[];
   rows: StatRow[];
   warnings: string[];
 }
@@ -305,6 +336,11 @@ export function usePanelSet(titles: string[], loadoutIndex: number | null) {
   return [index, choose] as const;
 }
 
+/** PoB's stats for a build as saved (its own loadout and main skill), e.g. for Compare. */
+export function fetchBuildStats(xml: string, signal: AbortSignal) {
+  return fetchStats(xml, null, null, signal);
+}
+
 async function fetchStats(
   xml: string,
   loadout: string | null,
@@ -342,6 +378,11 @@ async function fetchStats(
     headline: stats.headline ?? null,
     gear: stats.gear ? gearData(stats.gear) : null,
     config: list(stats.config),
+    skills: list(stats.skills).map((group) => ({
+      ...group,
+      gems: list(group.gems),
+    })),
+    passives: list(stats.passives),
     rows: list(stats.rows),
     warnings: list(stats.warnings),
   };

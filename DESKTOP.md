@@ -67,6 +67,13 @@ once in **Settings** (the ⚙ at the top right).
   level when PoB titles name levels (`Lvl 30`, `Level 12-28`), else your act (`Act 2`,
   `Act 4-6 - 50 pts`); pick another until your level or act changes. A zone's suggested
   level (`12+`) turns red while you're below it.
+- The card's clipboard button copies the build's PoB code. **Compare** works like pob.codes'
+  "Compare my PoB": paste your character's PoB code (import it in PoB, then Export) or a
+  pobb.in, poe.ninja, pastebin or maxroll link. The same bundled PoB calculates it, and the
+  Stats, Passives, Skills and Items tabs list what differs from the shown loadout. Passives
+  match by name, so a build on another tree version still lines up. The last code is
+  remembered; **New** pastes another. PoB holds one build at a time, so the guide's next
+  loadout change takes a few seconds longer after a compare.
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.
