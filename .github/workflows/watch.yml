@@ -1,0 +1,62 @@
+# Daily: fails (GitHub emails you) when
+# - HeartofPhos's exile-leveling or exile-log-api has changes not merged here yet
+#   (upstream-watch.ps1), or
+# - PoB Redux changed the build checks Build health is ported from (log-api/redux-watch.ps1).
+# Add this file to the repo as .github/workflows/watch.yml.
+name: Watch
+
+on:
+  schedule:
+    - cron: "17 9 * * *" # daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: one-page
+          persist-credentials: false
+
+      - id: upstream
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./upstream-watch.ps1
+
+      - id: redux
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./log-api/redux-watch.ps1
+
+      - if: steps.upstream.outputs.changed == 'true' || steps.redux.outputs.changed == 'true'
+        env:
+          UPSTREAM: ${{ steps.upstream.outputs.changed }}
+          UPSTREAM_SUMMARY: ${{ steps.upstream.outputs.summary }}
+          REDUX: ${{ steps.redux.outputs.changed }}
+          REDUX_COMPARE: ${{ steps.redux.outputs.compare }}
+        run: |
+          {
+            if [ "$UPSTREAM" = "true" ]; then
+              echo "### New route and game data upstream"
+              echo
+              echo "$UPSTREAM_SUMMARY" | tr '|' '\n'
+              echo
+              echo "Merge it (DESKTOP.md, \"Pull upstream updates\"), then run \`./upstream-watch.ps1 -Update\`."
+              echo
+            fi
+            if [ "$REDUX" = "true" ]; then
+              echo "### PoB Redux changed its build checks"
+              echo
+              echo "Compare: $REDUX_COMPARE"
+              echo
+              echo "Port what applies to \`healthFindings\` in \`log-api/src/pob-host.lua\`, then run \`./log-api/redux-watch.ps1 -Update\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::Upstream changes to look at; see the run summary."
+          exit 1
