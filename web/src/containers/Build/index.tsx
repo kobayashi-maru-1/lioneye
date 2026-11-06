@@ -8,7 +8,10 @@ import { Modal } from "../../components/Modal";
 import { OverlayForm } from "../../components/OverlayForm";
 import { STATS_AVAILABLE } from "../../components/PobStats";
 import { SearchStringsEditor } from "../../components/SearchStringsEditor";
-import { persistentAtom } from "../../state";
+import {
+  type SettingsTab as Tab,
+  settingsTabAtom,
+} from "../../state/settings-tab";
 import { buildDataSelector } from "../../state/build-data";
 import { configSelector } from "../../state/config";
 import { requiredGemsSelector } from "../../state/gem";
@@ -22,8 +25,6 @@ import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-type Tab = "build" | "route" | "app";
-
 /** Build: your PoB and search strings. Route: what the campaign shows. App: the exe's own. */
 const TABS: { id: Tab; label: string }[] = [
   { id: "build", label: "Build" },
@@ -31,9 +32,6 @@ const TABS: { id: Tab; label: string }[] = [
   // The in-game bar, the game log and the browser exist only with the exe.
   ...(STATS_AVAILABLE ? [{ id: "app" as Tab, label: "App" }] : []),
 ];
-
-/** The tab you were on, so Settings opens there again. */
-const settingsTabAtom = persistentAtom<Tab>("settings-tab", "build", 0);
 
 export default function BuildContainer() {
   const [config, setConfig] = useAtom(configSelector);
@@ -47,7 +45,11 @@ export default function BuildContainer() {
 
   return (
     <div>
-      <div className={classNames(styles.tabs)} role="tablist">
+      <div
+        className={classNames(styles.tabs)}
+        role="tablist"
+        aria-label="Settings"
+      >
         {TABS.map(({ id, label }) => (
           <button
             key={id}

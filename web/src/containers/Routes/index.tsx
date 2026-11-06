@@ -6,6 +6,7 @@ import { GearPanel } from "../../components/Gear";
 import { GemLinkViewer } from "../../components/GemLinkViewer";
 import { GemReward } from "../../components/ItemReward";
 import { jumpTargetsAtom } from "../../components/AppBar";
+import { settingsTabAtom } from "../../state/settings-tab";
 import {
   PageSection,
   pageSectionId,
@@ -564,6 +565,8 @@ function useCampaignInView() {
 
 function EmptyHint() {
   const navigate = useNavigate();
+  // Import is on Settings' Build tab, whichever tab was open last.
+  const setSettingsTab = useSetAtom(settingsTabAtom);
   return (
     <div className={classNames(styles.empty)}>
       <span>No build yet</span>
@@ -572,7 +575,10 @@ function EmptyHint() {
           styles.emptyButton,
           interactiveStyles.hoverPrimary,
         )}
-        onClick={() => navigate("/settings")}
+        onClick={() => {
+          setSettingsTab("build");
+          navigate("/settings");
+        }}
       >
         Import
       </button>

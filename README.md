@@ -71,4 +71,4 @@ Building the exe, the repo layout and pulling upstream updates: see
 ### Route
 
 Upstream doesn't take PRs for route changes: the base route follows current speedrunning
-strategies. Change the route to your playstyle with **Edit route** in the guide's Settings.
+strategies. Change the route to your playstyle with **Edit route** in the guide's Settings (**Route** tab).

@@ -24,7 +24,7 @@ Windows 10 and 11 PC, whichever browser you use).
 
 Running the exe again while it's already open brings its window to the front.
 
-**Settings** → **Game log** and **Browser** set the same as `--log-path` and `--browser`,
+**Settings** → **App** → **Game log** and **Browser** set the same as `--log-path` and `--browser`,
 saved in `%LOCALAPPDATA%\exile-leveling\settings.json`; the command line wins when given.
 A new game log applies at once; a new browser when the guide next opens. Whichever browser
 opens it, the guide loads the exe's copy of your data (below) when another browser saved it
@@ -143,7 +143,7 @@ once in **Settings** (the ⚙ at the top right).
   bar is in the lower half of the screen. Both need the guide open.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
-- **Settings** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,
+- **Settings** → **App** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,
   Gems, Tree and Notes to start). Panels the build doesn't have are left off.
 - The bar is a page of the guide (`overlay.html`) in WebView2, the engine Edge uses (part of
   Windows 11; its data is kept in `%LOCALAPPDATA%\exile-leveling\webview2`).
