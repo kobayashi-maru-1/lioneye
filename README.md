@@ -33,6 +33,9 @@ and imported build carry over.
   the game. Hover **Gems** for your links, or **Campaign** for your next steps.
 - On a wide screen, Campaign and the other panels sit side by side.
 - Trade and wiki links open in your usual Edge profile, where you're signed in.
+- **Settings → App**: the in-game bar, which game log to follow and which browser opens the
+  guide. The guide window reopens where you left it, and the line at the bottom says when
+  there's a new release.
 
 How it all works, the command-line options and where it keeps its data:
 [DESKTOP.md](DESKTOP.md).
