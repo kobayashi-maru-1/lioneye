@@ -121,11 +121,12 @@ export function useAutoProgress() {
       event.preventDefault();
       sendMessage(`open:${url.href}`);
     };
-    document.addEventListener("click", onClick);
-    document.addEventListener("auxclick", onClick);
+    // Capture: before any link's own handler can stop the click (Daily Layout does).
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("auxclick", onClick, true);
     return () => {
-      document.removeEventListener("click", onClick);
-      document.removeEventListener("auxclick", onClick);
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("auxclick", onClick, true);
     };
   }, [talks]);
   useEffect(() => {

@@ -238,18 +238,20 @@ fn local_origin(headers: &HeaderMap) -> bool {
         .strip_prefix("http://")
         .or_else(|| origin.strip_prefix("https://"))
         .unwrap_or("");
-    // The guide itself, however it was opened (e.g. a LAN address with --address 0.0.0.0:6754).
-    let same_host = headers
-        .get(header::HOST)
-        .and_then(|h| h.to_str().ok())
-        .is_some_and(|h| !authority.is_empty() && h.eq_ignore_ascii_case(authority));
-    if same_host {
-        return true;
-    }
     let host = match authority.strip_prefix('[') {
         Some(v6) => v6.split(']').next().unwrap_or(""),
         None => authority.split(':').next().unwrap_or(""),
     };
+    // The guide itself, however it was opened (e.g. a LAN address with --address 0.0.0.0:6754).
+    // Only by IP address: a site's own name can be pointed at this PC (DNS rebinding).
+    let same_host = host.parse::<std::net::IpAddr>().is_ok()
+        && headers
+            .get(header::HOST)
+            .and_then(|h| h.to_str().ok())
+            .is_some_and(|h| h.eq_ignore_ascii_case(authority));
+    if same_host {
+        return true;
+    }
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
@@ -391,7 +393,7 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                         #[cfg(not(windows))]
                         let _ = url;
                         #[cfg(windows)]
-                        if crate::edge::is_web_link(url) {
+                        if *guide && crate::edge::is_web_link(url) {
                             let url = url.to_string();
                             let _ = tokio::task::spawn_blocking(move || {
                                 if let Err(err) = crate::edge::open_link(&url) {
@@ -529,5 +531,9 @@ mod tests {
         let mut rebind = with_origin("http://evil.example");
         rebind.insert(header::HOST, HeaderValue::from_static("127.0.0.1:6754"));
         assert!(!local_origin(&rebind));
+        // A site's name pointed at this PC: Origin and Host match, but it's not an address.
+        let mut renamed = with_origin("http://evil.example:6754");
+        renamed.insert(header::HOST, HeaderValue::from_static("evil.example:6754"));
+        assert!(!local_origin(&renamed), "DNS rebinding");
     }
 }
