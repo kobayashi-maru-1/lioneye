@@ -31,3 +31,23 @@ export const overlaySettingsAtom = persistentAtom<OverlaySettings>(
  * set on the Settings page.
  */
 export const shownPanelsAtom = atom<string[] | null>(null);
+
+/** A gem as the in-game bar's Gems tooltip shows it. */
+export interface OverlayGem {
+  name: string;
+  /** Its colour (red, green, blue, white). */
+  colour: string;
+  /** The group's active skills; supports are indented. */
+  primary: boolean;
+  level?: number;
+  quality?: number;
+}
+
+/** The skill set the Gems panel shows, for the in-game bar's Gems tooltip. */
+export interface OverlayGems {
+  title: string;
+  groups: { label?: string; gems: OverlayGem[] }[];
+}
+
+/** Set by the Gems panel; null without gem links. Sent to the exe for the bar. */
+export const overlayGemsAtom = atom<OverlayGems | null>(null);

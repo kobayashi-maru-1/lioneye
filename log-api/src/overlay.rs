@@ -94,8 +94,9 @@ fn save(saved: &Saved) {
 }
 
 enum Ipc {
-    /// The page's bar in CSS pixels.
-    Size(f64, f64),
+    /// The page's size in CSS pixels; `up`: it grew upwards (the Gems tooltip opens above a
+    /// bar in the lower half of the screen), so the bottom edge stays put.
+    Size { width: f64, height: f64, up: bool },
 }
 
 struct Window {
@@ -188,9 +189,9 @@ impl Overlay {
 
         while let Ok(message) = self.ipc_rx.try_recv() {
             match message {
-                Ipc::Size(width, height) => {
+                Ipc::Size { width, height, up } => {
                     if let Some(window) = &mut self.window {
-                        resize(window.hwnd, width, height);
+                        resize(window.hwnd, width, height, up);
                         if !window.sized {
                             window.sized = true;
                             if self.position.is_none() {
@@ -253,10 +254,16 @@ impl Overlay {
                 if body == "drag" {
                     start_drag(target as HWND);
                 } else if let Some(size) = body.strip_prefix("size:") {
-                    let mut parts = size.split(',').map(|n| n.trim().parse::<f64>());
-                    if let (Some(Ok(width)), Some(Ok(height))) = (parts.next(), parts.next()) {
+                    // "width,height" or "width,height,up".
+                    let parts: Vec<&str> = size.split(',').map(str::trim).collect();
+                    let number = |i: usize| parts.get(i).and_then(|n| n.parse::<f64>().ok());
+                    if let (Some(width), Some(height)) = (number(0), number(1)) {
                         if width.is_finite() && height.is_finite() && width > 0.0 && height > 0.0 {
-                            let _ = tx.send(Ipc::Size(width.min(2000.0), height.min(400.0)));
+                            let _ = tx.send(Ipc::Size {
+                                width: width.min(2000.0),
+                                height: height.min(1200.0),
+                                up: parts.get(2) == Some(&"up"),
+                            });
                         }
                     }
                 }
@@ -402,18 +409,24 @@ fn on_screen(x: i32, y: i32) -> bool {
     !unsafe { MonitorFromPoint(point, MONITOR_DEFAULTTONULL) }.is_null()
 }
 
-/// Sizes the window to the page's bar (CSS pixels, scaled for the monitor).
-fn resize(hwnd: HWND, width: f64, height: f64) {
+/// Sizes the window to the page (CSS pixels, scaled for the monitor). The top edge stays
+/// put, or the bottom edge with `up`, so the bar itself never moves.
+fn resize(hwnd: HWND, width: f64, height: f64, up: bool) {
     let scale = unsafe { GetDpiForWindow(hwnd) }.max(96) as f64 / 96.0;
+    let width = (width * scale).ceil() as i32;
+    let height = (height * scale).ceil() as i32;
     unsafe {
+        let mut rect = std::mem::zeroed();
+        GetWindowRect(hwnd, &mut rect);
+        let top = if up { rect.bottom - height } else { rect.top };
         SetWindowPos(
             hwnd,
             std::ptr::null_mut(),
-            0,
-            0,
-            (width * scale).ceil() as i32,
-            (height * scale).ceil() as i32,
-            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+            rect.left,
+            top,
+            width,
+            height,
+            SWP_NOZORDER | SWP_NOACTIVATE,
         );
     }
 }

@@ -38,7 +38,13 @@ pub struct AppState {
     /// The in-game bar's settings, from the guide's Settings page (see overlay.rs).
     pub overlay: Arc<watch::Sender<OverlayConfig>>,
     pub guides: Arc<Guides>,
+    /// The skill set the guide's Gems panel shows (JSON, "null" for none), for the bar's
+    /// Gems tooltip.
+    pub gems: Arc<watch::Sender<String>>,
 }
+
+/// The largest gem set the guide may send (a big build's set is a few KB).
+const MAX_GEMS: usize = 64 * 1024;
 
 /// A button on the in-game bar: the guide panel it jumps to.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -239,6 +245,7 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
     let mut lines = state.lines.subscribe();
     let mut status = state.status.clone();
     let mut overlay = state.overlay.subscribe();
+    let mut gems = state.gems.subscribe();
     let mut ping = tokio::time::interval(Duration::from_secs(5));
 
     let first = status.borrow_and_update().message();
@@ -247,6 +254,10 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
     }
     let config = overlay_message(&overlay.borrow_and_update());
     if socket.send(Message::Text(config.into())).await.is_err() {
+        return;
+    }
+    let set = format!("gems:{}", *gems.borrow_and_update());
+    if socket.send(Message::Text(set.into())).await.is_err() {
         return;
     }
     info!("Page connected");
@@ -268,6 +279,11 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
             changed = overlay.changed() => {
                 if changed.is_err() { break; }
                 let text = overlay_message(&overlay.borrow_and_update());
+                if socket.send(Message::Text(text.into())).await.is_err() { break; }
+            },
+            changed = gems.changed() => {
+                if changed.is_err() { break; }
+                let text = format!("gems:{}", *gems.borrow_and_update());
                 if socket.send(Message::Text(text.into())).await.is_err() { break; }
             },
             _ = ping.tick() => {
@@ -303,6 +319,19 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                         }
                     } else if let Some(id) = text.strip_prefix("jump:").and_then(panel_id) {
                         jump(state, id).await;
+                    } else if let Some(json) = text.strip_prefix("gems:") {
+                        // The guide's gem set, passed on to the bar as is: JSON, kept small.
+                        if json.len() <= MAX_GEMS
+                            && serde_json::from_str::<serde_json::Value>(json).is_ok()
+                        {
+                            state.gems.send_if_modified(|set| {
+                                let changed = set != json;
+                                if changed {
+                                    *set = json.to_string();
+                                }
+                                changed
+                            });
+                        }
                     }
                 }
                 Some(Ok(_)) => {}

@@ -75,6 +75,9 @@ html {
   font-size: 1em;
   font-weight: 400;
   overflow-y: scroll;
+  /* The page's scrollbar as thin as the guide's columns and stats panel (.thin-scroll). */
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a3a transparent;
   user-select: none;
 }
 

@@ -1,6 +1,7 @@
 // The in-game bar, shown by exile-leveling.exe over the game in a WebView2 window
 // (log-api/src/overlay.rs). Buttons tell the exe, which tells the guide page to jump to that
-// panel. The exe sends the buttons ("overlay:" messages) from the guide's Settings.
+// panel. The exe sends the buttons ("overlay:" messages) from the guide's Settings, and the
+// Gems panel's set ("gems:") for the Gems button's tooltip.
 import "./styles.css";
 
 interface OverlayButton {
@@ -22,13 +23,33 @@ declare global {
 
 const SOCKET_URL = `ws://${location.host}/ws`;
 
+/** The Gems panel's set, from the guide (web/src/state/overlay.ts OverlayGems). */
+interface OverlayGems {
+  title: string;
+  groups: {
+    label?: string;
+    gems: {
+      name: string;
+      colour: string;
+      primary: boolean;
+      level?: number;
+      quality?: number;
+    }[];
+  }[];
+}
+
+const frame = document.getElementById("frame")!;
 const bar = document.getElementById("bar")!;
 const grip = document.getElementById("grip")!;
 const buttons = document.getElementById("buttons")!;
 const dot = document.getElementById("dot")!;
+const tip = document.getElementById("tip")!;
 
 let socket: WebSocket | null = null;
 let shown = "";
+let gems: OverlayGems | null = null;
+/** The tooltip opens above the bar (bar in the lower half of the screen). */
+let up = false;
 
 function render(config: OverlayConfig) {
   const key = JSON.stringify(config.buttons);
@@ -43,10 +64,70 @@ function render(config: OverlayConfig) {
       button.addEventListener("click", () => {
         if (socket?.readyState === WebSocket.OPEN) socket.send(`jump:${id}`);
       });
+      // Gems: hovering shows the Gems panel's links, to read them without leaving the game.
+      button.addEventListener("mouseenter", () =>
+        id === "gems" ? openTip() : closeTip(),
+      );
       return button;
     }),
   );
 }
+
+/** Builds an element with a class and children. */
+function el(tag: string, className: string, ...children: (Node | string)[]) {
+  const element = document.createElement(tag);
+  element.className = className;
+  element.append(...children);
+  return element;
+}
+
+function renderTip() {
+  if (gems === null || gems.groups.length === 0) {
+    tip.replaceChildren(el("div", "tipEmpty", "No gems"));
+    return;
+  }
+  tip.replaceChildren(
+    el("div", "tipTitle", gems.title),
+    ...gems.groups.map((group) =>
+      el(
+        "div",
+        "tipGroup",
+        ...(group.label ? [el("div", "tipLabel", group.label)] : []),
+        ...group.gems.map((gem) => {
+          const swatch = el("span", "tipDot");
+          swatch.style.backgroundColor = gem.colour;
+          return el(
+            "div",
+            gem.primary ? "tipGem" : "tipGem support",
+            swatch,
+            el("span", "tipName", gem.name),
+            ...(gem.level !== undefined
+              ? [el("span", "tipLevel", `${gem.level}/${gem.quality ?? 0}`)]
+              : []),
+          );
+        }),
+      ),
+    ),
+  );
+}
+
+function openTip() {
+  // Above the bar when it sits in the lower half of its screen, so it stays on screen.
+  const screenTop = (screen as Screen & { availTop?: number }).availTop ?? 0;
+  up =
+    window.screenY + bar.offsetHeight / 2 > screenTop + screen.availHeight / 2;
+  frame.classList.toggle("up", up);
+  renderTip();
+  tip.hidden = false;
+}
+
+function closeTip() {
+  tip.hidden = true;
+}
+
+frame.addEventListener("mouseleave", closeTip);
+grip.addEventListener("mouseenter", closeTip);
+dot.addEventListener("mouseenter", closeTip);
 
 const STATES = {
   offline: "Offline",
@@ -76,6 +157,15 @@ function connect() {
       } catch {
         // A malformed message: keep the current buttons.
       }
+    } else if (event.data.startsWith("gems:")) {
+      try {
+        gems = JSON.parse(
+          event.data.slice("gems:".length),
+        ) as OverlayGems | null;
+      } catch {
+        gems = null;
+      }
+      if (!tip.hidden) renderTip();
     }
     // Log lines and jumps are for the guide page.
   });
@@ -90,11 +180,13 @@ grip.addEventListener("pointerdown", (event) => {
   if (event.button === 0) window.ipc?.postMessage("drag");
 });
 
-// The window fits the bar.
+// The window fits the bar and the tooltip; with the tooltip above, it grows upwards.
 new ResizeObserver(() => {
-  const { width, height } = bar.getBoundingClientRect();
-  window.ipc?.postMessage(`size:${Math.ceil(width)},${Math.ceil(height)}`);
-}).observe(bar);
+  const { width, height } = frame.getBoundingClientRect();
+  window.ipc?.postMessage(
+    `size:${Math.ceil(width)},${Math.ceil(height)}${up ? ",up" : ""}`,
+  );
+}).observe(frame);
 
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 

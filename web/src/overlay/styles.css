@@ -1,5 +1,6 @@
 /* The in-game bar: the guide's jump bar (gold capitals on near-black), as one strip.
-   The window is sized to .bar; the exe's NAVY constant matches the background. */
+   The window is sized to .frame (the bar, plus the Gems tooltip while it's open); the
+   exe's NAVY constant matches the background. */
 :root {
   color-scheme: dark;
   --primary: #161616;
@@ -17,6 +18,105 @@ body {
   background-color: var(--primary);
   font-family: "Segoe UI", system-ui, sans-serif;
   user-select: none;
+}
+
+.frame {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: max-content;
+}
+
+/* Bar in the lower half of the screen: the tooltip opens above it. */
+.frame.up {
+  flex-direction: column-reverse;
+}
+
+/* The Gems panel's links, small: what to socket, at a glance. */
+.tip {
+  align-self: stretch;
+  box-sizing: border-box;
+  max-width: 420px;
+  max-height: 640px;
+  overflow: hidden;
+  padding: 6px 8px;
+  color: #e1e1e1;
+  font-size: 12px;
+  line-height: 1.35;
+  background-color: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.tip[hidden] {
+  display: none;
+}
+
+.tipTitle {
+  margin-bottom: 4px;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.tipGroup {
+  padding: 4px 6px;
+  background-color: #171e2a;
+  border: 1px solid #2f3b4d;
+  border-radius: 6px;
+}
+
+.tipGroup + .tipGroup {
+  margin-top: 4px;
+}
+
+.tipLabel {
+  overflow: hidden;
+  color: #8a96a8;
+  font-size: 10px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tipGem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+
+/* Supports: indented, regular weight, as in the guide's Gems panel. */
+.tipGem.support {
+  padding-left: 12px;
+  font-weight: 400;
+}
+
+.tipDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tipName {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tipLevel {
+  flex: none;
+  color: #8a96a8;
+  font-weight: 400;
+}
+
+.tipEmpty {
+  color: #8a96a8;
 }
 
 .bar {

@@ -107,6 +107,7 @@ fn main() -> ExitCode {
         pob: pob::Engine::start(),
         overlay: std::sync::Arc::new(overlay_tx),
         guides: std::sync::Arc::new(server::Guides::new(open_tx)),
+        gems: std::sync::Arc::new(watch::channel("null".to_string()).0),
     };
     #[cfg(windows)]
     let bar = Bar {

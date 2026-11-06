@@ -29,7 +29,7 @@ import type { TaskListProps } from "../../components/TaskList";
 import { currentActAtom } from "../../state/current-act";
 import { gemLinksSelector } from "../../state/gem-links";
 import { gemProgressFamily } from "../../state/gem-progress";
-import { shownPanelsAtom } from "../../state/overlay";
+import { overlayGemsAtom, shownPanelsAtom } from "../../state/overlay";
 import { pageSectionCollapseFamily } from "../../state/page-section-collapse";
 import { pobAtom } from "../../state/pob";
 import {
@@ -43,7 +43,7 @@ import { type UrlTree, urlTreesSelector } from "../../state/tree/url-tree";
 import { interactiveStyles } from "../../styles";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import type { RouteData } from "common";
+import { Data, type RouteData } from "common";
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
 import {
@@ -350,6 +350,44 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
     [gemLinks],
   );
   const [index, choose] = usePanelSet(titles, titleIndex(titles, sets?.skills));
+
+  // The set shown here, for the in-game bar's Gems tooltip.
+  const setOverlayGems = useSetAtom(overlayGemsAtom);
+  const title = titles[index];
+  useEffect(() => {
+    if (title === undefined) {
+      setOverlayGems(null);
+      return;
+    }
+    const gem = (link: RouteData.GemLink, primary: boolean) => {
+      const data = Data.Gems[link.id];
+      return data
+        ? [
+            {
+              name: data.name,
+              colour: Data.GemColours[data.primary_attribute],
+              primary,
+              level: link.level,
+              quality: link.quality,
+            },
+          ]
+        : [];
+    };
+    setOverlayGems({
+      title,
+      groups: gemLinks
+        .filter((link) => link.title === title)
+        .map((link) => ({
+          label: link.label,
+          gems: [
+            ...link.primaryGems.flatMap((g) => gem(g, true)),
+            ...link.secondaryGems.flatMap((g) => gem(g, false)),
+          ],
+        })),
+    });
+    // (Kept when you leave for Settings, so the bar still shows them.)
+  }, [gemLinks, title]);
+
   return (
     <PageSection
       id="gems"

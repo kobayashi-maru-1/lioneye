@@ -6,17 +6,21 @@
     <title>Exile Leveling Overlay</title>
   </head>
   <body>
-    <!-- The in-game bar (exe only): shown by exile-leveling.exe over the game, in WebView2. -->
-    <div id="bar" class="bar">
-      <span id="grip" class="grip" aria-label="Move" title="Move"></span>
-      <span id="buttons" class="buttons"></span>
-      <span
-        id="dot"
-        class="dot"
-        role="status"
-        aria-label="Offline"
-        title="Offline"
-      ></span>
+    <!-- The in-game bar (exe only): shown by exile-leveling.exe over the game, in WebView2.
+         The window is sized to #frame: the bar, plus the Gems tooltip while it's open. -->
+    <div id="frame" class="frame">
+      <div id="bar" class="bar">
+        <span id="grip" class="grip" aria-label="Move" title="Move"></span>
+        <span id="buttons" class="buttons"></span>
+        <span
+          id="dot"
+          class="dot"
+          role="status"
+          aria-label="Offline"
+          title="Offline"
+        ></span>
+      </div>
+      <div id="tip" class="tip" role="tooltip" hidden></div>
     </div>
     <script type="module" src="/src/overlay/main.ts"></script>
   </body>

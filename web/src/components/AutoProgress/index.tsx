@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { bossesKilledBy } from "../../state/boss-kills";
 import {
   OVERLAY_PANELS,
+  overlayGemsAtom,
   overlaySettingsAtom,
   shownPanelsAtom,
 } from "../../state/overlay";
@@ -38,8 +39,9 @@ export function useAutoProgress() {
         jump(event.data.slice("jump:".length));
         return;
       }
-      // The bar's settings, for the bar itself.
-      if (event.data.startsWith("overlay:")) return;
+      // The bar's settings and Gems tooltip, for the bar itself.
+      if (event.data.startsWith("overlay:") || event.data.startsWith("gems:"))
+        return;
       if (event.data.startsWith("status:")) {
         const [status, path] = event.data.slice("status:".length).split("|");
         setState(
@@ -83,6 +85,12 @@ export function useAutoProgress() {
           ).map(({ id, label }) => ({ id, label }));
     sendMessage(`overlay:${JSON.stringify({ on: settings.on, buttons })}`);
   }, [readyState, settings, shown]);
+  // The Gems panel's set, for the bar's Gems tooltip.
+  const gems = useAtomValue(overlayGemsAtom);
+  useEffect(() => {
+    if (readyState === ReadyState.OPEN)
+      sendMessage(`gems:${JSON.stringify(gems)}`);
+  }, [readyState, gems]);
 }
 
 /**
