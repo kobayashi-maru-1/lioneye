@@ -772,6 +772,197 @@ local function passives()
 	return out
 end
 
+-- Build health --------------------------------------------------------------------------
+-- The checks are ported from PoB Redux's sanity_check (crates/pob-engine/lua/bridge.lua,
+-- https://github.com/pobredux/pob-redux), under its MIT License:
+--
+--   Copyright (c) 2026 Judd
+--   Permission is hereby granted, free of charge, to any person obtaining a copy of this
+--   software and associated documentation files (the "Software"), to deal in the Software
+--   without restriction, including without limitation the rights to use, copy, modify,
+--   merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+--   permit persons to whom the Software is furnished to do so, subject to the following
+--   conditions: The above copyright notice and this permission notice shall be included in
+--   all copies or substantial portions of the Software.
+--   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+--
+-- Changed for a leveling guide: every check is scaled to the loadout's level (an Act 2
+-- loadout isn't expected to cap resistances), the texts are short, and checks PoB already
+-- warns about (skill costs, reservation) are left to PoB's warnings. log-api/redux-watch.ps1
+-- notices when Redux changes sanity_check.
+
+-- Quest passive points by the level an act starts at (PoB's Modules/Build.lua acts table).
+local QUEST_POINTS = {
+	{ 1, 0 }, { 12, 2 }, { 22, 4 }, { 32, 6 }, { 40, 7 }, { 44, 9 },
+	{ 50, 12 }, { 54, 15 }, { 60, 18 }, { 64, 20 }, { 67, 23 },
+}
+
+-- Passive points a character of `level` has (level - 1, quest points, bandits after Act 2).
+local function pointsAvailable(level, extra)
+	local quest, act = 0, 0
+	for index, entry in ipairs(QUEST_POINTS) do
+		if level >= entry[1] then
+			quest, act = entry[2], index
+		end
+	end
+	return level - 1 + quest + (act > 2 and extra or 0)
+end
+
+-- Ascendancy points by level, by PoB's lab suggestions: Normal from 33, Cruel 55,
+-- Merciless 68, Eternal 75.
+local function ascendancyExpected(level)
+	return level >= 75 and 8 or level >= 68 and 6 or level >= 55 and 4 or level >= 33 and 2 or 0
+end
+
+local function nextLab(points)
+	return ({ [0] = "Normal Lab", [2] = "Cruel Lab", [4] = "Merciless Lab", [6] = "Eternal Lab" })[points]
+end
+
+-- What to look at in the shown loadout, worst first: { severity, message, fix, panel }.
+-- severity: high, medium, low. panel: the guide panel that fixes it (gear, tree, gems, config).
+local function healthFindings()
+	local o = build.calcsTab.mainOutput or {}
+	local level = build.characterLevel or 1
+	local spec = build.spec
+	local out = setmetatable({}, ARRAY)
+	local function add(severity, message, fix, panel)
+		out[#out + 1] = { severity = severity, message = message, fix = fix, panel = panel }
+	end
+	local function number(value)
+		return type(value) == "number" and value == value and value or 0
+	end
+
+	-- Resistances: none expected before Act 5; half-capped through Acts 5-10; capped in maps.
+	local cap = level >= 68 and 75 or level >= 40 and 50 or nil
+	if cap then
+		local low, worst = {}, 75
+		for _, r in ipairs({ { "fire", o.FireResist }, { "cold", o.ColdResist }, { "lightning", o.LightningResist } }) do
+			local value = number(r[2])
+			if value < cap then
+				low[#low + 1] = string.format("%s %.0f%%", r[1], value)
+				worst = math.min(worst, value)
+			end
+		end
+		if #low > 0 then
+			add((cap == 75 and worst < 50) and "high" or "medium",
+				string.format("Below %d%%: %s", cap, table.concat(low, ", ")),
+				"Resistances on rings, amulet, belt, boots, gloves, helmet.", "gear")
+		end
+	end
+	local chaosImmune = false
+	for _, node in pairs(spec and spec.allocNodes or {}) do
+		if node.dn == "Chaos Inoculation" then
+			chaosImmune = true
+		end
+	end
+	if level >= 68 and number(o.ChaosResist) < 0 and not chaosImmune then
+		add("low", string.format("Chaos resistance %.0f%%", number(o.ChaosResist)),
+			"Chaos damage bypasses energy shield.", "gear")
+	end
+
+	-- Passive points for the loadout's level.
+	if spec and spec.CountAllocNodes then
+		local used, ascUsed = spec:CountAllocNodes()
+		local available = pointsAvailable(level, number(o.ExtraPoints))
+		if used > available + 1 then
+			add("high", string.format("%d passive points at level %d (max %d)", used, level, available),
+				"Set the loadout's level, or trim the tree.", "tree")
+		elseif used < available - 1 then
+			add("low", string.format("%d of %d passive points spent", used, available), nil, "tree")
+		end
+		local expected = ascendancyExpected(level)
+		if spec.curAscendClassId == 0 and level >= 33 then
+			add("medium", "No ascendancy chosen", "Pick one at the Normal Lab.", "tree")
+		elseif spec.curAscendClassId ~= 0 and (ascUsed or 0) < expected then
+			add("medium", string.format("%d of %d ascendancy points", ascUsed or 0, expected),
+				nextLab(ascUsed - ascUsed % 2) and ("Next: " .. nextLab(ascUsed - ascUsed % 2)) or nil, "tree")
+		end
+	end
+
+	-- Flasks: worth carrying from the first towns.
+	if level >= 12 then
+		local empty = 0
+		for i = 1, 5 do
+			local slot = build.itemsTab.slots["Flask " .. i]
+			if slot and (not slot.selItemId or slot.selItemId == 0) then
+				empty = empty + 1
+			end
+		end
+		if empty > 0 then
+			add(empty >= 3 and "medium" or "low", string.format("%d of 5 flask slots empty", empty),
+				"Life, utility and quicksilver flasks cover most gaps.", "gear")
+		end
+	end
+
+	-- Main skill links, from maps on.
+	local group = build.skillsTab.socketGroupList[build.mainSocketGroup]
+	if level >= 68 and group and not group.source then
+		local actives, supports = 0, 0
+		for _, gem in ipairs(group.gemList or {}) do
+			local effect = gem.gemData and gem.gemData.grantedEffect or gem.grantedEffect
+			if gem.enabled ~= false and effect then
+				if effect.support then supports = supports + 1 else actives = actives + 1 end
+			end
+		end
+		local want = level >= 85 and 5 or 4
+		-- A link can't outgrow its item: boots, gloves and helmets hold 4 sockets.
+		local slot = group.slot and build.itemsTab.slots[group.slot]
+		local item = slot and slot.selItemId and build.itemsTab.items[slot.selItemId]
+		local limit = item and item.base and item.base.socketLimit
+		if limit then
+			want = math.min(want, limit - 1)
+		end
+		if actives == 1 and supports < want then
+			add(supports < 3 and "high" or "medium", string.format("Main skill has %d supports", supports),
+				string.format("Most builds run %d at this level.", want), "gems")
+		end
+	end
+
+	if level >= 30 and number(o.Life) < 500 and number(o.EnergyShield) < 500 then
+		add("high", string.format("Life %.0f, energy shield %.0f", number(o.Life), number(o.EnergyShield)),
+			"Both pools are low for this level.", "gear")
+	end
+	local speed = o.EffectiveMovementSpeedMod or o.MovementSpeedMod
+	if level >= 15 and type(speed) == "number" and speed < 1.15 then
+		add("medium", string.format("Movement speed %+.0f%%", (speed - 1) * 100),
+			"Boots with movement speed shorten the campaign.", "gear")
+	end
+	local input = build.configTab and build.configTab.input or {}
+	local major, minor = input.pantheonMajorGod, input.pantheonMinorGod
+	if level >= 60 and (major == nil or major == "None") and (minor == nil or minor == "None") then
+		add("low", "No pantheon gods", "Set them in Config.", "config")
+	end
+
+	local rank = { high = 1, medium = 2, low = 3 }
+	table.sort(out, function(a, b)
+		return rank[a.severity] < rank[b.severity]
+	end)
+	return out
+end
+
+-- Redux's Defences card: the largest hit of each type you survive, and the rest.
+local function defences()
+	local o = build.calcsTab.mainOutput or {}
+	local function finite(value)
+		return type(value) == "number" and value == value and value ~= math.huge
+			and value ~= -math.huge and value or nil
+	end
+	return {
+		physical = finite(o.PhysicalMaximumHitTaken),
+		fire = finite(o.FireMaximumHitTaken),
+		cold = finite(o.ColdMaximumHitTaken),
+		lightning = finite(o.LightningMaximumHitTaken),
+		chaos = finite(o.ChaosMaximumHitTaken),
+		armour = finite(o.Armour),
+		evasion = finite(o.Evasion),
+		block = finite(o.EffectiveBlockChance or o.BlockChance),
+		spellBlock = finite(o.EffectiveSpellBlockChance or o.SpellBlockChance),
+		lifeRegen = finite(o.LifeRegenRecovery or o.LifeRegen),
+		manaRegen = finite(o.ManaRegenRecovery or o.ManaRegen),
+		movementSpeed = finite(o.EffectiveMovementSpeedMod or o.MovementSpeedMod),
+	}
+end
+
 -- Gem top levels other than 20 (Empower 3, Awakened 5, Portal 1...), by gem item id, for
 -- the Trade List's Max gem level. The same for every build, so built once.
 local gemMaxLevelCache
@@ -831,6 +1022,8 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		skills = skillGroups(),
 		passives = passives(),
 		gemMaxLevels = gemMaxLevels(),
+		health = healthFindings(),
+		defences = defences(),
 		rows = rows(),
 		warnings = warnings(),
 	})

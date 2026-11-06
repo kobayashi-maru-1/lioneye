@@ -78,6 +78,11 @@ once in **Settings** (the ⚙ at the top right).
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.
+- Above it, **Build health** lists what to look at in that loadout, judged for its level:
+  resistances from Act 5 (50%) and maps (75%), passive and ascendancy points (labs at 33,
+  55, 68, 75), flasks, movement speed, life, main skill links and pantheon. **Defenses**
+  shows the largest hit of each type it survives. The checks are ported from
+  [PoB Redux](https://github.com/pobredux/pob-redux) (MIT).
 - **Gear** shows the loadout's item set as a paper doll (with flasks, weapon swap, abyssal
   sockets, grafts and the jewels in the tree's taken sockets). Base art comes from RePoE's
   base item list (every base, flasks included) and unique art from poe.ninja for the league
@@ -136,7 +141,12 @@ Needs [Node.js 22+](https://nodejs.org), [Rust](https://rustup.rs) and Git.
 
 Each build bundles the latest [Path of Building](https://github.com/PathOfBuildingCommunity/PathOfBuilding)
 release (code and game data only, about 5 MB) for the Stats tab; `log-api\fetch-pob.ps1`
-downloads it and skips the download when that release is already there.
+downloads it and skips the download when that release is already there. An exe keeps the
+PoB it was built with: build again after a PoB release to pick it up.
+
+Build health is a port of PoB Redux's `sanity_check`. `log-api\redux-watch.ps1` says
+whether Redux changed it since the port (the Redux watch workflow runs it daily and fails
+on a change); after porting, `.\log-api\redux-watch.ps1 -Update` records the new version.
 
 ```powershell
 .\build.ps1            # writes .\exile-leveling.exe

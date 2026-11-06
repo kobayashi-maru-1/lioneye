@@ -23,6 +23,7 @@ import {
 import { SearchStrings } from "../../components/SearchStrings";
 import { SectionHolder } from "../../components/SectionHolder";
 import { SkillTreeViewer } from "../../components/SkillTreeViewer";
+import { BuildHealth } from "../../components/BuildHealth";
 import { StatsViewer } from "../../components/StatsViewer";
 import { TradeListPanel } from "../../components/TradeList";
 import type { TaskListProps } from "../../components/TaskList";
@@ -253,6 +254,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
       >
         {showStats && (
           <aside className={classNames(styles.sidebar, "thin-scroll")}>
+            <BuildHealth />
             <StatsViewer />
           </aside>
         )}
