@@ -221,9 +221,9 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
       ...(showStats ? [{ id: "gear", label: "Gear" }] : []),
       ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
       ...(showStats ? [{ id: "trade", label: "Trade" }] : []),
-      ...(showStats ? [{ id: "health", label: "Health" }] : []),
       ...(showStats ? [{ id: "config", label: "Config" }] : []),
       ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
+      ...(showStats ? [{ id: "health", label: "Health" }] : []),
       ...(notes !== null ? [{ id: "notes", label: "Notes" }] : []),
       ...(hasSearch ? [{ id: "search", label: "Search" }] : []),
     ],
@@ -303,9 +303,9 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
                 </div>
               )}
               {showStats && <TradeListPanel />}
-              {showStats && <BuildHealthPanel />}
               {showStats && <ConfigPanel />}
               {urlTrees.length > 0 && <TreePanel urlTrees={urlTrees} />}
+              {showStats && <BuildHealthPanel />}
               {notes !== null && (
                 <PageSection id="notes" title="Notes">
                   <BuildNotes notes={notes} />
@@ -455,7 +455,7 @@ function ConfigPanel() {
 
 /** The Tree panel's Compare choices: the loadout before, or your character (from the log). */
 const TREE_COMPARE = [
-  { value: "previous", label: "Last loadout" },
+  { value: "previous", label: "Previous set" },
   { value: "character", label: "Character" },
 ] as const;
 

@@ -1,23 +1,26 @@
 //! Your character's passive points and quest points, read back from the game's log, so the
 //! guide knows them even for a character started before the app (or before this run).
 //!
-//! - The character is the one in the log's latest "<name> (<class>) is now level N" line.
-//! - Its history starts at its "is now level 2" line (the start of the log when that's gone).
-//! - From there, "Successfully allocated passive skill id: <id>, name: <name>" lines are its
-//!   points while it's the one playing (the last level-up or death line names who that is;
-//!   the allocation lines themselves name no character). Refunds aren't logged.
+//! - The character is the one the guide follows (its name, from level-up lines), else the
+//!   one in the log's latest "<name> (<class>) is now level N" line.
+//! - Its history starts at its "is now level 2" line, else at its first line the log still
+//!   has. Party members' level-ups and deaths are logged too, so other names are ignored.
+//! - "Successfully allocated passive skill id: <id>, name: <name>" lines are always the
+//!   player's own (they name no character): all of them from the start count. A point taken
+//!   on another of your characters in between would count too, and refunds aren't logged.
 //! - "/passives" in game writes "N Passive Skill Points from quests:" and one "(N from
-//!   <quest>)" line per quest: the latest such list for the character is kept.
+//!   <quest>)" line per quest: the latest such list is kept.
 
 use std::{
     fs::File,
     io::{BufRead, BufReader, Read, Seek, SeekFrom},
-    path::Path,
+    path::{Path, PathBuf},
+    sync::Mutex,
 };
 
 use serde::Serialize;
 
-#[derive(Debug, Default, Serialize, PartialEq)]
+#[derive(Debug, Default, Clone, Serialize, PartialEq)]
 pub struct CharacterLog {
     pub name: String,
     pub class: String,
@@ -46,12 +49,6 @@ pub fn level_up(message: &str) -> Option<(&str, &str, u32)> {
     (!name.is_empty() && !name.contains(' ')).then_some((name, class, level))
 }
 
-/// ": KobayashiSRS has been slain." → the name.
-fn slain(message: &str) -> Option<&str> {
-    let name = message.strip_prefix(": ")?.strip_suffix(" has been slain.")?;
-    (!name.is_empty() && !name.contains(' ')).then_some(name)
-}
-
 /// "Successfully allocated passive skill id: dexterity869, name: Dexterity" → the id.
 pub fn allocated(message: &str) -> Option<&str> {
     let rest = message.strip_prefix("Successfully allocated passive skill id: ")?;
@@ -74,20 +71,55 @@ fn quest_line(message: &str) -> Option<(&str, u32)> {
     Some((quest, points.parse().ok()?))
 }
 
-/// Reads the character's history from the log at `path`; None when the log names none.
-pub fn scan(path: &Path) -> std::io::Result<Option<CharacterLog>> {
+/// The full log for a watched one: LatestClient.txt holds only this session, so its
+/// Client.txt beside it (when there is one) has the history.
+pub fn history_file(watched: &Path) -> PathBuf {
+    let is_latest = watched
+        .file_name()
+        .is_some_and(|name| name.eq_ignore_ascii_case("LatestClient.txt"));
+    if is_latest {
+        let full = watched.with_file_name("Client.txt");
+        if full.is_file() {
+            return full;
+        }
+    }
+    watched.to_path_buf()
+}
+
+/// The last scan, reused while the log hasn't grown (pages refresh after many lines).
+static LAST: Mutex<Option<(PathBuf, u64, Option<String>, Option<CharacterLog>)>> =
+    Mutex::new(None);
+
+/// `scan`, one at a time and cached until the log changes.
+pub fn scan_cached(path: &Path, name: Option<&str>) -> std::io::Result<Option<CharacterLog>> {
+    let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+    let len = std::fs::metadata(path)?.len();
+    if let Some((p, l, n, log)) = &*last
+        && p == path
+        && *l == len
+        && n.as_deref() == name
+    {
+        return Ok(log.clone());
+    }
+    let log = scan(path, name)?;
+    *last = Some((path.to_path_buf(), len, name.map(str::to_string), log.clone()));
+    Ok(log)
+}
+
+/// Reads `name`'s history (else the latest character's) from the log at `path`; None when
+/// the log doesn't name it.
+pub fn scan(path: &Path, name: Option<&str>) -> std::io::Result<Option<CharacterLog>> {
     let mut file = File::open(path)?;
-    let Some((name, class, level, start)) = find_character(&mut file)? else {
+    let Some((name, class, level, start)) = find_character(&mut file, name)? else {
         return Ok(None);
     };
     file.seek(SeekFrom::Start(start))?;
     let mut log = CharacterLog {
-        name: name.clone(),
+        name,
         class,
         level,
         ..Default::default()
     };
-    let mut playing = true;
     let mut list: Option<Vec<(String, u32)>> = None;
     for line in BufReader::new(file).split(b'\n') {
         let line = line?;
@@ -100,16 +132,10 @@ pub fn scan(path: &Path) -> std::io::Result<Option<CharacterLog>> {
             }
             log.quests = list.take();
         }
-        if let Some((who, _, _)) = level_up(message) {
-            playing = who == name;
-        } else if let Some(who) = slain(message) {
-            playing = who == name;
-        } else if playing {
-            if let Some(id) = allocated(message) {
-                log.allocated.push(id.to_string());
-            } else if quests_header(message) {
-                list = Some(Vec::new());
-            }
+        if let Some(id) = allocated(message) {
+            log.allocated.push(id.to_string());
+        } else if quests_header(message) {
+            list = Some(Vec::new());
         }
     }
     if list.is_some() {
@@ -118,15 +144,20 @@ pub fn scan(path: &Path) -> std::io::Result<Option<CharacterLog>> {
     Ok(Some(log))
 }
 
-/// The latest character (name, class, level) and where its history starts: its level 2
-/// line, else the start of the file. Reads backwards in chunks.
-fn find_character(file: &mut File) -> std::io::Result<Option<(String, String, u32, u64)>> {
+/// The character (name, class, level from its latest level-up) and where its history
+/// starts: its level 2 line, else its earliest level-up line in the log. Reads backwards.
+fn find_character(
+    file: &mut File,
+    wanted: Option<&str>,
+) -> std::io::Result<Option<(String, String, u32, u64)>> {
     const CHUNK: u64 = 4 * 1024 * 1024;
     let len = file.metadata()?.len();
     let mut end = len;
     // The start of a line cut by the chunk boundary, carried to the next (earlier) chunk.
     let mut carry: Vec<u8> = Vec::new();
+    // (name, class, level) from the latest level-up, and the earliest offset seen for it.
     let mut found: Option<(String, String, u32)> = None;
+    let mut earliest = 0u64;
     while end > 0 {
         let begin = end.saturating_sub(CHUNK);
         let mut buf = vec![0u8; (end - begin) as usize];
@@ -155,15 +186,21 @@ fn find_character(file: &mut File) -> std::io::Result<Option<(String, String, u3
                 if line_start < line_end {
                     let line = String::from_utf8_lossy(&buf[line_start..line_end]);
                     if let Some((name, class, level)) = level_up(message(line.trim_end())) {
-                        match &found {
-                            None => {
+                        let offset = begin + line_start as u64;
+                        let ours = match (&found, wanted) {
+                            (Some((current, _, _)), _) => current == name,
+                            (None, Some(wanted)) => wanted == name,
+                            (None, None) => true,
+                        };
+                        if ours {
+                            if found.is_none() {
                                 found = Some((name.to_string(), class.to_string(), level));
                             }
-                            Some((current, _, _)) if current == name && level == 2 => {
-                                let (name, class, level) = found.unwrap();
-                                return Ok(Some((name, class, level, begin + line_start as u64)));
+                            earliest = offset;
+                            if level == 2 {
+                                let (name, class, level) = found.take().unwrap_or_default();
+                                return Ok(Some((name, class, level, offset)));
                             }
-                            _ => {}
                         }
                     }
                 }
@@ -173,7 +210,7 @@ fn find_character(file: &mut File) -> std::io::Result<Option<(String, String, u3
         carry = buf[..first_break].to_vec();
         end = begin;
     }
-    Ok(found.map(|(name, class, level)| (name, class, level, 0)))
+    Ok(found.map(|(name, class, level)| (name, class, level, earliest)))
 }
 
 #[cfg(test)]
@@ -181,6 +218,13 @@ mod tests {
     use super::*;
 
     const P: &str = "2026/11/06 10:00:00 123 abc [INFO Client 52060]";
+
+    fn write(lines: &[&str], tag: &str) -> PathBuf {
+        let text: String = lines.iter().map(|l| format!("{P} {l}\n")).collect();
+        let path = std::env::temp_dir().join(format!("lioneye-{tag}-{}.txt", std::process::id()));
+        std::fs::write(&path, text).unwrap();
+        path
+    }
 
     #[test]
     fn reads_the_lines() {
@@ -194,7 +238,6 @@ mod tests {
             ))),
             Some("dexterity869")
         );
-        assert_eq!(slain(message(&format!("{P} : KobayashiSRS has been slain."))), Some("KobayashiSRS"));
         assert!(quests_header(message(&format!("{P} : 22 Passive Skill Points from quests:"))));
         assert_eq!(
             quest_line(message(&format!("{P} : (0 from The Dweller of the Deep)"))),
@@ -205,30 +248,31 @@ mod tests {
     }
 
     #[test]
-    fn keeps_the_latest_characters_history() {
-        let lines = [
-            ": Old (Ranger) is now level 2",
-            "Successfully allocated passive skill id: old1, name: X",
-            ": New (Witch) is now level 2",
-            "Successfully allocated passive skill id: new1, name: A",
-            ": Old (Ranger) is now level 3",
-            "Successfully allocated passive skill id: old2, name: Y",
-            ": New has been slain.",
-            "Successfully allocated passive skill id: new2, name: B",
-            ": 2 Passive Skill Points from quests:",
-            ": (1 from The Dweller of the Deep)",
-            ": (0 from The Marooned Mariner)",
-            ": You have entered The Coast.",
-            ": New (Witch) is now level 4",
-        ];
-        let text: String = lines.iter().map(|l| format!("{P} {l}\n")).collect();
-        let path = std::env::temp_dir().join(format!("lioneye-client-{}.txt", std::process::id()));
-        std::fs::write(&path, text).unwrap();
-        let log = scan(&path).unwrap().unwrap();
+    fn follows_the_named_character_past_party_members() {
+        let path = write(
+            &[
+                ": Old (Ranger) is now level 2",
+                "Successfully allocated passive skill id: old1, name: X",
+                ": New (Witch) is now level 2",
+                "Successfully allocated passive skill id: new1, name: A",
+                // A party member levels and dies: still your points.
+                ": Friend (Ranger) is now level 30",
+                "Successfully allocated passive skill id: new2, name: B",
+                ": Friend has been slain.",
+                ": 2 Passive Skill Points from quests:",
+                ": (1 from The Dweller of the Deep)",
+                ": (0 from The Marooned Mariner)",
+                ": You have entered The Coast.",
+                ": New (Witch) is now level 4",
+                ": Friend (Ranger) is now level 31",
+            ],
+            "party",
+        );
+        let log = scan(&path, Some("New")).unwrap().unwrap();
+        // Unnamed, the latest level-up (a party member) would be picked: the guide names it.
+        let latest = scan(&path, None).unwrap().unwrap();
         let _ = std::fs::remove_file(&path);
-        assert_eq!(log.name, "New");
-        assert_eq!(log.class, "Witch");
-        assert_eq!(log.level, 4);
+        assert_eq!((log.name.as_str(), log.class.as_str(), log.level), ("New", "Witch", 4));
         assert_eq!(log.allocated, ["new1", "new2"]);
         assert_eq!(
             log.quests,
@@ -237,5 +281,49 @@ mod tests {
                 ("The Marooned Mariner".to_string(), 0)
             ])
         );
+        assert_eq!(latest.name, "Friend");
+    }
+
+    #[test]
+    fn starts_at_level_two_or_the_characters_first_line() {
+        // Just reached level 2: its own line starts it.
+        let path = write(
+            &[
+                "Successfully allocated passive skill id: other1, name: X",
+                ": New (Witch) is now level 2",
+                "Successfully allocated passive skill id: new1, name: A",
+            ],
+            "two",
+        );
+        let log = scan(&path, Some("New")).unwrap().unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(log.allocated, ["new1"]);
+
+        // Its level 2 is gone from the log: from its first level-up the log still has.
+        let path = write(
+            &[
+                "Successfully allocated passive skill id: other1, name: X",
+                ": New (Witch) is now level 40",
+                "Successfully allocated passive skill id: new1, name: A",
+                ": New (Witch) is now level 41",
+            ],
+            "old",
+        );
+        let log = scan(&path, Some("New")).unwrap().unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(log.allocated, ["new1"]);
+        assert_eq!(log.level, 41);
+    }
+
+    #[test]
+    fn reads_client_txt_beside_latest() {
+        let dir = std::env::temp_dir().join(format!("lioneye-logs-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let latest = dir.join("LatestClient.txt");
+        std::fs::write(&latest, "").unwrap();
+        assert_eq!(history_file(&latest), latest);
+        std::fs::write(dir.join("Client.txt"), "").unwrap();
+        assert_eq!(history_file(&latest), dir.join("Client.txt"));
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

@@ -26,10 +26,16 @@ export function isCharacterLine(line: string) {
   return CHARACTER_LINE.test(line);
 }
 
-/** Asks the exe to read your character back from the log; null when it can't. */
-export async function fetchCharacterLog(): Promise<CharacterLog | null> {
+/**
+ * Asks the exe to read your character back from the log; null when it can't. `name`: the
+ * character the guide follows (party members level up in the log too).
+ */
+export async function fetchCharacterLog(
+  name: string | null,
+): Promise<CharacterLog | null> {
   try {
-    const response = await fetch("/api/character");
+    const query = name ? `?name=${encodeURIComponent(name)}` : "";
+    const response = await fetch(`/api/character${query}`);
     if (!response.ok) return null;
     const log = (await response.json()) as CharacterLog | null;
     return log && Array.isArray(log.allocated) ? log : null;
@@ -38,18 +44,24 @@ export async function fetchCharacterLog(): Promise<CharacterLog | null> {
   }
 }
 
-/** The log's passive ids → tree node numbers (RePoE, through the exe), once per load. */
+/**
+ * The log's passive ids → tree node numbers (RePoE, through the exe), once per load. A
+ * failed download (offline) is tried again after 5 minutes, not on every refresh.
+ */
 let passiveIds: Promise<Record<string, number> | null> | null = null;
 function fetchPassiveIds() {
   passiveIds ??= fetch("/api/data/repoe-passives")
     .then((response) => (response.ok ? response.json() : null))
     .catch(() => null)
     .then((ids: Record<string, number> | null) => {
-      if (ids === null) passiveIds = null;
+      if (ids === null) setTimeout(() => (passiveIds = null), 5 * 60 * 1000);
       return ids;
     });
   return passiveIds;
 }
+
+/** The last answer, kept while the nodes are the same so the tree doesn't redraw (and lose its zoom). */
+let lastNodes: { name: string; nodes: string[]; key: string } | null = null;
 
 /** Your character's allocated tree nodes (node numbers, as the tree uses them); null when unknown. */
 export const characterNodesAtom = atom(async (get) => {
@@ -62,7 +74,10 @@ export const characterNodesAtom = atom(async (get) => {
     const node = ids[id];
     if (node !== undefined) nodes.add(String(node));
   }
-  return { name: log.name, nodes: [...nodes] };
+  const key = `${log.name}|${[...nodes].join(",")}`;
+  if (lastNodes?.key !== key)
+    lastNodes = { name: log.name, nodes: [...nodes], key };
+  return lastNodes;
 });
 
 /** characterNodesAtom without waiting: null until known. */

@@ -6,7 +6,6 @@ import { PageSection, useJumpToSection } from "../PageSection";
 import { type HealthFinding, usePobStats } from "../PobStats";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { Data } from "common";
 import { useAtomValue } from "jotai";
 import { useMemo } from "react";
 
@@ -19,14 +18,40 @@ const PANELS: Record<string, string> = {
   campaign: "Campaign",
 };
 
-/** Quests by the name "/passives" lists them under. */
-const QUESTS_BY_NAME = new Map(
-  Object.values(Data.Quests).map((quest) => [quest.name, quest]),
-);
+/**
+ * The campaign's passive point quests, by act, with their points (PoB's Build.lua acts
+ * table: 23, plus 1 for killing all bandits). "/passives" may leave out quests not done.
+ */
+const PASSIVE_QUESTS: [string, number, number][] = [
+  ["The Dweller of the Deep", 1, 1],
+  ["The Marooned Mariner", 1, 1],
+  ["The Way Forward", 2, 1],
+  ["Through Sacred Ground", 2, 1],
+  ["Deal with the Bandits", 2, 1],
+  ["Victario's Secrets", 3, 1],
+  ["Piety's Pets", 3, 1],
+  ["An Indomitable Spirit", 4, 1],
+  ["In Service to Science", 5, 1],
+  ["Kitava's Torments", 5, 1],
+  ["The Father of War", 6, 1],
+  ["The Puppet Mistress", 6, 1],
+  ["The Cloven One", 6, 1],
+  ["The Master of a Million Faces", 7, 1],
+  ["Queen of Despair", 7, 1],
+  ["Kishara's Star", 7, 1],
+  ["Love is Dead", 8, 1],
+  ["Reflection of Terror", 8, 1],
+  ["The Gemling Legion", 8, 1],
+  ["Queen of the Sands", 9, 1],
+  ["The Ruler of Highgate", 9, 1],
+  ["Vilenta's Vengeance", 10, 1],
+  ["An End to Hunger", 10, 2],
+];
 
 /**
- * Passive quests your character left behind: in your latest "/passives" list with no
- * point, from an act you've finished. The bandit quest only counts when you kill all three.
+ * Passive quests your character left behind: from an act you've finished, missing from
+ * your latest "/passives" list or with fewer points. The bandit quest only counts when you
+ * kill all three.
  */
 function missedQuestPoints(
   quests: [string, number][],
@@ -34,11 +59,12 @@ function missedQuestPoints(
   bandit: string,
 ): HealthFinding[] {
   if (act === null) return [];
+  const got = new Map(quests);
   const missed: HealthFinding[] = [];
-  for (const [name, points] of quests) {
-    const quest = QUESTS_BY_NAME.get(name);
-    if (points > 0 || quest === undefined || Number(quest.act) >= act) continue;
+  for (const [name, questAct, points] of PASSIVE_QUESTS) {
+    if (questAct >= act || (got.get(name) ?? 0) >= points) continue;
     if (name === "Deal with the Bandits" && bandit !== "None") continue;
+    const quest = { act: questAct };
     missed.push({
       severity: "medium",
       message: `Missed quest point: ${name}`,
@@ -75,6 +101,13 @@ export function BuildHealthPanel() {
     pobHealth === null && missed.length === 0
       ? null
       : [...missed, ...(pobHealth ?? [])];
+  // PoB's own state, when it hasn't answered (shown with the quest findings too).
+  const pobStatus =
+    pobHealth === null
+      ? pob?.error
+        ? "Health unavailable"
+        : "Calculating"
+      : null;
 
   return (
     <PageSection
@@ -88,28 +121,23 @@ export function BuildHealthPanel() {
         )
       }
     >
-      {health === null ? (
-        <p className={classNames(styles.empty)}>
-          {pob?.error ? "Health unavailable" : "Calculating"}
-        </p>
-      ) : (
-        health.length > 0 && (
-          <ul
-            className={classNames(styles.findings, {
-              [styles.stale]: pob?.loading,
-            })}
-          >
-            {health.map((finding, i) => (
-              <Finding
-                key={i}
-                finding={finding}
-                onJump={
-                  finding.panel && present.has(finding.panel) ? jump : undefined
-                }
-              />
-            ))}
-          </ul>
-        )
+      {pobStatus && <p className={classNames(styles.empty)}>{pobStatus}</p>}
+      {health !== null && health.length > 0 && (
+        <ul
+          className={classNames(styles.findings, {
+            [styles.stale]: pob?.loading,
+          })}
+        >
+          {health.map((finding, i) => (
+            <Finding
+              key={i}
+              finding={finding}
+              onJump={
+                finding.panel && present.has(finding.panel) ? jump : undefined
+              }
+            />
+          ))}
+        </ul>
       )}
       {character && !character.quests && (
         <p className={classNames(styles.note)}>

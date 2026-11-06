@@ -102,16 +102,18 @@ once in **Settings** (the ⚙ at the top right).
 - Links out of the guide (trade searches, the wiki, poe.re) open in a normal tab of your
   last-used Edge profile, where you're signed in to the trade site, not in the guide's own
   profile.
-- **Build health** (under the Trade List) lists what to look at in the shown loadout, worst
+- **Build health** (under the Tree) lists what to look at in the shown loadout, worst
   first, each with a link to the panel that fixes it. The checks are
   [PoB Redux](https://github.com/pobredux/pob-redux)'s (MIT), with its rules unchanged:
   resistances, passive and ascendancy points, main skill links, skills to press, flasks,
   pantheon, skill costs, life, movement speed, attribute requirements, gem errors and
   reduced-requirement affixes. Like Redux, it uses the build's level from PoB.
-- Your character, from the game's log: the exe reads back the latest character's passive
-  points (every "Successfully allocated passive skill" line since its level 2, while it was
-  the one playing; refunds aren't logged) and its latest `/passives` list. Node ids map to
-  the tree through RePoE's passive data. **Tree** → **Compare** → **Character** shows the
+- Your character, from the game's log: the exe reads back the character the guide follows
+  (by name, so party members' level-ups are ignored): every "Successfully allocated passive
+  skill" line since its level 2 (refunds aren't logged; a point taken on another of your
+  characters meanwhile would count too) and its latest `/passives` list. A LatestClient.txt
+  log is read through the full Client.txt beside it. Node ids map to
+  the tree through RePoE's passive data. In **Tree**, pick **Character** (instead of **Previous set**) to see the
   loadout against your tree (green: to take; red: not in the guide). Type `/passives` in
   game and **Build health** lists quest points missed in finished acts.
 - Hover an item or gem for its in-game tooltip, with its buttons underneath; click it to pin

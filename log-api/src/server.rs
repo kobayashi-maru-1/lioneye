@@ -232,17 +232,29 @@ async fn app_info(State(state): State<AppState>, headers: HeaderMap) -> Response
     .into_response()
 }
 
+#[derive(Deserialize)]
+struct CharacterQuery {
+    /// The character the guide follows (else the log's latest).
+    name: Option<String>,
+}
+
 /// Your character's passive points and quest points, read back from the game's log
 /// (character-log.rs); null before the game's log is found or when it names no character.
-async fn character(State(state): State<AppState>, headers: HeaderMap) -> Response {
+async fn character(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<CharacterQuery>,
+) -> Response {
     if !local_origin(&headers) || !local_host(&headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
     let path = match &*state.status.borrow() {
-        Status::Watching(path) => path.clone(),
+        Status::Watching(path) => crate::character_log::history_file(path),
         Status::Waiting => return Json(serde_json::Value::Null).into_response(),
     };
-    match tokio::task::spawn_blocking(move || crate::character_log::scan(&path)).await {
+    let name = query.name.filter(|n| !n.is_empty() && n.len() <= 64);
+    let scan = move || crate::character_log::scan_cached(&path, name.as_deref());
+    match tokio::task::spawn_blocking(scan).await {
         Ok(Ok(Some(log))) => Json(log).into_response(),
         Ok(Ok(None)) => Json(serde_json::Value::Null).into_response(),
         Ok(Err(err)) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Log not read: {err}")).into_response(),

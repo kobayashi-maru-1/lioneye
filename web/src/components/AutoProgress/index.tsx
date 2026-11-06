@@ -33,6 +33,7 @@ import {
   isCharacterLine,
 } from "../../state/character";
 import { levelLineAtom } from "../../state/level-lines";
+import { characterLevelAtom } from "../../state/character-level";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
 import classNames from "classnames";
 import styles from "./styles.module.css";
@@ -48,14 +49,22 @@ export function useAutoProgress() {
   // Your character, read back from the game's log by the exe: when the log is found, and
   // after lines that change it (points taken, /passives, who is playing), batched.
   const setCharacter = useSetAtom(characterLogAtom);
+  // The character the guide follows (its level-ups), so a party member's isn't read back.
+  const followed = useAtomValue(characterLevelAtom)?.name ?? null;
+  const followedRef = useRef(followed);
+  followedRef.current = followed;
   const characterTimer = useRef<number | undefined>(undefined);
   const refreshCharacter = useCallback(() => {
     window.clearTimeout(characterTimer.current);
     characterTimer.current = window.setTimeout(
-      () => fetchCharacterLog().then(setCharacter),
+      () => fetchCharacterLog(followedRef.current).then(setCharacter),
       1000,
     );
   }, [setCharacter]);
+  // A new character followed (or the first level-up taken): read that one back.
+  useEffect(() => {
+    if (followed !== null) refreshCharacter();
+  }, [followed]);
 
   const jump = useJumpFromGame();
 
