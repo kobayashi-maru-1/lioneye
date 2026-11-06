@@ -30,10 +30,12 @@ Running the exe again while it's already open brings its window to the front.
 
 Progress, your imported build and layout are saved in the guide's window, and the exe keeps
 a copy in `%LOCALAPPDATA%\exile-leveling\state.json`: a new or reset guide profile picks up
-from it. The first start after updating from 0.2 or earlier moves them from your Edge
-profiles: the guide opens briefly in each, and the most complete (the one with an imported
-build first) is kept. Builds imported on the hosted site don't carry over, so import your
-PoB once in **Settings** (the ⚙ at the top right).
+from it. The first start after updating from 0.2 or earlier moves them from the Edge or
+Chrome profiles that hold the guide's data: the guide opens briefly in each, and the most
+recently used one with an imported build is kept (else the most recent with any data). Each
+profile's data is also kept in `%LOCALAPPDATA%\exile-leveling\moved`, and is never removed
+from the profile. Builds imported on the hosted site don't carry over, so import your PoB
+once in **Settings** (the ⚙ at the top right).
 
 ## Using the guide
 

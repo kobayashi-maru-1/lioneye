@@ -12,10 +12,12 @@ import {
 } from "../../state/overlay";
 import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
 import {
+  migrateProfile,
   pageMode,
   restoreStorage,
   startedFresh,
   storageSnapshot,
+  takeReset,
 } from "../../state/saved-state";
 import { pageSectionId, useJumpToSection } from "../PageSection";
 import { autoProgressAtom } from "../../state/auto-progress";
@@ -40,7 +42,7 @@ export function useAutoProgress() {
     shouldReconnect: true,
     reconnectInterval: 1000,
     onMessage(event) {
-      if (typeof event.data !== "string") return;
+      if (typeof event.data !== "string" || restoring) return;
       // The exe's copy of the guide's saved data (sent first on connect).
       if (event.data.startsWith("state:")) {
         takeSavedState(event.data.slice("state:".length), sendMessage);
@@ -140,10 +142,16 @@ let uploaded = "";
  */
 function takeSavedState(json: string, send: (message: string) => void) {
   if (pageMode === "migrate") {
-    send(`state-offer:${JSON.stringify(storageSnapshot())}`);
+    // "<profile id>\n<storage>": the exe matches it to the profile it opened.
+    send(`state-offer:${migrateProfile}\n${JSON.stringify(storageSnapshot())}`);
     return;
   }
-  if (pageMode !== "own" || savedStateReady) return;
+  if (pageMode !== "own" || savedStateReady || restoring) return;
+  // Reset from the error page: start empty, and the upload replaces the exe's copy.
+  if (takeReset()) {
+    savedStateReady = true;
+    return;
+  }
   let saved: Record<string, string> | null = null;
   try {
     saved = JSON.parse(json) as Record<string, string> | null;
@@ -151,12 +159,22 @@ function takeSavedState(json: string, send: (message: string) => void) {
     saved = null;
   }
   if (startedFresh && saved !== null && Object.keys(saved).length > 0) {
-    restoreStorage(saved);
+    try {
+      restoreStorage(saved);
+    } catch {
+      // Storage full or blocked: leave it empty rather than upload part of the copy.
+      localStorage.clear();
+      return;
+    }
+    restoring = true;
     location.reload();
     return;
   }
   savedStateReady = true;
 }
+
+/** Storage was filled from the exe's copy and the page is reloading: ignore the rest. */
+let restoring = false;
 
 function uploadSavedState(send: (message: string) => void) {
   if (!savedStateReady) return;

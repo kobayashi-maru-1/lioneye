@@ -41,7 +41,7 @@ pub struct AppState {
     /// Tooltips for the in-game bar's buttons, from the guide: panel id → JSON (the Gems
     /// panel's set, Campaign's next steps). Passed on to the bar as is.
     pub tips: Arc<watch::Sender<Tips>>,
-    /// The guide's saved data, kept by the exe (saved_state.rs).
+    /// The guide's saved data, kept by the exe (saved-state.rs).
     pub saved: Arc<crate::saved_state::SavedState>,
 }
 

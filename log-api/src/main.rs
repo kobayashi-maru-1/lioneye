@@ -10,6 +10,7 @@ use tracing::{error, info, warn};
 #[cfg(windows)]
 mod edge;
 #[cfg(windows)]
+#[path = "guide-move.rs"]
 mod guide_move;
 #[cfg(windows)]
 mod guide_window;
@@ -17,6 +18,7 @@ mod log_reader;
 #[cfg(windows)]
 mod overlay;
 mod pob;
+#[path = "saved-state.rs"]
 mod saved_state;
 mod web_data;
 mod server;
@@ -108,8 +110,13 @@ fn main() -> ExitCode {
     let (overlay_tx, overlay_rx) = watch::channel(overlay_config);
     // A bar button with no guide open asks the tray thread to open one.
     let (open_tx, open_rx) = std::sync::mpsc::channel::<()>();
-    // The guide's saved data, kept by the exe for the guide's own browser profile.
-    let saved = std::sync::Arc::new(saved_state::SavedState::load(data_dir().join("state.json")));
+    // The guide's saved data, kept by the exe for the guide's own browser profile; one per
+    // address, so a test run on another port never touches the real guide's.
+    let state_file = match url.trim_end_matches('/').rsplit(':').next() {
+        Some("6754") | None => "state.json".to_string(),
+        Some(port) => format!("state-{port}.json"),
+    };
+    let saved = std::sync::Arc::new(saved_state::SavedState::load(data_dir().join(state_file)));
     let state = server::AppState {
         lines: lines_tx.clone(),
         status: status_rx.clone(),
@@ -119,10 +126,12 @@ fn main() -> ExitCode {
         tips: std::sync::Arc::new(watch::channel(server::Tips::new()).0),
         saved: saved.clone(),
     };
-    // First run since the guide got its own profile: move its data from your Edge profiles.
+    // First run since the guide got its own profile: move its data from the old profiles.
     #[cfg(windows)]
-    let moving = (args.browser == Browser::App && guide_move::GuideMove::needed(&saved))
-        .then(|| guide_move::GuideMove::start(&url));
+    let moving = (args.browser == Browser::App)
+        .then(|| guide_move::GuideMove::needed(&url))
+        .flatten()
+        .map(|profiles| guide_move::GuideMove::start(&url, profiles));
     #[cfg(windows)]
     let opening = moving.is_none();
     #[cfg(not(windows))]
@@ -431,8 +440,16 @@ async fn already_running(addr: SocketAddr) -> bool {
 /// Brings back the open guide window (restoring it if minimized), or opens one.
 fn show_guide(browser: Browser, url: &str) {
     #[cfg(windows)]
-    if guide_window::show() {
-        return;
+    {
+        // The guide's data is moving (this or another copy of the exe): its windows come
+        // and go, and the own window opens when it's done.
+        if guide_move::in_progress() {
+            info!("The guide's data is moving; it opens when that's done");
+            return;
+        }
+        if guide_window::show() {
+            return;
+        }
     }
     open_browser(browser, url);
 }

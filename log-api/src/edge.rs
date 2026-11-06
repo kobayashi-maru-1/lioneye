@@ -1,86 +1,87 @@
-//! Opens the guide in Edge (part of every Windows 10 and 11 PC): in a browser profile of
+//! Opens the guide in Edge (part of every Windows 10 and 11 PC) in a browser profile of
 //! its own, so its window place and saved data never depend on the profiles you browse
-//! with; and, once, in each of your Edge profiles to move the guide's data from the old
-//! setup (guide_move.rs).
+//! with. Also opens it, once, in old Edge or Chrome profiles to move the guide's data from
+//! the old setup (guide-move.rs).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use windows_sys::Win32::System::Registry::{
     HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ, RegGetValueW,
 };
 
-/// The guide's own browser profile.
-pub fn own_profile_dir() -> PathBuf {
-    crate::data_dir().join("browser")
+/// The guide's own browser profile: one per address, so a test run on another port never
+/// shares the real guide's.
+pub fn own_profile_dir(url: &str) -> PathBuf {
+    let port = url.trim_end_matches('/').rsplit(':').next().unwrap_or("");
+    let dir = crate::data_dir();
+    if port == "6754" {
+        dir.join("browser")
+    } else {
+        dir.join(format!("browser-{port}"))
+    }
 }
 
 /// The guide in its own profile: a borderless app window that remembers its place.
 /// "?own" tells the page it's this window (it keeps the exe's copy of its data current).
 pub fn open_own(url: &str) -> std::io::Result<()> {
-    spawn(&[
-        format!("--user-data-dir={}", own_profile_dir().display()),
-        "--no-first-run".into(),
-        "--no-default-browser-check".into(),
-        format!("--app={url}?own"),
-    ])
+    spawn(
+        &msedge_or_default(),
+        &[
+            format!("--user-data-dir={}", own_profile_dir(url).display()),
+            "--no-first-run".into(),
+            "--no-default-browser-check".into(),
+            format!("--app={url}?own"),
+        ],
+    )
 }
 
-/// The guide in one of your Edge profiles ("Default", "Profile 1"), which sends the exe
-/// what that profile had saved ("?migrate").
-pub fn open_in_profile(profile: &str, url: &str) -> std::io::Result<()> {
-    spawn(&[
-        format!("--profile-directory={profile}"),
-        format!("--app={url}?migrate"),
-    ])
+/// The guide at `url` in one profile of an old setup's browser (guide-move.rs).
+pub fn open_profile_window(browser: &Path, profile: &str, url: &str) -> std::io::Result<()> {
+    spawn(
+        browser,
+        &[
+            format!("--profile-directory={profile}"),
+            format!("--app={url}"),
+        ],
+    )
 }
 
 /// The guide in your last-used Edge profile (`--browser edge`, as before 0.3).
 pub fn open_last_profile(url: &str) -> std::io::Result<()> {
-    spawn(&[format!("--app={url}")])
+    spawn(&msedge_or_default(), &[format!("--app={url}")])
 }
 
-fn spawn(args: &[String]) -> std::io::Result<()> {
-    std::process::Command::new(msedge())
+fn spawn(browser: &Path, args: &[String]) -> std::io::Result<()> {
+    std::process::Command::new(browser)
         .args(args)
         .spawn()
         .map(|_| ())
 }
 
-/// msedge.exe, from its App Paths registration, else where Edge installs.
-fn msedge() -> PathBuf {
-    let app_path = r"Software\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe";
-    [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE]
-        .into_iter()
-        .filter_map(|root| registry_string(root, app_path, None))
-        .map(PathBuf::from)
-        .find(|path| path.is_file())
-        .unwrap_or_else(|| {
-            PathBuf::from(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-        })
+/// msedge.exe, from its App Paths registration.
+pub fn msedge() -> Option<PathBuf> {
+    app_path("msedge.exe")
 }
 
-/// Your Edge profiles' folder names, the last used first.
-pub fn profiles() -> Vec<String> {
-    let path = std::env::var_os("LOCALAPPDATA")
+/// chrome.exe, when Chrome is installed.
+pub fn chrome() -> Option<PathBuf> {
+    app_path("chrome.exe")
+}
+
+fn msedge_or_default() -> PathBuf {
+    msedge().unwrap_or_else(|| {
+        PathBuf::from(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
+    })
+}
+
+/// A program's App Paths registration (per user, then per machine), when the file exists.
+fn app_path(exe: &str) -> Option<PathBuf> {
+    let key = format!(r"Software\Microsoft\Windows\CurrentVersion\App Paths\{exe}");
+    [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE]
+        .into_iter()
+        .filter_map(|root| registry_string(root, &key, None))
         .map(PathBuf::from)
-        .unwrap_or_default()
-        .join(r"Microsoft\Edge\User Data\Local State");
-    let state: serde_json::Value = std::fs::read_to_string(path)
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default();
-    let last = state["profile"]["last_used"].as_str().map(str::to_string);
-    let mut names: Vec<String> = state["profile"]["info_cache"]
-        .as_object()
-        .map(|cache| cache.keys().cloned().collect())
-        .unwrap_or_default();
-    if names.is_empty() {
-        names.push("Default".into());
-    }
-    if let Some(last) = last {
-        names.sort_by_key(|name| *name != last);
-    }
-    names
+        .find(|path| path.is_file())
 }
 
 /// A registry string value (`name` None: the key's default value).
