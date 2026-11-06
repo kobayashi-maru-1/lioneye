@@ -25,11 +25,11 @@ const SPEECH_PATTERN: &str =
 /// `] : You have been permanently weakened by Kitava's ...` — Kitava's death, a system line.
 const KITAVA_PATTERN: &str = r"\] : You have been permanently weakened by Kitava";
 /// `] Successfully allocated passive skill id: dexterity869, name: Dexterity` — your tree.
-const ALLOCATED_PATTERN: &str = r"] Successfully allocated passive skill id: ";
+const ALLOCATED_PATTERN: &str = r"\] Successfully allocated passive skill id: ";
 /// `/passives` in game: `] : 22 Passive Skill Points from quests:` then `] : (1 from <quest>)`.
-const QUESTS_PATTERN: &str = r"] : (?:d+ Passive Skill Points from quests:|(d+ from [^)]+)$)";
+const QUESTS_PATTERN: &str = r"\] : (?:\d+ Passive Skill Points from quests:|\(\d+ from [^)]+\)$)";
 /// `] : KobayashiSRS has been slain.` — tells which character is playing (deaths).
-const SLAIN_PATTERN: &str = r"] : S+ has been slain.$";
+const SLAIN_PATTERN: &str = r"\] : \S+ has been slain\.$";
 const PATTERNS: [&str; 7] = [
     AREA_PATTERN,
     LEVEL_PATTERN,
