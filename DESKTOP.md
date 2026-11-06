@@ -32,7 +32,7 @@ since, so switching never brings back old progress.
 
 The thin line at the bottom shows the app's version, the bundled Path of Building's, and
 the date of the exile-leveling route data merged in, with **Update** when GitHub has a
-newer release.
+newer release (checked on start, every 6 hours, and when you come back to the window).
 
 | Option | Default | What it does |
 | --- | --- | --- |

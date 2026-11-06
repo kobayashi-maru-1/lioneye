@@ -17,10 +17,17 @@ export function newer(tag: string, version: string) {
   return false;
 }
 
-/** The latest release on GitHub, once per page load; null when it can't be read. */
+/** How often a running guide asks GitHub again: every 6 h, and on focus after an hour. */
+const RECHECK = 6 * 60 * 60 * 1000;
+const RECHECK_ON_FOCUS = 60 * 60 * 1000;
+
+/** The latest release on GitHub, asked at most once per `maxAge`; null when it can't be read. */
 let latest: Promise<{ tag: string; url: string } | null> | null = null;
-function latestRelease() {
-  latest ??= fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+let checkedAt = 0;
+function latestRelease(maxAge = RECHECK) {
+  if (latest !== null && Date.now() - checkedAt < maxAge) return latest;
+  checkedAt = Date.now();
+  latest = fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
     .then((response) => (response.ok ? response.json() : null))
     .then((release) =>
       release && typeof release.tag_name === "string"
@@ -41,18 +48,27 @@ export function Footer() {
   const [update, setUpdate] = useState<{ tag: string; url: string } | null>(
     null,
   );
+  // On load, every 6 h, and when the window gets focus after an hour without a check: the
+  // guide can stay open for days.
   useEffect(() => {
     if (!info) return;
     let live = true;
-    latestRelease().then(
-      (release) =>
-        live &&
-        release &&
-        newer(release.tag, info.version) &&
-        setUpdate(release),
-    );
+    const check = (maxAge?: number) =>
+      latestRelease(maxAge).then(
+        (release) =>
+          live &&
+          release &&
+          newer(release.tag, info.version) &&
+          setUpdate(release),
+      );
+    check();
+    const timer = window.setInterval(() => check(RECHECK - 60_000), RECHECK);
+    const onFocus = () => check(RECHECK_ON_FOCUS);
+    window.addEventListener("focus", onFocus);
     return () => {
       live = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
     };
   }, [info?.version]);
   // Room for it at the bottom of the page (index.css).
