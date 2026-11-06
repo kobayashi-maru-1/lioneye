@@ -2,7 +2,7 @@ name: Desktop exe
 
 # Builds lioneye.exe: the guide plus the log watcher in one program. (Cargo builds it as
 # exile-leveling.exe, the name before 0.4; the "Name the exe" step renames it.)
-# Run it from the Actions tab, or push a tag like v1.0.0 to attach the exe to a release.
+# Run it from the Actions tab, or push a tag like v1.0.0 to attach lioneye.zip to a release.
 # Actions are pinned to commit SHAs so a moved tag can't change what runs.
 on:
   workflow_dispatch:
@@ -77,7 +77,12 @@ jobs:
         with:
           name: lioneye-windows
 
+      # Zipped: browsers warn less about a zip than a bare unsigned exe. Same name every
+      # release, so releases/latest/download/lioneye.zip always gets the newest.
+      - name: Zip the exe
+        run: zip -j lioneye.zip lioneye.exe
+
       - name: Attach to release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          files: lioneye.exe
+          files: lioneye.zip
