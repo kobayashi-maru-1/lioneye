@@ -1,15 +1,15 @@
-# Exile Leveling desktop
+# Lioneye
 
 A Path of Exile leveling guide and Path of Building build view in one Windows app. It
 follows your zones from the game's log, ticks off the campaign as you go, and shows your
 build's stats, gear, gems, tree and trade searches for the loadout that matches your level.
 
-**[Download the latest release](https://github.com/kobayashi-maru-1/poeleveling/releases/latest)**
-(`exile-leveling.exe`, Windows 10 or 11).
+**[Download the latest release](https://github.com/kobayashi-maru-1/lioneye/releases/latest)**
+(`lioneye.exe`, or `exile-leveling.exe` up to v0.3.0; Windows 10 or 11).
 
 ## Get started
 
-1. Download `exile-leveling.exe` and run it. Windows SmartScreen may warn that it's
+1. Download `lioneye.exe` and run it. Windows SmartScreen may warn that it's
    unrecognized (the exe isn't signed): pick **More info** → **Run anyway**.
 2. It runs in the tray (by the clock) and opens the guide in its own Edge window.
 3. Import your Path of Building code in **Settings** (⚙ at the top right).
@@ -36,6 +36,8 @@ and imported build carry over.
 
 How it all works, the command-line options and where it keeps its data:
 [DESKTOP.md](DESKTOP.md).
+
+Lioneye was called Exile Leveling desktop up to v0.3.0.
 
 ## Credits
 

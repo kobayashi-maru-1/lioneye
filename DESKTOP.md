@@ -1,13 +1,14 @@
-# Exile Leveling desktop
+# Lioneye
 
-One Windows program, `exile-leveling.exe`, that runs the leveling guide and the
+One Windows program, `lioneye.exe` (called Exile Leveling and `exile-leveling.exe` up to
+v0.3.0), that runs the leveling guide and the
 auto-progress log watcher together. It serves the guide at
 http://127.0.0.1:6754 and opens it in a borderless Edge app window (Edge is part of every
 Windows 10 and 11 PC, whichever browser you use).
 
 ## Run
 
-1. Start `exile-leveling.exe`. It runs in the tray (by the clock), with no console window.
+1. Start `lioneye.exe`. It runs in the tray (by the clock), with no console window.
    Closing the guide window leaves it running there. Click the icon or pick **Open** to bring
    the window back (or reopen it); pick **Quit** to close the window and stop.
    The icon's tooltip shows **Waiting** or **Auto**.
@@ -151,7 +152,7 @@ whether Redux changed it since the port (the Redux watch workflow runs it daily 
 on a change); after porting, `.\log-api\redux-watch.ps1 -Update` records the new version.
 
 ```powershell
-.\build.ps1            # writes .\exile-leveling.exe
+.\build.ps1            # writes .\lioneye.exe
 .\build.ps1 -SkipTree  # reuse the downloaded tree data
 ```
 

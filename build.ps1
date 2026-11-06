@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-  Builds exile-leveling.exe (the guide and the log watcher in one program).
+  Builds lioneye.exe (the guide and the log watcher in one program).
 
 .DESCRIPTION
-  Needs Node.js 22+ and Rust (rustup) on PATH. Output: .\exile-leveling.exe
+  Needs Node.js 22+ and Rust (rustup) on PATH. Output: .\lioneye.exe
   -SkipTree reuses tree data from an earlier build (the download is ~7 MB).
   Each build bundles the latest Path of Building release for the Stats tab
   (log-api\fetch-pob.ps1; skipped when that release is already downloaded).
@@ -60,7 +60,7 @@ try {
   if (-not (Test-Path -LiteralPath $built)) {
     throw "The build finished but $built is missing."
   }
-  $exe = Join-Path $PSScriptRoot 'exile-leveling.exe'
+  $exe = Join-Path $PSScriptRoot 'lioneye.exe'
   try {
     Copy-Item -LiteralPath $built -Destination $exe -Force
   }

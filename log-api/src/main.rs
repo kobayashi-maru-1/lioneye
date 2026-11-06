@@ -39,7 +39,7 @@ enum Browser {
 }
 
 #[derive(Parser, Debug)]
-#[command(version, about = "Exile Leveling with auto-progress, served locally", long_about = None)]
+#[command(version, about = "Lioneye: the Exile Leveling guide with auto-progress, served locally", long_about = None)]
 struct Args {
     /// Address to serve the guide and the auto-progress socket on
     #[arg(long, default_value_t = { "127.0.0.1:6754".to_string() })]
@@ -407,7 +407,7 @@ fn show_error(msg: &str) {
     };
     let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
     let text = wide(msg);
-    let title = wide("Exile Leveling");
+    let title = wide("Lioneye");
     unsafe {
         MessageBoxW(
             std::ptr::null_mut(),

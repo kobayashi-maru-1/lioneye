@@ -35,7 +35,7 @@ export function App() {
             <Route
               path="/"
               element={
-                <Page title="Exile Leveling" component={<RoutesContainer />} />
+                <Page title="Lioneye" component={<RoutesContainer />} />
               }
             />
             {/* Settings (was "Build"); /build kept for old links. */}
@@ -45,7 +45,7 @@ export function App() {
                 path={path}
                 element={
                   <Page
-                    title="Exile Leveling - Settings"
+                    title="Lioneye - Settings"
                     component={
                       <div className="page-narrow">
                         <BuildContainer />
@@ -59,7 +59,7 @@ export function App() {
               path="/edit-route"
               element={
                 <Page
-                  title="Exile Leveling - Edit Route"
+                  title="Lioneye - Edit Route"
                   component={
                     <div className="page-narrow">
                       <EditRouteContainer />

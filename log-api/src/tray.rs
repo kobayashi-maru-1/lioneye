@@ -42,8 +42,8 @@ pub enum Exit {
 
 fn tooltip(status: &Status) -> &'static str {
     match status {
-        Status::Waiting => "Exile Leveling · Waiting",
-        Status::Watching(_) => "Exile Leveling · Auto",
+        Status::Waiting => "Lioneye · Waiting",
+        Status::Watching(_) => "Lioneye · Auto",
     }
 }
 

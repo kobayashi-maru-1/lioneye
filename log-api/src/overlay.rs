@@ -350,7 +350,7 @@ unsafe extern "system" fn window_proc(
 
 fn create_window(position: Option<(i32, i32)>) -> Result<HWND, String> {
     let class = wide(CLASS);
-    let title = wide("Exile Leveling Overlay");
+    let title = wide("Lioneye Overlay");
     unsafe {
         let instance = GetModuleHandleW(std::ptr::null());
         let wc = WNDCLASSEXW {
