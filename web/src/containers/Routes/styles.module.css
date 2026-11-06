@@ -97,3 +97,57 @@
   align-items: start;
   gap: var(--size-4);
 }
+
+/* Campaign's column and the other panels' column. Below the wide breakpoint they take no
+   part in layout: the panels stack in .main as one column, scrolled by the window. */
+.columns,
+.column {
+  display: contents;
+}
+
+/* Wide screens (a 2560 px second monitor): three columns that fill the window. Stats,
+   Campaign and the other panels each scroll by themselves, so your route and your gear,
+   gems and tree are on screen together. The window itself doesn't scroll. */
+@media (min-width: 110rem) {
+  :global(html):has(.page) {
+    overflow-y: hidden;
+  }
+
+  .page {
+    grid-template-rows: minmax(0, 1fr);
+    max-width: 3200px;
+    height: calc(100vh - var(--navbar-height) - var(--jumpbar-height));
+    padding-bottom: var(--size-4);
+  }
+
+  .sidebar {
+    position: static;
+    max-height: 100%;
+  }
+
+  .main {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(32rem, 1fr) minmax(42rem, 1.35fr);
+    gap: var(--size-4);
+    flex: 1;
+    min-height: 0;
+    /* Inside a column, pinned headers and scrolled-to panels sit at the column's top,
+       not under the app bar. */
+    --navbar-height: 0rem;
+    --jumpbar-height: 0rem;
+  }
+
+  .column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}

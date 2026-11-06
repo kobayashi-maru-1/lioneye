@@ -237,29 +237,47 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
         <div className={classNames(styles.main)}>
           {code === null && <EmptyHint />}
           {showStats && <BuildHeader />}
-          <PageSection id="campaign" title="Campaign" actions={<ActPicker />}>
-            {campaign}
-          </PageSection>
-          {/* Gear and Gems side by side, as on pob.codes. */}
-          {(showStats || gemLinks.length > 0) && (
-            <div className={classNames(styles.pair)} data-panel-row>
-              {showStats && <GearPanel />}
-              {gemLinks.length > 0 && <GemsPanel gemLinks={gemLinks} />}
+          {/* Wide screens: Campaign and the other panels side by side, each column
+              scrolling by itself. Narrower: one column, as before (styles.columns). */}
+          <div className={classNames(styles.columns)}>
+            <div
+              className={classNames(styles.column, "thin-scroll")}
+              data-panel-column
+            >
+              <PageSection
+                id="campaign"
+                title="Campaign"
+                actions={<ActPicker />}
+              >
+                {campaign}
+              </PageSection>
             </div>
-          )}
-          {showStats && <TradeListPanel />}
-          {showStats && <ConfigPanel />}
-          {urlTrees.length > 0 && <TreePanel urlTrees={urlTrees} />}
-          {notes !== null && (
-            <PageSection id="notes" title="Notes">
-              <BuildNotes notes={notes} />
-            </PageSection>
-          )}
-          {hasSearch && (
-            <PageSection id="search" title="Search">
-              <SearchStrings values={searchStrings} />
-            </PageSection>
-          )}
+            <div
+              className={classNames(styles.column, "thin-scroll")}
+              data-panel-column
+            >
+              {/* Gear and Gems side by side, as on pob.codes. */}
+              {(showStats || gemLinks.length > 0) && (
+                <div className={classNames(styles.pair)} data-panel-row>
+                  {showStats && <GearPanel />}
+                  {gemLinks.length > 0 && <GemsPanel gemLinks={gemLinks} />}
+                </div>
+              )}
+              {showStats && <TradeListPanel />}
+              {showStats && <ConfigPanel />}
+              {urlTrees.length > 0 && <TreePanel urlTrees={urlTrees} />}
+              {notes !== null && (
+                <PageSection id="notes" title="Notes">
+                  <BuildNotes notes={notes} />
+                </PageSection>
+              )}
+              {hasSearch && (
+                <PageSection id="search" title="Search">
+                  <SearchStrings values={searchStrings} />
+                </PageSection>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </>

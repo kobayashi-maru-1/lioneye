@@ -20,6 +20,26 @@ export function pageSectionId(id: string) {
   return `page-${id}`;
 }
 
+/** A guide column that scrolls by itself (wide screens), else null: the window scrolls. */
+function scrollingColumn(element: Element): Element | null {
+  const column = element.closest("[data-panel-column]");
+  return column && getComputedStyle(column).display !== "contents"
+    ? column
+    : null;
+}
+
+/**
+ * True when an element's top has scrolled above where its pinned header sits, i.e. you're
+ * inside it. Measured from the top of its scrolling column on wide screens.
+ */
+export function scrolledInside(element: Element, header: Element) {
+  const top = scrollingColumn(element)?.getBoundingClientRect().top ?? 0;
+  return (
+    element.getBoundingClientRect().top - top <
+    parseFloat(getComputedStyle(header).top) - 2
+  );
+}
+
 interface PageSectionProps {
   id: string;
   title: React.ReactNode;
@@ -52,10 +72,7 @@ export function PageSection({
     const header = headerRef.current;
     // Inside: the panel's top has scrolled above where its header pins.
     const inside =
-      section !== null &&
-      header !== null &&
-      section.getBoundingClientRect().top <
-        parseFloat(getComputedStyle(header).top) - 2;
+      section !== null && header !== null && scrolledInside(section, header);
     setCollapsed(!collapsed);
     if (!collapsed && inside)
       requestAnimationFrame(() =>
@@ -100,13 +117,23 @@ export function PageSection({
 
 /**
  * The panel after this one; for panels side by side (data-panel-row), the one after the row.
- * Itself when it's the last.
+ * One column (narrow screens): across into the next column's panels. Itself when it's the
+ * last in its column.
  */
 function nextPanel(section: HTMLElement): Element {
   const row = section.parentElement?.hasAttribute("data-panel-row")
     ? section.parentElement
     : null;
-  return (row ?? section).nextElementSibling ?? section;
+  const stacked = (element: Element | null) =>
+    element !== null &&
+    element.hasAttribute("data-panel-column") &&
+    getComputedStyle(element).display === "contents";
+  let current: Element = row ?? section;
+  while (!current.nextElementSibling && stacked(current.parentElement))
+    current = current.parentElement!;
+  let next = current.nextElementSibling;
+  while (next !== null && stacked(next)) next = next.firstElementChild;
+  return next ?? section;
 }
 
 /** Opens a section if it's folded, then scrolls to its header. */

@@ -1,5 +1,6 @@
 import { atom, useAtom, useAtomValue } from "jotai";
 import { sectionCollapseFamily } from "../../state/section-collapse";
+import { scrolledInside } from "../PageSection";
 import { TaskList, type RangeHandler, type TaskListProps } from "../TaskList";
 import styles from "./styles.module.css";
 import classNames from "classnames";
@@ -50,11 +51,7 @@ export function SectionHolder({ name, items, onRange }: SectionHolderProps) {
     const act = actRef.current;
     const bar = barRef.current;
     // Inside: the act's top has scrolled above where its header pins.
-    const inside =
-      act !== null &&
-      bar !== null &&
-      act.getBoundingClientRect().top <
-        parseFloat(getComputedStyle(bar).top) - 2;
+    const inside = act !== null && bar !== null && scrolledInside(act, bar);
     setCollapsed(!collapsed);
     if (!collapsed && inside)
       requestAnimationFrame(() =>
