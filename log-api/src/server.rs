@@ -38,13 +38,40 @@ pub struct AppState {
     /// The in-game bar's settings, from the guide's Settings page (see overlay.rs).
     pub overlay: Arc<watch::Sender<OverlayConfig>>,
     pub guides: Arc<Guides>,
-    /// The skill set the guide's Gems panel shows (JSON, "null" for none), for the bar's
-    /// Gems tooltip.
-    pub gems: Arc<watch::Sender<String>>,
+    /// Tooltips for the in-game bar's buttons, from the guide: panel id → JSON (the Gems
+    /// panel's set, Campaign's next steps). Passed on to the bar as is.
+    pub tips: Arc<watch::Sender<Tips>>,
 }
 
-/// The largest gem set the guide may send (a big build's set is a few KB).
-const MAX_GEMS: usize = 64 * 1024;
+pub type Tips = std::collections::BTreeMap<String, String>;
+
+/// The largest tooltip the guide may send (a big build's gem set is a few KB).
+const MAX_TIP: usize = 64 * 1024;
+/// How many buttons may have a tooltip.
+const MAX_TIPS: usize = 12;
+
+/// "tips:{"gems":…,"campaign":…}": ids are checked panel ids and values checked JSON.
+fn tips_message(tips: &Tips) -> String {
+    let entries: Vec<String> = tips
+        .iter()
+        .map(|(id, json)| format!("\"{id}\":{json}"))
+        .collect();
+    format!("tips:{{{}}}", entries.join(","))
+}
+
+/// Tells pages which guide this exe serves, so a page left open across an exe update
+/// reloads itself (the guide compares it with the first one it saw).
+fn build_message() -> &'static str {
+    static BUILD: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    BUILD.get_or_init(|| {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        if let Some(index) = Assets::get("index.html") {
+            index.data.hash(&mut hasher);
+        }
+        format!("build:{:016x}", hasher.finish())
+    })
+}
 
 /// A button on the in-game bar: the guide panel it jumps to.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -245,9 +272,16 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
     let mut lines = state.lines.subscribe();
     let mut status = state.status.clone();
     let mut overlay = state.overlay.subscribe();
-    let mut gems = state.gems.subscribe();
+    let mut tips = state.tips.subscribe();
     let mut ping = tokio::time::interval(Duration::from_secs(5));
 
+    if socket
+        .send(Message::Text(build_message().into()))
+        .await
+        .is_err()
+    {
+        return;
+    }
     let first = status.borrow_and_update().message();
     if socket.send(Message::Text(first.into())).await.is_err() {
         return;
@@ -256,8 +290,8 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
     if socket.send(Message::Text(config.into())).await.is_err() {
         return;
     }
-    let set = format!("gems:{}", *gems.borrow_and_update());
-    if socket.send(Message::Text(set.into())).await.is_err() {
+    let all = tips_message(&tips.borrow_and_update());
+    if socket.send(Message::Text(all.into())).await.is_err() {
         return;
     }
     info!("Page connected");
@@ -281,9 +315,9 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                 let text = overlay_message(&overlay.borrow_and_update());
                 if socket.send(Message::Text(text.into())).await.is_err() { break; }
             },
-            changed = gems.changed() => {
+            changed = tips.changed() => {
                 if changed.is_err() { break; }
-                let text = format!("gems:{}", *gems.borrow_and_update());
+                let text = tips_message(&tips.borrow_and_update());
                 if socket.send(Message::Text(text.into())).await.is_err() { break; }
             },
             _ = ping.tick() => {
@@ -319,17 +353,22 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                         }
                     } else if let Some(id) = text.strip_prefix("jump:").and_then(panel_id) {
                         jump(state, id).await;
-                    } else if let Some(json) = text.strip_prefix("gems:") {
-                        // The guide's gem set, passed on to the bar as is: JSON, kept small.
-                        if json.len() <= MAX_GEMS
+                    } else if let Some(rest) = text.strip_prefix("tip:") {
+                        // "tip:<panel>:<json>": a button's tooltip, passed on to the bar as
+                        // is (checked to be JSON, kept small).
+                        if let Some((id, json)) = rest.split_once(':')
+                            && panel_id(id).is_some()
+                            && json.len() <= MAX_TIP
                             && serde_json::from_str::<serde_json::Value>(json).is_ok()
                         {
-                            state.gems.send_if_modified(|set| {
-                                let changed = set != json;
-                                if changed {
-                                    *set = json.to_string();
+                            state.tips.send_if_modified(|tips| {
+                                if tips.get(id).is_some_and(|old| old == json)
+                                    || (!tips.contains_key(id) && tips.len() >= MAX_TIPS)
+                                {
+                                    return false;
                                 }
-                                changed
+                                tips.insert(id.to_string(), json.to_string());
+                                true
                             });
                         }
                     }

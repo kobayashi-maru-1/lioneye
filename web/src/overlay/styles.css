@@ -123,6 +123,47 @@ body {
   color: #8a96a8;
 }
 
+/* Campaign: the next steps, coloured as in the guide's Campaign. */
+.tipStep {
+  padding: 3px 6px;
+  font-size: 12.5px;
+  background-color: #171e2a;
+  border: 1px solid #2f3b4d;
+  border-radius: 6px;
+}
+
+.tipStep + .tipStep {
+  margin-top: 4px;
+}
+
+.part.area {
+  color: #ffcf91;
+}
+
+.part.enemy {
+  color: darkorange;
+}
+
+.part.quest {
+  color: gold;
+}
+
+.part.questText {
+  color: lime;
+}
+
+.part.waypoint {
+  color: #8ab3ff;
+}
+
+.part.trial {
+  color: darkseagreen;
+}
+
+.part.gem {
+  font-weight: 600;
+}
+
 .bar {
   display: inline-flex;
   align-items: center;

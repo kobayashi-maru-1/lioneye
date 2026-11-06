@@ -2,7 +2,8 @@
 
 One Windows program, `exile-leveling.exe`, that runs the leveling guide and the
 auto-progress log watcher together. It serves the guide at
-http://127.0.0.1:6754 and opens it in a borderless Edge app window.
+http://127.0.0.1:6754 and opens it in a borderless app window: Chrome when it's your
+default browser, otherwise Edge (part of every Windows 10 and 11 PC).
 
 ## Run
 
@@ -12,8 +13,9 @@ http://127.0.0.1:6754 and opens it in a borderless Edge app window.
    The icon's tooltip shows **Waiting** or **Auto**.
    The log is at `%LOCALAPPDATA%\exile-leveling\exile-leveling.log`. Started from a terminal,
    it also prints there; the prompt returns right away, and Ctrl+C in that terminal quits it.
-2. The guide opens in an Edge app window. Drag it to the monitor you want; Edge
-   remembers its size and place next time.
+2. The guide opens in an app window (Chrome or Edge, as above). Drag it to the monitor you
+   want; the browser remembers its size and place next time. After an update the open
+   window reloads itself when the new exe starts.
 3. Start Path of Exile. The pill at the top right of the panel turns green (**Auto**)
    once the game's log is found, and the route advances as you change zones.
 
@@ -21,13 +23,13 @@ Running the exe again while it's already open brings its window to the front.
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--browser edge\|default\|none` | `edge` | How to open the guide on start |
+| `--browser app\|edge\|default\|none` | `app` | How to open the guide on start: an app window in Chrome if it's the default browser, else Edge (`app`); always Edge (`edge`); a normal tab (`default`); nothing (`none`) |
 | `--log-path <file>` | found from the game | Use this `Client.txt` / `LatestClient.txt` |
 | `--address <ip:port>` | `127.0.0.1:6754` | Where to serve. Keep the port the same: progress is saved per address |
 | `--heart-beat <secs>` | `1` | How often the log is read |
 
-Progress, your imported build and layout are saved in Edge for
-`127.0.0.1:6754`. Builds imported on the hosted site don't carry over, so import
+Progress, your imported build and layout are saved in the browser the guide opens in
+(Chrome or Edge) for `127.0.0.1:6754`; changing your default browser starts them fresh. Builds imported on the hosted site don't carry over, so import
 your PoB once in **Settings** (the ⚙ at the top right).
 
 ## Using the guide
@@ -98,6 +100,9 @@ your PoB once in **Settings** (the ⚙ at the top right).
   button per guide panel. A button opens that panel in the guide (on your other monitor) and
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
+- Hover **Gems** for the Gems panel's links (the set it shows for your loadout), or
+  **Campaign** for your next 3 steps. The tooltip opens below the bar, or above it when the
+  bar is in the lower half of the screen. Both need the guide open.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
 - **Settings** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,

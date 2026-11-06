@@ -21,6 +21,8 @@ mod watcher;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
 enum Browser {
+    /// Borderless app window in Chrome when it's your default browser, else in Edge
+    App,
     /// Borderless Microsoft Edge app window (remembers its size and position)
     Edge,
     /// Your default browser, in a normal tab
@@ -42,7 +44,7 @@ struct Args {
     #[arg(long, default_value_t = 1)]
     heart_beat: u64,
     /// How to open the guide on start
-    #[arg(long, value_enum, default_value_t = Browser::Edge)]
+    #[arg(long, value_enum, default_value_t = Browser::App)]
     browser: Browser,
 }
 
@@ -107,7 +109,7 @@ fn main() -> ExitCode {
         pob: pob::Engine::start(),
         overlay: std::sync::Arc::new(overlay_tx),
         guides: std::sync::Arc::new(server::Guides::new(open_tx)),
-        gems: std::sync::Arc::new(watch::channel("null".to_string()).0),
+        tips: std::sync::Arc::new(watch::channel(server::Tips::new()).0),
     };
     #[cfg(windows)]
     let bar = Bar {
@@ -207,7 +209,7 @@ fn wait(
     mut bar: Bar,
 ) -> ExitCode {
     // Open from the tray always shows a window, even with --browser none.
-    let browser = if args.browser == Browser::None { Browser::Edge } else { args.browser };
+    let browser = if args.browser == Browser::None { Browser::App } else { args.browser };
     let (stopped_tx, stopped_rx) = std::sync::mpsc::channel::<()>();
     let (result_tx, result_rx) = std::sync::mpsc::channel::<Result<(), String>>();
     // Forward the server result so the tray loop wakes up when it stops.
@@ -407,7 +409,8 @@ fn show_guide(browser: Browser, url: &str) {
 fn open_browser(browser: Browser, url: &str) {
     let result = match browser {
         Browser::None => return,
-        Browser::Edge => spawn_edge(url),
+        Browser::App if default_is_chrome() => spawn_app_window("chrome", url),
+        Browser::App | Browser::Edge => spawn_edge(url),
         Browser::Default => spawn_default(url),
     };
     if let Err(err) = result {
@@ -417,13 +420,57 @@ fn open_browser(browser: Browser, url: &str) {
 
 #[cfg(windows)]
 fn spawn_edge(url: &str) -> std::io::Result<()> {
+    spawn_app_window("msedge", url)
+}
+
+/// A borderless app window of a Chromium browser ("msedge", "chrome") showing the guide.
+#[cfg(windows)]
+fn spawn_app_window(browser: &str, url: &str) -> std::io::Result<()> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     std::process::Command::new("cmd")
-        .args(["/C", "start", "", "msedge", &format!("--app={url}")])
+        .args(["/C", "start", "", browser, &format!("--app={url}")])
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map(|_| ())
+}
+
+/// True when Chrome is the default web browser (Windows' choice for https links).
+#[cfg(windows)]
+fn default_is_chrome() -> bool {
+    use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW};
+    let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+    let key = wide(r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice");
+    let name = wide("ProgId");
+    let mut buf = [0u16; 128];
+    let mut size = std::mem::size_of_val(&buf) as u32;
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            key.as_ptr(),
+            name.as_ptr(),
+            RRF_RT_REG_SZ,
+            std::ptr::null_mut(),
+            buf.as_mut_ptr().cast(),
+            &mut size,
+        )
+    };
+    if status != 0 {
+        return false;
+    }
+    let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+    // Chrome's ProgId is "ChromeHTML" (also for Beta, Dev and Canary).
+    String::from_utf16_lossy(&buf[..len]).starts_with("ChromeHTML")
+}
+
+#[cfg(not(windows))]
+fn default_is_chrome() -> bool {
+    false
+}
+
+#[cfg(not(windows))]
+fn spawn_app_window(_browser: &str, url: &str) -> std::io::Result<()> {
+    spawn_default(url)
 }
 
 #[cfg(windows)]

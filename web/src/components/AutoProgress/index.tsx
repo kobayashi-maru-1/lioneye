@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { bossesKilledBy } from "../../state/boss-kills";
 import {
   OVERLAY_PANELS,
+  overlayCampaignAtom,
   overlayGemsAtom,
   overlaySettingsAtom,
   shownPanelsAtom,
@@ -39,8 +40,14 @@ export function useAutoProgress() {
         jump(event.data.slice("jump:".length));
         return;
       }
-      // The bar's settings and Gems tooltip, for the bar itself.
-      if (event.data.startsWith("overlay:") || event.data.startsWith("gems:"))
+      // A new exe (an update) serves a new guide: reload to get it.
+      if (event.data.startsWith("build:")) {
+        if (seenBuild !== null && seenBuild !== event.data) location.reload();
+        seenBuild = event.data;
+        return;
+      }
+      // The bar's settings and tooltips, for the bar itself.
+      if (event.data.startsWith("overlay:") || event.data.startsWith("tips:"))
         return;
       if (event.data.startsWith("status:")) {
         const [status, path] = event.data.slice("status:".length).split("|");
@@ -85,13 +92,21 @@ export function useAutoProgress() {
           ).map(({ id, label }) => ({ id, label }));
     sendMessage(`overlay:${JSON.stringify({ on: settings.on, buttons })}`);
   }, [readyState, settings, shown]);
-  // The Gems panel's set, for the bar's Gems tooltip.
+  // The bar's tooltips: the Gems panel's set and Campaign's next steps.
   const gems = useAtomValue(overlayGemsAtom);
   useEffect(() => {
     if (readyState === ReadyState.OPEN && gems !== undefined)
-      sendMessage(`gems:${JSON.stringify(gems)}`);
+      sendMessage(`tip:gems:${JSON.stringify(gems)}`);
   }, [readyState, gems]);
+  const campaign = useAtomValue(overlayCampaignAtom);
+  useEffect(() => {
+    if (readyState === ReadyState.OPEN && campaign !== undefined)
+      sendMessage(`tip:campaign:${JSON.stringify(campaign)}`);
+  }, [readyState, campaign]);
 }
+
+/** The exe's build this page was served by (its first "build:" message). */
+let seenBuild: string | null = null;
 
 /**
  * Jumps to a panel for the in-game bar: from Settings, back to the guide first. Campaign

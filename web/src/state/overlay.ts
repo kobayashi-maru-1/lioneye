@@ -1,4 +1,5 @@
 import { persistentAtom } from ".";
+import type { StepPart } from "./step-text";
 import { atom } from "jotai";
 
 /** Every guide panel that can have a button on the in-game bar, in page order. */
@@ -55,3 +56,12 @@ export interface OverlayGems {
  * page doesn't clear the set another guide page sent.
  */
 export const overlayGemsAtom = atom<OverlayGems | null | undefined>(undefined);
+
+/** How many upcoming steps the bar's Campaign tooltip shows. */
+export const CAMPAIGN_TIP_STEPS = 3;
+
+/**
+ * The next unfinished route steps after your current zone, for the bar's Campaign
+ * tooltip. Undefined until the guide page has worked them out.
+ */
+export const overlayCampaignAtom = atom<StepPart[][] | undefined>(undefined);

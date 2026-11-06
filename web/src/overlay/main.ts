@@ -1,7 +1,7 @@
 // The in-game bar, shown by exile-leveling.exe over the game in a WebView2 window
 // (log-api/src/overlay.rs). Buttons tell the exe, which tells the guide page to jump to that
 // panel. The exe sends the buttons ("overlay:" messages) from the guide's Settings, and the
-// Gems panel's set ("gems:") for the Gems button's tooltip.
+// guide's tooltips ("tips:"): the Gems panel's set and Campaign's next steps.
 import "./styles.css";
 
 interface OverlayButton {
@@ -45,11 +45,23 @@ const buttons = document.getElementById("buttons")!;
 const dot = document.getElementById("dot")!;
 const tip = document.getElementById("tip")!;
 
+/** A route step as text pieces, from the guide (web/src/state/step-text.ts StepPart). */
+type Step = { text: string; kind?: string }[];
+
 let socket: WebSocket | null = null;
 let shown = "";
-let gems: OverlayGems | null = null;
+/** The guide's tooltips by button: "gems" (OverlayGems | null), "campaign" (Step[]). */
+let tips: Record<string, unknown> = {};
+/** The button whose tooltip is open. */
+let openId: string | null = null;
 /** The tooltip opens above the bar (bar in the lower half of the screen). */
 let up = false;
+
+/** Buttons with a tooltip: Gems (the Gems panel's links), Campaign (the next steps). */
+const TIPS: Record<string, () => void> = {
+  gems: renderGems,
+  campaign: renderCampaign,
+};
 
 function render(config: OverlayConfig) {
   const key = JSON.stringify(config.buttons);
@@ -64,9 +76,9 @@ function render(config: OverlayConfig) {
       button.addEventListener("click", () => {
         if (socket?.readyState === WebSocket.OPEN) socket.send(`jump:${id}`);
       });
-      // Gems: hovering shows the Gems panel's links, to read them without leaving the game.
+      // Hovering Gems or Campaign shows what they'd jump to, without leaving the game.
       button.addEventListener("mouseenter", () =>
-        id === "gems" ? openTip() : closeTip(),
+        TIPS[id] ? openTip(id) : closeTip(),
       );
       return button;
     }),
@@ -82,15 +94,37 @@ function el(tag: string, className: string, ...children: (Node | string)[]) {
 }
 
 function renderTip() {
+  if (openId === null) return;
   try {
-    renderGems();
+    TIPS[openId]?.();
   } catch {
-    // Not a gem set (a malformed message): say so rather than never opening.
-    tip.replaceChildren(el("div", "tipEmpty", "No gems"));
+    // A malformed message: say so rather than never opening.
+    tip.replaceChildren(el("div", "tipEmpty", "Not available"));
   }
 }
 
+function renderCampaign() {
+  const steps = tips.campaign as Step[] | undefined;
+  if (!Array.isArray(steps) || steps.length === 0) {
+    tip.replaceChildren(el("div", "tipEmpty", "No steps"));
+    return;
+  }
+  tip.replaceChildren(
+    el("div", "tipTitle", "Next"),
+    ...steps.map((step) =>
+      el(
+        "div",
+        "tipStep",
+        ...step.map((part) =>
+          el("span", part.kind ? `part ${part.kind}` : "part", part.text),
+        ),
+      ),
+    ),
+  );
+}
+
 function renderGems() {
+  const gems = (tips.gems ?? null) as OverlayGems | null;
   if (
     gems === null ||
     !Array.isArray(gems.groups) ||
@@ -124,9 +158,10 @@ function renderGems() {
   );
 }
 
-function openTip() {
-  // Already open (back on Gems from the tooltip): the window holds the tooltip too, so
-  // working out the side again would move the bar.
+function openTip(id: string) {
+  openId = id;
+  // Already open (back on the button from the tooltip, or another button with one): the
+  // window holds the tooltip too, so working out the side again would move the bar.
   if (!tip.hidden) {
     renderTip();
     return;
@@ -143,6 +178,7 @@ function openTip() {
 
 function closeTip() {
   tip.hidden = true;
+  openId = null;
 }
 
 frame.addEventListener("mouseleave", closeTip);
@@ -177,13 +213,15 @@ function connect() {
       } catch {
         // A malformed message: keep the current buttons.
       }
-    } else if (event.data.startsWith("gems:")) {
+    } else if (event.data.startsWith("tips:")) {
       try {
-        gems = JSON.parse(
-          event.data.slice("gems:".length),
-        ) as OverlayGems | null;
+        const all = JSON.parse(event.data.slice("tips:".length)) as unknown;
+        tips =
+          all !== null && typeof all === "object"
+            ? (all as Record<string, unknown>)
+            : {};
       } catch {
-        gems = null;
+        tips = {};
       }
       if (!tip.hidden) renderTip();
     }
