@@ -1,24 +1,72 @@
-> **Desktop build:** this copy runs as one Windows program with auto-progress built in. See [DESKTOP.md](DESKTOP.md).
+# Exile Leveling desktop
 
-## Getting Started
+A Path of Exile leveling guide and Path of Building build view in one Windows app. It
+follows your zones from the game's log, ticks off the campaign as you go, and shows your
+build's stats, gear, gems, tree and trade searches for the loadout that matches your level.
+
+**[Download the latest release](https://github.com/kobayashi-maru-1/poeleveling/releases/latest)**
+(`exile-leveling.exe`, Windows 10 or 11).
+
+## Get started
+
+1. Download `exile-leveling.exe` and run it. Windows SmartScreen may warn that it's
+   unrecognized (the exe isn't signed): pick **More info** → **Run anyway**.
+2. It runs in the tray (by the clock) and opens the guide in its own Edge window.
+3. Import your Path of Building code in **Settings** (⚙ at the top right).
+4. Start Path of Exile in **Windowed** or **Windowed Fullscreen** mode. The guide follows
+   your zones from the game's log.
+
+New versions don't install themselves: download the latest release again. Your progress
+and imported build carry over.
+
+## What's in it
+
+- **Campaign** steps that tick off as you change zones, level up and kill bosses. Gem
+  rewards name the quest or NPC.
+- **Stats** from a bundled Path of Building, for the loadout that matches your level.
+- **Gear** with item tooltips (Copy, Trade), **Gems** with Wiki and Trade links, a
+  **Trade List** with pob.codes' search options, **Build health**, **Config** (with Custom
+  Modifiers), the passive **Tree** and the build's **Notes**.
+- **Compare** any PoB code or build link with the guide's loadout: Stats, Passives,
+  Skills and Items.
+- An **in-game bar** over the game: its buttons jump the guide to a panel without leaving
+  the game. Hover **Gems** for your links, or **Campaign** for your next steps.
+- On a wide screen, Campaign and the other panels sit side by side.
+- Trade and wiki links open in your usual Edge profile, where you're signed in.
+
+How it all works, the command-line options and where it keeps its data:
+[DESKTOP.md](DESKTOP.md).
+
+## Credits
+
+- [HeartofPhos/exile-leveling](https://github.com/HeartofPhos/exile-leveling): the guide,
+  routes and game data, and [exile-log-api](https://github.com/HeartofPhos/exile-log-api),
+  the log watcher. This repo is a fork of both.
+- [Path of Building Community](https://github.com/PathOfBuildingCommunity/PathOfBuilding)
+  (MIT): the stats, bundled in the exe.
+- [PoB Redux](https://github.com/pobredux/pob-redux) (MIT): the Build health checks.
+
+## Developing
+
+Building the exe, the repo layout and pulling upstream updates: see
+[DESKTOP.md](DESKTOP.md). The guide's own web app (from upstream):
 
 - `npm i`
 - `npm run dev -w web`
 
-## Seeding
+### Seeding
 
-### Passive Tree
+#### Passive Tree
 
 - `npm run seed tree -w seeding`
 
-### General
+#### General
 
 - Find the list of required `dat` files in `seeding/data/index.ts`
-- Use https://github.com/HeartofPhos/exile-export to get required `.dat.json` files
+- Use [exile-export](https://github.com/HeartofPhos/exile-export) to get required `.dat.json` files
 - `npm run seed data -w seeding`
 
-## Route
+### Route
 
-I'm not currently taking PRs related to route changes, my intention is to keep the base route in line with current speed running strategies.
-
-Users are encourged to use the [Edit Route Tab](https://heartofphos.github.io/exile-leveling/#/edit-route) in the deployed app to update the route to their preferred playstyle.
+Upstream doesn't take PRs for route changes: the base route follows current speedrunning
+strategies. Change the route to your playstyle with **Edit route** in the guide's Settings.
