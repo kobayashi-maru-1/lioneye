@@ -121,6 +121,10 @@ export interface Gear {
 
 /** A gem in a socket group of the shown skill set. */
 export interface SkillGem {
+  /** The gem's item id ("Metadata/Items/Gems/SkillGemFireball"). */
+  id?: string;
+  /** The level it reaches without corruption (20; 3 for Empower, 5 for Awakened). */
+  maxLevel?: number;
   name: string;
   support?: boolean;
   enabled: boolean;

@@ -37,6 +37,47 @@
   color: var(--on-secondary);
 }
 
+.track {
+  display: flex;
+  flex-direction: column;
+}
+
+.track input {
+  width: 100%;
+  margin: 0;
+}
+
+/* A tick under each stop; the thumb's half-width in from each end. */
+.ticks {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.tick {
+  width: 2px;
+  height: 0.4rem;
+  background-color: #6b6b6b;
+  border-radius: 1px;
+}
+
+/* A row's art and name: hover for the tooltip, click to pin it. */
+.hover {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
 .lists {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));

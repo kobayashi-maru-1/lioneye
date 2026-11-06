@@ -270,16 +270,39 @@ export function tradeUrl(
 }
 
 /** A trade search for a gem at (at least) the build's level and quality. */
+/**
+ * A gem search. The build's level and quality are minimums, unless the trade options
+ * override them: level 1 (exactly), the gem's top level (`maxLevel`, 20 when unknown) or one
+ * above it (corrupted); quality as a minimum (0: any).
+ */
 export function gemTradeUrl(
   name: string,
   level: number | undefined,
   quality: number | undefined,
   league: string,
   options: TradeOptions = DEFAULT_TRADE_OPTIONS,
+  maxLevel = 20,
 ) {
   const misc: Record<string, unknown> = {};
-  if (level !== undefined && level > 1) misc.gem_level = { min: level };
-  if (quality !== undefined && quality > 0) misc.quality = { min: quality };
+  switch (options.gemLevel) {
+    case "1":
+      misc.gem_level = { max: 1 };
+      break;
+    case "max":
+      misc.gem_level = { min: maxLevel };
+      break;
+    case "max+1":
+      misc.gem_level = { min: maxLevel + 1 };
+      break;
+    default:
+      if (level !== undefined && level > 1) misc.gem_level = { min: level };
+  }
+  const minQuality =
+    options.gemQuality === undefined || options.gemQuality === null
+      ? quality
+      : options.gemQuality;
+  if (minQuality !== undefined && minQuality > 0)
+    misc.quality = { min: minQuality };
   const query: Record<string, unknown> = {
     status: { option: options.status },
     type: name,

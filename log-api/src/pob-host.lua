@@ -727,6 +727,9 @@ local function skillGroups()
 				or (effect and effect.name)
 			if name then
 				gems[#gems + 1] = {
+					-- The gem's item id and normal top level, for the Trade List's Max level.
+					id = gem.gemData and gem.gemData.gameId,
+					maxLevel = gem.gemData and gem.gemData.naturalMaxLevel,
 					name = name,
 					support = effect and effect.support or nil,
 					enabled = gem.enabled ~= false,

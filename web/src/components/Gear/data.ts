@@ -1,4 +1,5 @@
 import { persistentAtom } from "../../state";
+import type { SkillGroup } from "../PobStats";
 import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 
@@ -196,7 +197,13 @@ export interface TradeOptions {
   valueShare: number;
   /** Share of an item's matched mods a listing must have (0.5-1). */
   modShare: number;
+  /** Gem level searched: the build's ("default", also when unset), 1, max or max + 1. */
+  gemLevel?: GemLevelOverride;
+  /** Gem quality searched: the build's when unset, else this minimum. */
+  gemQuality?: number | null;
 }
+
+export type GemLevelOverride = "default" | "1" | "max" | "max+1";
 
 export const DEFAULT_TRADE_OPTIONS: TradeOptions = {
   status: "securable",
@@ -212,4 +219,13 @@ const tradeOptionsAtom = persistentAtom<TradeOptions>(
 
 export function useTradeOptions() {
   return useAtom(tradeOptionsAtom);
+}
+
+/** Each gem's top level (by gem id), from PoB's gem data for the shown skill set. */
+export function gemMaxLevels(skills: SkillGroup[] | undefined) {
+  const levels = new Map<string, number>();
+  for (const group of skills ?? [])
+    for (const gem of group.gems)
+      if (gem.id && gem.maxLevel) levels.set(gem.id, gem.maxLevel);
+  return levels;
 }

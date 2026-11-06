@@ -1,8 +1,9 @@
-import { useTradeLeague, useTradeOptions } from "../Gear/data";
+import { gemMaxLevels, useTradeLeague, useTradeOptions } from "../Gear/data";
 import { gemTradeUrl, wikiUrl } from "../Gear/trade-query";
 import { GemCost } from "../GemCost";
 import { InlineFakeBlock } from "../InlineFakeBlock";
 import { PoeTooltip, TooltipProperty, tooltipStyles } from "../PoeTooltip";
+import { usePobStats } from "../PobStats";
 import { Popover, PopoverAction, usePopover } from "../Popover";
 import { SetPager, useFollowAct } from "../SetPager";
 import styles from "./styles.module.css";
@@ -34,6 +35,8 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
   const popover = usePopover<RouteData.GemLink>();
   const { league } = useTradeLeague();
   const [options] = useTradeOptions();
+  const skills = usePobStats()?.stats?.skills;
+  const maxLevels = useMemo(() => gemMaxLevels(skills), [skills]);
 
   const activeGemLinks: RouteData.GemLinkGroup[] = gemLinks.filter(
     (link) => link.title === gemSections[curIndex],
@@ -61,6 +64,7 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
                     shown.value.quality,
                     league,
                     options,
+                    maxLevels.get(shown.value.id),
                   )}
                 >
                   <FaBalanceScale aria-hidden />
@@ -162,7 +166,7 @@ interface GemTooltipProps {
 }
 
 /** The gem as an in-game tooltip, with where to get it while leveling. */
-function GemTooltip({ gemLink }: GemTooltipProps) {
+export function GemTooltip({ gemLink }: GemTooltipProps) {
   const gem = Data.Gems[gemLink.id];
 
   return (
