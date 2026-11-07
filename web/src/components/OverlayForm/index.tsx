@@ -5,7 +5,7 @@ import classNames from "classnames";
 import { useAtom } from "jotai";
 
 /**
- * Settings for the in-game bar (exe only): whether it shows over the game, and which
+ * Settings for the in-game bar: whether it shows over the game, and which
  * panels get a button. Panels the build doesn't have are left off the bar.
  */
 export function OverlayForm() {

@@ -8,7 +8,6 @@ import { stripPob } from "../PobText";
 import { RARITY_COLOURS, itemName } from "../Gear";
 import { Modal } from "../Modal";
 import {
-  STATS_AVAILABLE,
   type SkillGroup,
   type Stats,
   fetchBuildStats,
@@ -61,7 +60,6 @@ interface Yours {
  */
 export function BuildCompare({ buttonClassName }: { buttonClassName: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  if (!STATS_AVAILABLE) return null;
   return (
     <>
       <button className={buttonClassName} onClick={() => setIsOpen(true)}>

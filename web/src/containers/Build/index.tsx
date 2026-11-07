@@ -6,7 +6,6 @@ import { ConfigForm } from "../../components/ConfigForm";
 import { GemEditForm } from "../../components/GemEditForm";
 import { Modal } from "../../components/Modal";
 import { OverlayForm } from "../../components/OverlayForm";
-import { STATS_AVAILABLE } from "../../components/PobStats";
 import { SearchStringsEditor } from "../../components/SearchStringsEditor";
 import {
   type SettingsTab as Tab,
@@ -31,8 +30,7 @@ import { toast } from "react-toastify";
  * Route: what the campaign shows.
  */
 const TABS: { id: Tab; label: string }[] = [
-  // The in-game bar, the game log and the browser exist only with the exe.
-  ...(STATS_AVAILABLE ? [{ id: "app" as Tab, label: "App" }] : []),
+  { id: "app", label: "App" },
   { id: "build", label: "Build" },
   { id: "route", label: "Route" },
 ];

@@ -4,7 +4,6 @@ import { useAutoProgress } from "../components/AutoProgress";
 import { AppBar } from "../components/AppBar";
 import { CampaignTip } from "../components/CampaignTip";
 import { Footer } from "../components/Footer";
-import { STATS_AVAILABLE } from "../components/PobStats";
 import { pipe } from "../utility";
 import { withBlank } from "../utility/withBlank";
 import { withScrollRestoration } from "../utility/withScrollRestoration";
@@ -27,7 +26,7 @@ export function App() {
   return (
     <>
       <AppBar />
-      {STATS_AVAILABLE && <Footer />}
+      <Footer />
       {/* The in-game bar's Campaign tooltip, kept current on every page. */}
       <Suspense fallback={null}>
         <CampaignTip />

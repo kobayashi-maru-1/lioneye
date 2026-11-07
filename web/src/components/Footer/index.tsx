@@ -41,7 +41,7 @@ function latestRelease(maxAge = RECHECK) {
 /**
  * PoB Redux-style status line at the bottom of the window: the app's version, the bundled
  * Path of Building's, the date of the merged exile-leveling route data, a newer release
- * when there is one, and links. Exe only (the hosted site has no versions to show).
+ * when there is one, and links.
  */
 export function Footer() {
   const { info } = useAppInfo();

@@ -20,7 +20,6 @@ import {
 import { PanelSelect } from "../../components/PanelSelect";
 import {
   PobStatsProvider,
-  STATS_AVAILABLE,
   useLoadoutSets,
   usePanelSet,
   usePobStats,
@@ -209,7 +208,7 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
   const searchStrings = useAtomValue(searchStringsSelector);
   const xml = pob?.xml ?? null;
   const notes = useMemo(() => (xml ? buildNotes(xml) : null), [xml]);
-  const showStats = STATS_AVAILABLE && code !== null;
+  const showStats = code !== null;
   const hasSearch = searchStrings !== null && searchStrings.length > 0;
   useCampaignInView();
   useFoldCampaignAtEnd();

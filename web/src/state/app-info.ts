@@ -36,7 +36,7 @@ function fetchAppInfo() {
   return request;
 }
 
-/** The exe's app info; null until it answers (or on the hosted site, where nothing does). */
+/** The exe's app info; null until it answers. */
 export function useAppInfo() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   useEffect(() => {

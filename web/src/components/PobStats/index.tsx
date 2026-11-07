@@ -15,9 +15,6 @@ import React, {
   useState,
 } from "react";
 
-/** The exe runs Path of Building; the hosted site has nothing to ask. */
-export const STATS_AVAILABLE = import.meta.env.MODE !== "production";
-
 const STATS_URL = "/api/pob/stats";
 
 export type StatRow =
@@ -185,7 +182,7 @@ export interface PobStatsValue {
   xml: string | null;
   /** A build is imported but its code can't be read. */
   unreadable: boolean;
-  /** The answer for the current build; null before the first one (or on the hosted site). */
+  /** The answer for the current build; null before the first one. */
   stats: Stats | null;
   /** Loadout names without colour codes, for the pager. */
   titles: string[];
@@ -242,7 +239,7 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!STATS_AVAILABLE || xml === null) return;
+    if (xml === null) return;
     const controller = new AbortController();
     setLoading(true);
     setError(null);

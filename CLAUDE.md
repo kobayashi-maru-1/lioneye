@@ -31,7 +31,8 @@ Read DESKTOP.md for how it runs, builds and pulls upstream updates.
 - `origin`: kobayashi-maru-1/lioneye (this app; renamed from poeleveling)
 - `upstream`: HeartofPhos/exile-leveling (guide, routes, gems, trees)
 - `upstream-log-api`: HeartofPhos/exile-log-api (subtree at `log-api/`)
-- Branch `overlay-archive` and tag `overlay-final` keep the old Electron/Tauri overlay that main replaced.
+- Upstream's website build (GitHub Pages workflow, PWA plugin, phone icons) is removed here.
+  Keep it out when merging upstream (DESKTOP.md, "Pull upstream updates").
 
 ## Rules
 

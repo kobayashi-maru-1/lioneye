@@ -146,8 +146,6 @@ once in **Settings** (the ⚙ at the top right).
   10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`. A build with a
   timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub the first time.
   Specs on an older tree are calculated on the latest one (noted under the stats).
-- On the hosted site (no exe) there are no stats, gear or config; Tree and Gems follow your act
-  with their own arrows.
 
 ## Overlay
 
@@ -234,6 +232,10 @@ git subtree pull --prefix=log-api upstream-log-api main
 .\upstream-watch.ps1 -Update   # records what was merged (the footer's route date)
 .\build.ps1
 ```
+
+Lioneye doesn't build upstream's website. When a merge brings back their GitHub Pages
+workflow (`.github/workflows/build-and-deploy.yml`), the PWA plugin (`vite-plugin-pwa`) or
+the phone icons in `web/public`, keep them out, and keep this repo's `web/vite.config.ts`.
 
 `upstream-watch.ps1` (without `-Update`) says whether either upstream has changes not merged
 yet. The **Watch** workflow runs it and `log-api\redux-watch.ps1` daily and fails (GitHub
