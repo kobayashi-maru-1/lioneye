@@ -13,7 +13,8 @@ build's stats, gear, gems, tree and trade searches for the loadout that matches 
    Windows SmartScreen may warn that it's unrecognized (the exe isn't signed): pick
    **More info** → **Run anyway**.
 2. It runs in the tray (by the clock) and opens the guide in its own Edge window.
-3. Import your Path of Building code in **Settings** (⚙ at the top right).
+3. In **Settings** (⚙ at the top right), import your Path of Building code, or **Open** a
+   build file PoB saved.
 4. Start Path of Exile in **Windowed** or **Windowed Fullscreen** mode. The guide follows
    your zones from the game's log.
 
@@ -29,6 +30,8 @@ imported build carry over.
 - **Gear** with item tooltips (Copy, Trade), **Gems** with Wiki and Trade links, a
   **Trade List** with pob.codes' search options, **Build health**, **Config** (with Custom
   Modifiers), the passive **Tree** and the build's **Notes**.
+- **Open** a build file from Path of Building and the guide follows it: each save in PoB
+  updates the guide. **Edit** opens the build in PoB Community.
 - **Compare** any PoB code or build link with the guide's loadout: Stats, Passives,
   Skills and Items.
 - An **in-game bar** over the game: its buttons jump the guide to a panel without leaving

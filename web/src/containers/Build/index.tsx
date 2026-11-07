@@ -18,8 +18,8 @@ import { requiredGemsSelector } from "../../state/gem";
 import { formStyles } from "../../styles";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { RESET, useAtomCallback } from "jotai/utils";
-import { pobAtom } from "../../state/pob";
+import { useAtomCallback } from "jotai/utils";
+import { pobAtom, resetCampaignAtom, resetGemsAtom } from "../../state/pob";
 import { routeSelector } from "../../state/route";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -39,9 +39,6 @@ export default function BuildContainer() {
   const [config, setConfig] = useAtom(configSelector);
   const [buildData, setBuildData] = useAtom(buildDataSelector);
   const [requiredGems, setRequiredGems] = useAtom(requiredGemsSelector);
-  const setPob = useSetAtom(pobAtom);
-  // Reset wipes the build and route progress: asked first.
-  const [confirmReset, setConfirmReset] = useState(false);
   // Opens on the first tab, or the one a link asked for (once).
   const [requested, setRequested] = useAtom(settingsTabAtom);
   const [tab, setTab] = useState<Tab>(() =>
@@ -82,12 +79,7 @@ export default function BuildContainer() {
       >
         {tab === "build" && (
           <div className={classNames(formStyles.form)}>
-            <BuildCodeForm
-              onImport={(pobCode) => {
-                setPob(pobCode);
-              }}
-              onReset={() => setConfirmReset(true)}
-            />
+            <BuildCodeForm />
             <SearchStringsEditor />
             <span className={classNames(styles.hint)}>
               A # line names the string below it.
@@ -143,44 +135,31 @@ export default function BuildContainer() {
           </>
         )}
       </div>
-      <Modal
-        size="small"
-        isOpen={confirmReset}
-        onRequestClose={() => setConfirmReset(false)}
-        contentLabel="Reset progress?"
-      >
-        <div className={classNames(formStyles.form)}>
-          <div className={classNames(formStyles.formRow)}>
-            <label>Reset progress?</label>
-          </div>
-          <p>Clears the imported build and your route progress.</p>
-          <div className={classNames(formStyles.groupRight)}>
-            <button
-              className={classNames(formStyles.formButton)}
-              autoFocus
-              onClick={() => setConfirmReset(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className={classNames(formStyles.formButton)}
-              onClick={() => {
-                setConfirmReset(false);
-                setPob(RESET);
-              }}
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }
 
-/** Route editing and the export for other tools (the old menu bar's). */
+/** The resets: each asks first. Loading a build never clears any of these. */
+const RESETS = {
+  campaign: {
+    title: "Reset campaign?",
+    detail: "Clears campaign ticks, your place and level.",
+    done: "Campaign reset",
+  },
+  gems: {
+    title: "Reset gems?",
+    detail: "Clears gem ticks.",
+    done: "Gems reset",
+  },
+} as const;
+
+/** Route editing, the export for other tools (the old menu bar's), and the resets. */
 function RouteActions() {
   const navigate = useNavigate();
+  const resetCampaign = useSetAtom(resetCampaignAtom);
+  const resetGems = useSetAtom(resetGemsAtom);
+  const [confirm, setConfirm] = useState<keyof typeof RESETS | null>(null);
+  const asking = confirm === null ? null : RESETS[confirm];
   const exportRoute = useAtomCallback(
     useCallback(async (get) => {
       const route = await get(routeSelector);
@@ -211,7 +190,52 @@ function RouteActions() {
         >
           Export
         </button>
+        <button
+          className={classNames(formStyles.formButton)}
+          onClick={() => setConfirm("campaign")}
+        >
+          Reset campaign
+        </button>
+        <button
+          className={classNames(formStyles.formButton)}
+          onClick={() => setConfirm("gems")}
+        >
+          Reset gems
+        </button>
       </div>
+      <Modal
+        size="small"
+        isOpen={asking !== null}
+        onRequestClose={() => setConfirm(null)}
+        contentLabel={asking?.title ?? ""}
+      >
+        <div className={classNames(formStyles.form)}>
+          <div className={classNames(formStyles.formRow)}>
+            <label>{asking?.title}</label>
+          </div>
+          <p>{asking?.detail}</p>
+          <div className={classNames(formStyles.groupRight)}>
+            <button
+              className={classNames(formStyles.formButton)}
+              autoFocus
+              onClick={() => setConfirm(null)}
+            >
+              Cancel
+            </button>
+            <button
+              className={classNames(formStyles.formButton)}
+              onClick={() => {
+                if (confirm === "campaign") resetCampaign();
+                if (confirm === "gems") resetGems();
+                if (asking) toast.success(asking.done);
+                setConfirm(null);
+              }}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

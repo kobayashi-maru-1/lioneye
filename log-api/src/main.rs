@@ -22,6 +22,10 @@ mod log_reader;
 #[cfg(windows)]
 mod overlay;
 mod pob;
+#[path = "pob-files.rs"]
+mod pob_files;
+#[path = "pob-routes.rs"]
+mod pob_routes;
 #[path = "saved-state.rs"]
 mod saved_state;
 mod web_data;
@@ -162,7 +166,13 @@ fn main() -> ExitCode {
     let browser_now = Browser::from_name(&settings.browser.borrow());
     let guides = std::sync::Arc::new(server::Guides::new(open_tx));
     let guides_open = guides.clone();
+    // The guide pages' linked PoB build files; the latest is watched for saves in PoB.
+    let pob_links = std::sync::Arc::new(pob_files::Links::new());
+    let pob_file_rx = pob_links.watched.subscribe();
+    let (pob_saved_tx, _) = tokio::sync::broadcast::channel::<String>(4);
     let state = server::AppState {
+        pob_links,
+        pob_saved: pob_saved_tx.clone(),
         settings: settings.clone(),
         lines: lines_tx.clone(),
         status: status_rx.clone(),
@@ -205,6 +215,7 @@ fn main() -> ExitCode {
     let heart_beat = Duration::from_secs(args.heart_beat.max(1));
     let log_path = settings.log_path.subscribe();
     let (done_tx, done_rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    runtime.spawn(pob_files::watch(pob_file_rx, pob_saved_tx));
     runtime.spawn(async move {
         let res = tokio::select! {
             res = server::serve(listener, state) => res,

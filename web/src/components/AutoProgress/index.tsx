@@ -34,6 +34,7 @@ import {
   isCharacterLine,
 } from "../../state/character";
 import { levelLineAtom } from "../../state/level-lines";
+import { pobFileSelector, refreshFromFileAtom } from "../../state/pob";
 import { characterLevelAtom } from "../../state/character-level";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
 import classNames from "classnames";
@@ -68,6 +69,7 @@ export function useAutoProgress() {
   }, [followed]);
 
   const jump = useJumpFromGame();
+  const refreshFromFile = useSetAtom(refreshFromFileAtom);
 
   const { readyState, sendMessage } = useWebSocket({
     url: AUTO_PROGRESS_URL,
@@ -103,6 +105,11 @@ export function useAutoProgress() {
       // The bar's settings and tooltips, for the bar itself.
       if (event.data.startsWith("overlay:") || event.data.startsWith("tips:"))
         return;
+      // PoB saved the linked build file: read it back.
+      if (event.data.startsWith("pob-file:")) {
+        if (event.data === "pob-file:changed") refreshFromFile();
+        return;
+      }
       if (event.data.startsWith("status:")) {
         const [status, path] = event.data.slice("status:".length).split("|");
         // The game's log found (again): read the character back from it.
@@ -139,6 +146,14 @@ export function useAutoProgress() {
   useEffect(() => {
     if (talks) sendMessage("guide");
   }, [talks]);
+  // The linked PoB build file, for the exe to watch; read once on connect, for saves made
+  // while the guide was closed.
+  const pobFile = useAtomValue(pobFileSelector);
+  useEffect(() => {
+    if (!talks) return;
+    sendMessage(`pob-file:${pobFile ?? ""}`);
+    if (pobFile !== null) refreshFromFile();
+  }, [talks, pobFile]);
   // The guide's own window keeps the exe's copy of its data current.
   useEffect(() => {
     if (!talks || pageMode !== "own") return;

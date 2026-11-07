@@ -50,6 +50,40 @@ profile's data is also kept in `%LOCALAPPDATA%\exile-leveling\moved`, and is nev
 from the profile. Builds imported on the hosted site don't carry over, so import your PoB
 once in **Settings** (the ⚙ at the top right).
 
+## Your build
+
+In ⚙ **Settings → Build**:
+
+- **Import**: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link.
+- **Open**: pick a build file Path of Building saved. The dialog starts in PoB Community's
+  builds folder (its "Build save path" if you set one, else
+  `Documents\Path of Building\Builds`), or Downloads when there's none. The file's name shows
+  under the code, and the guide follows it: each save in PoB (Ctrl+S) updates the guide
+  within a couple of seconds, with a **Build updated** note. Saves made while the guide was
+  closed are picked up when it opens.
+- **Edit** (when PoB Community is installed): opens PoB on the build. For an opened file,
+  PoB opens straight into it: Lioneye sets it as PoB's last open build (the `<Mode>` entry in
+  PoB's `Settings.xml`), then starts PoB. With PoB already open, a second PoB window opens.
+  For a pasted code, **Save to PoB?** first saves it as a new file in PoB's builds folder
+  (never over an existing one) under the name you give; from then on it's an opened file.
+  Pasted codes are never saved anywhere otherwise.
+- **Unload**: removes the build (code, file, tree, links and gem list).
+
+Loading a different build (Import or Open) brings its gem list, class and bandit (Settings →
+**Route**) and keeps your progress. A save of the same file in PoB updates only what comes
+from PoB (stats, tree, gear, links); the gem list, class and bandit stay as you set them, so
+Open the file again to take PoB's. To start over, **Settings → Route** has
+**Reset campaign** (campaign ticks, your place and level) and **Reset gems** (gem ticks).
+
+Campaign ticks are kept by what each step says (with the step before it), not by its place,
+so a different gem list, bandit or route option never moves a tick onto another step. Ticks
+saved before 0.4.7 are moved over once, the first time the guide opens.
+
+Open, Edit and the file watch work only from the guide on this PC: never from another
+device (`--address 0.0.0.0`) or another website, and only for local `.xml` files (not
+network paths). Edit changes PoB's `Settings.xml` only when it reads cleanly as PoB's own
+settings; otherwise it leaves it alone and says so.
+
 ## Using the guide
 
 - **Click** a step to mark it done. **Shift-click** marks it and every step before it.
@@ -70,10 +104,10 @@ once in **Settings** (the ⚙ at the top right).
   you're in that panel. Folding a panel or act while you're inside it lands on the next one.
 - An act folds to one line once all its steps are done, and Campaign folds once the last
   act is done. Nothing reopens on its own: a folded act or panel stays folded until you
-  click it (or use the bar). Importing a build opens Campaign again.
+  click it (or use the bar). **Reset campaign** opens Campaign again.
 - The one bar at the top jumps to each panel and holds the auto-progress pill and ⚙
-  **Settings**, in three tabs: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded PoB code: paste a code or link and **Import**, **Copy**, **Reset**; search strings), **Route** (Edit
-  route, Export, class, bandits, League Start, Library, Gems Only, hints, and the gem list,
+  **Settings**, in three tabs: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded build: **Unload**, **Copy**, **Open**, **Edit**, **Import**; search strings; see [Your build](#your-build)), **Route** (Edit
+  route, Export, **Reset campaign**, **Reset gems**, class, bandits, League Start, Library, Gems Only, hints, and the gem list,
   open until you fold it). The
   Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while
   Campaign is on screen.
@@ -141,7 +175,7 @@ once in **Settings** (the ⚙ at the top right).
   `#` notes, are dimmed). On the tree, Ctrl+scroll zooms and dragging pans.
 - At the top of the left column, pick the main skill as in PoB. The pick is remembered by
   skill gem, so the same skill stays selected in every loadout that has it; loadouts without
-  it show PoB's own pick, tagged **PoB pick**. Importing a build clears the pick.
+  it show PoB's own pick, tagged **PoB pick**. Loading a different build clears the pick.
 - The first stats after starting take a few seconds while PoB loads; it unloads after
   10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`. A build with a
   timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub the first time.

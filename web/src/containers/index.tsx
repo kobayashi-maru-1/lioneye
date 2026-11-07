@@ -4,7 +4,10 @@ import { useAutoProgress } from "../components/AutoProgress";
 import { AppBar } from "../components/AppBar";
 import { CampaignTip } from "../components/CampaignTip";
 import { Footer } from "../components/Footer";
+import { moveOldTicksAtom } from "../state/route-progress";
+import { pageMode } from "../state/saved-state";
 import { pipe } from "../utility";
+import { useSetAtom } from "jotai";
 import { withBlank } from "../utility/withBlank";
 import { withScrollRestoration } from "../utility/withScrollRestoration";
 import { Suspense, lazy, useEffect, type JSX } from "react";
@@ -22,6 +25,11 @@ const EditRouteContainer = withBlank(lazy(() => import("./EditRoute")));
 
 export function App() {
   useAutoProgress();
+  // Campaign ticks saved before 0.4.7, moved to their new keys once.
+  const moveOldTicks = useSetAtom(moveOldTicksAtom);
+  useEffect(() => {
+    if (pageMode !== "migrate") moveOldTicks();
+  }, []);
 
   return (
     <>

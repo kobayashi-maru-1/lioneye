@@ -14,6 +14,25 @@
   font-size: 0.8rem;
 }
 
+/* The linked PoB file: its name, the full path on hover. */
+.file {
+  display: flex;
+  gap: var(--size-2);
+  margin-top: var(--size-1);
+  font-size: 0.8rem;
+  min-width: 0;
+}
+
+.fileLabel {
+  color: #8a96a8;
+}
+
+.fileName {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .buttons {
   margin-top: var(--size-2);
 }

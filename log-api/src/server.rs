@@ -6,7 +6,7 @@ use std::{
 use axum::{
     Json, Router,
     extract::{
-        DefaultBodyLimit, Path, Query, State,
+        ConnectInfo, DefaultBodyLimit, Path, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::{HeaderMap, StatusCode, Uri, header},
@@ -45,6 +45,11 @@ pub struct AppState {
     pub saved: Arc<crate::saved_state::SavedState>,
     /// The game log and browser set in the guide's Settings (app-settings.rs).
     pub settings: Arc<crate::app_settings::AppSettings>,
+    /// The PoB build file each guide page is linked to; the latest is watched for saves
+    /// (pob-files.rs).
+    pub pob_links: Arc<crate::pob_files::Links>,
+    /// "pob-file:changed" after PoB saves that file.
+    pub pob_saved: broadcast::Sender<String>,
 }
 
 pub type Tips = std::collections::BTreeMap<String, String>;
@@ -214,10 +219,16 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
         .route("/api/app", get(app_info))
         .route("/api/character", get(character))
         .route("/api/settings", post(update_settings))
+        .merge(crate::pob_routes::routes())
         .fallback(static_handler)
         .with_state(state);
 
-    axum::serve(listener, app).await?;
+    // With the peer's address: PoB file requests answer only this PC (pob-routes.rs).
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -290,18 +301,24 @@ pub const WHOAMI: &str = "exile-leveling";
 async fn ws_handler(
     ws: WebSocketUpgrade,
     headers: HeaderMap,
+    ConnectInfo(peer): ConnectInfo<std::net::SocketAddr>,
     State(state): State<AppState>,
 ) -> Response {
     // Only this machine's pages may follow the log; other sites you visit can't.
     if !local_origin(&headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
-    ws.on_upgrade(move |socket| client(socket, state))
+    // The guide on this PC itself (not another device with --address 0.0.0.0, nor another
+    // local web app) may also link a PoB build file to watch.
+    let this_pc = peer.ip().is_loopback()
+        && local_host(&headers)
+        && crate::pob_routes::same_origin(&headers);
+    ws.on_upgrade(move |socket| client(socket, state, this_pc))
 }
 
 /// The request was sent to this PC by address (127.0.0.1, localhost, a LAN IP), not by a
 /// site's name pointed here (DNS rebinding).
-fn local_host(headers: &HeaderMap) -> bool {
+pub(crate) fn local_host(headers: &HeaderMap) -> bool {
     let Some(host) = headers.get(header::HOST).and_then(|h| h.to_str().ok()) else {
         return true; // not a browser
     };
@@ -312,7 +329,7 @@ fn local_host(headers: &HeaderMap) -> bool {
     name.eq_ignore_ascii_case("localhost") || name.parse::<std::net::IpAddr>().is_ok()
 }
 
-fn local_origin(headers: &HeaderMap) -> bool {
+pub(crate) fn local_origin(headers: &HeaderMap) -> bool {
     let Some(origin) = headers.get(header::ORIGIN) else {
         return true; // not a browser page
     };
@@ -348,20 +365,31 @@ fn overlay_message(config: &OverlayConfig) -> String {
 }
 
 /// One page on the socket: the guide (it says "guide" first) or the in-game bar.
-async fn client(socket: WebSocket, state: AppState) {
+async fn client(socket: WebSocket, state: AppState, this_pc: bool) {
     let mut guide = false;
-    serve_client(socket, &state, &mut guide).await;
+    // This page's id for its linked PoB file (pob-files.rs Links): pages on this PC only.
+    let page = this_pc.then(|| state.pob_links.page());
+    serve_client(socket, &state, &mut guide, page).await;
     if guide {
         state.guides.disconnected();
+    }
+    if let Some(page) = page {
+        state.pob_links.closed(page);
     }
     info!("Page disconnected");
 }
 
-async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool) {
+async fn serve_client(
+    mut socket: WebSocket,
+    state: &AppState,
+    guide: &mut bool,
+    page: Option<u64>,
+) {
     let mut lines = state.lines.subscribe();
     let mut status = state.status.clone();
     let mut overlay = state.overlay.subscribe();
     let mut tips = state.tips.subscribe();
+    let mut pob_saved = state.pob_saved.subscribe();
     let mut ping = tokio::time::interval(Duration::from_secs(5));
 
     if socket
@@ -415,6 +443,15 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                 if changed.is_err() { break; }
                 let text = tips_message(&tips.borrow_and_update());
                 if socket.send(Message::Text(text.into())).await.is_err() { break; }
+            },
+            saved = pob_saved.recv() => match saved {
+                Ok(text) => {
+                    // Only pages on this PC link files.
+                    if page.is_none() { continue; }
+                    if socket.send(Message::Text(text.into())).await.is_err() { break; }
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
             },
             _ = ping.tick() => {
                 if socket.send(Message::Ping(Default::default())).await.is_err() { break; }
@@ -494,6 +531,12 @@ async fn serve_client(mut socket: WebSocket, state: &AppState, guide: &mut bool)
                                 }
                             })
                             .await;
+                        }
+                    } else if let Some(path) = text.strip_prefix("pob-file:") {
+                        // The build file this guide page is linked to ("" when none), watched
+                        // for saves: a local .xml file only, from a page on this PC.
+                        if *guide && let Some(page) = page {
+                            state.pob_links.set(page, crate::pob_files::linkable(path));
                         }
                     } else if let Some(json) = text.strip_prefix("state-offer:") {
                         // A window opened in an old Edge profile, for the one-time move.

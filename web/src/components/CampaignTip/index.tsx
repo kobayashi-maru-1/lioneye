@@ -1,6 +1,6 @@
 import { gemProgressFamily } from "../../state/gem-progress";
 import { CAMPAIGN_TIP_STEPS, overlayCampaignAtom } from "../../state/overlay";
-import { activeEdgeAtom, routeSelector } from "../../state/route";
+import { activeEdgeAtom, routeSelector, stepKey } from "../../state/route";
 import { routeProgressFamily } from "../../state/route-progress";
 import { type StepPart, stepParts } from "../../state/step-text";
 import type { RouteData } from "common";
@@ -44,7 +44,7 @@ function nextSteps(route: RouteData.Route) {
         }
         const done =
           step.type === "fragment_step"
-            ? get(routeProgressFamily([sectionIndex, stepIndex].toString()))
+            ? get(routeProgressFamily(stepKey(step)))
             : get(gemProgressFamily(step.requiredGem.id));
         if (done) continue;
         steps.push(stepParts(step));

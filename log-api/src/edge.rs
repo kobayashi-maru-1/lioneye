@@ -105,7 +105,7 @@ fn app_path(exe: &str) -> Option<PathBuf> {
 }
 
 /// A registry string value (`name` None: the key's default value).
-fn registry_string(root: HKEY, key: &str, name: Option<&str>) -> Option<String> {
+pub(crate) fn registry_string(root: HKEY, key: &str, name: Option<&str>) -> Option<String> {
     let wide = |s: &str| {
         s.encode_utf16()
             .chain(std::iter::once(0))

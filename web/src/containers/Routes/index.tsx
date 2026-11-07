@@ -46,6 +46,7 @@ import {
   campaignInViewAtom,
   routeSelector,
   scrollToActiveEdgeEffect,
+  stepKey,
 } from "../../state/route";
 import { routeProgressFamily } from "../../state/route-progress";
 import { searchStringsSelector } from "../../state/search-strings";
@@ -86,12 +87,12 @@ export default function RoutesContainer() {
   // Every step's done flag in route order, for shift-click ranges.
   const order = useMemo(() => {
     const order: ProgressRef[] = [];
-    route.sections.forEach((section, sectionIndex) =>
-      section.steps.forEach((step, stepIndex) => {
+    route.sections.forEach((section) =>
+      section.steps.forEach((step) => {
         if (step.type === "fragment_step")
           order.push({
             family: "route",
-            key: [sectionIndex, stepIndex].toString(),
+            key: stepKey(step),
           });
         if (step.type === "gem_step")
           order.push({ family: "gem", key: step.requiredGem.id });
@@ -153,7 +154,7 @@ export default function RoutesContainer() {
             edgeIndex: step.edgeIndex,
             orderIndex: orderIndex++,
             isCompletedState: routeProgressFamily(
-              [sectionIndex, stepIndex].toString(),
+              stepKey(step),
             ),
             children: <FragmentStep key={stepIndex} step={step} />,
           });
@@ -566,12 +567,11 @@ function useFoldCampaignAtEnd() {
   const endedAtom = useMemo(
     () =>
       atom((get) => {
-        const sectionIndex = route.sections.length - 1;
-        const section = route.sections[sectionIndex];
+        const section = route.sections[route.sections.length - 1];
         if (!section) return false;
-        return section.steps.every((step, stepIndex) =>
+        return section.steps.every((step) =>
           step.type === "fragment_step"
-            ? get(routeProgressFamily([sectionIndex, stepIndex].toString()))
+            ? get(routeProgressFamily(stepKey(step)))
             : step.type === "gem_step"
               ? get(gemProgressFamily(step.requiredGem.id))
               : true,

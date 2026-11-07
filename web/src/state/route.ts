@@ -16,6 +16,34 @@ import { routeProgressFamily } from "./route-progress";
  */
 const stepZones = new WeakMap<RouteData.Step, number>();
 
+/**
+ * A campaign step's key for its tick: its act, what it says (with the step before it, so a
+ * repeated line like "Logout" stays tied to its place) and which time that pair comes up
+ * in the act. Not its position: gem steps, gems-only mode and the route's options (bandit,
+ * league start, library) add or remove steps, and a tick must never move onto another.
+ */
+const stepKeys = new WeakMap<RouteData.Step, string>();
+export function stepKey(step: RouteData.Step) {
+  return stepKeys.get(step) ?? "";
+}
+
+/** What a step says, without where it falls in the route (its zone number). */
+function stepText(step: RouteData.Step) {
+  return step.type === "fragment_step"
+    ? JSON.stringify([step.parts, step.subSteps.map((sub) => sub.parts)])
+    : "";
+}
+
+/** FNV-1a, as 8 hex digits: keeps stored keys short. */
+function hash(text: string) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
 const baseRouteSelector = atom(async (get) => {
   const { initializeRouteState, parseRoute } = await import("common");
 
@@ -49,12 +77,21 @@ const baseRouteSelector = atom(async (get) => {
   const route = parseRoute(routeFiles, routeState);
   // Record each step's zone while every step is still present (gems-only mode hides enter-steps).
   let zone = 0;
-  for (const section of route.sections)
+  route.sections.forEach((section, sectionIndex) => {
+    const seen = new Map<string, number>();
+    let before = "";
     for (const step of section.steps) {
       if (step.type === "fragment_step" && step.edgeIndex !== null)
         zone = step.edgeIndex;
       stepZones.set(step, zone);
+      const text = stepText(step);
+      const content = hash(`${before}\n${text}`);
+      const n = seen.get(content) ?? 0;
+      seen.set(content, n + 1);
+      stepKeys.set(step, `${sectionIndex}:${content}:${n}`);
+      before = text;
     }
+  });
   return route;
 });
 
@@ -119,6 +156,7 @@ export const routeSelector = atom(async (get) => {
         const zone = stepZones.get(baseStep);
         if (zone !== undefined)
           for (const added of [step, ...gemSteps]) stepZones.set(added, zone);
+        stepKeys.set(step, stepKey(baseStep));
         section.steps.push(step, ...gemSteps);
       }
     }
@@ -187,14 +225,13 @@ export const activeEdgeAtom = atom(
 
       const routeKeys: string[] = [];
       const gemKeys: string[] = [];
-      route.sections.forEach((section, sectionIndex) =>
-        section.steps.forEach((step, stepIndex) => {
+      route.sections.forEach((section) =>
+        section.steps.forEach((step) => {
           const zone = stepZones.get(step);
           if (zone === undefined) return;
           if (step.type === "fragment_step") {
             // A zone's own line ("➞ The Climb") belongs to that zone: it ticks when you leave.
-            if (zones.has(zone))
-              routeKeys.push([sectionIndex, stepIndex].toString());
+            if (zones.has(zone)) routeKeys.push(stepKey(step));
           } else if (
             zones.has(zone) &&
             (gemLastZone.get(step.requiredGem.id) ?? zone) <= lastZone
@@ -254,8 +291,8 @@ export const bossKillAtom = atom(null, async (get, set, bosses: string[]) => {
   const route = await get(routeSelector);
   const here = get(activeEdgeIndex)[0];
   let best: { key: string; distance: number } | null = null;
-  route.sections.forEach((section, sectionIndex) =>
-    section.steps.forEach((step, stepIndex) => {
+  route.sections.forEach((section) =>
+    section.steps.forEach((step) => {
       if (step.type !== "fragment_step") return;
       const kills = step.parts.some(
         (part) =>
@@ -264,7 +301,7 @@ export const bossKillAtom = atom(null, async (get, set, bosses: string[]) => {
           bosses.includes(part.value),
       );
       if (!kills) return;
-      const key = [sectionIndex, stepIndex].toString();
+      const key = stepKey(step);
       if (get(routeProgressFamily(key))) return;
       const zone = stepZones.get(step);
       if (zone === undefined) return;
