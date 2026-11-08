@@ -201,7 +201,9 @@ settings; otherwise it leaves it alone and says so.
   **Gear** for the Gear panel's items with their PoB mods (enchants and implicits, then
   explicits; crafted lighter), **Notes** for the build's PoB notes in PoB's colours (both
   scroll with the mouse wheel when long),
-  **Campaign** for your next 3 steps, or **Tree** for the tree zoomed to your next points
+  **Campaign** for your next 3 steps (each with a small checkbox at its right that marks it
+  done in the guide, for what the log can't tell, like a bandit killed early; the next step
+  then shows), or **Tree** for the tree zoomed to your next points
   (for the set the Tree panel shows, named beside the title):
   yours blue, the guide's points up to 3 away from yours
   along its paths bright green, its later ones dim green. Your points come from the game's

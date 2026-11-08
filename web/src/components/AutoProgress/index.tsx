@@ -39,6 +39,7 @@ import { pobAtom, pobFileSelector, refreshFromFileAtom } from "../../state/pob";
 import { pobCodeToXml } from "../../state/pob/process";
 import { buildNotes } from "../BuildNotes";
 import { characterLevelAtom } from "../../state/character-level";
+import { tickStepAtom } from "../../state/route-progress";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
 import classNames from "classnames";
 import styles from "./styles.module.css";
@@ -103,6 +104,7 @@ export function useAutoProgress() {
   }, [followed]);
 
   const jump = useJumpFromGame();
+  const tickStep = useSetAtom(tickStepAtom);
   const refreshFromFile = useSetAtom(refreshFromFileAtom);
 
   const { readyState, sendMessage } = useWebSocket({
@@ -128,6 +130,11 @@ export function useAutoProgress() {
       // A button on the in-game bar.
       if (event.data.startsWith("jump:")) {
         jump(event.data.slice("jump:".length));
+        return;
+      }
+      // A step ticked in the bar's Campaign tooltip.
+      if (event.data.startsWith("tick:")) {
+        tickStep(event.data.slice("tick:".length));
         return;
       }
       // A new exe (an update) serves a new guide: reload to get it.

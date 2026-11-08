@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "exile-leveling-local"
-version = "0.4.16"
+version = "0.4.17"
 dependencies = [
  "anyhow",
  "axum",

@@ -1,5 +1,6 @@
 import { atom } from "jotai";
 import { buildToggleState } from "./toggle-state";
+import { gemProgressFamily } from "./gem-progress";
 import { clearPersistent, getPersistent, NO_MIGRATORS } from "../utility";
 
 const ROUTE_PROGRESS_VERSION = 0;
@@ -43,4 +44,17 @@ const moveOldTicksAtom = atom(null, async (get, set) => {
   clearPersistent(OLD_KEY);
 });
 
-export { routeProgressFamily, moveOldTicksAtom };
+/**
+ * A step ticked from the in-game bar's Campaign tooltip: "route:<step key>" or
+ * "gem:<gem id>" (components/CampaignTip). Only ever ticks, never unticks.
+ */
+const tickStepAtom = atom(null, (_get, set, tick: string) => {
+  const at = tick.indexOf(":");
+  const kind = tick.slice(0, at);
+  const key = tick.slice(at + 1);
+  if (at < 1 || key === "") return;
+  if (kind === "route") set(routeProgressFamily(key), true);
+  else if (kind === "gem") set(gemProgressFamily(key), true);
+});
+
+export { routeProgressFamily, moveOldTicksAtom, tickStepAtom };

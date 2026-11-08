@@ -279,6 +279,9 @@ body {
 
 /* Campaign: the next steps, coloured as in the guide's Campaign. */
 .tipStep {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   padding: 3px 6px;
   font-size: 12.5px;
   background-color: #171e2a;
@@ -288,6 +291,21 @@ body {
 
 .tipStep + .tipStep {
   margin-top: 4px;
+}
+
+.tipStepText {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Marks the step done: small and at the row's edge, so a stray click misses it. */
+.tipDone {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin: 2px 0 0;
+  accent-color: var(--gold);
+  cursor: pointer;
 }
 
 .part.area {

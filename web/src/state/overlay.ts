@@ -72,11 +72,21 @@ export const overlayTreeAtom = atom<TreeTip | undefined>(undefined);
 /** How many upcoming steps the bar's Campaign tooltip shows. */
 export const CAMPAIGN_TIP_STEPS = 3;
 
+/** A step in the bar's Campaign tooltip. */
+export interface OverlayStep {
+  parts: StepPart[];
+  /**
+   * What its checkbox ticks: "route:<step key>" or "gem:<gem id>" (state/route-progress
+   * tickStepAtom). Absent for a step without a key.
+   */
+  tick?: string;
+}
+
 /**
  * The next unfinished route steps after your current zone, for the bar's Campaign
  * tooltip. Undefined until the guide page has worked them out.
  */
-export const overlayCampaignAtom = atom<StepPart[][] | undefined>(undefined);
+export const overlayCampaignAtom = atom<OverlayStep[] | undefined>(undefined);
 
 /** An item as the in-game bar's Gear tooltip shows it: its name and PoB's mods. */
 export interface OverlayItem {

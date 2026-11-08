@@ -195,6 +195,17 @@ fn panel_id(id: &str) -> Option<&str> {
         .then_some(id)
 }
 
+/// A step the bar's Campaign tooltip ticked ("route:<step key>" or "gem:<gem id>"):
+/// printable ASCII without spaces, kept short.
+fn step_tick(key: &str) -> Option<&str> {
+    let (kind, rest) = key.split_once(':')?;
+    (matches!(kind, "route" | "gem")
+        && !rest.is_empty()
+        && key.len() <= 200
+        && key.bytes().all(|b| b.is_ascii_graphic()))
+    .then_some(key)
+}
+
 /// A bar button: tells the open guide pages to jump and brings one up, or opens one.
 async fn jump(state: &AppState, id: &str) {
     if state.guides.open_or_wait(id) {
@@ -486,6 +497,10 @@ async fn serve_client(
                         }
                     } else if let Some(id) = text.strip_prefix("jump:").and_then(panel_id) {
                         jump(state, id).await;
+                    } else if let Some(key) = text.strip_prefix("tick:").and_then(step_tick) {
+                        // The bar's Campaign tooltip ticked a step: the guide pages keep
+                        // the ticks (and send the tooltip's next steps back).
+                        let _ = state.lines.send(format!("tick:{key}"));
                     } else if let Some(rest) = text.strip_prefix("tip:") {
                         // "tip:<panel>:<json>": a button's tooltip, passed on to the bar as
                         // is (checked to be JSON, kept small). One too big or not JSON
@@ -655,6 +670,17 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(header::ORIGIN, HeaderValue::from_str(origin).unwrap());
         headers
+    }
+
+    #[test]
+    fn only_route_and_gem_ticks_pass() {
+        assert_eq!(step_tick("route:3:1a2b3c:0"), Some("route:3:1a2b3c:0"));
+        assert_eq!(step_tick("gem:Metadata/Items/Gems/SkillGemArc"), Some("gem:Metadata/Items/Gems/SkillGemArc"));
+        assert_eq!(step_tick("route:"), None);
+        assert_eq!(step_tick("jump:gems"), None);
+        assert_eq!(step_tick("route:a b"), None);
+        assert_eq!(step_tick("route:a\nstatus:waiting"), None);
+        assert_eq!(step_tick(&format!("route:{}", "x".repeat(300))), None);
     }
 
     #[test]

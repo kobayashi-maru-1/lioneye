@@ -53,8 +53,11 @@ const buttons = document.getElementById("buttons")!;
 const dot = document.getElementById("dot")!;
 const tip = document.getElementById("tip")!;
 
-/** A route step as text pieces, from the guide (web/src/state/step-text.ts StepPart). */
-type Step = { text: string; kind?: string }[];
+/**
+ * A route step from the guide (web/src/state/overlay.ts OverlayStep): its text pieces
+ * (state/step-text.ts StepPart), and what its checkbox ticks.
+ */
+type Step = { parts: { text: string; kind?: string }[]; tick?: string };
 
 let socket: WebSocket | null = null;
 let shown = "";
@@ -308,16 +311,56 @@ function renderCampaign() {
   }
   fill(
     "Next",
-    ...steps.map((step) =>
-      el(
+    ...steps.map((step) => {
+      // An older guide page sends each step as its parts alone.
+      const parts = Array.isArray(step)
+        ? (step as Step["parts"])
+        : Array.isArray(step?.parts)
+          ? step.parts
+          : [];
+      const text = el(
         "div",
-        "tipStep",
-        ...step.map((part) =>
+        "tipStepText",
+        ...parts.map((part) =>
           el("span", part.kind ? `part ${part.kind}` : "part", part.text),
         ),
-      ),
-    ),
+      );
+      return el(
+        "div",
+        "tipStep",
+        text,
+        ...(typeof step?.tick === "string" ? [doneBox(step.tick)] : []),
+      );
+    }),
   );
+}
+
+/**
+ * The checkbox at a Campaign step's right: ticks it in the guide (for steps the log can't
+ * tell, like a bandit killed early), which then sends the next steps.
+ */
+function doneBox(tick: string) {
+  const box = document.createElement("input");
+  box.type = "checkbox";
+  box.className = "tipDone";
+  box.title = "Mark done";
+  box.setAttribute("aria-label", "Mark done");
+  box.addEventListener("change", () => {
+    if (!box.checked) return;
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(`tick:${tick}`);
+      box.disabled = true;
+      // The guide sends the next steps, which redraws the tooltip. Still here after a
+      // while: no guide took it (none open), so it can be ticked again.
+      setTimeout(() => {
+        box.disabled = false;
+        box.checked = false;
+      }, 3000);
+    } else {
+      box.checked = false;
+    }
+  });
+  return box;
 }
 
 function renderGems() {

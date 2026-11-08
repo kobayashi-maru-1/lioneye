@@ -1,8 +1,12 @@
 import { gemProgressFamily } from "../../state/gem-progress";
-import { CAMPAIGN_TIP_STEPS, overlayCampaignAtom } from "../../state/overlay";
+import {
+  CAMPAIGN_TIP_STEPS,
+  type OverlayStep,
+  overlayCampaignAtom,
+} from "../../state/overlay";
 import { activeEdgeAtom, routeSelector, stepKey } from "../../state/route";
 import { routeProgressFamily } from "../../state/route-progress";
-import { type StepPart, stepParts } from "../../state/step-text";
+import { stepParts } from "../../state/step-text";
 import type { RouteData } from "common";
 import { atom, useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo } from "react";
@@ -31,7 +35,7 @@ function nextSteps(route: RouteData.Route) {
       ),
     );
     let started = !hasActive;
-    const steps: StepPart[][] = [];
+    const steps: OverlayStep[] = [];
     for (const [sectionIndex, section] of route.sections.entries()) {
       for (const [stepIndex, step] of section.steps.entries()) {
         if (!started) {
@@ -47,7 +51,15 @@ function nextSteps(route: RouteData.Route) {
             ? get(routeProgressFamily(stepKey(step)))
             : get(gemProgressFamily(step.requiredGem.id));
         if (done) continue;
-        steps.push(stepParts(step));
+        // What the bar's checkbox ticks for this step.
+        const key = step.type === "fragment_step" ? stepKey(step) : "";
+        const tick =
+          step.type === "fragment_step"
+            ? key !== ""
+              ? `route:${key}`
+              : undefined
+            : `gem:${step.requiredGem.id}`;
+        steps.push({ parts: stepParts(step), ...(tick ? { tick } : {}) });
         if (steps.length === CAMPAIGN_TIP_STEPS) return steps;
       }
     }
