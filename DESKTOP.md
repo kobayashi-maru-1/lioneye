@@ -48,7 +48,7 @@ Chrome profiles that hold the guide's data: the guide opens briefly in each, and
 recently used one with an imported build is kept (else the most recent with any data). Each
 profile's data is also kept in `%LOCALAPPDATA%\exile-leveling\moved`, and is never removed
 from the profile. Builds imported on the hosted site don't carry over, so import your PoB
-once in **Settings** (the ⚙ at the top right).
+once in **Settings** (the ⚙ in the top bar, after the panel buttons).
 
 ## Your build
 
@@ -107,8 +107,8 @@ settings; otherwise it leaves it alone and says so.
 - An act folds to one line once all its steps are done, and Campaign folds once the last
   act is done. Nothing reopens on its own: a folded act or panel stays folded until you
   click it (or use the bar). **Reset campaign** opens Campaign again.
-- The one bar at the top jumps to each panel and holds the auto-progress pill and ⚙
-  **Settings**, in three tabs: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded build: **Unload**, **Copy**, **Open**, **Edit**, **Import**; search strings; see [Your build](#your-build)), **Route** (Edit
+- The one bar at the top jumps to each panel and holds the auto-progress pill (at the right)
+  and ⚙ **Settings** (right after the panel buttons), in three tabs: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded build: **Unload**, **Copy**, **Open**, **Edit**, **Import**; search strings; see [Your build](#your-build)), **Route** (Edit
   route, Export, **Reset campaign**, **Reset gems**, class, bandits, League Start, Library, Gems Only, hints, and the gem list,
   open until you fold it). The
   Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while

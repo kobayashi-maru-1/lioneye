@@ -13,7 +13,7 @@ build's stats, gear, gems, tree and trade searches for the loadout that matches 
    Windows SmartScreen may warn that it's unrecognized (the exe isn't signed): pick
    **More info** → **Run anyway**.
 2. It runs in the tray (by the clock) and opens the guide in its own Edge window.
-3. In **Settings** (⚙ at the top right), import your Path of Building code, or **Open** a
+3. In **Settings** (⚙ in the top bar, after the panel buttons), import your Path of Building code, or **Open** a
    build file PoB saved.
 4. Start Path of Exile in **Windowed** or **Windowed Fullscreen** mode. The guide follows
    your zones from the game's log.

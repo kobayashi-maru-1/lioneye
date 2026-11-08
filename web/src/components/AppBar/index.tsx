@@ -16,8 +16,8 @@ export const jumpTargetsAtom = atom<JumpTarget[]>([]);
 
 /**
  * The app's one bar, pinned at the top: on the guide, a button per panel (opens it if
- * folded and scrolls to it); elsewhere, the way back to the guide. Always the auto-progress
- * pill and Settings.
+ * folded and scrolls to it); elsewhere, the way back to the guide. Settings right after
+ * them, and the auto-progress pill at the right.
  */
 export function AppBar() {
   const navigate = useNavigate();
@@ -47,8 +47,6 @@ export function AppBar() {
           Guide
         </button>
       )}
-      <span className={classNames(styles.spacer)} />
-      <AutoProgressStatus />
       <button
         className={classNames(styles.button, styles.icon, {
           [styles.active]: pathname === "/settings" || pathname === "/build",
@@ -59,6 +57,8 @@ export function AppBar() {
       >
         <FiSettings aria-hidden />
       </button>
+      <span className={classNames(styles.spacer)} />
+      <AutoProgressStatus />
     </nav>
   );
 }
