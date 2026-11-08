@@ -293,6 +293,21 @@ body {
   margin-top: 4px;
 }
 
+/* Missed quest points, above the next steps: in the badge's orange. */
+.tipMissed {
+  margin-bottom: 4px;
+  padding: 3px 6px;
+  background-color: #2a1f12;
+  border: 1px solid #8a5a1e;
+  border-radius: 6px;
+}
+
+.tipMissedQuest {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .tipStepText {
   flex: 1;
   min-width: 0;
@@ -392,6 +407,24 @@ body {
 
 .button:active {
   background-color: #2a2a2a;
+}
+
+/* Campaign: how many quest points your character missed. */
+.badge {
+  display: inline-block;
+  min-width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  color: #161616;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  vertical-align: 1px;
+  background-color: #e0902a;
+  border-radius: 7px;
 }
 
 /* Its tooltip is pinned (right-click, or the tooltip's pin). */

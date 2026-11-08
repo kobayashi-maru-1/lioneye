@@ -29,6 +29,26 @@ pub struct CharacterLog {
     pub allocated: Vec<String>,
     /// The latest "/passives" list: quest name and the points it gave.
     pub quests: Option<Vec<(String, u32)>>,
+    /// The campaign area you were last in when that list was typed ("1_3_town"), so the
+    /// guide checks only the acts finished by then.
+    #[serde(rename = "questsArea")]
+    pub quests_area: Option<String>,
+}
+
+/// `Generating level 23 area "1_2_town" with seed 1` → "1_2_town", for campaign areas only
+/// ("<part>_<act>_…"; not hideouts, maps or the labyrinth).
+fn campaign_area(message: &str) -> Option<&str> {
+    let rest = message.strip_prefix("Generating level ")?;
+    let (_, rest) = rest.split_once(" area \"")?;
+    let (id, _) = rest.split_once('"')?;
+    let mut parts = id.split('_');
+    let part = parts.next()?;
+    let act = parts.next()?;
+    let campaign = (part == "1" || part == "2")
+        && !act.is_empty()
+        && act.chars().all(|c| c.is_ascii_digit())
+        && parts.next().is_some();
+    campaign.then_some(id)
 }
 
 /// The line's message: what follows the "[INFO Client 1234] " prefix.
@@ -121,6 +141,9 @@ pub fn scan(path: &Path, name: Option<&str>) -> std::io::Result<Option<Character
         ..Default::default()
     };
     let mut list: Option<Vec<(String, u32)>> = None;
+    // The campaign area you were last in, and where the list being read was typed.
+    let mut area: Option<String> = None;
+    let mut list_area: Option<String> = None;
     for line in BufReader::new(file).split(b'\n') {
         let line = line?;
         let line = String::from_utf8_lossy(&line);
@@ -131,15 +154,20 @@ pub fn scan(path: &Path, name: Option<&str>) -> std::io::Result<Option<Character
                 continue;
             }
             log.quests = list.take();
+            log.quests_area = list_area.take();
         }
         if let Some(id) = allocated(message) {
             log.allocated.push(id.to_string());
         } else if quests_header(message) {
             list = Some(Vec::new());
+            list_area = area.clone();
+        } else if let Some(id) = campaign_area(message) {
+            area = Some(id.to_string());
         }
     }
     if list.is_some() {
         log.quests = list;
+        log.quests_area = list_area;
     }
     Ok(Some(log))
 }
@@ -243,6 +271,12 @@ mod tests {
             quest_line(message(&format!("{P} : (0 from The Dweller of the Deep)"))),
             Some(("The Dweller of the Deep", 0))
         );
+        let area = |id: &str| format!(r#"{P} Generating level 5 area "{id}" with seed 7"#);
+        assert_eq!(campaign_area(message(&area("1_1_town"))), Some("1_1_town"));
+        assert_eq!(campaign_area(message(&area("2_10_1"))), Some("2_10_1"));
+        assert_eq!(campaign_area(message(&area("1_Labyrinth_boss_3"))), None);
+        assert_eq!(campaign_area(message(&area("MapWorldsBeach"))), None);
+        assert_eq!(campaign_area(message(&area("HideoutFelled"))), None);
         // Chat isn't a system line.
         assert!(level_up(message(&format!("{P} #Bob: Alice (Witch) is now level 9"))).is_none());
     }
@@ -259,6 +293,8 @@ mod tests {
                 ": Friend (Ranger) is now level 30",
                 "Successfully allocated passive skill id: new2, name: B",
                 ": Friend has been slain.",
+                r#"Generating level 13 area "1_2_town" with seed 1"#,
+                r#"Generating level 14 area "HideoutFelled" with seed 1"#,
                 ": 2 Passive Skill Points from quests:",
                 ": (1 from The Dweller of the Deep)",
                 ": (0 from The Marooned Mariner)",
@@ -281,6 +317,8 @@ mod tests {
                 ("The Marooned Mariner".to_string(), 0)
             ])
         );
+        // Typed in a hideout: the campaign area before it counts.
+        assert_eq!(log.quests_area.as_deref(), Some("1_2_town"));
         assert_eq!(latest.name, "Friend");
     }
 

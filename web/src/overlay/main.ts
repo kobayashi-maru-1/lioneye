@@ -58,13 +58,59 @@ const tip = document.getElementById("tip")!;
  * (state/step-text.ts StepPart), and what its checkbox ticks.
  */
 type Step = { parts: { text: string; kind?: string }[]; tick?: string };
+type MissedQuest = { name: string; act: number };
+
+/**
+ * The Campaign tooltip's message: { steps, missed } (an older guide page sends the steps
+ * alone), checked field by field.
+ */
+function campaignTip() {
+  const value = tips.campaign as unknown;
+  const message =
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as { steps?: unknown; missed?: unknown })
+      : { steps: value, missed: [] };
+  const steps = Array.isArray(message.steps) ? (message.steps as Step[]) : [];
+  const missed = Array.isArray(message.missed)
+    ? (message.missed as MissedQuest[]).filter(
+        (quest) =>
+          typeof quest?.name === "string" && typeof quest?.act === "number",
+      )
+    : [];
+  return { steps, missed };
+}
+
+/** The count of missed quest points on the Campaign button (none: no badge). */
+function markBadges() {
+  const button = buttons.querySelector<HTMLElement>(
+    '.button[data-id="campaign"]',
+  );
+  if (!button) return;
+  const count = campaignTip().missed.length;
+  let badge = button.querySelector<HTMLElement>(".badge");
+  if (count === 0) {
+    badge?.remove();
+    button.removeAttribute("aria-description");
+    return;
+  }
+  if (!badge) {
+    badge = el("span", "badge");
+    badge.setAttribute("aria-hidden", "true");
+    button.append(badge);
+  }
+  badge.textContent = String(count);
+  button.setAttribute(
+    "aria-description",
+    `${count} missed ${count === 1 ? "point" : "points"}`,
+  );
+}
 
 let socket: WebSocket | null = null;
 let shown = "";
 /** The ids of the bar's buttons. */
 let barIds = new Set<string>();
 /**
- * The guide's tooltips by button: "gems" (OverlayGems | null), "campaign" (Step[]), "tree"
+ * The guide's tooltips by button: "gems" (OverlayGems | null), "campaign" ({ steps, missed }), "tree"
  * (TreeTip), "gear" (OverlayGear | null), "notes" (string | null).
  */
 let tips: Record<string, unknown> = {};
@@ -201,6 +247,7 @@ function render(config: OverlayConfig) {
     }),
   );
   markPinned();
+  markBadges();
   // Open the pinned tooltip, or close one whose button left; a hovered one stays.
   if (tip.hidden || (openId !== null && !barIds.has(openId))) rest();
 }
@@ -303,14 +350,37 @@ function renderTip() {
   }
 }
 
+/**
+ * Campaign: the quest points your character missed (from your latest /passives), then the
+ * next steps.
+ */
 function renderCampaign() {
-  const steps = tips.campaign as Step[] | undefined;
-  if (!Array.isArray(steps) || steps.length === 0) {
-    fill("Next", el("div", "tipEmpty", "No steps"));
+  const { steps, missed } = campaignTip();
+  const missedBox =
+    missed.length > 0
+      ? [
+          el(
+            "div",
+            "tipMissed",
+            el("div", "tipLabel", "Missed points"),
+            ...missed.map((quest) =>
+              el(
+                "div",
+                "tipMissedQuest",
+                el("span", "tipName", quest.name),
+                el("span", "tipLevel", `Act ${quest.act}`),
+              ),
+            ),
+          ),
+        ]
+      : [];
+  if (steps.length === 0) {
+    fill("Next", ...missedBox, el("div", "tipEmpty", "No steps"));
     return;
   }
   fill(
     "Next",
+    ...missedBox,
     ...steps.map((step) => {
       // An older guide page sends each step as its parts alone.
       const parts = Array.isArray(step)
@@ -797,6 +867,7 @@ function connect() {
       } catch {
         tips = {};
       }
+      markBadges();
       // Every tooltip comes each time one changes (Campaign on each zone): the open one is
       // drawn again only when its own changed, keeping where you scrolled it to.
       const changed =

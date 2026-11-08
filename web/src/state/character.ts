@@ -13,6 +13,8 @@ export interface CharacterLog {
   allocated: string[];
   /** [quest name, points]; null until you type /passives in game. */
   quests: [string, number][] | null;
+  /** The campaign area ("1_3_town") you were last in when that list was typed. */
+  questsArea?: string | null;
 }
 
 /** Null until the exe has read the game's log (or it names no character yet). */

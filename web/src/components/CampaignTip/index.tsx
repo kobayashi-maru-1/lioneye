@@ -4,6 +4,7 @@ import {
   type OverlayStep,
   overlayCampaignAtom,
 } from "../../state/overlay";
+import { missedQuestsAtom } from "../../state/quest-points";
 import { activeEdgeAtom, routeSelector, stepKey } from "../../state/route";
 import { routeProgressFamily } from "../../state/route-progress";
 import { stepParts } from "../../state/step-text";
@@ -13,15 +14,17 @@ import { useEffect, useMemo } from "react";
 
 /**
  * Keeps the in-game bar's Campaign tooltip up to date: the next few unfinished steps after
- * your current zone's own line. Mounted with the app (not the guide page), so it follows
- * zone changes while you're on Settings too. Renders nothing.
+ * your current zone's own line, and the quest points your character missed (from your
+ * latest /passives). Mounted with the app (not the guide page), so it follows zone changes
+ * while you're on Settings too. Renders nothing.
  */
 export function CampaignTip() {
   const route = useAtomValue(routeSelector);
   const nextStepsAtom = useMemo(() => nextSteps(route), [route]);
   const steps = useAtomValue(nextStepsAtom);
+  const missed = useAtomValue(missedQuestsAtom);
   const setTip = useSetAtom(overlayCampaignAtom);
-  useEffect(() => setTip(steps), [steps]);
+  useEffect(() => setTip({ steps, missed }), [steps, missed]);
   return null;
 }
 

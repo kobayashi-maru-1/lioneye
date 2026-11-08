@@ -167,7 +167,9 @@ settings; otherwise it leaves it alone and says so.
   log is read through the full Client.txt beside it. Node ids map to
   the tree through RePoE's passive data. In **Tree**, pick **Character** (instead of **Previous set**) to see the
   loadout against your tree (green: to take; red: not in the guide). Type `/passives` in
-  game and **Build health** lists quest points missed in finished acts.
+  game and **Build health** lists quest points missed in the acts you'd finished when you
+  typed it (the in-game bar's **Campaign** button shows their count). Its note asks for
+  `/passives` again once you're in a later act.
 - Hover an item or gem for its in-game tooltip, with its buttons underneath; click it to pin
   the tooltip and use them: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
   **W** (the wiki) and **Trade**. Escape, a click elsewhere or a second click unpins it.
@@ -210,7 +212,9 @@ settings; otherwise it leaves it alone and says so.
   scroll with the mouse wheel when long),
   **Campaign** for your next 3 steps (each with a small checkbox at its right that marks it
   done in the guide, for what the log can't tell, like a bandit killed early; the next step
-  then shows), or **Tree** for the tree zoomed to your next points
+  then shows; quest points your character missed in finished acts, from your latest
+  `/passives`, list above the steps under **Missed points**, and their count shows as an
+  orange badge on the **Campaign** button), or **Tree** for the tree zoomed to your next points
   (for the set the Tree panel shows, named beside the title):
   yours blue, the guide's points up to 3 away from yours
   along its paths bright green, its later ones dim green. Your points come from the game's

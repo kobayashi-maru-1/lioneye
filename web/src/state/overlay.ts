@@ -1,4 +1,5 @@
 import { persistentAtom } from ".";
+import type { MissedQuest } from "./quest-points";
 import type { StepPart } from "./step-text";
 import type { TreeTip } from "./tree/next-points";
 import { atom } from "jotai";
@@ -83,10 +84,17 @@ export interface OverlayStep {
 }
 
 /**
- * The next unfinished route steps after your current zone, for the bar's Campaign
- * tooltip. Undefined until the guide page has worked them out.
+ * The bar's Campaign tooltip: the next unfinished route steps after your current zone,
+ * and the quest points your character missed (a count on the button, the list above the
+ * steps).
  */
-export const overlayCampaignAtom = atom<OverlayStep[] | undefined>(undefined);
+export interface OverlayCampaign {
+  steps: OverlayStep[];
+  missed: MissedQuest[];
+}
+
+/** Undefined until the guide page has worked it out. */
+export const overlayCampaignAtom = atom<OverlayCampaign | undefined>(undefined);
 
 /** An item as the in-game bar's Gear tooltip shows it: its name and PoB's mods. */
 export interface OverlayItem {
