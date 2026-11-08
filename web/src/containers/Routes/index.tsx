@@ -35,7 +35,10 @@ import { currentActAtom, displaySetName } from "../../state/current-act";
 import { stripPob } from "../../components/PobText";
 import { gemLinksSelector } from "../../state/gem-links";
 import { gemProgressFamily } from "../../state/gem-progress";
+import { gemsToGetSelector } from "../../state/gem";
+import { gemRegex } from "../../state/gem-regex";
 import {
+  type OverlayGems,
   overlayGemsAtom,
   overlayTreeAtom,
   shownPanelsAtom,
@@ -69,6 +72,9 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
+
+/** Every gem's name, for the gem searches' unique pieces. */
+const ALL_GEM_NAMES = Object.values(Data.Gems).map((gem) => gem.name);
 
 /** Where a step's done flag is stored, in route order. */
 interface ProgressRef {
@@ -372,9 +378,27 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
   );
   const [index, choose] = usePanelSet(titles, titleIndex(titles, sets?.skills));
 
-  // The set shown here, for the in-game bar's Gems tooltip.
+  // The set shown here, for the in-game bar's Gems tooltip, with a search for its gems
+  // still on the gem list unticked (soonest first). Gems you took off the list stay off.
   const setOverlayGems = useSetAtom(overlayGemsAtom);
   const title = titles[index];
+  const toGet = useAtomValue(gemsToGetSelector);
+  // As JSON, so a tick that doesn't change the search doesn't send the tooltip again.
+  const search = useMemo(() => {
+    if (title === undefined) return "";
+    const inSet = new Set(
+      gemLinks
+        .filter((link) => link.title === title)
+        .flatMap((link) => [...link.primaryGems, ...link.secondaryGems])
+        .map((gem) => gem.id),
+    );
+    const wanted = toGet
+      .filter((id) => inSet.has(id))
+      .flatMap((id) => (Data.Gems[id] ? [Data.Gems[id].name] : []));
+    if (wanted.length === 0) return "";
+    const { regex, count, total } = gemRegex(wanted, ALL_GEM_NAMES);
+    return count > 0 ? JSON.stringify({ text: regex, count, total }) : "";
+  }, [gemLinks, title, toGet]);
   useEffect(() => {
     if (title === undefined) {
       setOverlayGems(null);
@@ -405,9 +429,12 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
             ...link.secondaryGems.flatMap((g) => gem(g, false)),
           ],
         })),
+      ...(search
+        ? { search: JSON.parse(search) as OverlayGems["search"] }
+        : {}),
     });
     // (Kept when you leave for Settings, so the bar still shows them.)
-  }, [gemLinks, title]);
+  }, [gemLinks, title, search]);
 
   return (
     <PageSection

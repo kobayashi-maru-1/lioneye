@@ -49,6 +49,11 @@ export interface OverlayGem {
 export interface OverlayGems {
   title: string;
   groups: { label?: string; gems: OverlayGem[] }[];
+  /**
+   * A vendor or stash search for the set's gems still unticked on the gem list
+   * (state/gem-regex.ts): `count` of `total` fit. Absent when there are none.
+   */
+  search?: { text: string; count: number; total: number };
 }
 
 /**

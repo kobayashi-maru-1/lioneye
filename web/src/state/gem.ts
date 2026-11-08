@@ -24,3 +24,10 @@ export const requiredGemsSelector = atom(
     }
   },
 );
+
+/** The gem list's gems you haven't ticked as got, in the list's order (soonest first). */
+export const gemsToGetSelector = atom((get) =>
+  get(requiredGemsSelector)
+    .filter((gem) => !get(gemProgressFamily(gem.id)))
+    .map((gem) => gem.id),
+);

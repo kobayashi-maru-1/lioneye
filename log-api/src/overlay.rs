@@ -280,6 +280,12 @@ impl Overlay {
                 let body = request.body();
                 if body == "drag" {
                     start_drag(target as HWND);
+                } else if let Some(text) = body.strip_prefix("copy:") {
+                    // The Gems tooltip's search. The page can't use its own clipboard:
+                    // this window never has focus.
+                    if !text.is_empty() && text.len() <= MAX_COPY && !copy_text(target as HWND, text) {
+                        warn!("Couldn't copy to the clipboard");
+                    }
                 } else if let Some(size) = body.strip_prefix("size:") {
                     // "width,height", "width,height,up", or either with the bar's height
                     // after ("width,height,,22", "width,height,up,22").
@@ -478,6 +484,55 @@ fn place_default(hwnd: HWND) {
         );
     }
     MOVED.store(true, Ordering::SeqCst);
+}
+
+/// Text the bar may put on the clipboard, at most (a gem search is ~50 characters).
+const MAX_COPY: usize = 1000;
+/// Unicode text on the clipboard (CF_UNICODETEXT).
+const CF_UNICODETEXT: u32 = 13;
+
+/// Puts text on the clipboard, owned by the bar's window.
+fn copy_text(owner: HWND, text: &str) -> bool {
+    use windows_sys::Win32::System::DataExchange::{
+        CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+    };
+    use windows_sys::Win32::Foundation::GlobalFree;
+    use windows_sys::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        let memory = GlobalAlloc(GMEM_MOVEABLE, wide.len() * 2);
+        if memory.is_null() {
+            return false;
+        }
+        let target = GlobalLock(memory) as *mut u16;
+        if target.is_null() {
+            GlobalFree(memory);
+            return false;
+        }
+        std::ptr::copy_nonoverlapping(wide.as_ptr(), target, wide.len());
+        GlobalUnlock(memory);
+        // Clipboard history or another app can hold it for a moment: try a few times.
+        let mut opened = false;
+        for _ in 0..5 {
+            if OpenClipboard(owner) != 0 {
+                opened = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(15));
+        }
+        if !opened {
+            GlobalFree(memory);
+            return false;
+        }
+        EmptyClipboard();
+        // The clipboard owns the memory once this succeeds.
+        let placed = !SetClipboardData(CF_UNICODETEXT, memory).is_null();
+        if !placed {
+            GlobalFree(memory);
+        }
+        CloseClipboard();
+        placed
+    }
 }
 
 /// Drags the window by its grip: Windows' own move loop, as a title bar would.

@@ -42,6 +42,8 @@ interface OverlayGems {
       quality?: number;
     }[];
   }[];
+  /** A vendor or stash search for the gems still to get. */
+  search?: { text: string; count: number; total: number };
 }
 
 const frame = document.getElementById("frame")!;
@@ -227,7 +229,7 @@ function iconButton(icon: string, label: string, className: string) {
  * A tooltip's title row: the pin at its left (near the bar's grip), the flip at its right.
  * It sits on the edge next to the bar: on top below the bar, at the bottom above it.
  */
-function head(title: string, sub = "") {
+function head(title: string, sub = "", extra: HTMLElement[] = []) {
   const id = openId;
   const on = id !== null && pinned === id;
   const pin = iconButton(PIN_ICON, "Pin", on ? "icon on" : "icon");
@@ -248,7 +250,35 @@ function head(title: string, sub = "") {
   );
   // The whole title on hover when a long one is cut short.
   text.title = sub ? `${title} · ${sub}` : title;
-  return el("div", "tipHead", pin, text, flip);
+  // `extra`: the tooltip's own icons (Gems' copy), before the flip.
+  return el("div", "tipHead", pin, text, ...extra, flip);
+}
+
+const COPY_ICON =
+  '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M5 1.5h7.5a1.5 1.5 0 0 1 1.5 1.5v8.5h-1.5V3H5zM2 4.5h8.5V15H2zm1.5 1.5v7.5H9V6z" fill="currentColor"/></svg>';
+
+/**
+ * Copies a vendor or stash search for the gems still to get. The exe puts it on the
+ * clipboard: this window never has focus, which the page's clipboard needs.
+ */
+function copyButton(search: { text: string; count: number; total: number }) {
+  const label =
+    search.count < search.total
+      ? `Copy search (${search.count} of ${search.total})`
+      : "Copy search";
+  const button = iconButton(COPY_ICON, label, "icon");
+  button.addEventListener("click", () => {
+    window.ipc?.postMessage(`copy:${search.text}`);
+    button.classList.add("on");
+    button.title = "Copied";
+    button.setAttribute("aria-label", "Copied");
+    setTimeout(() => {
+      button.classList.remove("on");
+      button.title = label;
+      button.setAttribute("aria-label", label);
+    }, 1500);
+  });
+  return button;
 }
 
 /** Fills the tooltip: the title row on the bar's side, then the content. */
@@ -300,9 +330,18 @@ function renderGems() {
     fill("Gems", el("div", "tipEmpty", "No gems"));
     return;
   }
-  fill(
-    gems.title,
-    ...gems.groups.map((group) =>
+  const search = gems.search;
+  const copy =
+    search &&
+    typeof search.text === "string" &&
+    search.text !== "" &&
+    typeof search.count === "number" &&
+    typeof search.total === "number"
+      ? [copyButton(search)]
+      : [];
+  fillWith(
+    head(gems.title, "", copy),
+    gems.groups.map((group) =>
       el(
         "div",
         "tipGroup",

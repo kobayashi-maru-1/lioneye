@@ -191,7 +191,12 @@ settings; otherwise it leaves it alone and says so.
   button per guide panel. A button opens that panel in the guide (on your other monitor) and
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
-- Hover **Gems** for the Gems panel's links (the set it shows for your loadout),
+- Hover **Gems** for the Gems panel's links (the set it shows for your loadout; its copy
+  icon puts a search for the set's gems still unticked on the gem list on the clipboard,
+  to paste into a vendor or stash search: the gem list's soonest first, as many as fit the
+  game's 50-character box, with the count in the icon's label when some don't fit. Each
+  gem is a short piece of its name that starts at a word and no other gem's name has, so
+  a few gems whose names sit inside others', like Arc, light up those too),
   **Gear** for the Gear panel's items with their PoB mods (enchants and implicits, then
   explicits; crafted lighter), **Notes** for the build's PoB notes in PoB's colours (both
   scroll with the mouse wheel when long),
