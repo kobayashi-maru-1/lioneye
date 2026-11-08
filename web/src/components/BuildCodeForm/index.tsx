@@ -29,7 +29,8 @@ function readable(code: string) {
 /**
  * The build: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link and
  * Import it, or Open a build file PoB saved (then each save in PoB updates the guide).
- * Edit opens the build in PoB Community, when it's installed (components/DesktopPob).
+ * Edit opens the build in the PoB chosen under Editor, when it's installed
+ * (components/DesktopPob).
  * Loading a build keeps your progress; Unload removes it.
  */
 export function BuildCodeForm() {

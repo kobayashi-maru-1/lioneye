@@ -1,0 +1,6 @@
+/* Under the Editor dropdown: the chosen PoB isn't on this PC. */
+.note {
+  margin-top: var(--size-1);
+  color: #8f8f8f;
+  font-size: 0.8rem;
+}

@@ -666,7 +666,7 @@ function useCampaignInView() {
 
 function EmptyHint() {
   const navigate = useNavigate();
-  // Import is on Settings' Build tab (Settings opens on App).
+  // Import is in Settings' Build section (Settings opens at App, the top).
   const setSettingsTab = useSetAtom(settingsTabAtom);
   return (
     <div className={classNames(styles.empty)}>

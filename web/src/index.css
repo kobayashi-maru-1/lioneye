@@ -37,6 +37,8 @@
   --jumpbar-height: 2.25rem;
   /* A guide panel's sticky header (PageSection), under the jump bar. */
   --panel-header-height: 2.75rem;
+  /* Settings' section bar (App, Build, Route), pinned under the app bar. */
+  --settings-jump-height: 2.5rem;
   /* The bars above the page, fixed here: the guide's wide-layout columns set the two
      above to 0 so their pinned headers sit at the column top. */
   --app-bar-height: calc(var(--navbar-height) + var(--jumpbar-height));

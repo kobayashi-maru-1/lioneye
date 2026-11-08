@@ -1,11 +1,14 @@
-//! Path of Building Community on this PC, for the guide's Open and Edit buttons, and the
-//! build file the guide is linked to.
+//! Path of Building on this PC (PoB Community or PoB Redux, the guide's Editor setting),
+//! for the guide's Open and Edit buttons, and the build file the guide is linked to.
 //!
 //! - `find()`: the installed PoB (its uninstall entry, else the installer's default folder)
 //!   and the folder it saves builds to. PoB's own rules (Launch.lua, Main.lua): an installed
 //!   copy (`installed.cfg` beside the exe) keeps its data in `Documents\Path of Building`, a
 //!   portable one in its own folder; builds go to `Builds` there unless "Build save path" is
 //!   set (`buildPath` on `<Misc>` in its `Settings.xml`).
+//! - `find_redux()`: PoB Redux (its uninstall entry, else `%LOCALAPPDATA%\PoB Redux`). It
+//!   opens a build file named on its command line, in a new window, and saves builds to
+//!   `Documents\Path of Building\Builds` unless its `settings.json` names another folder.
 //! - `open_dialog()`: Windows' Open dialog for a build file, in that folder (else Downloads).
 //! - `read_build()`, `save_build()`: a build file read, or a new one written (never over an
 //!   existing file), checked to be PoB's XML.
@@ -86,10 +89,124 @@ pub fn find() -> Option<Pob> {
     None
 }
 
-/// Where the Open dialog starts: PoB's builds folder when it exists, else Downloads.
+/// Which PoB the guide's Edit opens (its Editor setting).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Editor {
+    #[default]
+    Community,
+    Redux,
+}
+
+pub const NO_POB: &str = "PoB not found. Install PoB Community";
+pub const NO_REDUX: &str = "PoB Redux not found. Install it or change Editor";
+
+/// An installed PoB Redux.
+#[derive(Debug, Clone)]
+pub struct Redux {
+    pub exe: PathBuf,
+}
+
+impl Redux {
+    /// Its builds folder: the PoE 1 folder its settings name, else
+    /// `Documents\Path of Building\Builds` (as PoB Community's installed copy).
+    pub fn builds_dir(&self) -> Option<PathBuf> {
+        std::env::var_os("APPDATA")
+            .map(|appdata| {
+                PathBuf::from(appdata)
+                    .join("dev.pobredux.desktop")
+                    .join("settings.json")
+            })
+            .and_then(|file| std::fs::read_to_string(file).ok())
+            .and_then(|settings| redux_build_path(&settings))
+            .or_else(|| {
+                known_folder(Folder::Documents).map(|docs| docs.join("Path of Building").join("Builds"))
+            })
+    }
+}
+
+/// The PoE 1 builds folder PoB Redux's `settings.json` names, when set.
+fn redux_build_path(settings: &str) -> Option<PathBuf> {
+    let settings: serde_json::Value = serde_json::from_str(settings).ok()?;
+    let path = settings.get("builds_dirs")?.get("poe1")?.as_str()?.trim();
+    (!path.is_empty()).then(|| PathBuf::from(path))
+}
+
+/// The installed PoB Redux, if any.
+#[cfg(windows)]
+pub fn find_redux() -> Option<Redux> {
+    use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    const KEYS: [&str; 2] = [
+        r"Software\Microsoft\Windows\CurrentVersion\Uninstall\PoB Redux",
+        r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\PoB Redux",
+    ];
+    let listed = [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE]
+        .into_iter()
+        .flat_map(|root| KEYS.iter().map(move |key| (root, *key)))
+        .filter_map(|(root, key)| crate::edge::registry_string(root, key, Some("InstallLocation")))
+        .map(|dir| PathBuf::from(dir.trim().trim_matches('"')));
+    // The installer's default, in case the entry is missing.
+    let default = std::env::var_os("LOCALAPPDATA")
+        .map(|local| PathBuf::from(local).join("PoB Redux"));
+    let exe = listed
+        .chain(default)
+        .map(|dir| dir.join("pob-redux.exe"))
+        .find(|exe| exe.is_file())?;
+    Some(Redux { exe })
+}
+
+#[cfg(not(windows))]
+pub fn find_redux() -> Option<Redux> {
+    None
+}
+
+/// The builds folder of the chosen editor (where "Save to PoB?" writes).
+pub fn builds_dir(editor: Editor) -> Result<PathBuf, String> {
+    match editor {
+        Editor::Community => find().map(|pob| pob.builds_dir()).ok_or_else(|| NO_POB.into()),
+        Editor::Redux => find_redux()
+            .ok_or_else(|| NO_REDUX.to_string())?
+            .builds_dir()
+            .ok_or_else(|| "Builds folder not found. Change Editor".into()),
+    }
+}
+
+/// Opens the chosen editor on `build`.
+pub fn edit_with(editor: Editor, build: &Path) -> Result<(), String> {
+    match editor {
+        Editor::Community => edit(&find().ok_or_else(|| NO_POB.to_string())?, build),
+        Editor::Redux => edit_redux(&find_redux().ok_or_else(|| NO_REDUX.to_string())?, build),
+    }
+}
+
+/// Opens PoB Redux on `build` (a new Redux window; one already open stays as it is).
+pub fn edit_redux(redux: &Redux, build: &Path) -> Result<(), String> {
+    if !is_xml(build) || !build.is_file() {
+        return Err(NOT_FOUND.into());
+    }
+    let dir = redux.exe.parent().unwrap_or(Path::new("."));
+    std::process::Command::new(&redux.exe)
+        .arg(build)
+        .current_dir(dir)
+        .spawn()
+        .map_err(|err| {
+            warn!("Couldn't start {}: {err}", redux.exe.display());
+            "PoB Redux not started. Reinstall it".to_string()
+        })?;
+    info!("Opened {} in PoB Redux", build.display());
+    Ok(())
+}
+
+/// Where the Open dialog starts: PoB Community's builds folder when it exists, else PoB
+/// Redux's, else Downloads.
 pub fn open_dir(pob: Option<&Pob>) -> Option<PathBuf> {
     pob.map(Pob::builds_dir)
         .filter(|dir| dir.is_dir())
+        .or_else(|| {
+            find_redux()
+                .and_then(|redux| redux.builds_dir())
+                .filter(|dir| dir.is_dir())
+        })
         .or_else(|| known_folder(Folder::Downloads))
 }
 
@@ -583,6 +700,24 @@ mod tests {
     }
 
     #[test]
+    fn redux_build_path_read() {
+        let set = r#"{"game":"poe1","builds_dirs":{"poe1":"D:\\PoB\\Builds","poe2":"E:\\x"}}"#;
+        assert_eq!(redux_build_path(set), Some(PathBuf::from(r"D:\PoB\Builds")));
+        assert_eq!(redux_build_path(r#"{"game":"poe1","builds_dirs":{}}"#), None);
+        assert_eq!(redux_build_path(r#"{"builds_dirs":{"poe1":"  "}}"#), None);
+        assert_eq!(redux_build_path(r#"{"builds_dirs":{"poe2":"E:\\x"}}"#), None);
+        assert_eq!(redux_build_path("not json"), None);
+    }
+
+    #[test]
+    fn editor_names_read() {
+        let read = |json: &str| serde_json::from_str::<Editor>(json).ok();
+        assert_eq!(read(r#""community""#), Some(Editor::Community));
+        assert_eq!(read(r#""redux""#), Some(Editor::Redux));
+        assert_eq!(read(r#""other""#), None);
+    }
+
+    #[test]
     fn file_names_are_safe() {
         assert_eq!(file_stem("Necro: SRS/HRoC?"), "Necro SRSHRoC");
         assert_eq!(file_stem("  ..  "), "Lioneye build");
@@ -603,6 +738,9 @@ mod tests {
         println!("PoB: {pob:?}");
         println!("Builds: {:?}", pob.as_ref().map(Pob::builds_dir));
         println!("Open starts in: {:?}", open_dir(pob.as_ref()));
+        let redux = find_redux();
+        println!("Redux: {redux:?}");
+        println!("Redux builds: {:?}", redux.as_ref().and_then(Redux::builds_dir));
         println!("Downloads: {:?}", known_folder(Folder::Downloads));
     }
 

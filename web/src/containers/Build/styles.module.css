@@ -1,20 +1,27 @@
-/* Settings: App, Build and Route tabs, in the top bar's gold capitals. */
+/* Settings: one list. The jump bar (App, Build, Route, in the top bar's gold capitals)
+   stays pinned under the top bar; the section you're in is underlined. */
 .tabs {
+  position: sticky;
+  top: var(--app-bar-height);
+  z-index: 3;
   display: flex;
   gap: var(--size-2);
+  height: var(--settings-jump-height);
   padding: 0 var(--size-3);
+  background-color: var(--primary);
   border-bottom: var(--border-width) solid var(--panel-border);
 }
 
 .tab {
-  padding: var(--size-3) var(--size-3) var(--size-2);
+  display: flex;
+  align-items: flex-end;
+  padding: 0 var(--size-3) var(--size-2);
   color: var(--gold);
   font-size: 0.8rem;
   font-weight: var(--font-heavy);
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  background: none;
-  border: none;
+  text-decoration: none;
   border-bottom: 2px solid transparent;
   margin-bottom: calc(-1 * var(--border-width));
   cursor: pointer;
@@ -26,6 +33,42 @@
 
 .tab.active {
   border-bottom-color: var(--gold);
+}
+
+/* Jumped to: its heading lands just under the jump bar. */
+.section {
+  scroll-margin-top: calc(var(--app-bar-height) + var(--settings-jump-height));
+  padding-bottom: var(--size-4);
+}
+
+.section + .section {
+  border-top: var(--border-width) solid var(--panel-border);
+}
+
+/* At least a screen tall, so every section's heading can reach the jump bar. */
+.section:last-child {
+  min-height: calc(
+    100vh - var(--app-bar-height) - var(--settings-jump-height) -
+      var(--footer-height)
+  );
+}
+
+/* Fields reached with Tab scroll in clear of both bars. */
+.section * {
+  scroll-margin-top: calc(var(--app-bar-height) + var(--settings-jump-height));
+}
+
+.heading:focus {
+  outline: none;
+}
+
+.heading {
+  padding: var(--size-3) var(--size-3) 0;
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: var(--font-heavy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 /* The gem list under its count: open until folded, then as left. */

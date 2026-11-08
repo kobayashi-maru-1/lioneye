@@ -6,10 +6,28 @@ import { deflate } from "pako";
  * the file). Each throws an Error whose message is ready to show.
  */
 
-/** PoB Community on this PC: whether it's installed, and its builds folder. */
+/**
+ * Path of Building on this PC: whether PoB Community is installed (with its builds
+ * folder), and whether PoB Redux is.
+ */
 export interface PobHome {
   installed: boolean;
   builds: string | null;
+  /** Missing from an older exe: not installed. */
+  redux?: boolean;
+}
+
+/** Which PoB Edit opens (Settings' Editor). */
+export type PobEditor = "community" | "redux";
+
+export const POB_EDITORS: { value: PobEditor; label: string }[] = [
+  { value: "community", label: "PoB Community" },
+  { value: "redux", label: "PoB Redux" },
+];
+
+/** Whether the chosen PoB is installed (no answer yet: no). */
+export function editorInstalled(home: PobHome | null, editor: PobEditor) {
+  return editor === "redux" ? home?.redux === true : home?.installed === true;
 }
 
 /** A build file and the XML PoB saved in it. */
@@ -72,19 +90,23 @@ export function readBuildFile(path: string) {
   return call<BuildFile>("/api/pob/read", { path }, "File not read");
 }
 
-/** Saves a build as a new file in PoB's builds folder; answers its path. */
-export async function saveBuildFile(name: string, xml: string) {
+/** Saves a build as a new file in the chosen PoB's builds folder; answers its path. */
+export async function saveBuildFile(
+  name: string,
+  xml: string,
+  editor: PobEditor,
+) {
   const saved = await call<{ path: string }>(
     "/api/pob/save",
-    { name, xml },
+    { name, xml, editor },
     "Not saved",
   );
   return saved.path;
 }
 
-/** Opens PoB Community on a build file. */
-export function editBuildFile(path: string) {
-  return call<void>("/api/pob/edit", { path }, "PoB not opened");
+/** Opens the chosen PoB on a build file. */
+export function editBuildFile(path: string, editor: PobEditor) {
+  return call<void>("/api/pob/edit", { path, editor }, "PoB not opened");
 }
 
 /** The XML PoB saves, as the code PoB exports (zlib, base64 with - and _). */

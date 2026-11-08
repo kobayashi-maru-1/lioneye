@@ -32,7 +32,7 @@ imported build carry over.
   Modifiers), the passive **Tree** and the build's **Notes**.
 - **Open** a build file from Path of Building and the guide follows it: each save in PoB
   updates the guide. **Desktop PoB** (or **Edit** in Settings) opens the build in PoB
-  Community.
+  Community or PoB Redux (Settings → Build → **Editor**).
 - **Compare** any PoB code or build link with the guide's loadout: Stats, Passives,
   Skills and Items.
 - An **in-game bar** over the game: its buttons jump the guide to a panel without leaving
@@ -80,4 +80,4 @@ Building the exe, the repo layout and pulling upstream updates: see
 ### Route
 
 Upstream doesn't take PRs for route changes: the base route follows current speedrunning
-strategies. Change the route to your playstyle with **Edit route** in the guide's Settings (**Route** tab).
+strategies. Change the route to your playstyle with **Edit route** in the guide's Settings (**Route** section).

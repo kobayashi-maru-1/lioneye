@@ -1,6 +1,6 @@
-//! The guide's requests for PoB build files (pob-files.rs): whether PoB Community is
-//! installed, Open (Windows' dialog), reading the linked file again, saving a pasted build
-//! as a file, and Edit (PoB opened on the file). They read or write files and start PoB, so
+//! The guide's requests for PoB build files (pob-files.rs): whether PoB Community and PoB
+//! Redux are installed, Open (Windows' dialog), reading the linked file again, saving a
+//! pasted build as a file, and Edit (the chosen PoB opened on the file). They read or write files and start PoB, so
 //! only a page on this PC itself may make them: never another device (`--address
 //! 0.0.0.0`) or a site pointed here by name.
 
@@ -53,8 +53,6 @@ pub(crate) fn same_origin(headers: &HeaderMap) -> bool {
     }
 }
 
-const NO_POB: &str = "PoB not found. Install PoB Community";
-
 /// A failure as the page shows it: "File not found" is 404 (the linked file moved).
 fn failed(msg: String) -> Response {
     let status = if msg == pob_files::NOT_FOUND {
@@ -65,7 +63,8 @@ fn failed(msg: String) -> Response {
     (status, msg).into_response()
 }
 
-/// Whether PoB Community is installed (the guide shows Edit), and its builds folder.
+/// Whether PoB Community (`installed`, with its builds folder) and PoB Redux (`redux`) are
+/// installed: the guide shows Edit for the one its Editor setting picks.
 async fn home(ConnectInfo(peer): ConnectInfo<SocketAddr>, headers: HeaderMap) -> Response {
     if !this_pc(&peer, &headers) {
         return StatusCode::FORBIDDEN.into_response();
@@ -75,6 +74,7 @@ async fn home(ConnectInfo(peer): ConnectInfo<SocketAddr>, headers: HeaderMap) ->
         serde_json::json!({
             "installed": pob.is_some(),
             "builds": pob.as_ref().map(|pob| pob.builds_dir().to_string_lossy().into_owned()),
+            "redux": pob_files::find_redux().is_some(),
         })
     })
     .await;
@@ -147,9 +147,13 @@ async fn read(
 struct SaveRequest {
     name: String,
     xml: String,
+    /// Whose builds folder (missing: PoB Community's).
+    #[serde(default)]
+    editor: pob_files::Editor,
 }
 
-/// A pasted build saved as a new file in PoB's builds folder (Edit on a pasted code).
+/// A pasted build saved as a new file in the chosen PoB's builds folder (Edit on a pasted
+/// code).
 async fn save(
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
@@ -159,8 +163,8 @@ async fn save(
         return StatusCode::FORBIDDEN.into_response();
     }
     let saved = tokio::task::spawn_blocking(move || {
-        let pob = pob_files::find().ok_or_else(|| NO_POB.to_string())?;
-        pob_files::save_build(&pob.builds_dir(), &request.name, &request.xml)
+        let dir = pob_files::builds_dir(request.editor)?;
+        pob_files::save_build(&dir, &request.name, &request.xml)
     })
     .await;
     match saved {
@@ -170,20 +174,30 @@ async fn save(
     }
 }
 
-/// Opens PoB on the linked build file.
+#[derive(Deserialize)]
+struct EditRequest {
+    path: String,
+    /// Which PoB (missing: PoB Community).
+    #[serde(default)]
+    editor: pob_files::Editor,
+}
+
+/// Opens the chosen PoB on the linked build file.
 async fn edit(
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
-    Json(request): Json<PathRequest>,
+    Json(request): Json<EditRequest>,
 ) -> Response {
     if !this_pc(&peer, &headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
-    let opened = tokio::task::spawn_blocking(move || {
-        let pob = pob_files::find().ok_or_else(|| NO_POB.to_string())?;
-        pob_files::edit(&pob, Path::new(&request.path))
-    })
-    .await;
+    // Only a local file named by a full path, as the guide links: never a network path
+    // (checking one contacts that server) or a relative name PoB could read as a switch.
+    let Some(path) = pob_files::linkable(&request.path) else {
+        return failed(pob_files::NOT_FOUND.into());
+    };
+    let editor = request.editor;
+    let opened = tokio::task::spawn_blocking(move || pob_files::edit_with(editor, &path)).await;
     match opened {
         Ok(Ok(())) => StatusCode::NO_CONTENT.into_response(),
         Ok(Err(msg)) => failed(msg),

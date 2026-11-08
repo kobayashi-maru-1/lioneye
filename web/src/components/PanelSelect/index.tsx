@@ -14,6 +14,8 @@ interface PanelSelectProps {
   onChange: (index: number) => void;
   placeholder?: string;
   className?: string;
+  /** Id of a note about the choice (aria-describedby). */
+  describedBy?: string;
 }
 
 /** pob.codes-style dropdown for picking a set or loadout. */
@@ -24,12 +26,14 @@ export function PanelSelect({
   onChange,
   placeholder,
   className,
+  describedBy,
 }: PanelSelectProps) {
   const shown = value >= 0 ? options[value] : placeholder;
   return (
     <select
       className={classNames(styles.select, className)}
       aria-label={label}
+      aria-describedby={describedBy}
       title={displaySetName(stripPob(shown ?? ""))}
       value={value}
       onChange={(event) => onChange(Number(event.target.value))}

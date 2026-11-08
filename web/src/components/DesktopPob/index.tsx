@@ -1,15 +1,21 @@
 import { linkBuildFileAtom, pobAtom, pobFileSelector } from "../../state/pob";
 import {
+  type PobEditor,
   type PobHome,
+  POB_EDITORS,
   editBuildFile,
+  editorInstalled,
   pobHome,
   saveBuildFile,
 } from "../../state/pob/file";
 import { pobCodeToXml } from "../../state/pob/process";
+import { pobEditorAtom } from "../../state/settings-tab";
 import { formStyles } from "../../styles";
 import { Modal } from "../Modal";
+import { PanelSelect } from "../PanelSelect";
+import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -37,7 +43,7 @@ function defaultName(code: string) {
   }
 }
 
-/** PoB Community on this PC (null until the exe answers, or without an exe). */
+/** Path of Building on this PC (null until the exe answers, or without an exe). */
 export function usePobHome() {
   const [home, setHome] = useState<PobHome | null>(null);
   useEffect(() => {
@@ -50,6 +56,46 @@ export function usePobHome() {
   return home;
 }
 
+/** The chosen editor (anything stored that isn't Redux reads as PoB Community). */
+function usePobEditor() {
+  const [stored, setEditor] = useAtom(pobEditorAtom);
+  const editor: PobEditor = stored === "redux" ? "redux" : "community";
+  return [editor, setEditor] as const;
+}
+
+/**
+ * Settings' Editor: which PoB Edit and Desktop PoB open. Shows with the exe; "Not
+ * installed" under it when the chosen one isn't on this PC (then neither button shows).
+ */
+export function PobEditorSelect() {
+  const home = usePobHome();
+  const [editor, setEditor] = usePobEditor();
+  if (home === null) return null;
+  const installed = editorInstalled(home, editor);
+  return (
+    <div className={classNames(formStyles.formRow)}>
+      <label>Editor</label>
+      <div>
+        <PanelSelect
+          label="Editor"
+          describedBy={installed ? undefined : "pob-editor-note"}
+          options={POB_EDITORS.map((option) => option.label)}
+          value={Math.max(
+            0,
+            POB_EDITORS.findIndex((option) => option.value === editor),
+          )}
+          onChange={(i) => setEditor(POB_EDITORS[i].value)}
+        />
+      </div>
+      {!installed && (
+        <span id="pob-editor-note" className={classNames(styles.note)}>
+          Not installed
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface DesktopPobProps {
   className: string;
   /** Extra reason to disable it (the form is busy). */
@@ -59,9 +105,10 @@ interface DesktopPobProps {
 }
 
 /**
- * Opens the build in PoB Community on this PC: its linked file, or for a pasted build a
- * new file in PoB's builds folder first ("Save to PoB?"), which the guide then follows.
- * Shows only with PoB Community installed and a build loaded.
+ * Opens the build in the chosen PoB (Settings' Editor: PoB Community or PoB Redux): its
+ * linked file, or for a pasted build a new file in that PoB's builds folder first ("Save
+ * to PoB?"), which the guide then follows. Shows only with that PoB installed and a build
+ * loaded.
  */
 export function DesktopPob({
   className,
@@ -70,6 +117,7 @@ export function DesktopPob({
   children,
 }: React.PropsWithChildren<DesktopPobProps>) {
   const home = usePobHome();
+  const [editor] = usePobEditor();
   const code = useAtomValue(pobAtom);
   const file = useAtomValue(pobFileSelector);
   const linkFile = useSetAtom(linkBuildFileAtom);
@@ -81,7 +129,9 @@ export function DesktopPob({
   /** The name a pasted build gets as a PoB file, while "Save to PoB?" is open. */
   const [saveName, setSaveName] = useState<string | null>(null);
 
-  if (!home?.installed || code === null) return null;
+  if (!editorInstalled(home, editor) || code === null) return null;
+  const editorLabel =
+    POB_EDITORS.find((option) => option.value === editor)?.label ?? "PoB";
 
   const open = async () => {
     if (file === null) {
@@ -90,7 +140,7 @@ export function DesktopPob({
     }
     setBusy(true);
     try {
-      await editBuildFile(file);
+      await editBuildFile(file, editor);
       toast.info("PoB opening");
     } catch (error) {
       toast.error(errorMessage(error, "PoB not opened"));
@@ -104,10 +154,10 @@ export function DesktopPob({
     setSaveName(null);
     setBusy(true);
     try {
-      const path = await saveBuildFile(saveName, pobCodeToXml(code));
+      const path = await saveBuildFile(saveName, pobCodeToXml(code), editor);
       // Only if the same build is still loaded (not unloaded or replaced meanwhile).
       if (!linkFile(path, code)) return;
-      await editBuildFile(path);
+      await editBuildFile(path, editor);
       toast.info("Saved. PoB opening");
     } catch (error) {
       toast.error(errorMessage(error, "Not saved"));
@@ -120,7 +170,7 @@ export function DesktopPob({
     <>
       <button
         className={className}
-        title="Open in PoB"
+        title={`Open in ${editorLabel}`}
         disabled={disabled || busy}
         onClick={open}
       >

@@ -57,18 +57,24 @@ In ⚙ **Settings → Build**:
 - **Import**: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link.
 - **Open**: pick a build file Path of Building saved. The dialog starts in PoB Community's
   builds folder (its "Build save path" if you set one, else
-  `Documents\Path of Building\Builds`), or Downloads when there's none. The file's full path
+  `Documents\Path of Building\Builds`), else PoB Redux's, or Downloads when there's none. The file's full path
   shows under the code, and the guide follows it: each save in PoB (Ctrl+S) updates the guide
   within a couple of seconds, with a **Build updated** note. The loadout you're on stays (by
   its name) while the new numbers calculate. Saves made while the guide was closed are
   picked up when it opens.
-- **Edit** (when PoB Community is installed; also **Desktop PoB** next to **Compare** at the
-  top of the guide): opens PoB on the build. For an opened file,
-  PoB opens straight into it: Lioneye sets it as PoB's last open build (the `<Mode>` entry in
-  PoB's `Settings.xml`), then starts PoB. With PoB already open, a second PoB window opens.
-  For a pasted code, **Save to PoB?** first saves it as a new file in PoB's builds folder
-  (never over an existing one) under the name you give; from then on it's an opened file.
-  Pasted codes are never saved anywhere otherwise.
+- **Editor**: which Path of Building **Edit** and **Desktop PoB** open, **PoB Community**
+  (the default) or **PoB Redux**. **Not installed** under it means the chosen one isn't on
+  this PC, and neither button shows.
+- **Edit** (when the chosen editor is installed; also **Desktop PoB** next to **Compare** at
+  the top of the guide): opens PoB on the build. For an opened file, PoB opens straight into
+  it. PoB Community: Lioneye sets the file as PoB's last open build (the `<Mode>` entry in
+  PoB's `Settings.xml`), then starts PoB. PoB Redux: Lioneye starts Redux with the file.
+  With PoB already open, a second PoB window opens. A save updates the guide when the editor
+  writes it back to the same file.
+  For a pasted code, **Save to PoB?** first saves it as a new file in the editor's builds
+  folder (never over an existing one) under the name you give; from then on it's an opened
+  file. Redux's builds folder is the PoE 1 folder set in Redux, else
+  `Documents\Path of Building\Builds`. Pasted codes are never saved anywhere otherwise.
 - **Unload**: removes the build (code, file, tree, links and gem list).
 
 Loading a different build (Import or Open) brings its gem list, class and bandit (Settings →
@@ -108,7 +114,8 @@ settings; otherwise it leaves it alone and says so.
   act is done. Nothing reopens on its own: a folded act or panel stays folded until you
   click it (or use the bar). **Reset campaign** opens Campaign again.
 - The one bar at the top jumps to each panel and holds the auto-progress pill (at the right)
-  and ⚙ **Settings** (right after the panel buttons), in three tabs: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded build: **Unload**, **Copy**, **Open**, **Edit**, **Import**; search strings; see [Your build](#your-build)), **Route** (Edit
+  and ⚙ **Settings** (right after the panel buttons): one list in three sections, with a bar
+  pinned at its top that jumps to each and underlines the one you're in: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded build: **Unload**, **Copy**, **Open**, **Edit**, **Import**; **Editor**; search strings; see [Your build](#your-build)), **Route** (Edit
   route, Export, **Reset campaign**, **Reset gems**, class, bandits, League Start, Library, Gems Only, hints, and the gem list,
   open until you fold it). The
   Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while
