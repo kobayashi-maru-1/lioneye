@@ -144,7 +144,8 @@ settings; otherwise it leaves it alone and says so.
   Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while
   Campaign is on screen.
 - The card at the top shows the build (skill, ascendancy, PoB's level), your level from the
-  game log (**Char lvl**), its headline numbers and the **Loadout** dropdown. The loadout follows your
+  game log (**Char lvl**) and its headline numbers. The **Loadout** dropdown heads the left
+  column, above **Stats**. The loadout follows your
   level when PoB titles name levels (`Lvl 30`, `Level 12-28`), else your act (`Act 2`,
   `Act 4-6 - 50 pts`). When no title names a level or act (`Early`, `27 points`), it
   follows your tree: the set after the last one whose main-tree points you all have (from
@@ -212,7 +213,7 @@ settings; otherwise it leaves it alone and says so.
   another set until the loadout or act changes. **Config** lists only the options a set
   changes from PoB's defaults, and its Custom Modifiers (lines PoB doesn't apply, such as
   `#` notes, are dimmed). On the tree, Ctrl+scroll zooms and dragging pans.
-- At the top of the left column, pick the main skill as in PoB. The pick is remembered by
+- Under **Stats** in the left column, pick the main skill as in PoB. The pick is remembered by
   skill gem, so the same skill stays selected in every loadout that has it; loadouts without
   it show PoB's own pick, tagged **PoB pick**. Loading a different build clears the pick.
 - The first stats after starting take a few seconds while PoB loads; it unloads after

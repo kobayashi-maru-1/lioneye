@@ -204,8 +204,9 @@ export default function RoutesContainer() {
 }
 
 /**
- * The page, laid out like a pob.codes build page: PoB's stats on the left; the header
- * card (title, headline numbers, Loadout) and the panels on the right, Campaign first.
+ * The page, laid out like a pob.codes build page: the Loadout and PoB's stats on the
+ * left; the header card (title, headline numbers) and the panels on the right, Campaign
+ * first.
  */
 function GuidePage({ campaign }: { campaign: ReactNode }) {
   const code = useAtomValue(pobAtom);

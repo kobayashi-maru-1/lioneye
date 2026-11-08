@@ -1,5 +1,6 @@
 import type { MainSkillPick } from "../../state/main-skill";
 import { formStyles } from "../../styles";
+import { PanelSelect } from "../PanelSelect";
 import { type SkillState, usePobStats } from "../PobStats";
 import { PobText, stripPob } from "../PobText";
 import styles from "./styles.module.css";
@@ -9,8 +10,8 @@ import classNames from "classnames";
 const HEADING = /^(minion|player):?$/i;
 
 /**
- * Path of Building's sidebar for the shown loadout (picked in the header card): main
- * skill and stats, in pob.codes' striped rows. Reads the page's PobStatsProvider.
+ * Path of Building's sidebar: the Loadout dropdown, then the shown loadout's main skill
+ * and stats, in pob.codes' striped rows. Reads the page's PobStatsProvider.
  */
 export function StatsViewer() {
   const pob = usePobStats();
@@ -19,10 +20,23 @@ export function StatsViewer() {
       <p className={classNames(styles.status)}>Build unreadable. Re-import.</p>
     ) : null;
   }
-  const { stats, loading, error, retry } = pob;
+  const { stats, loading, error, retry, titles, index, setIndex } = pob;
 
   return (
     <div className={classNames(styles.stats)}>
+      {/* The loadout everything on the page shows; it follows your level or act. */}
+      {titles.length > 0 && (
+        <>
+          <h2 className={classNames(styles.heading)}>Loadout</h2>
+          <PanelSelect
+            className={classNames(styles.loadout)}
+            label="Loadout"
+            options={titles}
+            value={index}
+            onChange={setIndex}
+          />
+        </>
+      )}
       <h2 className={classNames(styles.heading)}>Stats</h2>
       {stats?.skill && stats.skill.groups.length > 0 && (
         <SkillPicker

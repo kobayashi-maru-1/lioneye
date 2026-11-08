@@ -101,7 +101,7 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("stats");
   // Asks PoB again for the same code (after a failure, or the same code pasted again).
   const [attempt, setAttempt] = useState(0);
-  // The guide's shown loadout (the header's Loadout picker), once PoB has answered for it.
+  // The guide's shown loadout (the left column's Loadout), once PoB has answered for it.
   const pob = usePobStats();
   const guide = pob?.stats ?? null;
   const guideReady = guide !== null && !pob?.loading && !pob?.error;

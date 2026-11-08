@@ -2,7 +2,6 @@ import { characterLevelAtom } from "../../state/character-level";
 import { pobAtom } from "../../state/pob";
 import { BuildCompare } from "../BuildCompare";
 import { DesktopPob } from "../DesktopPob";
-import { PanelSelect } from "../PanelSelect";
 import { usePobStats } from "../PobStats";
 import { BuildTitle, HeadlineNumbers, Stat } from "./headline";
 import styles from "./styles.module.css";
@@ -23,8 +22,8 @@ async function copyCode(code: string) {
 
 /**
  * pob.codes-style card above the guide: the build's title, its headline numbers for
- * the shown loadout, Compare, Desktop PoB (opens it in PoB Community), Copy and the
- * Loadout dropdown (which follows your act).
+ * the shown loadout, Compare, Desktop PoB (opens it in the chosen PoB) and Copy. The
+ * Loadout dropdown is at the top of the left column (StatsViewer).
  */
 export function BuildHeader() {
   const pob = usePobStats();
@@ -32,7 +31,7 @@ export function BuildHeader() {
   const characterLevel = useAtomValue(characterLevelAtom);
   const code = useAtomValue(pobAtom);
   if (pob === null || pob.stats === null) return null;
-  const { titles, index, setIndex, error, loading } = pob;
+  const { error, loading } = pob;
   const headline = pob.stats.headline ?? {};
   // Never the old loadout's numbers under the new loadout's name.
   const numbersShown = error === null;
@@ -58,15 +57,6 @@ export function BuildHeader() {
             >
               <FaRegClipboard aria-hidden />
             </button>
-          )}
-          {titles.length > 0 && (
-            <PanelSelect
-              className={classNames(styles.loadout)}
-              label="Loadout"
-              options={titles}
-              value={index}
-              onChange={setIndex}
-            />
           )}
         </div>
       </div>

@@ -14,6 +14,14 @@
   letter-spacing: 0.02em;
 }
 
+/* The Loadout dropdown: the column's width, like the skill pickers under Stats. */
+.stats .loadout {
+  width: 100%;
+  max-width: none;
+  margin-bottom: var(--size-2);
+  font-size: 0.85rem;
+}
+
 /* pob.codes stat rows: coloured labels right-aligned against their values, striped. */
 .rows {
   display: flex;
