@@ -369,6 +369,11 @@ body {
   background-color: #2a2a2a;
 }
 
+/* Its tooltip is pinned (right-click, or the tooltip's pin). */
+.button.pinned {
+  border-color: var(--gold);
+}
+
 .dot {
   width: 9px;
   height: 9px;

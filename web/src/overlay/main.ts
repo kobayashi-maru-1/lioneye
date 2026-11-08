@@ -148,7 +148,14 @@ function setPin(id: string | null) {
   } catch {
     // Not kept: pinned until the bar reloads.
   }
+  markPinned();
   renderTip();
+}
+
+/** Marks the button whose tooltip is pinned. */
+function markPinned() {
+  for (const button of buttons.querySelectorAll<HTMLElement>(".button"))
+    button.classList.toggle("pinned", button.dataset.id === pinned);
 }
 
 /** The pinned tooltip, while its button is on the bar. */
@@ -167,6 +174,7 @@ function render(config: OverlayConfig) {
       button.type = "button";
       button.className = "button";
       button.textContent = label;
+      button.dataset.id = id;
       button.addEventListener("click", () => {
         if (socket?.readyState === WebSocket.OPEN) socket.send(`jump:${id}`);
       });
@@ -174,9 +182,20 @@ function render(config: OverlayConfig) {
       button.addEventListener("mouseenter", () =>
         TIPS[id] ? openTip(id) : rest(),
       );
+      // Right-click pins its tooltip (or unpins it), as the tooltip's pin does.
+      button.addEventListener("contextmenu", () => {
+        if (!TIPS[id]) return;
+        if (pinned === id) {
+          setPin(null);
+        } else {
+          openTip(id);
+          setPin(id);
+        }
+      });
       return button;
     }),
   );
+  markPinned();
   // Open the pinned tooltip, or close one whose button left; a hovered one stays.
   if (tip.hidden || (openId !== null && !barIds.has(openId))) rest();
 }

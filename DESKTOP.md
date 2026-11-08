@@ -205,8 +205,10 @@ settings; otherwise it leaves it alone and says so.
   its left keeps that tooltip open while you play (one at a time, kept after a restart),
   and the flip (**Show above** / **Show below**) at its right moves tooltips to the other
   side of the bar (below to start, kept after a restart; the bar stays put). A pinned
-  tooltip moves at once; otherwise the next one opens on the new side. Hovering another button shows its tooltip until
-  the pointer leaves the bar and its tooltip.
+  tooltip moves at once; otherwise the next one opens on the new side. Hovering another
+  button shows its tooltip until the pointer leaves the bar and its tooltip.
+- Right-clicking a button pins or unpins its tooltip, like the pin. A pinned tooltip's
+  button has a gold border.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
 - **Settings** → **App** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,
