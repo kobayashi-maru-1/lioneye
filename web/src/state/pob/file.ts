@@ -87,11 +87,6 @@ export function editBuildFile(path: string) {
   return call<void>("/api/pob/edit", { path }, "PoB not opened");
 }
 
-/** A file's name without its folder or ".xml", as PoB's build list shows it. */
-export function buildFileName(path: string) {
-  return (path.split(/[\\/]/).pop() ?? path).replace(/\.xml$/i, "");
-}
-
 /** The XML PoB saves, as the code PoB exports (zlib, base64 with - and _). */
 export function xmlToPobCode(xml: string) {
   const bytes = deflate(new TextEncoder().encode(xml));

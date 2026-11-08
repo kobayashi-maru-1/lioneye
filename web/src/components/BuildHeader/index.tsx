@@ -1,13 +1,14 @@
 import { characterLevelAtom } from "../../state/character-level";
 import { pobAtom } from "../../state/pob";
 import { BuildCompare } from "../BuildCompare";
+import { DesktopPob } from "../DesktopPob";
 import { PanelSelect } from "../PanelSelect";
 import { usePobStats } from "../PobStats";
 import { BuildTitle, HeadlineNumbers, Stat } from "./headline";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useAtomValue } from "jotai";
-import { FaRegClipboard } from "react-icons/fa";
+import { FaDesktop, FaRegClipboard } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 /** The imported build's PoB code to the clipboard, as pob.codes' Copy does. */
@@ -22,7 +23,8 @@ async function copyCode(code: string) {
 
 /**
  * pob.codes-style card above the guide: the build's title, its headline numbers for
- * the shown loadout, and the Loadout dropdown (which follows your act).
+ * the shown loadout, Compare, Desktop PoB (opens it in PoB Community), Copy and the
+ * Loadout dropdown (which follows your act).
  */
 export function BuildHeader() {
   const pob = usePobStats();
@@ -43,6 +45,10 @@ export function BuildHeader() {
         </h1>
         <div className={classNames(styles.tools)}>
           <BuildCompare buttonClassName={classNames(styles.tool)} />
+          <DesktopPob className={classNames(styles.tool)}>
+            <FaDesktop aria-hidden />
+            Desktop PoB
+          </DesktopPob>
           {code !== null && (
             <button
               className={classNames(styles.tool)}

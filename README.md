@@ -31,7 +31,8 @@ imported build carry over.
   **Trade List** with pob.codes' search options, **Build health**, **Config** (with Custom
   Modifiers), the passive **Tree** and the build's **Notes**.
 - **Open** a build file from Path of Building and the guide follows it: each save in PoB
-  updates the guide. **Edit** opens the build in PoB Community.
+  updates the guide. **Desktop PoB** (or **Edit** in Settings) opens the build in PoB
+  Community.
 - **Compare** any PoB code or build link with the guide's loadout: Stats, Passives,
   Skills and Items.
 - An **in-game bar** over the game: its buttons jump the guide to a panel without leaving

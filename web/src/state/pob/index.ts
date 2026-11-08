@@ -32,6 +32,14 @@ const pobCodeAtom = persistentAtom<string | null>(
 const pobFileAtom = persistentAtom<string | null>("pob-file", null, 0);
 export const pobFileSelector = atom((get) => get(pobFileAtom));
 
+/**
+ * Which build is loaded: changes on load and unload, not when PoB saves the same build
+ * again, so the page keeps its loadout and numbers through a refresh. Stored, so another
+ * guide window loading a build counts as a different build here too.
+ */
+const buildIdAtom = persistentAtom("pob-build-id", 0, 0);
+export const buildIdSelector = atom((get) => get(buildIdAtom));
+
 /** The build in a PoB code, or null when it can't be read (processPob throws on some). */
 function readPob(code: string) {
   try {
@@ -78,6 +86,7 @@ export const loadBuildAtom = atom(
     set(gemLinksSelector, pob.gemLinks);
     set(pobCodeAtom, code);
     set(pobFileAtom, file);
+    set(buildIdAtom, (id) => id + 1);
     // The pick is a skill of the old build.
     set(mainSkillPickAtom, RESET);
     return true;
@@ -142,6 +151,7 @@ export const linkBuildFileAtom = atom(
 export const unloadBuildAtom = atom(null, (_get, set) => {
   set(pobCodeAtom, RESET);
   set(pobFileAtom, null);
+  set(buildIdAtom, (id) => id + 1);
   set(buildTreesSelector, RESET);
   set(gemLinksSelector, RESET);
   // An empty list, not RESET: that would clear your gem ticks too.

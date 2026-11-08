@@ -26,7 +26,7 @@
   color: #8f8f8f;
 }
 
-/* Compare, Copy and the Loadout picker, at the right of the title. */
+/* Compare, Desktop PoB, Copy and the Loadout picker, at the right of the title. */
 .tools {
   display: flex;
   align-items: center;
@@ -52,6 +52,11 @@
 
 .tool:hover {
   background-color: #26221c;
+}
+
+.tool:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .loadout {

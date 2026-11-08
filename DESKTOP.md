@@ -57,11 +57,13 @@ In ⚙ **Settings → Build**:
 - **Import**: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link.
 - **Open**: pick a build file Path of Building saved. The dialog starts in PoB Community's
   builds folder (its "Build save path" if you set one, else
-  `Documents\Path of Building\Builds`), or Downloads when there's none. The file's name shows
-  under the code, and the guide follows it: each save in PoB (Ctrl+S) updates the guide
-  within a couple of seconds, with a **Build updated** note. Saves made while the guide was
-  closed are picked up when it opens.
-- **Edit** (when PoB Community is installed): opens PoB on the build. For an opened file,
+  `Documents\Path of Building\Builds`), or Downloads when there's none. The file's full path
+  shows under the code, and the guide follows it: each save in PoB (Ctrl+S) updates the guide
+  within a couple of seconds, with a **Build updated** note. The loadout you're on stays (by
+  its name) while the new numbers calculate. Saves made while the guide was closed are
+  picked up when it opens.
+- **Edit** (when PoB Community is installed; also **Desktop PoB** next to **Compare** at the
+  top of the guide): opens PoB on the build. For an opened file,
   PoB opens straight into it: Lioneye sets it as PoB's last open build (the `<Mode>` entry in
   PoB's `Settings.xml`), then starts PoB. With PoB already open, a second PoB window opens.
   For a pasted code, **Save to PoB?** first saves it as a new file in PoB's builds folder

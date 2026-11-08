@@ -1,7 +1,7 @@
 import { characterLevelAtom } from "../../state/character-level";
 import { currentActAtom, indexForLevel } from "../../state/current-act";
 import { type MainSkillPick, mainSkillPickAtom } from "../../state/main-skill";
-import { pobAtom } from "../../state/pob";
+import { buildIdSelector, pobAtom } from "../../state/pob";
 import { pobCodeToXml } from "../../state/pob/process";
 import { stripPob } from "../PobText";
 import { useFollowAct } from "../SetPager";
@@ -217,14 +217,24 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
     }
   }, [code]);
 
+  const buildId = useAtomValue(buildIdSelector);
+
   // Kept with the build and pick it was asked with, so a new import never shows the old
-  // build's loadouts and the "PoB pick" tag never describes an older pick.
+  // build's loadouts and the "PoB pick" tag never describes an older pick. A save of the
+  // same build in PoB keeps the last answer (shown as calculating) until the new one
+  // comes, so the loadout list and your pick stay put.
   const [answer, setAnswer] = useState<{
     xml: string;
+    buildId: number;
     pickKey: string;
     stats: Stats;
   } | null>(null);
-  const stats = answer !== null && answer.xml === xml ? answer.stats : null;
+  const stats =
+    answer !== null &&
+    xml !== null &&
+    (answer.xml === xml || answer.buildId === buildId)
+      ? answer.stats
+      : null;
   const loadouts = stats?.loadouts ?? NONE;
   // PoB's names carry its colour codes ("^2Act 1 - 12 pts"); match and show them without.
   const titles = useMemo(() => loadouts.map(stripPob), [loadouts]);
@@ -245,7 +255,9 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
     setError(null);
     fetchStats(xml, requested, pick, controller.signal)
       .then((stats) => {
-        setAnswer({ xml, pickKey, stats });
+        // An older request (previous save or loadout) never replaces the current one.
+        if (controller.signal.aborted) return;
+        setAnswer({ xml, buildId, pickKey, stats });
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -254,7 +266,7 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
         setLoading(false);
       });
     return () => controller.abort();
-  }, [xml, requested, pickKey, attempt]);
+  }, [xml, buildId, requested, pickKey, attempt]);
 
   const value = useMemo<PobStatsValue>(
     () => ({

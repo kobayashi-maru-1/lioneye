@@ -14,7 +14,7 @@
   font-size: 0.8rem;
 }
 
-/* The linked PoB file: its name, the full path on hover. */
+/* The linked PoB file's full path. */
 .file {
   display: flex;
   gap: var(--size-2);
@@ -28,9 +28,8 @@
 }
 
 .fileName {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .buttons {
