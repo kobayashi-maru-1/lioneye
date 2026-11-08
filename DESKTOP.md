@@ -100,10 +100,13 @@ playing:
 - **Live character**: pick one (**None** stops following). The guide reads the PoB code
   poe.ninja's character page shows ("Import code for Path of Building"), then the bundled
   PoB calculates it. Under it: the character's name, level and class, or why it wasn't read.
-- It stays current by itself: every 3 minutes, and 1 and 4 minutes after a level-up, the
-  exe asks poe.ninja whether the character changed and reads it only if so. **Refresh**
-  reads it now. poe.ninja re-reads a connected character from the game every few minutes;
-  making it re-read right away needs a poe.ninja sign-in, so Lioneye doesn't.
+- It stays current by itself: every 3 minutes, and 30 seconds and 4 minutes after a
+  level-up, the exe asks poe.ninja whether the character changed and reads it only if so.
+  **Refresh** reads it now. poe.ninja's own re-reads of a character from the game can be
+  an hour or more apart, but viewing your profile's character list seems to have it
+  re-read your current character within seconds (seen, not documented). So after each
+  level-up the guide loads that list once. poe.ninja's "refresh character" itself needs a poe.ninja sign-in, so Lioneye
+  doesn't use it.
 
 poe.ninja's addresses for this are the ones its own pages use, not a published API, so a
 change on poe.ninja's side can break it until Lioneye is updated. The bundled PoB holds one

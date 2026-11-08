@@ -667,7 +667,8 @@ struct NinjaAccountQuery {
     account: String,
 }
 
-/// The characters on an account's public poe.ninja profile, for Settings to pick from.
+/// The characters on an account's public poe.ninja profile, for Settings to pick from
+/// (and loaded after a level-up, which has poe.ninja re-read the current character).
 async fn ninja_characters(
     headers: HeaderMap,
     Query(query): Query<NinjaAccountQuery>,

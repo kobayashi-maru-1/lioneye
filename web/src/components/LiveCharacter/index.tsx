@@ -24,14 +24,19 @@ import { useEffect, useRef, useState } from "react";
 
 /** How often poe.ninja is asked whether the character changed. */
 const CHECK_EVERY = 3 * 60 * 1000;
-/** After a level-up: poe.ninja re-reads the character within a few minutes. */
-const AFTER_LEVEL_UP = [60 * 1000, 4 * 60 * 1000];
+/** After a level-up (and the nudge below), when to check for poe.ninja's re-read. */
+const AFTER_LEVEL_UP = [30 * 1000, 4 * 60 * 1000];
+
+/** The account part of a character's poe.ninja page ("…/profile/Name-1234/…"). */
+function accountOf(link: string) {
+  return /\/profile\/([^/]+)\//.exec(link)?.[1] ?? null;
+}
 
 /**
  * Keeps your live character current: reads it when the link is set or Refresh is
  * pressed, checks poe.ninja's version every few minutes and after a level-up (reading it
- * again only when it changed), and has PoB calculate it when its code changes. Mounted
- * with the app. Renders nothing.
+ * again only when it changed; a level-up also nudges poe.ninja to re-read it), and has
+ * PoB calculate it when its code changes. Mounted with the app. Renders nothing.
  */
 export function LiveCharacterSync() {
   const link = useAtomValue(liveLinkAtom);
@@ -111,13 +116,17 @@ export function LiveCharacterSync() {
     return () => window.clearInterval(timer);
   }, [link]);
 
-  // After a level-up, a couple of checks while poe.ninja catches up.
+  // After a level-up: your profile's character list is loaded once, which has poe.ninja
+  // re-read your current character (as viewing your profile page does; its own checks
+  // can be an hour or more apart), then a couple of checks pick the new data up.
   const lastLevel = useRef(level);
   useEffect(() => {
     const before = lastLevel.current;
     lastLevel.current = level;
     if (link === null || level === null || before === null || level <= before)
       return;
+    const account = accountOf(link);
+    if (account) fetchLiveCharacters(account).catch(() => {});
     const timers = AFTER_LEVEL_UP.map((delay) =>
       window.setTimeout(() => read(link, true), delay),
     );
