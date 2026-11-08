@@ -234,8 +234,10 @@ settings; otherwise it leaves it alone and says so.
   guide window comes up without taking it. With no guide open, the button opens one first.
 - Hover **Gems** for the Gems panel's links (the set it shows for your loadout; its copy
   icon puts a search for the set's gems still unticked on the gem list on the clipboard,
+  or for all the set's gems once none are left to get,
   to paste into a vendor or stash search: the gem list's soonest first, as many as fit the
-  game's 50-character box, with the count in the icon's label when some don't fit. Each
+  game's 50-character box (a gem too long to fit is skipped for shorter ones after it),
+  with the count in the icon's label when some don't fit. Each
   gem is a short piece of its name that starts at a word and no other gem's name has,
   anchored to the name's start or end where that helps, as [poe.re](https://poe.re/gems)
   does: Arc is `arc$`, so Arctic Armour stays dark),

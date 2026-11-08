@@ -238,8 +238,9 @@ function search(pieces: string[]) {
 }
 
 /**
- * The search for `wanted` (gem names, soonest needed first): as many as fit the search
- * box, in that order. `count` is how many it covers.
+ * The search for `wanted` (gem names, soonest needed first): soonest first, as many as
+ * fit the search box. A gem whose piece doesn't fit is skipped, and later, shorter ones
+ * still go in. `count` is how many it covers.
  */
 export function gemRegex(
   wanted: readonly string[],
@@ -247,16 +248,16 @@ export function gemRegex(
   limit = SEARCH_LIMIT,
 ) {
   const pieces: string[] = [];
-  let count = 0;
   const names = [...new Set(wanted.map(norm))];
   for (const name of names) {
     // A piece already in the search covers this gem too.
-    if (!pieces.some((piece) => pieceMatches(piece, name))) {
-      const piece = gemPiece(name, allNames);
-      if (search([...pieces, piece]).length > limit) break;
-      pieces.push(piece);
-    }
-    count++;
+    if (pieces.some((piece) => pieceMatches(piece, name))) continue;
+    const piece = gemPiece(name, allNames);
+    if (search([...pieces, piece]).length <= limit) pieces.push(piece);
   }
+  // Counted at the end: a later piece can cover a gem skipped earlier.
+  const count = names.filter((name) =>
+    pieces.some((piece) => pieceMatches(piece, name)),
+  ).length;
   return { regex: search(pieces), count, total: names.length };
 }

@@ -381,22 +381,28 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
   const [index, choose] = usePanelSet(titles, titleIndex(titles, sets?.skills));
 
   // The set shown here, for the in-game bar's Gems tooltip, with a search for its gems
-  // still on the gem list unticked (soonest first). Gems you took off the list stay off.
+  // still on the gem list unticked (soonest first; gems you took off the list stay off).
+  // With none of them left to get (or none on the list), the search is for all the set's
+  // gems in the set's order, for finding them in your stash.
   const setOverlayGems = useSetAtom(overlayGemsAtom);
   const title = titles[index];
   const toGet = useAtomValue(gemsToGetSelector);
   // As JSON, so a tick that doesn't change the search doesn't send the tooltip again.
   const search = useMemo(() => {
     if (title === undefined) return "";
-    const inSet = new Set(
-      gemLinks
-        .filter((link) => link.title === title)
-        .flatMap((link) => [...link.primaryGems, ...link.secondaryGems])
-        .map((gem) => gem.id),
+    const setIds = [
+      ...new Set(
+        gemLinks
+          .filter((link) => link.title === title)
+          .flatMap((link) => [...link.primaryGems, ...link.secondaryGems])
+          .map((gem) => gem.id),
+      ),
+    ];
+    const inSet = new Set(setIds);
+    const left = toGet.filter((id) => inSet.has(id));
+    const wanted = (left.length > 0 ? left : setIds).flatMap((id) =>
+      Data.Gems[id] ? [Data.Gems[id].name] : [],
     );
-    const wanted = toGet
-      .filter((id) => inSet.has(id))
-      .flatMap((id) => (Data.Gems[id] ? [Data.Gems[id].name] : []));
     if (wanted.length === 0) return "";
     const { regex, count, total } = gemRegex(wanted, ALL_GEM_NAMES);
     return count > 0 ? JSON.stringify({ text: regex, count, total }) : "";
