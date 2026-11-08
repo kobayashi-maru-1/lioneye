@@ -1176,7 +1176,8 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		loadBuildFromXML(bundled, "Guide")
 		local msg = takePromptError()
 		if msg then
-			error("Build didn't load: " .. msg, 0)
+			-- A build PoB can't read (a pasted or live one) leaves PoB itself fine: kept.
+			error(KEEP .. "Build didn't load: " .. msg, 0)
 		end
 		loadedXml = xml
 	else

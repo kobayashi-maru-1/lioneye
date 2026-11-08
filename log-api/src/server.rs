@@ -227,6 +227,9 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
             post(pob_stats).layer(DefaultBodyLimit::max(32 * 1024 * 1024)),
         )
         .route("/api/data/{name}", get(web_data))
+        .route("/api/ninja/version", get(ninja_version))
+        .route("/api/ninja/character", get(ninja_character))
+        .route("/api/ninja/characters", get(ninja_characters))
         .route("/api/app", get(app_info))
         .route("/api/character", get(character))
         .route("/api/settings", post(update_settings))
@@ -626,6 +629,79 @@ async fn web_data(
     match web_data::fetch(source).await {
         Ok(json) => ([(header::CONTENT_TYPE, "application/json")], json).into_response(),
         Err(msg) => (StatusCode::BAD_GATEWAY, msg).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct NinjaQuery {
+    /// The character's poe.ninja page.
+    link: String,
+}
+
+/// Your live character's data version on poe.ninja (ninja-character.rs): the guide checks
+/// it every few minutes and fetches the character only when it changed.
+async fn ninja_version(headers: HeaderMap, Query(query): Query<NinjaQuery>) -> Response {
+    ninja_answer(&headers, &query.link, |character| {
+        crate::ninja_character::version(&character)
+            .map(|version| serde_json::json!({ "version": version }))
+    })
+    .await
+}
+
+/// Your live character from poe.ninja: level, class and the PoB code its page shows.
+async fn ninja_character(headers: HeaderMap, Query(query): Query<NinjaQuery>) -> Response {
+    ninja_answer(&headers, &query.link, |character| {
+        crate::ninja_character::fetch(&character)
+            .and_then(|live| serde_json::to_value(live).map_err(|err| err.to_string()))
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+struct NinjaAccountQuery {
+    /// "Name#1234" (or "Name-1234").
+    account: String,
+}
+
+/// The characters on an account's public poe.ninja profile, for Settings to pick from.
+async fn ninja_characters(
+    headers: HeaderMap,
+    Query(query): Query<NinjaAccountQuery>,
+) -> Response {
+    if !local_origin(&headers) || !local_host(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let Some(account) = crate::ninja_character::parse_account(&query.account) else {
+        return (StatusCode::BAD_REQUEST, "Not an account name. Use Name#1234").into_response();
+    };
+    match tokio::task::spawn_blocking(move || crate::ninja_character::characters(&account)).await
+    {
+        Ok(Ok(list)) => Json(list).into_response(),
+        Ok(Err(msg)) => (StatusCode::BAD_GATEWAY, msg).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+/// Runs a poe.ninja request off the async runtime, for a guide page on this PC and a
+/// character page link only.
+async fn ninja_answer(
+    headers: &HeaderMap,
+    link: &str,
+    work: impl FnOnce(crate::ninja_character::Character) -> Result<serde_json::Value, String>
+    + Send
+    + 'static,
+) -> Response {
+    // Starts curl: only for a guide page on this PC, by its local name.
+    if !local_origin(headers) || !local_host(headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let Some(character) = crate::ninja_character::parse_link(link) else {
+        return (StatusCode::BAD_REQUEST, "Character link invalid. Pick again").into_response();
+    };
+    match tokio::task::spawn_blocking(move || work(character)).await {
+        Ok(Ok(json)) => Json(json).into_response(),
+        Ok(Err(msg)) => (StatusCode::BAD_GATEWAY, msg).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
 

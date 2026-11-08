@@ -19,6 +19,8 @@ mod guide_move;
 #[cfg(windows)]
 mod guide_window;
 mod log_reader;
+#[path = "ninja-character.rs"]
+mod ninja_character;
 #[cfg(windows)]
 mod overlay;
 mod pob;

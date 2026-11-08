@@ -87,6 +87,29 @@ Campaign ticks are kept by what each step says (with the step before it), not by
 so a different gem list, bandit or route option never moves a tick onto another step. Ticks
 saved before 0.4.7 are moved over once, the first time the guide opens.
 
+### Live character (poe.ninja)
+
+Also in **Settings → Build**, for **Compare** and **Build health** on the character you're
+playing:
+
+- **PoE account**: your account name (`Name#1234`), then **Load**. It lists the characters
+  your poe.ninja profile shows (name, level, class, league), and the account is kept once
+  they load. Emptied, the button reads **Clear** and forgets the account and the live
+  character. Connect your account on poe.ninja and keep the profile public: nothing here
+  signs in.
+- **Live character**: pick one (**None** stops following). The guide reads the PoB code
+  poe.ninja's character page shows ("Import code for Path of Building"), then the bundled
+  PoB calculates it. Under it: the character's name, level and class, or why it wasn't read.
+- It stays current by itself: every 3 minutes, and 1 and 4 minutes after a level-up, the
+  exe asks poe.ninja whether the character changed and reads it only if so. **Refresh**
+  reads it now. poe.ninja re-reads a connected character from the game every few minutes;
+  making it re-read right away needs a poe.ninja sign-in, so Lioneye doesn't.
+
+poe.ninja's addresses for this are the ones its own pages use, not a published API, so a
+change on poe.ninja's side can break it until Lioneye is updated. The bundled PoB holds one
+build at a time, so after the live character is calculated, the guide's next loadout
+change takes a few seconds longer (as after a Compare).
+
 Open, Edit and the file watch work only from the guide on this PC: never from another
 device (`--address 0.0.0.0`) or another website, and only for local `.xml` files (not
 network paths). Edit changes PoB's `Settings.xml` only when it reads cleanly as PoB's own
@@ -115,7 +138,7 @@ settings; otherwise it leaves it alone and says so.
   click it (or use the bar). **Reset campaign** opens Campaign again.
 - The one bar at the top jumps to each panel and holds the auto-progress pill (at the right)
   and ⚙ **Settings** (right after the panel buttons): one list in three sections, with a bar
-  pinned at its top that jumps to each and underlines the one you're in: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded build: **Unload**, **Copy**, **Open**, **Edit**, **Import**; **Editor**; search strings; see [Your build](#your-build)), **Route** (Edit
+  pinned at its top that jumps to each and underlines the one you're in: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded build: **Unload**, **Copy**, **Open**, **Edit**, **Import**; **Editor**; **PoE account** and **Live character**; search strings; see [Your build](#your-build)), **Route** (Edit
   route, Export, **Reset campaign**, **Reset gems**, class, bandits, League Start, Library, Gems Only, hints, and the gem list,
   open until you fold it). The
   Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while
@@ -140,7 +163,9 @@ settings; otherwise it leaves it alone and says so.
   same bundled PoB calculates it as **Build 1**; **Build 2** is the guide's shown loadout.
   The Stats, Passives, Skills and Items tabs list what differs between them. Passives
   match by name, so a build on another tree version still lines up. The last code is
-  remembered; **Change** pastes another. PoB holds one build at a time, so the guide's next
+  remembered; **Change** pastes another. With a live character set, the dropdown at the
+  top picks Build 1: **Live character** (tagged **Live**, with its level; **Refresh** reads
+  it again) or **Pasted build**. PoB holds one build at a time, so the guide's next
   loadout change takes a few seconds longer after a compare.
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
@@ -159,7 +184,10 @@ settings; otherwise it leaves it alone and says so.
   [PoB Redux](https://github.com/pobredux/pob-redux)'s (MIT), with its rules unchanged:
   resistances, passive and ascendancy points, main skill links, skills to press, flasks,
   pantheon, skill costs, life, movement speed, attribute requirements, gem errors and
-  reduced-requirement affixes. Like Redux, it uses the build's level from PoB.
+  reduced-requirement affixes. Like Redux, it uses the build's level from PoB. With a live
+  character set, its header's dropdown picks what it checks: **Live** (your character from
+  poe.ninja, named under the header; its findings don't link to the guide's panels, which
+  show the plan) or **Plan** (the shown loadout).
 - Your character, from the game's log: the exe reads back the character the guide follows
   (by name, so party members' level-ups are ignored): every "Successfully allocated passive
   skill" line since its level 2 (refunds aren't logged; a point taken on another of your

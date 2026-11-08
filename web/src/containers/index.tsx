@@ -4,6 +4,7 @@ import { useAutoProgress } from "../components/AutoProgress";
 import { AppBar } from "../components/AppBar";
 import { CampaignTip } from "../components/CampaignTip";
 import { Footer } from "../components/Footer";
+import { LiveCharacterSync } from "../components/LiveCharacter";
 import { moveOldTicksAtom } from "../state/route-progress";
 import { pageMode } from "../state/saved-state";
 import { pipe } from "../utility";
@@ -39,6 +40,8 @@ export function App() {
       <Suspense fallback={null}>
         <CampaignTip />
       </Suspense>
+      {/* Your live character from poe.ninja (Compare, Build health). */}
+      {pageMode !== "migrate" && <LiveCharacterSync />}
       <Suspense fallback={<Loading />}>
         <ErrorBoundary FallbackComponent={ErrorFallback}>
           <Routes>

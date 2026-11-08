@@ -4,6 +4,7 @@ import { BuildCodeForm } from "../../components/BuildCodeForm";
 import { BuildInfoForm } from "../../components/BuildInfoForm";
 import { ConfigForm } from "../../components/ConfigForm";
 import { PobEditorSelect } from "../../components/DesktopPob";
+import { LiveCharacterForm } from "../../components/LiveCharacter";
 import { GemEditForm } from "../../components/GemEditForm";
 import { Modal } from "../../components/Modal";
 import { OverlayForm } from "../../components/OverlayForm";
@@ -207,6 +208,7 @@ export default function BuildContainer() {
         <div className={classNames(formStyles.form)}>
           <BuildCodeForm />
           <PobEditorSelect />
+          <LiveCharacterForm />
           <SearchStringsEditor />
           <span className={classNames(styles.hint)}>
             A # line names the string below it.

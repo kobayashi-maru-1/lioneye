@@ -1,4 +1,11 @@
 import { compareCodeAtom } from "../../state/compare";
+import {
+  compareSourceAtom,
+  liveCharacterAtom,
+  liveRefreshAtom,
+  liveStatsAtom,
+} from "../../state/live-character";
+import { PanelSelect } from "../PanelSelect";
 import { pobCodeToXml } from "../../state/pob/process";
 import { formStyles } from "../../styles";
 import { fetchStringOrUrl } from "../../utility";
@@ -25,8 +32,8 @@ import {
 } from "./diff";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useAtom } from "jotai";
-import { useEffect, useMemo, useState } from "react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaExchangeAlt } from "react-icons/fa";
 
 type Tab = "stats" | "passives" | "skills" | "items";
@@ -71,8 +78,21 @@ export function BuildCompare({ buttonClassName }: { buttonClassName: string }) {
   );
 }
 
+/** Build 1's choices, when a live character is set. */
+const SOURCES = [
+  { value: "live", label: "Live character" },
+  { value: "code", label: "Pasted build" },
+] as const;
+
 function CompareDialog({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useAtom(compareCodeAtom);
+  // Build 1: your live character from poe.ninja (when set), or a pasted build.
+  const live = useAtomValue(liveCharacterAtom);
+  const liveStats = useAtomValue(liveStatsAtom);
+  const setRefresh = useSetAtom(liveRefreshAtom);
+  const [source, setSource] = useAtom(compareSourceAtom);
+  const onLive = live !== null && source === "live";
+  const liveReady = onLive && liveStats?.code === live.code ? liveStats : null;
   const [editing, setEditing] = useState(code === null);
   const [draft, setDraft] = useState("");
   const [importing, setImporting] = useState(false);
@@ -92,9 +112,16 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
       : undefined;
   const loadoutTitle = guide?.loadout ? stripPob(guide.loadout) : undefined;
 
-  // The pasted build's stats, for the saved code.
+  // The pasted build's stats, for the saved code. Switching back from Live keeps the
+  // answer already here (each calculation reloads PoB's build).
+  const calculated = useRef<{ code: string; attempt: number } | null>(null);
   useEffect(() => {
-    if (code === null) return;
+    if (code === null || onLive) return;
+    if (
+      calculated.current?.code === code &&
+      calculated.current.attempt === attempt
+    )
+      return;
     let xml: string;
     try {
       xml = pobCodeToXml(code);
@@ -105,14 +132,17 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
     const controller = new AbortController();
     setYours({ code });
     fetchBuildStats(xml, controller.signal)
-      .then((stats) => setYours({ code, stats }))
+      .then((stats) => {
+        calculated.current = { code, attempt };
+        setYours({ code, stats });
+      })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
         console.warn("Compare: PoB failed", err);
         setYours({ code, error: "Not calculated. Retry or restart the app." });
       });
     return () => controller.abort();
-  }, [code, attempt]);
+  }, [code, attempt, onLive]);
 
   const submit = async () => {
     const text = draft.trim();
@@ -138,7 +168,16 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const ready = yours?.code === code ? yours : null;
+  const pasted = yours?.code === code ? yours : null;
+  // Build 1 as shown: the live character's numbers, or the pasted build's.
+  const ready: Yours | null = onLive
+    ? liveReady === null || liveReady.state === "loading"
+      ? { code: live.code }
+      : liveReady.state === "error"
+        ? { code: live.code, error: "Not calculated. Retry." }
+        : { code: live.code, stats: liveReady.stats }
+    : pasted;
+  const showEditor = editing && !onLive;
 
   return (
     <Modal
@@ -151,12 +190,24 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
     >
       <div className={classNames(styles.top)}>
         <h2 className={classNames(styles.heading)}>Compare</h2>
+        {live !== null && (
+          <PanelSelect
+            label="Build 1"
+            options={SOURCES.map((option) => option.label)}
+            value={source === "live" ? 0 : 1}
+            onChange={(i) => {
+              const next = SOURCES[i].value;
+              setSource(next);
+              if (next === "code" && code === null) setEditing(true);
+            }}
+          />
+        )}
         <button className={classNames(formStyles.formButton)} onClick={onClose}>
           Close
         </button>
       </div>
 
-      {editing ? (
+      {showEditor ? (
         <div className={classNames(styles.input)}>
           <textarea
             className={classNames(formStyles.formInput, styles.code)}
@@ -193,8 +244,9 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
           <div className={classNames(styles.builds)}>
             <div className={classNames(styles.buildList)}>
               <BuildRow
-                tag="Build 1"
+                tag={onLive ? "Live" : "Build 1"}
                 stats={ready?.stats}
+                loadout={onLive ? `Level ${live.level}` : undefined}
                 note={
                   ready?.error ??
                   (ready?.stats === undefined ? "Calculating…" : undefined)
@@ -210,20 +262,34 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
             {ready?.error && (
               <button
                 className={classNames(formStyles.formButton)}
-                onClick={() => setAttempt((n) => n + 1)}
+                onClick={() =>
+                  onLive ? setRefresh((n) => n + 1) : setAttempt((n) => n + 1)
+                }
               >
                 Retry
               </button>
             )}
-            <button
-              className={classNames(formStyles.formButton)}
-              onClick={() => {
-                setImportError(null);
-                setEditing(true);
-              }}
-            >
-              Change
-            </button>
+            {onLive ? (
+              // Retry does the same while an error shows.
+              !ready?.error && (
+                <button
+                  className={classNames(formStyles.formButton)}
+                  onClick={() => setRefresh((n) => n + 1)}
+                >
+                  Refresh
+                </button>
+              )
+            ) : (
+              <button
+                className={classNames(formStyles.formButton)}
+                onClick={() => {
+                  setImportError(null);
+                  setEditing(true);
+                }}
+              >
+                Change
+              </button>
+            )}
           </div>
           {ready?.stats && guide && guideReady && (
             <Differences
