@@ -23,8 +23,16 @@ import {
 } from "./data";
 import styles from "./styles.module.css";
 import { type TradeIndex, tradeIndex, tradeUrl } from "./trade-query";
+import {
+  type OverlayGear,
+  type OverlayItem,
+  overlayGearAtom,
+} from "../../state/overlay";
+import { displaySetName } from "../../state/current-act";
+import { stripPob } from "../PobText";
 import classNames from "classnames";
-import { useMemo, useState } from "react";
+import { useSetAtom } from "jotai";
+import { useEffect, useMemo, useState } from "react";
 import { FaBalanceScale, FaRegClipboard } from "react-icons/fa";
 import { toast } from "react-toastify";
 
@@ -85,6 +93,36 @@ export async function copyItem(item: GearItem) {
   }
 }
 
+/** An item set as the in-game bar shows it: paper-doll slots, then flasks. */
+function overlayGear(gear: Gear, set: Gear["sets"][number]): OverlayGear {
+  const order = (slot: string) =>
+    DOLL[slot] !== undefined ? 0 : slot.startsWith("Flask") ? 1 : 2;
+  const items = set.slots
+    .filter((s) => order(s.slot) < 2)
+    .sort((a, b) => order(a.slot) - order(b.slot))
+    .flatMap(({ slot, item: id }): OverlayItem[] => {
+      const item = gear.items[String(id)];
+      if (!item) return [];
+      const name = itemName(item);
+      return [
+        {
+          slot,
+          name,
+          base: item.base && item.base !== name ? item.base : undefined,
+          colour: RARITY_COLOURS[item.rarity ?? "NORMAL"] ?? "#c8c8c8",
+          enchant: item.enchant.map((line) => line.text),
+          implicit: item.implicit.map((line) => line.text),
+          explicit: item.explicit.map((line) =>
+            line.crafted
+              ? { text: line.text, crafted: true }
+              : { text: line.text },
+          ),
+        },
+      ];
+    });
+  return { title: displaySetName(stripPob(set.title)), items };
+}
+
 /**
  * pob.codes-style Gear panel: the loadout's item set as a paper doll, with flasks, the
  * other slots (weapon swap, abyssal sockets, grafts) and the tree's jewels. Hover an item
@@ -103,6 +141,14 @@ export function GearPanel() {
     lists ? lists.active.items - 1 : null,
   );
   const { league, leagues, setLeague } = useTradeLeague();
+
+  // The in-game bar's Gear tooltip: the set shown here, with each item's mods.
+  const setOverlayGear = useSetAtom(overlayGearAtom);
+  // None while a different build calculates (a save of the same one keeps its gear).
+  useEffect(() => {
+    const set = gear?.sets[index];
+    setOverlayGear(gear && set ? overlayGear(gear, set) : null);
+  }, [gear, index, setOverlayGear]);
 
   return (
     <PageSection

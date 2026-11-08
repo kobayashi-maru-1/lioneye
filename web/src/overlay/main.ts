@@ -1,8 +1,10 @@
 // The in-game bar, shown by lioneye.exe over the game in a WebView2 window
 // (log-api/src/overlay.rs). Buttons tell the exe, which tells the guide page to jump to that
 // panel. The exe sends the buttons ("overlay:" messages) from the guide's Settings, and the
-// guide's tooltips ("tips:"): the Gems panel's set, Campaign's next steps and the Tree's
-// next points.
+// guide's tooltips ("tips:"): the Gems panel's set, Campaign's next steps, the Tree's
+// next points, the Gear panel's items and the build's notes.
+import type { OverlayGear } from "../state/overlay";
+import { notesLines, pobSpans } from "../state/pob/colour";
 import { TREE_DATA_LOOKUP } from "../state/tree";
 import type { TreeTip } from "../state/tree/next-points";
 import "./styles.css";
@@ -56,7 +58,10 @@ let socket: WebSocket | null = null;
 let shown = "";
 /** The ids of the bar's buttons. */
 let barIds = new Set<string>();
-/** The guide's tooltips by button: "gems" (OverlayGems | null), "campaign" (Step[]), "tree" (TreeTip). */
+/**
+ * The guide's tooltips by button: "gems" (OverlayGems | null), "campaign" (Step[]), "tree"
+ * (TreeTip), "gear" (OverlayGear | null), "notes" (string | null).
+ */
 let tips: Record<string, unknown> = {};
 /** Whether the first tooltips have arrived (a pinned one opens then). */
 let tipsArrived = false;
@@ -66,13 +71,15 @@ let openId: string | null = null;
 let up = false;
 
 /**
- * Buttons with a tooltip: Gems (the Gems panel's links), Campaign (the next steps), Tree.
- * Every tooltip gets the pin and the flip.
+ * Buttons with a tooltip: Gems (the Gems panel's links), Campaign (the next steps), Tree,
+ * Gear (the items' mods) and Notes. Every tooltip gets the pin and the flip.
  */
 const TIPS: Record<string, () => void> = {
   gems: renderGems,
   campaign: renderCampaign,
   tree: renderTree,
+  gear: renderGear,
+  notes: renderNotes,
 };
 
 /** One tooltip can be pinned open, kept across restarts. */
@@ -299,6 +306,77 @@ function renderGems() {
   );
 }
 
+/** A text list from a message, keeping only strings. */
+function texts(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((text): text is string => typeof text === "string")
+    : [];
+}
+
+/**
+ * Gear: the Gear panel's items with PoB's mods, two to a row, scrolling past the cap.
+ * Enchants and implicits dim above the explicit mods; crafted mods in their own colour.
+ */
+function renderGear() {
+  const gear = (tips.gear ?? null) as OverlayGear | null;
+  if (gear === null || !Array.isArray(gear.items) || gear.items.length === 0) {
+    fill("Gear", el("div", "tipEmpty", "No gear"));
+    return;
+  }
+  const items = gear.items.map((item) => {
+    const name = el("div", "tipItemName", String(item.name ?? ""));
+    if (typeof item.colour === "string") name.style.color = item.colour;
+    const mods = (kind: string, lines: string[]) =>
+      lines.map((text) => el("div", `tipMod ${kind}`, text));
+    const above = [
+      ...mods("enchant", texts(item.enchant)),
+      ...mods("implicit", texts(item.implicit)),
+    ];
+    const explicit = (Array.isArray(item.explicit) ? item.explicit : [])
+      .filter((mod) => typeof mod?.text === "string")
+      .map((mod) =>
+        el("div", mod.crafted ? "tipMod crafted" : "tipMod", mod.text),
+      );
+    return el(
+      "div",
+      "tipItem",
+      el("div", "tipSlot", String(item.slot ?? "")),
+      name,
+      ...(item.base ? [el("div", "tipBase", String(item.base))] : []),
+      ...above,
+      ...(above.length > 0 && explicit.length > 0 ? [el("div", "tipSep")] : []),
+      ...explicit,
+    );
+  });
+  fill(
+    typeof gear.title === "string" && gear.title ? gear.title : "Gear",
+    el("div", "tipScroll", el("div", "tipGear", ...items)),
+  );
+}
+
+/** Notes: the build's PoB notes in PoB's colours, scrolling past the cap. */
+function renderNotes() {
+  const notes = tips.notes;
+  if (typeof notes !== "string" || notes.trim() === "") {
+    fill("Notes", el("div", "tipEmpty", "No notes"));
+    return;
+  }
+  const lines = notesLines(notes).map((line) => {
+    if (line.replace(/\^(x[0-9a-fA-F]{6}|[0-9])/g, "").trim() === "")
+      return el("div", "tipBlank");
+    return el(
+      "div",
+      "tipNote",
+      ...pobSpans(line).map((span) => {
+        const part = el("span", "", span.text);
+        if (span.colour) part.style.color = span.colour;
+        return part;
+      }),
+    );
+  });
+  fill("Notes", el("div", "tipScroll", ...lines));
+}
+
 const TREE_TITLE = "Next points";
 
 /** "^2Lvl 13-24 {2}" → "Lvl 13-24": PoB colour codes and loadout links aren't for reading. */
@@ -501,6 +579,7 @@ function connect() {
         // A malformed message: keep the current buttons.
       }
     } else if (event.data.startsWith("tips:")) {
+      const before = openId === null ? undefined : JSON.stringify(tips[openId]);
       try {
         const all = JSON.parse(event.data.slice("tips:".length)) as unknown;
         tips =
@@ -510,8 +589,18 @@ function connect() {
       } catch {
         tips = {};
       }
-      if (!tip.hidden) renderTip();
-      else if (!tipsArrived) rest();
+      // Every tooltip comes each time one changes (Campaign on each zone): the open one is
+      // drawn again only when its own changed, keeping where you scrolled it to.
+      const changed =
+        openId === null || JSON.stringify(tips[openId]) !== before;
+      if (!tip.hidden) {
+        if (changed) {
+          const scrolled = tip.querySelector(".tipScroll")?.scrollTop ?? 0;
+          renderTip();
+          const scroll = tip.querySelector(".tipScroll");
+          if (scroll) scroll.scrollTop = scrolled;
+        }
+      } else if (!tipsArrived) rest();
       tipsArrived = true;
     }
     // Log lines and jumps are for the guide page.

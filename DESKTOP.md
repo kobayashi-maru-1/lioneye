@@ -185,11 +185,16 @@ settings; otherwise it leaves it alone and says so.
 
 ## Overlay
 
-- While Path of Exile is the window in front, the exe shows a small bar over the game with a
+- While Path of Exile is the window in front and you're playing a character, the exe shows a
+  small bar over the game (hidden on the login and character select screens, as the game's
+  log tells: a zone shows it, logging in or out hides it) with a
   button per guide panel. A button opens that panel in the guide (on your other monitor) and
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
 - Hover **Gems** for the Gems panel's links (the set it shows for your loadout),
+  **Gear** for the Gear panel's items with their PoB mods (enchants and implicits, then
+  explicits; crafted lighter), **Notes** for the build's PoB notes in PoB's colours (both
+  scroll with the mouse wheel when long),
   **Campaign** for your next 3 steps, or **Tree** for the tree zoomed to your next points
   (for the set the Tree panel shows, named beside the title):
   yours blue, the guide's points up to 3 away from yours

@@ -72,3 +72,29 @@ export const CAMPAIGN_TIP_STEPS = 3;
  * tooltip. Undefined until the guide page has worked them out.
  */
 export const overlayCampaignAtom = atom<StepPart[][] | undefined>(undefined);
+
+/** An item as the in-game bar's Gear tooltip shows it: its name and PoB's mods. */
+export interface OverlayItem {
+  slot: string;
+  name: string;
+  /** The base type, when the name isn't it (rares, uniques). */
+  base?: string;
+  /** Its rarity's colour. */
+  colour: string;
+  enchant: string[];
+  implicit: string[];
+  /** Explicit mods; crafted ones marked. */
+  explicit: { text: string; crafted?: boolean }[];
+}
+
+/** The item set the Gear panel shows, for the in-game bar's Gear tooltip. */
+export interface OverlayGear {
+  title: string;
+  items: OverlayItem[];
+}
+
+/**
+ * Set by the Gear panel; null when the build has no gear. Undefined until the Gear panel
+ * has shown, so a guide opened on Settings doesn't clear what another page sent.
+ */
+export const overlayGearAtom = atom<OverlayGear | null | undefined>(undefined);

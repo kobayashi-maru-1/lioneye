@@ -1,6 +1,7 @@
 //! The in-game bar: a small always-on-top window over Path of Exile that shows the guide's
 //! `/overlay.html` page in WebView2 (the engine Edge uses). Its buttons tell the guide page to
-//! jump to a panel (see server.rs). It shows while the game is the window in front.
+//! jump to a panel (see server.rs). It shows while the game is the window in front and the
+//! game's log has you in a zone (not on the login or character select screens).
 //!
 //! The window never takes focus: clicking it leaves the game focused. If WebView2 takes focus
 //! anyway, it's handed straight back to the game.
@@ -112,6 +113,9 @@ struct Window {
 pub struct Overlay {
     url: String,
     config: watch::Receiver<OverlayConfig>,
+    /// From the game's log: in a zone (true), or at login or character select (false);
+    /// None when the log doesn't say. The bar hides only on false.
+    zone: watch::Receiver<Option<bool>>,
     position: Option<(i32, i32)>,
     always: bool,
     window: Option<Window>,
@@ -131,7 +135,12 @@ pub struct Overlay {
 impl Overlay {
     /// `url` is the guide's address ("http://127.0.0.1:6754/"). Nothing is created until the
     /// bar is first needed.
-    pub fn new(url: &str, config: watch::Receiver<OverlayConfig>, saved: &Saved) -> Self {
+    pub fn new(
+        url: &str,
+        config: watch::Receiver<OverlayConfig>,
+        zone: watch::Receiver<Option<bool>>,
+        saved: &Saved,
+    ) -> Self {
         let (ipc_tx, ipc_rx) = mpsc::channel();
         let always = std::env::var_os(ALWAYS_ENV).is_some_and(|v| v != "0");
         if always {
@@ -140,6 +149,7 @@ impl Overlay {
         Self {
             url: format!("{url}overlay.html"),
             config,
+            zone,
             // A spot on a monitor that's gone: start over at the default place.
             position: saved.position.filter(|&(x, y)| on_screen(x, y)),
             always,
@@ -189,7 +199,10 @@ impl Overlay {
         }
 
         let on = self.config.borrow().on;
-        let wanted = on && (self.always || own || is_game(front));
+        // Over the game only while you're playing a character: not on its login or
+        // character select screens.
+        let playing = *self.zone.borrow() != Some(false);
+        let wanted = on && (self.always || ((own || is_game(front)) && playing));
         if wanted && self.window.is_none() && !self.failed {
             match self.create() {
                 Ok(window) => self.window = Some(window),

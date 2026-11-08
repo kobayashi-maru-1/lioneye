@@ -20,6 +20,11 @@ pub struct Reader {
 }
 
 impl Reader {
+    /// Where the next read starts (bytes into the file).
+    pub fn offset(&self) -> u64 {
+        self.byte_offset
+    }
+
     /// Reads lines added since the last call and passes the matching ones to `f`.
     pub fn read_latest(&mut self, mut f: impl FnMut(&str)) -> Result<(), std::io::Error> {
         let mut file = File::open(&self.path)?;

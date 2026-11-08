@@ -1,11 +1,12 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { bossesKilledBy } from "../../state/boss-kills";
 import {
   OVERLAY_PANELS,
   overlayCampaignAtom,
+  overlayGearAtom,
   overlayGemsAtom,
   overlaySettingsAtom,
   overlayTreeAtom,
@@ -34,11 +35,44 @@ import {
   isCharacterLine,
 } from "../../state/character";
 import { levelLineAtom } from "../../state/level-lines";
-import { pobFileSelector, refreshFromFileAtom } from "../../state/pob";
+import { pobAtom, pobFileSelector, refreshFromFileAtom } from "../../state/pob";
+import { pobCodeToXml } from "../../state/pob/process";
+import { buildNotes } from "../BuildNotes";
 import { characterLevelAtom } from "../../state/character-level";
 import useWebSocket, { ReadyState } from "react-use-websocket-lite";
 import classNames from "classnames";
 import styles from "./styles.module.css";
+
+/** The Notes tooltip's message at most this long, in bytes (the exe takes 64 KB a tooltip). */
+const MAX_NOTES_BYTES = 60_000;
+
+/** A message's size as the exe counts it. */
+const byteLength = (text: string) => new TextEncoder().encode(text).length;
+
+/**
+ * The build's PoB notes for the bar's Notes tooltip, as JSON: cut to fit the exe's limit
+ * (never inside a character); "null" without a build or notes.
+ */
+function notesFor(code: string | null) {
+  if (code === null) return "null";
+  let notes: string | null;
+  try {
+    notes = buildNotes(pobCodeToXml(code));
+  } catch {
+    return "null";
+  }
+  if (notes === null) return "null";
+  let json = JSON.stringify(notes);
+  let keep = notes.length;
+  while (byteLength(json) > MAX_NOTES_BYTES && keep > 0) {
+    keep = Math.floor(keep * 0.9);
+    // Not between the two halves of an emoji or other paired character.
+    const unit = notes.charCodeAt(keep - 1);
+    const cut = unit >= 0xd800 && unit <= 0xdbff ? keep - 1 : keep;
+    json = JSON.stringify(`${notes.slice(0, cut)}\n…`);
+  }
+  return json;
+}
 
 // The local exe serves the page and the auto-progress socket from the same address.
 const AUTO_PROGRESS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
@@ -197,7 +231,8 @@ export function useAutoProgress() {
           ).map(({ id, label }) => ({ id, label }));
     sendMessage(`overlay:${JSON.stringify({ on: settings.on, buttons })}`);
   }, [talks, settings, shown]);
-  // The bar's tooltips: the Gems panel's set, Campaign's next steps, the Tree's next points.
+  // The bar's tooltips: the Gems panel's set, Campaign's next steps, the Tree's next
+  // points, the Gear panel's items and the build's notes.
   const gems = useAtomValue(overlayGemsAtom);
   useEffect(() => {
     if (talks && gems !== undefined)
@@ -213,6 +248,20 @@ export function useAutoProgress() {
     if (talks && tree !== undefined)
       sendMessage(`tip:tree:${JSON.stringify(tree)}`);
   }, [talks, tree]);
+  const gear = useAtomValue(overlayGearAtom);
+  useEffect(() => {
+    if (talks && gear !== undefined)
+      sendMessage(`tip:gear:${JSON.stringify(gear)}`);
+  }, [talks, gear]);
+  const code = useAtomValue(pobAtom);
+  const notes = useMemo(() => notesFor(code), [code]);
+  // Only a page that has had a build speaks for the notes (and clears them on Unload), so
+  // another page without one doesn't blank the bar's.
+  const hadBuild = useRef(false);
+  if (code !== null) hadBuild.current = true;
+  useEffect(() => {
+    if (talks && hadBuild.current) sendMessage(`tip:notes:${notes}`);
+  }, [talks, notes]);
 }
 
 /** The exe's build this page was served by (its first "build:" message). */

@@ -196,6 +196,80 @@ body {
   color: #8a96a8;
 }
 
+/* Gear and Notes can run long: their content scrolls (mouse wheel) under the title row. */
+.tipScroll {
+  max-height: 560px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3d4a5e transparent;
+}
+
+/* Gear: two items to a row, wider than the other tooltips. */
+.tip:has(.tipGear) {
+  max-width: 600px;
+}
+
+.tipGear {
+  display: grid;
+  grid-template-columns: repeat(2, 280px);
+  gap: 4px;
+}
+
+.tipItem {
+  padding: 4px 6px;
+  background-color: #1b1b1b;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+}
+
+.tipSlot {
+  color: #8a96a8;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tipItemName {
+  font-weight: 600;
+}
+
+.tipBase {
+  color: #c8c8c8;
+}
+
+.tipMod {
+  color: #8888ff;
+}
+
+.tipMod.enchant {
+  color: #b4b4ff;
+}
+
+.tipMod.implicit {
+  color: #8888ff;
+  opacity: 0.75;
+}
+
+.tipMod.crafted {
+  color: #b4b4ff;
+}
+
+/* Between enchants and implicits and the explicit mods, as in the game's tooltips. */
+.tipSep {
+  margin: 2px 0;
+  border-top: 1px solid #2d2d2d;
+}
+
+/* Notes: PoB's colours on its normal grey-white. */
+.tipNote {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tipBlank {
+  height: 0.6em;
+}
+
 /* Campaign: the next steps, coloured as in the guide's Campaign. */
 .tipStep {
   padding: 3px 6px;

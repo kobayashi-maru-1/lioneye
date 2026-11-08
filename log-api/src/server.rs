@@ -488,12 +488,18 @@ async fn serve_client(
                         jump(state, id).await;
                     } else if let Some(rest) = text.strip_prefix("tip:") {
                         // "tip:<panel>:<json>": a button's tooltip, passed on to the bar as
-                        // is (checked to be JSON, kept small).
+                        // is (checked to be JSON, kept small). One too big or not JSON
+                        // clears that tooltip rather than leaving an older build's.
                         if let Some((id, json)) = rest.split_once(':')
                             && panel_id(id).is_some()
-                            && json.len() <= MAX_TIP
-                            && serde_json::from_str::<serde_json::Value>(json).is_ok()
                         {
+                            let json = if json.len() <= MAX_TIP
+                                && serde_json::from_str::<serde_json::Value>(json).is_ok()
+                            {
+                                json
+                            } else {
+                                "null"
+                            };
                             state.tips.send_if_modified(|tips| {
                                 if tips.get(id).is_some_and(|old| old == json)
                                     || (!tips.contains_key(id) && tips.len() >= MAX_TIPS)

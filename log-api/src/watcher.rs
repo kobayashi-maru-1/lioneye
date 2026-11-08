@@ -39,6 +39,64 @@ const PATTERNS: [&str; 7] = [
     QUESTS_PATTERN,
     SLAIN_PATTERN,
 ];
+// Where you are, for the in-game bar (these lines aren't sent to the guide). Each is the
+// game's own line from its start (`2026/11/08 06:46:49 798362062 890d9dbc [INFO Client
+// 47200] …`), so chat can't fake one.
+/// `… [DEBUG Client 1] Generating level 23 area "1_2_town"` — a zone: you're playing.
+const ZONE_PATTERN: &str =
+    r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d \d+ [0-9a-f]+ \[\w+ Client \d+\] Generating level \d+ area";
+/// `… [INFO Client 1] Async connecting to wdc.login.pathofexile.com:20489` — the game went
+/// to its login server: logging in, or logging out to character select.
+const LOGIN_PATTERN: &str =
+    r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d \d+ [0-9a-f]+ \[\w+ Client \d+\] Async connecting to \S*login\.";
+/// `2026/11/08 06:46:28 ***** LOG FILE OPENING *****` — the game started (login screen next).
+const OPENING_PATTERN: &str = r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d \*{5} LOG FILE OPENING";
+/// `… [INFO Client 1] [SCENE] Set Source [(unknown)]` — no scene: back at the login screen
+/// (Exit to Login Screen, or after a disconnect).
+const NO_SCENE_PATTERN: &str =
+    r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d \d+ [0-9a-f]+ \[\w+ Client \d+\] \[SCENE\] Set Source \[\(unknown\)\]";
+/// `… [INFO Client 1] Abnormal disconnect: …` — dropped to the login screen.
+const DISCONNECT_PATTERN: &str =
+    r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d \d+ [0-9a-f]+ \[\w+ Client \d+\] Abnormal disconnect";
+/// In the order `in_zone` reads them: in a zone, then the ones that aren't.
+const PLACE_PATTERNS: [&str; 5] = [
+    ZONE_PATTERN,
+    LOGIN_PATTERN,
+    OPENING_PATTERN,
+    NO_SCENE_PATTERN,
+    DISCONNECT_PATTERN,
+];
+/// How much of the log before its end is read for where you are when it's first opened
+/// (zone or login lines come far more often than this in play).
+const PLACE_TAIL: u64 = 1024 * 1024;
+
+/// True for a line that puts you in a zone, false for login or character select, None for
+/// any other line.
+fn in_zone(places: &RegexSet, line: &str) -> Option<bool> {
+    let matched = places.matches(line);
+    if matched.matched(0) {
+        Some(true)
+    } else if matched.matched_any() {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+/// Where the log's last such line before `end` (where the reader starts) puts you. None:
+/// none in the last MB before it.
+fn last_place(path: &Path, end: u64, places: &RegexSet) -> Option<bool> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(path).ok()?;
+    let start = end.saturating_sub(PLACE_TAIL);
+    file.seek(SeekFrom::Start(start)).ok()?;
+    let mut tail = Vec::new();
+    file.take(end - start).read_to_end(&mut tail).ok()?;
+    String::from_utf8_lossy(&tail)
+        .lines()
+        .rev()
+        .find_map(|line| in_zone(places, line))
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -62,19 +120,25 @@ impl Status {
 /// Finds the PoE log, tails it, and broadcasts area, level and speech lines. Goes back to waiting
 /// when the game closes so a restart (and a fresh LatestClient.txt) is picked up. `fixed` is
 /// the log set on the command line or in Settings (None: found from the running game); a
-/// change starts over with it.
+/// change starts over with it. `in_zone` follows whether you're in a zone (true) or at
+/// login or character select (false); None while no log is read or it doesn't say.
 pub async fn run(
     mut fixed: watch::Receiver<Option<PathBuf>>,
     heart_beat: Duration,
     lines: broadcast::Sender<String>,
     status: watch::Sender<Status>,
+    zone: watch::Sender<Option<bool>>,
 ) -> anyhow::Result<()> {
     let patterns = RegexSet::new(PATTERNS)?;
+    let places = RegexSet::new(PLACE_PATTERNS)?;
+    // The reader passes on both kinds of line; only `patterns`' go to the guide.
+    let read = RegexSet::new(PATTERNS.iter().chain(&PLACE_PATTERNS))?;
     let mut sys = System::new();
     let mut interval = tokio::time::interval(heart_beat);
 
     loop {
         status.send_replace(Status::Waiting);
+        zone.send_replace(None);
         info!("Waiting for the Path of Exile client...");
 
         let fixed_path = fixed.borrow_and_update().clone();
@@ -98,7 +162,7 @@ pub async fn run(
         info!("Log file: {}", log_path.display());
         status.send_replace(Status::Watching(log_path.clone()));
 
-        let mut reader = match log_reader::build(&log_path, patterns.clone()) {
+        let mut reader = match log_reader::build(&log_path, read.clone()) {
             Ok(reader) => reader,
             Err(err) => {
                 info!("Could not open the log: {}", err);
@@ -106,6 +170,14 @@ pub async fn run(
                 continue;
             }
         };
+        // Up to where the reader starts, so no line is missed or read twice.
+        let end = reader.offset();
+        let path = log_path.clone();
+        let tail_places = places.clone();
+        let place = tokio::task::spawn_blocking(move || last_place(&path, end, &tail_places))
+            .await
+            .unwrap_or(None);
+        zone.send_replace(place);
 
         let mut ticks: u32 = 0;
         loop {
@@ -115,7 +187,16 @@ pub async fn run(
                 break;
             }
             if let Err(err) = reader.read_latest(|line| {
-                let _ = lines.send(line.to_string());
+                if let Some(now) = in_zone(&places, line) {
+                    zone.send_if_modified(|was| {
+                        let changed = *was != Some(now);
+                        *was = Some(now);
+                        changed
+                    });
+                }
+                if patterns.is_match(line) {
+                    let _ = lines.send(line.to_string());
+                }
             }) {
                 info!("Lost the log: {}", err);
                 break;
@@ -230,5 +311,51 @@ mod tests {
         assert!(forwarded(" : (0 from The Dweller of the Deep)"));
         assert!(forwarded(" : KobayashiSRS has been slain."));
         assert!(!forwarded(" #Bob: (1 from chat)"));
+        assert!(!forwarded(" Async connecting to wdc.login.pathofexile.com:20489"));
+    }
+
+    #[test]
+    fn zones_login_and_character_select_are_told_apart() {
+        let places = RegexSet::new(PLACE_PATTERNS).unwrap();
+        let prefix = "2026/11/08 06:46:49 798362062 890d9dbc [INFO Client 47200]";
+        let place = |rest: &str| in_zone(&places, &format!("{prefix}{rest}"));
+        assert_eq!(place(r#" Generating level 23 area "1_2_town" with seed 1"#), Some(true));
+        assert_eq!(place(" Async connecting to wdc.login.pathofexile.com:20489"), Some(false));
+        assert_eq!(place(" Connecting to instance server at 170.23.221.76:6112"), None);
+        assert_eq!(place(" : You have entered The Coast."), None);
+        assert_eq!(place(" [SCENE] Set Source [(unknown)]"), Some(false));
+        assert_eq!(place(" [SCENE] Set Source [The Coast]"), None);
+        assert_eq!(
+            place(" Abnormal disconnect: An unexpected disconnection occurred."),
+            Some(false)
+        );
+        assert_eq!(in_zone(&places, "2026/11/08 06:46:28 ***** LOG FILE OPENING *****"), Some(false));
+        // Chat can't fake them.
+        assert_eq!(place(" #Bob: ] Async connecting to x.login.y"), None);
+        assert_eq!(place(&format!(" #Bob: {prefix} Abnormal disconnect")), None);
+        assert_eq!(place(" #Bob: 2026/11/08 06:46:28 ***** LOG FILE OPENING *****"), None);
+        assert_eq!(place(&format!(" #Bob: {prefix} Generating level 1 area")), None);
+    }
+
+    #[test]
+    fn the_last_place_in_the_log_counts() {
+        let dir = std::env::temp_dir().join(format!("exile-place-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("Client.txt");
+        let places = RegexSet::new(PLACE_PATTERNS).unwrap();
+        let area = "2026/11/08 06:46:54 798367250 1186a8a3 [DEBUG Client 1] Generating level 2 area \"1_1_2\" with seed 4";
+        let login = "2026/11/08 06:46:49 798362062 890d9dbc [INFO Client 1] Async connecting to wdc.login.pathofexile.com:20489";
+        let len = |path: &Path| std::fs::metadata(path).unwrap().len();
+        std::fs::write(&path, format!("{area}\r\n{login}\r\nnoise\r\n")).unwrap();
+        assert_eq!(last_place(&path, len(&path), &places), Some(false));
+        std::fs::write(&path, format!("{login}\r\n{area}\r\nnoise\r\n")).unwrap();
+        assert_eq!(last_place(&path, len(&path), &places), Some(true));
+        // Only up to where the reader starts: a later login line is the reader's.
+        let before = (login.len() + area.len() + 4) as u64;
+        std::fs::write(&path, format!("{login}\r\n{area}\r\n{login}\r\n")).unwrap();
+        assert_eq!(last_place(&path, before, &places), Some(true));
+        std::fs::write(&path, "noise\r\n").unwrap();
+        assert_eq!(last_place(&path, len(&path), &places), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

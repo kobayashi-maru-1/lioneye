@@ -152,6 +152,8 @@ fn main() -> ExitCode {
     #[cfg(not(windows))]
     let overlay_config = server::OverlayConfig::default();
     let (overlay_tx, overlay_rx) = watch::channel(overlay_config);
+    // From the log: in a zone or at login / character select, for when the bar shows.
+    let (zone_tx, zone_rx) = watch::channel::<Option<bool>>(None);
     // A bar button with no guide open asks the tray thread to open one.
     let (open_tx, open_rx) = std::sync::mpsc::channel::<()>();
     // The guide's saved data, kept by the exe for the guide's own browser profile; one per
@@ -197,14 +199,14 @@ fn main() -> ExitCode {
     let opening = true;
     #[cfg(windows)]
     let bar = Bar {
-        overlay: overlay::Overlay::new(&url, overlay_rx, &saved_overlay),
+        overlay: overlay::Overlay::new(&url, overlay_rx, zone_rx, &saved_overlay),
         open_requests: open_rx,
         moving,
         saved,
         placement: guide_window::PlacementKeeper::load(placement_file(&url)),
     };
     #[cfg(not(windows))]
-    let _ = (overlay_rx, open_rx, saved);
+    let _ = (overlay_rx, zone_rx, open_rx, saved);
 
     // A guide window left open from an earlier run reconnects by itself; bring it up instead.
     if opening && browser_now != Browser::None {
@@ -219,7 +221,7 @@ fn main() -> ExitCode {
     runtime.spawn(async move {
         let res = tokio::select! {
             res = server::serve(listener, state) => res,
-            res = watcher::run(log_path, heart_beat, lines_tx, status_tx) => res,
+            res = watcher::run(log_path, heart_beat, lines_tx, status_tx, zone_tx) => res,
         };
         let _ = done_tx.send(res.map_err(|err| err.to_string()));
     });
