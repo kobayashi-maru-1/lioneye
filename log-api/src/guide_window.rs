@@ -10,10 +10,10 @@ use windows_sys::Win32::System::Threading::{
     OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetClassNameW, GetWindowTextW, GetWindowThreadProcessId, HWND_TOP, IsIconic,
-    IsWindowVisible, PostMessageW, SW_RESTORE, SW_SHOWNOACTIVATE, SWP_ASYNCWINDOWPOS,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetForegroundWindow, SetWindowPos, ShowWindowAsync,
-    WM_CLOSE,
+    EnumWindows, GWL_EXSTYLE, GetClassNameW, GetWindowLongW, GetWindowTextW,
+    GetWindowThreadProcessId, HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, IsWindowVisible,
+    PostMessageW, SW_RESTORE, SW_SHOWNOACTIVATE, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, SetForegroundWindow, SetWindowPos, ShowWindowAsync, WM_CLOSE, WS_EX_TOPMOST,
 };
 
 /// The page titles set in web/src/containers/index.tsx; keep in sync. The app was called
@@ -115,23 +115,28 @@ pub fn show() -> bool {
 
 /// Brings the open guide window above other windows without focusing it, so the game
 /// keeps focus when a bar button is clicked. Restores it if minimized.
+///
+/// Windows ignores a plain move to the top (HWND_TOP) unless Edge may take the foreground,
+/// which it can't while the game is in front. So the window is made topmost and then
+/// normal again: that leaves it above every normal window.
 pub fn raise() {
     let Some(&hwnd) = find().first() else {
         return;
     };
+    let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS;
     unsafe {
         if IsIconic(hwnd) != 0 {
             ShowWindowAsync(hwnd, SW_SHOWNOACTIVATE);
         }
-        SetWindowPos(
-            hwnd,
-            HWND_TOP,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS,
-        );
+        // Already topmost (set so, or an earlier click's pair still running): it's above
+        // every normal window, and adding only half a pair could leave it stuck topmost.
+        if (GetWindowLongW(hwnd, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST) != 0 {
+            return;
+        }
+        // Async: posted to the window's own thread (a hung Edge can't stall the bar), and
+        // run there in this order.
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags);
+        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
     }
 }
 
