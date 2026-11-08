@@ -187,14 +187,18 @@ export function gemPiece(name: string, allNames: readonly string[]) {
   const cached = list.pieces.get(key);
   if (cached !== undefined) return cached;
   const others = list.names.filter((other) => other !== key);
-  let best: { piece: string; rank: number[] } | null = null;
+  // In an object: TypeScript doesn't follow a `let` assigned inside the closure.
+  const found: { best: { piece: string; rank: number[] } | null } = {
+    best: null,
+  };
   const consider = (piece: string) => {
     const rank = [
       others.filter((other) => pieceMatches(piece, other)).length,
       /[ ']/.test(piece) ? 1 : 0,
       piece.length,
     ];
-    if (best === null || before(rank, best.rank)) best = { piece, rank };
+    if (found.best === null || before(rank, found.best.rank))
+      found.best = { piece, rank };
   };
   for (let start = 0; start < key.length; start++) {
     if (start > 0 && key[start - 1] !== " ") continue;
@@ -216,7 +220,7 @@ export function gemPiece(name: string, allNames: readonly string[]) {
       if (whole) consider(`^${core}$`);
     }
   }
-  const piece = best?.piece ?? `^${key.replace(/[^a-z0-9 '-]/g, ".")}$`;
+  const piece = found.best?.piece ?? `^${key.replace(/[^a-z0-9 '-]/g, ".")}$`;
   list.pieces.set(key, piece);
   return piece;
 }
