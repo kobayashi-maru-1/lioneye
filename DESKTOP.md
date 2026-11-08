@@ -195,8 +195,9 @@ settings; otherwise it leaves it alone and says so.
   icon puts a search for the set's gems still unticked on the gem list on the clipboard,
   to paste into a vendor or stash search: the gem list's soonest first, as many as fit the
   game's 50-character box, with the count in the icon's label when some don't fit. Each
-  gem is a short piece of its name that starts at a word and no other gem's name has, so
-  a few gems whose names sit inside others', like Arc, light up those too),
+  gem is a short piece of its name that starts at a word and no other gem's name has,
+  anchored to the name's start or end where that helps, as [poe.re](https://poe.re/gems)
+  does: Arc is `arc$`, so Arctic Armour stays dark),
   **Gear** for the Gear panel's items with their PoB mods (enchants and implicits, then
   explicits; crafted lighter), **Notes** for the build's PoB notes in PoB's colours (both
   scroll with the mouse wheel when long),

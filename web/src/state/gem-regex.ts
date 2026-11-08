@@ -1,13 +1,14 @@
 // A search for the game's vendor and stash windows that highlights the gems you still
 // need: for each, the shortest piece of its name no other gem's name has, joined with "|".
-// The search box ignores case and matches an item's whole text, so pieces that are also
-// common gem text (tags like "Fire", labels like "Level") are skipped.
+// The search box ignores case, matches an item's whole text line by line, and reads `^`
+// and `$` as a line's start and end (as poe.re's gem search relies on). Pieces that are
+// also common gem text (tags like "Fire", labels like "Level") are skipped.
 
 /** The game's search box takes this many characters. */
 export const SEARCH_LIMIT = 50;
 
 /** Pieces shorter than this match too much other item text. */
-const MIN_PIECE = 3;
+const MIN_PIECE = 4;
 
 /** Text on most gems besides their name: tags, property labels, the usual description. */
 const GEM_TEXT = [
@@ -158,12 +159,27 @@ function listFor(allNames: readonly string[]) {
 }
 
 /**
- * The piece of `name` that the fewest other gems' names have (none, for most gems), then
- * without a space or apostrophe, then the shortest. A piece starts at the start of a word
- * ("Added Fire" gives "fire"-ish pieces, never "ed f", which "increased fire" in other
- * gems' text would match), has at least MIN_PIECE letters of the last word it reaches
- * into, and isn't common gem text. Gems whose whole name is in others' ("Arc" in "Arctic
- * Armour") get the piece that lights up the fewest others.
+ * Whether a piece matches a line of text: the game's search reads `^` and `$` as the
+ * start and end of a line, and the gem's name is a line of its own.
+ */
+export function pieceMatches(piece: string, line: string) {
+  const head = piece.startsWith("^");
+  const tail = piece.endsWith("$");
+  const core = piece.slice(head ? 1 : 0, tail ? -1 : undefined);
+  if (head && tail) return line === core;
+  if (head) return line.startsWith(core);
+  if (tail) return line.endsWith(core);
+  return line.includes(core);
+}
+
+/**
+ * The piece of `name` that the fewest other gems' names match (none, for most gems),
+ * then without a space or apostrophe, then the shortest. A piece starts at the start of a
+ * word ("Added Fire" gives "fire"-ish pieces, never "ed f", which "increased fire" in
+ * other gems' text would match), not at a linking word, has at least MIN_PIECE letters of
+ * the last word it reaches into, and isn't common gem text. At the name's start or end it
+ * may be anchored there (`^`, `$`, as poe.re's gem search does): "Arc" becomes "arc$",
+ * which "Arctic Armour" doesn't match.
  */
 export function gemPiece(name: string, allNames: readonly string[]) {
   const key = norm(name);
@@ -172,24 +188,35 @@ export function gemPiece(name: string, allNames: readonly string[]) {
   if (cached !== undefined) return cached;
   const others = list.names.filter((other) => other !== key);
   let best: { piece: string; rank: number[] } | null = null;
+  const consider = (piece: string) => {
+    const rank = [
+      others.filter((other) => pieceMatches(piece, other)).length,
+      /[ ']/.test(piece) ? 1 : 0,
+      piece.length,
+    ];
+    if (best === null || before(rank, best.rank)) best = { piece, rank };
+  };
   for (let start = 0; start < key.length; start++) {
     if (start > 0 && key[start - 1] !== " ") continue;
     if (LINKING.has(key.slice(start).split(" ")[0])) continue;
-    for (let end = start + MIN_PIECE; end <= key.length; end++) {
-      const piece = key.slice(start, end);
-      if (piece.endsWith(" ") || !PLAIN.test(piece)) continue;
-      // Words before the last are whole (it starts at a word); the last may be cut.
-      if (piece.slice(piece.lastIndexOf(" ") + 1).length < MIN_PIECE) continue;
-      if (GEM_TEXT.some((text) => text.includes(piece))) continue;
-      const rank = [
-        others.filter((other) => other.includes(piece)).length,
-        /[ ']/.test(piece) ? 1 : 0,
-        piece.length,
-      ];
-      if (best === null || before(rank, best.rank)) best = { piece, rank };
+    for (let end = start + 1; end <= key.length; end++) {
+      const core = key.slice(start, end);
+      if (core.endsWith(" ") || !PLAIN.test(core)) continue;
+      const whole = start === 0 && end === key.length;
+      // Words before the last are whole (it starts at a word); the last may be cut. The
+      // whole name, anchored, is safe however short ("^arc$").
+      if (!whole && core.slice(core.lastIndexOf(" ") + 1).length < MIN_PIECE)
+        continue;
+      // Common gem text, as the piece would meet it in other gems' lines.
+      if (!GEM_TEXT.some((text) => text.includes(core))) consider(core);
+      if (start === 0 && !GEM_TEXT.some((text) => text.startsWith(core)))
+        consider(`^${core}`);
+      if (end === key.length && !GEM_TEXT.some((text) => text.endsWith(core)))
+        consider(`${core}$`);
+      if (whole) consider(`^${core}$`);
     }
   }
-  const piece = best?.piece ?? key.replace(/[^a-z0-9 '-]/g, ".");
+  const piece = best?.piece ?? `^${key.replace(/[^a-z0-9 '-]/g, ".")}$`;
   list.pieces.set(key, piece);
   return piece;
 }
@@ -220,7 +247,7 @@ export function gemRegex(
   const names = [...new Set(wanted.map(norm))];
   for (const name of names) {
     // A piece already in the search covers this gem too.
-    if (!pieces.some((piece) => name.includes(piece))) {
+    if (!pieces.some((piece) => pieceMatches(piece, name))) {
       const piece = gemPiece(name, allNames);
       if (search([...pieces, piece]).length > limit) break;
       pieces.push(piece);
