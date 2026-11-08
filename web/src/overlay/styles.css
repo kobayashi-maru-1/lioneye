@@ -137,6 +137,13 @@ body {
   background-color: #11161f;
   border-radius: 6px;
   overflow: hidden;
+  /* Wheel zooms, drag moves, double-click goes back (overlay/main.ts zoomable). */
+  cursor: grab;
+  touch-action: none;
+}
+
+.tipTree.dragging {
+  cursor: grabbing;
 }
 
 .tipGroup {

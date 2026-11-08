@@ -450,6 +450,7 @@ function renderTree() {
       picture?.setAttribute("height", "100%");
       picture?.setAttribute("preserveAspectRatio", "xMidYMid meet");
       const css = document.createElement("style");
+      zoomable(box);
       treeView = { version: data.version, skillTree, compiled, box, css };
       try {
         drawTree(treeView, data);
@@ -479,11 +480,117 @@ function drawTree(view: TreeView, data: TreeTip) {
     else tip.prepend(head(TREE_TITLE, name));
     return;
   }
-  drawnTree = key;
-  view.css.textContent = treeStyle(data, view.skillTree, view.compiled);
   const { x, y, w, h } = data.view;
-  view.box.querySelector("svg")?.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+  if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0)
+    throw new Error("No tree area");
+  view.css.textContent = treeStyle(data, view.skillTree, view.compiled);
+  // New points: back to their area. The same points again (reopened, or after another
+  // tooltip) keep your zoom.
+  if (key !== zoomedFor || !treeArea) {
+    zoomedFor = key;
+    treeHome = { x, y, w, h };
+    treeArea = { ...treeHome };
+  }
+  drawnTree = key;
+  showArea(view.box, treeArea);
   fillWith(head(TREE_TITLE, name), [view.css, view.box]);
+}
+
+/** The points the zoom belongs to. */
+let zoomedFor = "";
+
+type Area = { x: number; y: number; w: number; h: number };
+/** The area the tooltip zooms to for the next points, and the area shown now. */
+let treeHome: Area | null = null;
+let treeArea: Area | null = null;
+/** Zooming stops at this much closer or farther than the next points' area. */
+const ZOOM_IN = 6;
+const ZOOM_OUT = 12;
+
+function showArea(box: HTMLElement, area: Area) {
+  treeArea = area;
+  box
+    .querySelector("svg")
+    ?.setAttribute("viewBox", `${area.x} ${area.y} ${area.w} ${area.h}`);
+}
+
+/** A point on the screen in the tree's own units. */
+function treePoint(svg: SVGSVGElement, clientX: number, clientY: number) {
+  const matrix = svg.getScreenCTM();
+  if (!matrix) return null;
+  return new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
+}
+
+/**
+ * The tree tooltip zooms: the mouse wheel zooms in and out around the pointer, dragging
+ * moves the tree, and a double-click goes back to the next points.
+ */
+function zoomable(box: HTMLElement) {
+  box.addEventListener(
+    "wheel",
+    (event) => {
+      const svg = box.querySelector("svg");
+      if (!svg || !treeArea || !treeHome) return;
+      event.preventDefault();
+      const at = treePoint(svg, event.clientX, event.clientY);
+      if (!at) return;
+      // In pixels, whatever the device: a wheel notch (~100) zooms about 20%, and a
+      // touchpad's many small steps add up to the same.
+      const pixels =
+        event.deltaY *
+        (event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 33
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? 240
+            : 1);
+      const step = Math.exp(Math.max(-100, Math.min(100, pixels)) * 0.002);
+      const scale =
+        Math.min(
+          Math.max(treeArea.w * step, treeHome.w / ZOOM_IN),
+          treeHome.w * ZOOM_OUT,
+        ) / treeArea.w;
+      showArea(box, {
+        x: at.x - (at.x - treeArea.x) * scale,
+        y: at.y - (at.y - treeArea.y) * scale,
+        w: treeArea.w * scale,
+        h: treeArea.h * scale,
+      });
+    },
+    { passive: false },
+  );
+  // The last pointer position while dragging; each move pans from the area shown now, so
+  // a wheel zoom or new points mid-drag aren't undone.
+  let drag: { x: number; y: number } | null = null;
+  const stop = () => {
+    drag = null;
+    box.classList.remove("dragging");
+  };
+  box.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !treeArea) return;
+    drag = { x: event.clientX, y: event.clientY };
+    box.setPointerCapture(event.pointerId);
+    box.classList.add("dragging");
+  });
+  box.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    // The button came up where the box didn't hear it.
+    if (event.buttons === 0) return stop();
+    const units = box.querySelector("svg")?.getScreenCTM()?.a;
+    if (!treeArea || !units) return;
+    showArea(box, {
+      ...treeArea,
+      x: treeArea.x - (event.clientX - drag.x) / units,
+      y: treeArea.y - (event.clientY - drag.y) / units,
+    });
+    drag = { x: event.clientX, y: event.clientY };
+  });
+  box.addEventListener("pointerup", stop);
+  box.addEventListener("pointercancel", stop);
+  // Capture lost some other way (the tooltip redrawn, focus handed back to the game).
+  box.addEventListener("lostpointercapture", stop);
+  box.addEventListener("dblclick", () => {
+    if (treeHome) showArea(box, { ...treeHome });
+  });
 }
 
 /**
