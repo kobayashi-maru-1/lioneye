@@ -42,6 +42,7 @@ import {
   overlayGemsAtom,
   overlayTreeAtom,
   shownPanelsAtom,
+  treeStepAtom,
 } from "../../state/overlay";
 import { pageSectionCollapseFamily } from "../../state/page-section-collapse";
 import { pobAtom } from "../../state/pob";
@@ -507,6 +508,17 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   const progress = useAtomValue(treeProgressAtom);
   const index = picked ? panelIndex : lookAhead(titles, panelIndex, progress);
   const ahead = index !== panelIndex;
+  // The in-game Tree tooltip's ‹ › arrows: the set before or after the one shown, picked
+  // here as if from the dropdown (until the loadout, act or level set changes).
+  const treeStep = useAtomValue(treeStepAtom);
+  const handledStep = useRef(treeStep);
+  useEffect(() => {
+    const delta = treeStep - handledStep.current;
+    handledStep.current = treeStep;
+    if (delta === 0 || titles.length === 0) return;
+    const next = Math.min(Math.max(index + delta, 0), titles.length - 1);
+    if (next !== index) choose(next);
+  }, [treeStep]);
   // Your character's tree, once the exe has read it from the game's log.
   const character = useAtomValue(characterNodesNowAtom);
   const [compare, setCompare] = useAtom(treeCompareAtom);
@@ -578,7 +590,12 @@ function useTreeTip(
     let live = true;
     const have = character ?? urlTrees[index - 1]?.nodes ?? [];
     TREE_DATA_LOOKUP[tree.version]?.then(([skillTree]) => {
-      if (live) setTip(treeTip(tree, have, skillTree));
+      if (live)
+        setTip({
+          ...treeTip(tree, have, skillTree),
+          index,
+          count: urlTrees.length,
+        });
     });
     return () => {
       live = false;

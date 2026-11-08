@@ -244,7 +244,9 @@ settings; otherwise it leaves it alone and says so.
   then shows; quest points your character missed in finished acts, from your latest
   `/passives`, list above the steps under **Missed points**, and their count shows as an
   orange badge on the **Campaign** button), or **Tree** for the tree zoomed to your next points
-  (for the set the Tree panel shows, named beside the title):
+  (for the set the Tree panel shows, named beside the title; the small ‹ › after the name
+  step the Tree panel to the set before or after, as picking it in the panel does, until
+  your loadout, act or level set changes; a finished set shows **Set done**):
   yours blue, the guide's points up to 3 away from yours
   along its paths bright green, its later ones dim green. Your points come from the game's
   log; before the log has any, the set before stands in for them (for the first set, all

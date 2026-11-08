@@ -11,6 +11,7 @@ import {
   overlaySettingsAtom,
   overlayTreeAtom,
   shownPanelsAtom,
+  treeStepAtom,
 } from "../../state/overlay";
 import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
 import {
@@ -105,6 +106,7 @@ export function useAutoProgress() {
 
   const jump = useJumpFromGame();
   const tickStep = useSetAtom(tickStepAtom);
+  const setTreeStep = useSetAtom(treeStepAtom);
   const refreshFromFile = useSetAtom(refreshFromFileAtom);
 
   const { readyState, sendMessage } = useWebSocket({
@@ -135,6 +137,12 @@ export function useAutoProgress() {
       // A step ticked in the bar's Campaign tooltip.
       if (event.data.startsWith("tick:")) {
         tickStep(event.data.slice("tick:".length));
+        return;
+      }
+      // An arrow in the bar's Tree tooltip: the Tree panel steps its set.
+      if (event.data === "tree:prev" || event.data === "tree:next") {
+        const delta = event.data === "tree:next" ? 1 : -1;
+        setTreeStep((total) => total + delta);
         return;
       }
       // A new exe (an update) serves a new guide: reload to get it.

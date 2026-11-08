@@ -19,6 +19,9 @@ export interface TreeTip {
   later: string[];
   /** The area to show, in tree coordinates. */
   view: { x: number; y: number; w: number; h: number };
+  /** Where the set is among the build's tree sets (the tooltip's ‹ › arrows). */
+  index?: number;
+  count?: number;
 }
 
 /** Space around the next points, and the smallest area shown (tree units). */

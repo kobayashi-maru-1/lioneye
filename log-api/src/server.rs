@@ -504,6 +504,10 @@ async fn serve_client(
                         // The bar's Campaign tooltip ticked a step: the guide pages keep
                         // the ticks (and send the tooltip's next steps back).
                         let _ = state.lines.send(format!("tick:{key}"));
+                    } else if let Some(step @ ("prev" | "next")) = text.strip_prefix("tree:") {
+                        // The bar's Tree tooltip arrows: the guide's Tree panel shows the
+                        // set before or after (and sends the tooltip back for it).
+                        let _ = state.lines.send(format!("tree:{step}"));
                     } else if let Some(rest) = text.strip_prefix("tip:") {
                         // "tip:<panel>:<json>": a button's tooltip, passed on to the bar as
                         // is (checked to be JSON, kept small). One too big or not JSON

@@ -70,6 +70,13 @@ export const overlayGemsAtom = atom<OverlayGems | null | undefined>(undefined);
  */
 export const overlayTreeAtom = atom<TreeTip | undefined>(undefined);
 
+/**
+ * The bar's Tree tooltip arrows, added up (+1 each ›, -1 each ‹): the Tree panel steps its
+ * set by however much this moved since it last looked, so presses that arrive together
+ * all count.
+ */
+export const treeStepAtom = atom(0);
+
 /** How many upcoming steps the bar's Campaign tooltip shows. */
 export const CAMPAIGN_TIP_STEPS = 3;
 

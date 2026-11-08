@@ -93,12 +93,34 @@ body {
 }
 
 .tipHead .tipTitle {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   margin-bottom: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Pushes the row's own icons and the flip to the right. */
+.tipSpacer {
+  flex: 1;
+}
+
+/* The Tree's set arrows, right after its set name: smaller than the row's icons. */
+.icon.step {
+  width: 16px;
+  height: 16px;
+  margin-left: -2px;
+}
+
+.icon:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.icon:disabled:hover {
+  color: #6b7686;
+  border-color: transparent;
 }
 
 /* The Tree's set name beside its title, quieter. */

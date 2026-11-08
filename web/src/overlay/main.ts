@@ -279,7 +279,13 @@ function iconButton(icon: string, label: string, className: string) {
  * A tooltip's title row: the pin at its left (near the bar's grip), the flip at its right.
  * It sits on the edge next to the bar: on top below the bar, at the bottom above it.
  */
-function head(title: string, sub = "", extra: HTMLElement[] = []) {
+function head(
+  title: string,
+  sub = "",
+  extra: HTMLElement[] = [],
+  /** Small controls right after the title (the Tree's set arrows). */
+  afterTitle: HTMLElement[] = [],
+) {
   const id = openId;
   const on = id !== null && pinned === id;
   const pin = iconButton(PIN_ICON, "Pin", on ? "icon on" : "icon");
@@ -301,7 +307,49 @@ function head(title: string, sub = "", extra: HTMLElement[] = []) {
   // The whole title on hover when a long one is cut short.
   text.title = sub ? `${title} · ${sub}` : title;
   // `extra`: the tooltip's own icons (Gems' copy), before the flip.
-  return el("div", "tipHead", pin, text, ...extra, flip);
+  return el(
+    "div",
+    "tipHead",
+    pin,
+    text,
+    ...afterTitle,
+    el("div", "tipSpacer"),
+    ...extra,
+    flip,
+  );
+}
+
+const PREV_ICON =
+  '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M10.5 2.5L5 8l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+const NEXT_ICON =
+  '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M5.5 2.5L11 8l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+
+/**
+ * The Tree tooltip's ‹ › beside its set name: the guide's Tree panel shows the set before
+ * or after, and sends this tooltip back for it. None for a one-set build.
+ */
+function treeArrows(data: TreeTip) {
+  const { index, count } = data;
+  if (typeof index !== "number" || typeof count !== "number" || count < 2)
+    return [];
+  const arrow = (step: "prev" | "next") => {
+    const button = iconButton(
+      step === "prev" ? PREV_ICON : NEXT_ICON,
+      step === "prev" ? "Set before" : "Set after",
+      "icon step",
+    );
+    button.disabled = step === "prev" ? index <= 0 : index >= count - 1;
+    button.addEventListener("click", () => {
+      if (socket?.readyState === WebSocket.OPEN) socket.send(`tree:${step}`);
+    });
+    return button;
+  };
+  return [arrow("prev"), arrow("next")];
+}
+
+/** The Tree tooltip's title row: its set name, with the arrows to step it. */
+function treeHead(data: TreeTip) {
+  return head(TREE_TITLE, setName(data.set), [], treeArrows(data));
 }
 
 const COPY_ICON =
@@ -583,7 +631,8 @@ function renderTree() {
     return;
   }
   if (data.next.length === 0) {
-    fill(TREE_TITLE, el("div", "tipEmpty", "Tree done"));
+    // Its set is done: the arrows step on to the next one.
+    fillWith(treeHead(data), [el("div", "tipEmpty", "Set done")]);
     return;
   }
   if (treeView?.version === data.version) {
@@ -624,12 +673,11 @@ let drawnTree = "";
 function drawTree(view: TreeView, data: TreeTip) {
   const key = JSON.stringify(data);
   const row = tip.querySelector(".tipHead");
-  const name = setName(data.set);
   if (key === drawnTree && view.box.parentNode === tip) {
     // Same picture: only the title row (the pin, or its side after a flip) may change.
     row?.remove();
-    if (up) tip.append(head(TREE_TITLE, name));
-    else tip.prepend(head(TREE_TITLE, name));
+    if (up) tip.append(treeHead(data));
+    else tip.prepend(treeHead(data));
     return;
   }
   const { x, y, w, h } = data.view;
@@ -645,7 +693,7 @@ function drawTree(view: TreeView, data: TreeTip) {
   }
   drawnTree = key;
   showArea(view.box, treeArea);
-  fillWith(head(TREE_TITLE, name), [view.css, view.box]);
+  fillWith(treeHead(data), [view.css, view.box]);
 }
 
 /** The points the zoom belongs to. */
