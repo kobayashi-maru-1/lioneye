@@ -49,7 +49,7 @@ export interface OverlayGem {
 /** The skill set the Gems panel shows, for the in-game bar's Gems tooltip. */
 export interface OverlayGems {
   title: string;
-  groups: { label?: string; gems: OverlayGem[] }[];
+  groups: { label?: string; slot?: string; gems: OverlayGem[] }[];
   /**
    * A vendor or stash search for the set's gems still unticked on the gem list
    * (state/gem-regex.ts): `count` of `total` fit. Absent when there are none.

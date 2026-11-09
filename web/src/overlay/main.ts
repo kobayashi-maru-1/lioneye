@@ -34,6 +34,7 @@ interface OverlayGems {
   title: string;
   groups: {
     label?: string;
+    slot?: string;
     gems: {
       name: string;
       colour: string;
@@ -512,7 +513,18 @@ function renderGems() {
       el(
         "div",
         "tipGroup",
-        ...(group.label ? [el("div", "tipLabel", group.label)] : []),
+        ...(group.label || group.slot
+          ? [
+              el(
+                "div",
+                "tipGroupHead",
+                el("span", "tipLabel", group.label ?? ""),
+                ...(typeof group.slot === "string"
+                  ? [el("span", "tipGroupSlot", group.slot)]
+                  : []),
+              ),
+            ]
+          : []),
         ...group.gems.map((gem) => {
           const swatch = el("span", "tipDot");
           swatch.style.backgroundColor = gem.colour;

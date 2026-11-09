@@ -246,7 +246,8 @@ settings; otherwise it leaves it alone and says so.
   button per guide panel. A button opens that panel in the guide (on your other monitor) and
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
-- Hover **Gems** for the Gems panel's links (the set it shows for your loadout; its copy
+- Hover **Gems** for the Gems panel's links (the set it shows for your loadout; each
+  group's header names the gear slot PoB socketed it in, as in the Gems panel; its copy
   icon puts a search for the set's gems still unticked on the gem list on the clipboard,
   or for all the set's gems once none are left to get,
   to paste into a vendor or stash search: the gem list's soonest first, as many as fit the

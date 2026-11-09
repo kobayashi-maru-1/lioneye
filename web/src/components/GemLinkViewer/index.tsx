@@ -81,34 +81,43 @@ export function GemLinkViewer({ gemLinks, selectedTitle }: GemLinkViewerProps) {
       {activeGemLinks.length > 0 && (
         <div className={classNames(styles.gemLinkSection)}>
           {flattenChildren(
-            activeGemLinks.map(({ label, primaryGems, secondaryGems }, g) => (
-              <>
-                <div className={classNames(styles.gemLinkRow)}>
-                  {label && (
-                    <div
-                      className={classNames(styles.gemLinkLabel)}
-                      title={label}
-                    >
-                      {label}
-                    </div>
-                  )}
-                  {flattenChildren(
-                    [...primaryGems, ...secondaryGems].map((gem, i) => {
-                      const key = `${g}-${i}-${gem.id}`;
-                      return (
-                        <GemLink
-                          key={key}
-                          gemLink={gem}
-                          isPrimary={i < primaryGems.length}
-                          open={popover.state?.key === key}
-                          handlers={popover.bind(gem, key)}
-                        />
-                      );
-                    }),
-                  )}
-                </div>
-              </>
-            )),
+            activeGemLinks.map(
+              ({ label, slot, primaryGems, secondaryGems }, g) => (
+                <>
+                  <div className={classNames(styles.gemLinkRow)}>
+                    {(label || slot) && (
+                      <div className={classNames(styles.gemLinkHead)}>
+                        <span
+                          className={classNames(styles.gemLinkLabel)}
+                          title={label}
+                        >
+                          {label}
+                        </span>
+                        {slot && (
+                          <span className={classNames(styles.gemLinkSlot)}>
+                            {slot}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {flattenChildren(
+                      [...primaryGems, ...secondaryGems].map((gem, i) => {
+                        const key = `${g}-${i}-${gem.id}`;
+                        return (
+                          <GemLink
+                            key={key}
+                            gemLink={gem}
+                            isPrimary={i < primaryGems.length}
+                            open={popover.state?.key === key}
+                            handlers={popover.bind(gem, key)}
+                          />
+                        );
+                      }),
+                    )}
+                  </div>
+                </>
+              ),
+            ),
           )}
         </div>
       )}

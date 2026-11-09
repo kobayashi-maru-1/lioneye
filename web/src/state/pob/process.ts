@@ -57,6 +57,20 @@ function cleanPobText(dirty: string) {
   return dirty.replace(POB_COLOUR_REGEX, "");
 }
 
+const SLOT_NAMES: Record<string, string> = {
+  "Weapon 1": "Main hand",
+  "Weapon 2": "Off hand",
+  "Weapon 1 Swap": "Main hand swap",
+  "Weapon 2 Swap": "Off hand swap",
+  "Body Armour": "Body",
+};
+
+/** A PoB socket group's slot as shown on the Gems panel ("Weapon 1": "Main hand"). */
+function slotName(slot: string | null) {
+  if (!slot) return undefined;
+  return SLOT_NAMES[slot] ?? slot;
+}
+
 function processSkills(
   requiredGems: RouteData.RequiredGem[],
   gemLinks: RouteData.GemLinkGroup[],
@@ -72,6 +86,7 @@ function processSkills(
     if (!skillEnabled || skillEnabled.value == "false") continue;
 
     const skillLabel = skillElement.attributes.getNamedItem("label")?.value;
+    const slot = slotName(skillElement.getAttribute("slot"));
 
     const gemElements = Array.from(skillElement.getElementsByTagName("Gem"));
     if (gemElements.length == 0) recentEmptySkillLabel = skillLabel;
@@ -122,6 +137,7 @@ function processSkills(
       gemLinks.push({
         title: gemLinkTitle,
         label: skillLabel ? cleanPobText(skillLabel) : undefined,
+        slot,
         primaryGems: primaryGemIds.map((x) => ({
           ...gemIdToGemLink(x, characterClass),
           ...gemProps.get(x),
@@ -135,6 +151,7 @@ function processSkills(
       gemLinks.push({
         title: gemLinkTitle,
         label: skillLabel ? cleanPobText(skillLabel) : undefined,
+        slot,
         primaryGems: secondaryGemIds.map((x) => ({
           ...gemIdToGemLink(x, characterClass),
           ...gemProps.get(x),

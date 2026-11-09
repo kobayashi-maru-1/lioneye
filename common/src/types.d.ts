@@ -114,6 +114,8 @@ export namespace RouteData {
     title: string;
     /** The socket group's label in PoB, if it has one. */
     label?: string;
+    /** The gear slot PoB socketed the group in ("Boots", "Main hand"), if set. */
+    slot?: string;
     primaryGems: GemLink[];
     secondaryGems: GemLink[];
   }

@@ -450,6 +450,7 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
         .filter((link) => link.title === title)
         .map((link) => ({
           label: link.label,
+          slot: link.slot,
           gems: [
             ...link.primaryGems.flatMap((g) => gem(g, true)),
             ...link.secondaryGems.flatMap((g) => gem(g, false)),

@@ -188,6 +188,25 @@ body {
   text-overflow: ellipsis;
 }
 
+/* A gem group's header: PoB label left, gear slot right. */
+.tipGroupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tipGroupHead .tipLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.tipGroupSlot {
+  flex: none;
+  color: #b0bccc;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
 .tipGem {
   display: flex;
   align-items: center;

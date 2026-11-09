@@ -24,17 +24,30 @@
   border-radius: var(--border-radius);
 }
 
-/* The group's PoB label: small grey capitals, one line. */
-.gemLinkLabel {
+/* The group's header: PoB label left, gear slot right, both small grey capitals. */
+.gemLinkHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-3);
   margin-bottom: var(--size-2);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   color: #5a7090;
   font-size: 0.68rem;
   font-weight: var(--font-heavy);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.gemLinkLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gemLinkSlot {
+  flex: none;
+  color: #8a9bb5;
 }
 
 .gemLinkTitleInfo {
