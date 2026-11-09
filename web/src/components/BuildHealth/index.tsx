@@ -61,7 +61,7 @@ export function BuildHealthPanel() {
     ? liveAnswer?.state !== "ready"
     : !!pob?.planLoading;
   // Missed quest points from your character's "/passives" list, read from the game's log.
-  // (state/quest-points; the bar's Campaign badge shows the same.)
+  // (state/quest-points; the bar's Campaign icon turns amber for them.)
   // Not typed yet, or older than your act: ask for it.
   const passivesStale = useAtomValue(passivesStaleAtom);
   const missedQuests = useAtomValue(missedQuestsAtom);
@@ -91,10 +91,11 @@ export function BuildHealthPanel() {
   const overlay: OverlayHealth = {
     ...(live !== null ? { source: onLive ? "Live" : "Plan" } : {}),
     ...(pobStatus ? { status: pobStatus } : {}),
-    findings: (health ?? []).map(({ severity, message, fix }) => ({
+    findings: (health ?? []).map(({ severity, message, fix, panel }) => ({
       severity,
       message,
       ...(fix ? { fix } : {}),
+      ...(panel === "campaign" ? { campaign: true } : {}),
     })),
     passivesStale,
     // Dimmed as the panel dims them: earlier findings while PoB works on new ones.

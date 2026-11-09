@@ -71,7 +71,7 @@ const passivesActAtom = atom((get) => {
 });
 
 /**
- * Your character's missed quest points (Build health, the bar's Campaign badge): only
+ * Your character's missed quest points (Build health, the bar's amber Campaign icon): only
  * acts finished when you last typed /passives, so finishing an act after it never shows a
  * false miss. Empty until you type /passives in game.
  */

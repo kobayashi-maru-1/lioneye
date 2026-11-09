@@ -21,13 +21,37 @@ export interface OverlaySettings {
   on: boolean;
   /** Panel ids with a button. */
   panels: string[];
+  /** NEW_PANELS already put on this bar once (untick one and it stays off). */
+  added?: string[];
 }
+
+/** Panels newer than many saved bars: each goes on a saved bar once. */
+const NEW_PANELS = ["health"];
 
 export const overlaySettingsAtom = persistentAtom<OverlaySettings>(
   "overlay",
-  { on: true, panels: ["campaign", "gear", "gems", "tree", "health", "notes"] },
+  {
+    on: true,
+    panels: ["campaign", "gear", "gems", "tree", "health", "notes"],
+    added: NEW_PANELS,
+  },
   0,
 );
+
+/** Saved settings with the new panels they haven't had yet; the same object when none. */
+export function withNewPanels(settings: OverlaySettings): OverlaySettings {
+  const added = settings.added ?? [];
+  const fresh = NEW_PANELS.filter((id) => !added.includes(id));
+  if (fresh.length === 0) return settings;
+  return {
+    ...settings,
+    panels: [
+      ...settings.panels,
+      ...fresh.filter((id) => !settings.panels.includes(id)),
+    ],
+    added: [...added, ...fresh],
+  };
+}
 
 /**
  * The panels the guide page last showed for this build (null before it has shown), so
@@ -138,6 +162,8 @@ export interface OverlayFinding {
   severity: "high" | "medium" | "low";
   message: string;
   fix?: string;
+  /** A missed quest point: the bar's Campaign icon shows these, so Health's colour leaves them out. */
+  campaign?: boolean;
 }
 
 /** What the Build health panel shows, for the in-game bar's Health tooltip. */

@@ -199,10 +199,17 @@ settings; otherwise it leaves it alone and says so.
   profile.
 - **Build health** (under the Tree) lists what to look at in the shown loadout, worst
   first, each with a link to the panel that fixes it. The checks are
-  [PoB Redux](https://github.com/pobredux/pob-redux)'s (MIT), with its rules unchanged:
-  resistances, passive and ascendancy points, main skill links, skills to press, flasks,
-  pantheon, skill costs, life, movement speed, attribute requirements, gem errors and
-  reduced-requirement affixes. Like Redux, it uses the build's level from PoB. With a live
+  [PoB Redux](https://github.com/pobredux/pob-redux)'s (MIT): resistances, passive
+  points, main skill links, skills to press, flasks, pantheon, skill costs, life, movement
+  speed, attribute requirements, gem errors and reduced-requirement affixes. Two are
+  Lioneye's own for leveling: **Labyrinths** due by level (Normal by 35, Cruel by 57,
+  Merciless by 70, Eternal by 78, counted from the ascendancy points on the tree; this
+  replaces Redux's two ascendancy checks, which ignore your level; bloodline points don't
+  count), and worn rares and magic items 15 or more item levels below your level (one
+  medium finding; uniques, flasks, jewels, items without an item level and slots PoB hides,
+  like the weapon set not in use, left out). Like Redux, it uses the build's level from
+  PoB; for these two, where a loadout's points say a level well below it (a guide saved at
+  level 90 in manual mode), that level. With a live
   character set, its header's dropdown picks what it checks: **Live** (your character from
   poe.ninja, named under the header; its findings don't link to the guide's panels, which
   show the plan) or **Plan** (the shown loadout).
@@ -214,7 +221,7 @@ settings; otherwise it leaves it alone and says so.
   the tree through RePoE's passive data. In **Tree**, pick **Character** (instead of **Previous set**) to see the
   loadout against your tree (green: to take; red: not in the guide). Type `/passives` in
   game and **Build health** lists quest points missed in the acts you'd finished when you
-  typed it (the in-game bar's **Campaign** button shows their count). Its note asks for
+  typed it (the in-game bar's **Campaign** icon turns amber for them). Its note asks for
   `/passives` again once you're in a later act.
 - Hover an item or gem for its in-game tooltip, with its buttons underneath; click it to pin
   the tooltip and use them: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
@@ -243,10 +250,12 @@ settings; otherwise it leaves it alone and says so.
 - While Path of Exile is the window in front and you're playing a character, the exe shows a
   small bar over the game (hidden on the login and character select screens, as the game's
   log tells: a zone shows it, logging in or out hides it) with an
-  icon button per guide panel: a flag for **Campaign**, chest armour for **Gear**, a cut
+  icon button per guide panel: a flag for **Campaign**, plate armour for **Gear**, a cut
   gem for **Gems**, two arrows for **Trade**, sliders for **Config**, linked nodes for
   **Tree**, a heart with a pulse for **Health**, a page for **Notes** and a magnifier for
-  **Search** (hover one for its name). A button opens that panel in the guide (on your other monitor) and
+  **Search** (hover one for its name). **Health** turns red with a high finding and amber
+  with a medium one; **Campaign** turns amber with missed quest points (which then don't
+  colour **Health** too). A button opens that panel in the guide (on your other monitor) and
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
 - Hover **Gems** for the Gems panel's links (the set it shows for your loadout; each
@@ -268,8 +277,8 @@ settings; otherwise it leaves it alone and says so.
   **Campaign** for your next 3 steps (each with a small checkbox at its right that marks it
   done in the guide, for what the log can't tell, like a bandit killed early; the next step
   then shows; quest points your character missed in finished acts, from your latest
-  `/passives`, list above the steps under **Missed points**, and their count shows as an
-  orange badge on the **Campaign** button; its copy icon puts a vendor search on the
+  `/passives`, list above the steps under **Missed points**, and turn the **Campaign**
+  icon amber; its copy icon puts a vendor search on the
   clipboard for the gems to buy at your next vendor stop: from your zone on, the first
   unticked gem to buy and every one after it until the route leaves town, as the Gems
   search is built; quest reward gems are left out, since they come from the reward
@@ -282,7 +291,9 @@ settings; otherwise it leaves it alone and says so.
   log; before the log has any, the set before stands in for them (for the first set, all
   its points are next). In the Tree tooltip the mouse wheel zooms around the pointer,
   dragging moves the tree and a double-click goes back to the next points; the zoom stays
-  until your next points change. All need the guide open.
+  until your next points change. Under the tree, **Next ascendancy** names the set's
+  ascendancy notables you haven't taken, nearest the start first (your next lab's pick;
+  hover one for what it does). All need the guide open.
 - Every tooltip's title row sits on its edge next to the bar, with two icons: the pin at
   its left keeps that tooltip open while you play (one at a time, kept after a restart),
   and the flip (**Show above** / **Show below**) at its right moves tooltips to the other
@@ -294,8 +305,8 @@ settings; otherwise it leaves it alone and says so.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
 - **Settings** → **App** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,
-  Gems, Tree, Health and Notes to start; tick **Health** to add it to a bar set up
-  before it existed). Panels the build doesn't have are left off.
+  Gems, Tree, Health and Notes to start; a bar set up before Health existed gets it once,
+  and unticking it keeps it off). Panels the build doesn't have are left off.
 - The bar is a page of the guide (`overlay.html`) in WebView2, the engine Edge uses (part of
   Windows 11; its data is kept in `%LOCALAPPDATA%\exile-leveling\webview2`).
 - PoE must run in **Windowed** or **Windowed Fullscreen** mode: nothing can show over its
@@ -317,7 +328,9 @@ switches stay quick; it's unloaded (freeing about 500 MB) 10-20 minutes after th
 guide closes. Each calculation is logged ("PoB stats for … in 0.8s", with "PoB loaded
 first" when it had to load).
 
-Build health is a port of PoB Redux's `sanity_check`. `log-api\redux-watch.ps1` says
+Build health is a port of PoB Redux's `sanity_check`, with its two ascendancy checks
+replaced by Lioneye's Labyrinth check and an item level check added (both marked
+"Lioneye" in `healthFindings`; keep them when porting). `log-api\redux-watch.ps1` says
 whether Redux changed it since the port (the Watch workflow runs it daily and fails
 on a change); after porting, `.\log-api\redux-watch.ps1 -Update` records the new version.
 

@@ -900,7 +900,7 @@ end
 local function buildSummary()
 	local o = build.calcsTab.mainOutput or {}
 	local spec = build.spec
-	local used, ascUsed, _, _, ws1, ws2 = spec:CountAllocNodes()
+	local used, ascUsed, bloodlineUsed, _, ws1, ws2 = spec:CountAllocNodes()
 	used, ascUsed, ws1, ws2 = used or 0, ascUsed or 0, ws1 or 0, ws2 or 0
 	local level = build.characterLevel or 1
 	local questLow, questHigh, extraLow, extraHigh = questPointsForLevel(level, o.ExtraPoints)
@@ -963,6 +963,8 @@ local function buildSummary()
 		pointsAvailableMin = math.max(0, level - 1) + questLow + extraLow,
 		pointsAvailableMax = math.max(0, level - 1) + questHigh + extraHigh,
 		ascendancyPointsUsed = ascUsed,
+		-- Lioneye: bloodline nodes, which ascUsed counts too (no lab gives them).
+		bloodlinePointsUsed = bloodlineUsed or 0,
 		life = o.Life or 0,
 		energyShield = o.EnergyShield or 0,
 		mana = o.Mana or 0,
@@ -1022,12 +1024,44 @@ local function healthFindings()
 		add("low", "passive points", string.format("%d of %d available passive points spent", s.passivePointsSpent, s.pointsAvailableMin),
 			"Unspent points.")
 	end
+	-- Lioneye: each Labyrinth by a level, in place of Redux's two level-blind checks ("no
+	-- ascendancy chosen" from level 20, "x of 8 points" at any level). A lab's 2 points
+	-- not on the tree count as the lab not done.
 	local ascended = s.ascendancyName ~= nil and s.ascendancyName ~= "None"
-	if not ascended and s.characterLevel >= 20 then
-		add("medium", "ascendancy", "no ascendancy chosen",
-			"Ascendancies carry 8 points of build-defining bonuses and are usually the reason to pick a class.")
-	elseif ascended and s.ascendancyPointsUsed < 8 then
-		add("medium", "ascendancy", string.format("%d of 8 ascendancy points allocated", s.ascendancyPointsUsed))
+	local ascPoints = ascended and (s.ascendancyPointsUsed - s.bloodlinePointsUsed) or 0
+	-- PoB keeps one level for the whole build: a guide saved at level 90 in manual mode
+	-- would check its Act 2 loadout at 90. Where the tree's points say a much lower level,
+	-- the lab and item level checks use that.
+	local checkLevel = s.characterLevel
+	for level = 1, 100 do
+		local _, questHigh, _, extraHigh = questPointsForLevel(level, o.ExtraPoints)
+		if math.max(0, level - 1) + questHigh + extraHigh >= s.passivePointsSpent then
+			if level < s.characterLevel - 3 then checkLevel = level end
+			break
+		end
+	end
+	local LABS = {
+		{ name = "Normal", due = 35, points = 2, severity = "medium" },
+		{ name = "Cruel", due = 57, points = 4, severity = "medium" },
+		{ name = "Merciless", due = 70, points = 6, severity = "medium" },
+		{ name = "Eternal", due = 78, points = 8, severity = "low" },
+	}
+	local behind, labSeverity = {}, "low"
+	for _, lab in ipairs(LABS) do
+		if checkLevel >= lab.due and ascPoints < lab.points then
+			behind[#behind + 1] = lab.name
+			if lab.severity == "medium" then labSeverity = "medium" end
+		end
+	end
+	if #behind > 0 then
+		-- "Cruel", "Cruel and Merciless", "Cruel, Merciless and Eternal".
+		local names = #behind == 1 and behind[1]
+			or table.concat(behind, ", ", 1, #behind - 1) .. " and " .. behind[#behind]
+		add(labSeverity, "ascendancy",
+			string.format("%s %s not done at level %d (%d of 8 ascendancy points)",
+				names, #behind == 1 and "Labyrinth" or "Labyrinths",
+				checkLevel, ascPoints),
+			"Normal by level 35, Cruel by 57, Merciless by 70, Eternal by 78. Lab done? Spend its points on the tree.")
 	end
 
 	local linkSkills, itemSkill = 0, false
@@ -1107,6 +1141,43 @@ local function healthFindings()
 	if #deadLines > 0 then
 		add("low", "gear", string.format("%d affix(es) spent on reduced attribute requirements: %s", #deadLines, table.concat(deadLines, "; ")),
 			"Usually a dead affix: the same suffix slot could carry resistance, life or an attribute, which meets the requirement and adds something. Keep it only when the item is otherwise the best available and nothing else would meet the requirement.")
+	end
+
+	-- Lioneye: worn rares and magic items far below your level (item level sets the mod tiers
+	-- they can roll). Uniques, flasks, jewels and slots PoB hides (the weapon set not in use,
+	-- grafts on other trees) are left out.
+	local ITEM_LEVEL_GAP = 15
+	local function worn(slotName, slot)
+		if slot.nodeId or slotName:find("Flask", 1, true) or slotName:find("Abyssal", 1, true) then
+			return false
+		end
+		if type(slot.shown) == "function" then
+			local ok, shown = pcall(slot.shown)
+			if ok and not shown then return false end
+		end
+		return true
+	end
+	local oldItems = {}
+	for slotName, slot in pairs(build.itemsTab.slots) do
+		local item = slot.selItemId and slot.selItemId ~= 0 and build.itemsTab.items[slot.selItemId]
+		if item and worn(slotName, slot)
+			and (item.rarity == "RARE" or item.rarity == "MAGIC")
+			and item.itemLevel and item.itemLevel <= checkLevel - ITEM_LEVEL_GAP then
+			oldItems[#oldItems + 1] = { slot = slotName, level = item.itemLevel }
+		end
+	end
+	if #oldItems > 0 then
+		table.sort(oldItems, function(a, b)
+			if a.level ~= b.level then return a.level < b.level end
+			return a.slot < b.slot
+		end)
+		local listed = {}
+		for _, old in ipairs(oldItems) do
+			listed[#listed + 1] = string.format("%s (%d)", old.slot, old.level)
+		end
+		add("medium", "gear", string.format("%d %s %d+ item levels below your level: %s", #oldItems,
+			#oldItems == 1 and "item" or "items", ITEM_LEVEL_GAP, table.concat(listed, ", ")),
+			"Item level caps the mod tiers. Rares from your current zones roll more life and resistance.")
 	end
 
 	-- Attribute shortfalls surface as per-gem errors from PoB itself.

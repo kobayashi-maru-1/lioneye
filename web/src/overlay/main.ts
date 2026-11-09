@@ -94,29 +94,47 @@ function validSearch(value: unknown) {
     : null;
 }
 
-/** The count of missed quest points on the Campaign button (none: no badge). */
-function markBadges() {
-  const button = buttons.querySelector<HTMLElement>(
-    '.button[data-id="campaign"]',
-  );
+/** Sets or clears a button's warning colour and what screen readers add about it. */
+function markWarning(
+  id: string,
+  level: "high" | "medium" | null,
+  description: string,
+) {
+  const button = buttons.querySelector<HTMLElement>(`.button[data-id="${id}"]`);
   if (!button) return;
+  button.classList.toggle("warnHigh", level === "high");
+  button.classList.toggle("warnMedium", level === "medium");
+  if (level === null) button.removeAttribute("aria-description");
+  else button.setAttribute("aria-description", description);
+}
+
+/**
+ * Campaign turns amber with quest points your character missed; Health takes the colour of
+ * its worst finding (red high, amber medium; low ones leave it gold).
+ */
+function markBadges() {
   const count = campaignTip().missed.length;
-  let badge = button.querySelector<HTMLElement>(".badge");
-  if (count === 0) {
-    badge?.remove();
-    button.removeAttribute("aria-description");
-    return;
-  }
-  if (!badge) {
-    badge = el("span", "badge");
-    badge.setAttribute("aria-hidden", "true");
-    button.append(badge);
-  }
-  badge.textContent = String(count);
-  button.setAttribute(
-    "aria-description",
+  markWarning(
+    "campaign",
+    count > 0 ? "medium" : null,
     `${count} missed ${count === 1 ? "point" : "points"}`,
   );
+  const findings = (tips.health as { findings?: unknown } | null | undefined)
+    ?.findings;
+  // Missed quest points colour Campaign; Health counts them only without that button.
+  const severities = (Array.isArray(findings) ? findings : [])
+    .map((finding) => finding as { severity?: unknown; campaign?: unknown })
+    .filter(
+      (finding) => !(finding?.campaign === true && barIds.has("campaign")),
+    )
+    .map((finding) => finding?.severity);
+  const level = severities.includes("high")
+    ? "high"
+    : severities.includes("medium")
+      ? "medium"
+      : null;
+  const issues = severities.filter((s) => s === "high" || s === "medium");
+  markWarning("health", level, `${issues.length} to check`);
 }
 
 let socket: WebSocket | null = null;
@@ -157,9 +175,9 @@ const barIcon = (paths: string) =>
 const BAR_ICONS: Record<string, string> = {
   // A flag: the route.
   campaign: barIcon('<path d="M3.5 14.5v-13M3.5 2.5h9l-2 3 2 3h-9"/>'),
-  // A breastplate (a cog would read as Settings).
+  // Plate armour: pauldrons, a V neck and belly plates (a cog would read as Settings).
   gear: barIcon(
-    '<path d="M5.5 1.5C6 3 7 3.75 8 3.75S10 3 10.5 1.5L14 3l-1 4.5.5 6C12 14.5 10 15 8 15s-4-.5-5.5-1.5l.5-6L2 3zM8 3.75V15M4 8.5c1.5 1 2.75 1 4 0 1.25 1 2.5 1 4 0"/>',
+    '<path d="M4.5 3.25 8 6l3.5-2.75.5 5.25-.5 5.5c-1 .75-2.25 1-3.5 1s-2.5-.25-3.5-1L4 8.5z"/><path d="M4.5 3.25C2.5 3.5 1.25 5 1.5 7.75L4 8.5M11.5 3.25c2 .25 3.25 1.75 3 4.5L12 8.5M4.5 10.5c1.25.5 2.25.75 3.5.75s2.25-.25 3.5-.75M4.75 12.5c1 .5 2 .75 3.25.75s2.25-.25 3.25-.75"/>',
   ),
   // A cut gem.
   gems: barIcon(
@@ -765,7 +783,10 @@ function renderTree() {
   }
   if (data.next.length === 0) {
     // Its set is done: the arrows step on to the next one.
-    fillWith(treeHead(data), [el("div", "tipEmpty", "Set done")]);
+    fillWith(treeHead(data), [
+      el("div", "tipEmpty", "Set done"),
+      ...ascendancyRow(data),
+    ]);
     return;
   }
   if (treeView?.version === data.version) {
@@ -826,7 +847,30 @@ function drawTree(view: TreeView, data: TreeTip) {
   }
   drawnTree = key;
   showArea(view.box, treeArea);
-  fillWith(treeHead(data), [view.css, view.box]);
+  fillWith(treeHead(data), [view.css, view.box, ...ascendancyRow(data)]);
+}
+
+/**
+ * Under the tree: the set's ascendancy notables you haven't taken, nearest its start
+ * first (your next lab's pick). Hover one for what it does. None when all are taken.
+ */
+function ascendancyRow(data: TreeTip) {
+  const next = (
+    Array.isArray(data.ascendancyNext) ? data.ascendancyNext : []
+  ).filter((notable) => typeof notable?.name === "string");
+  if (next.length === 0) return [];
+  return [
+    el(
+      "div",
+      "tipAscend",
+      el("div", "tipLabel", "Next ascendancy"),
+      ...next.map((notable) => {
+        const name = el("div", "tipAscendName", notable.name);
+        name.title = texts(notable.stats).join("\n");
+        return name;
+      }),
+    ),
+  ];
 }
 
 /** The points the zoom belongs to. */

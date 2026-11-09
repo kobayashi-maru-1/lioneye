@@ -1,4 +1,4 @@
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -13,6 +13,7 @@ import {
   overlayTreeAtom,
   shownPanelsAtom,
   treeStepAtom,
+  withNewPanels,
 } from "../../state/overlay";
 import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
 import {
@@ -190,12 +191,18 @@ export function useAutoProgress() {
 
   // Tell the exe this is a guide page (a bar button with no guide open waits for one),
   // and send the bar's settings whenever they or the build's panels change.
-  const settings = useAtomValue(overlaySettingsAtom);
+  const [settings, setSettings] = useAtom(overlaySettingsAtom);
   const shown = useAtomValue(shownPanelsAtom);
   const talks = readyState === ReadyState.OPEN && pageMode !== "migrate";
   useEffect(() => {
     if (talks) sendMessage("guide");
   }, [talks]);
+  // A bar saved before a panel existed gets that panel's button once.
+  useEffect(() => {
+    if (!talks) return;
+    const updated = withNewPanels(settings);
+    if (updated !== settings) setSettings(updated);
+  }, [talks, settings]);
   // The linked PoB build file, for the exe to watch; read once on connect, for saves made
   // while the guide was closed.
   const pobFile = useAtomValue(pobFileSelector);

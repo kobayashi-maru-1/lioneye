@@ -59,7 +59,8 @@ export async function buildUrlTree(
 
   const version = read_u32(buffer, 0);
   const classId = buffer[4];
-  const ascendancyId = buffer[5];
+  // The low 2 bits; PoB puts a bloodline (secondary ascendancy) in the bits above.
+  const ascendancyId = buffer[5] & 3;
 
   let nodesOffset;
   let nodesCount;
