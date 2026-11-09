@@ -1,4 +1,4 @@
-import { gemLinksSelector } from "../../state/gem-links";
+import { viewedGemLinksAtom } from "../../state/live-view";
 import {
   artFor,
   copyItem,
@@ -76,7 +76,7 @@ export function TradeListPanel() {
   const gear = stats?.gear ?? null;
   const lists = stats?.lists ?? null;
   const sets = useLoadoutSets();
-  const gemLinks = useAtomValue(gemLinksSelector);
+  const gemLinks = useAtomValue(viewedGemLinksAtom);
   const { league, leagues, setLeague } = useTradeLeague();
   const [options, setOptions] = useTradeOptions();
   const art = useArt(league);

@@ -546,8 +546,8 @@ fn start_drag(hwnd: HWND) {
     }
 }
 
-/// Gives wry our window.
-struct Handle(HWND);
+/// Gives wry our window (also the poe.ninja sign-in window's, ninja-window.rs).
+pub(crate) struct Handle(pub(crate) HWND);
 
 impl HasWindowHandle for Handle {
     fn window_handle(&self) -> Result<WindowHandle<'_>, HandleError> {

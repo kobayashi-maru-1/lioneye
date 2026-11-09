@@ -89,24 +89,38 @@ saved before 0.4.7 are moved over once, the first time the guide opens.
 
 ### Live character (poe.ninja)
 
-Also in **Settings → Build**, for **Compare** and **Build health** on the character you're
-playing:
+Also in **Settings → Build**, for the character you're playing: the guide can show it
+(the Loadout dropdown's **Live character**), compare it with the plan (**Compare**) and
+check it (**Build health**).
 
 - **PoE account**: your account name (`Name#1234`), then **Load**. It lists the characters
   your poe.ninja profile shows (name, level, class, league), and the account is kept once
   they load. Emptied, the button reads **Clear** and forgets the account and the live
-  character. Connect your account on poe.ninja and keep the profile public: nothing here
-  signs in.
+  character. Connect your account on poe.ninja and keep the profile public: reading it
+  needs no sign-in.
 - **Live character**: pick one (**None** stops following). The guide reads the PoB code
   poe.ninja's character page shows ("Import code for Path of Building"), then the bundled
   PoB calculates it. Under it: the character's name, level and class, or why it wasn't read.
-- It stays current by itself: every 3 minutes, and 30 seconds and 4 minutes after a
-  level-up, the exe asks poe.ninja whether the character changed and reads it only if so.
-  **Refresh** reads it now. poe.ninja's own re-reads of a character from the game can be
-  an hour or more apart, but viewing your profile's character list seems to have it
-  re-read your current character within seconds (seen, not documented). So after each
-  level-up the guide loads that list once. poe.ninja's "refresh character" itself needs a poe.ninja sign-in, so Lioneye
-  doesn't use it.
+- It stays current by itself: every 3 minutes the exe asks poe.ninja whether the
+  character changed and reads it only if so. **Refresh** reads it now. poe.ninja re-reads a
+  character from the game on its own schedule, which can be an hour or more apart.
+- **poe.ninja: Sign in** opens Lioneye's own poe.ninja window on its account page; sign in
+  there with poe.ninja's own Path of Exile sign-in, then close it (closing only hides it;
+  the login is kept in `%LOCALAPPDATA%\exile-leveling\ninja-webview2`). Signed in, a
+  level-up and **Refresh** ask poe.ninja to re-read the character now (its profile page's
+  own refresh), then check for the new data 20 seconds, 1 minute and 4 minutes later.
+  The row reads **Signed in**, **Not signed in** or **Not checked**. It's checked once
+  you've used **Sign in** (until then the poe.ninja window isn't started): when the guide
+  opens, and when the guide gets focus while you're not signed in (at most every 20
+  seconds).
+- **Loadout → Live character** (the first entry once one is set) shows it in the guide:
+  the left column's stats, the header's numbers, **Gear**, **Gems**, **Tree**, **Trade
+  List** and **Config**. Its name and level show under the dropdown, and PoB's own main
+  skill is used (no skill picker). **Campaign**, your gem list, **Notes** and your tree
+  progress stay on the plan, **Compare**'s Build 2 is the plan's loadout, **Build health**
+  follows its own **Live**/**Plan** dropdown, and the in-game bar's buttons and tooltips
+  stay on the plan. Picking a loadout goes back to the plan (so does reopening the guide,
+  or clearing the live character).
 
 poe.ninja's addresses for this are the ones its own pages use, not a published API, so a
 change on poe.ninja's side can break it until Lioneye is updated. The bundled PoB holds one
@@ -248,7 +262,11 @@ settings; otherwise it leaves it alone and says so.
   done in the guide, for what the log can't tell, like a bandit killed early; the next step
   then shows; quest points your character missed in finished acts, from your latest
   `/passives`, list above the steps under **Missed points**, and their count shows as an
-  orange badge on the **Campaign** button), or **Tree** for the tree zoomed to your next points
+  orange badge on the **Campaign** button; its copy icon puts a vendor search on the
+  clipboard for the gems to buy at your next vendor stop: from your zone on, the first
+  unticked gem to buy and every one after it until the route leaves town, as the Gems
+  search is built; quest reward gems are left out, since they come from the reward
+  window), or **Tree** for the tree zoomed to your next points
   (for the set the Tree panel shows, named beside the title; the small ‹ › after the name
   step the Tree panel to the set before or after, as picking it in the panel does, until
   your loadout, act or level set changes; a finished set shows **Set done**):

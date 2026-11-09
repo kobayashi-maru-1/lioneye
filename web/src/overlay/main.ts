@@ -68,8 +68,8 @@ function campaignTip() {
   const value = tips.campaign as unknown;
   const message =
     value !== null && typeof value === "object" && !Array.isArray(value)
-      ? (value as { steps?: unknown; missed?: unknown })
-      : { steps: value, missed: [] };
+      ? (value as { steps?: unknown; missed?: unknown; search?: unknown })
+      : { steps: value, missed: [], search: undefined };
   const steps = Array.isArray(message.steps) ? (message.steps as Step[]) : [];
   const missed = Array.isArray(message.missed)
     ? (message.missed as MissedQuest[]).filter(
@@ -77,7 +77,20 @@ function campaignTip() {
           typeof quest?.name === "string" && typeof quest?.act === "number",
       )
     : [];
-  return { steps, missed };
+  return { steps, missed, search: validSearch(message.search) };
+}
+
+/** A gem search from a message, when it's complete (else none: no copy icon). */
+function validSearch(value: unknown) {
+  const search = value as
+    { text?: unknown; count?: unknown; total?: unknown } | null | undefined;
+  return search &&
+    typeof search.text === "string" &&
+    search.text !== "" &&
+    typeof search.count === "number" &&
+    typeof search.total === "number"
+    ? { text: search.text, count: search.count, total: search.total }
+    : null;
 }
 
 /** The count of missed quest points on the Campaign button (none: no badge). */
@@ -400,10 +413,11 @@ function renderTip() {
 
 /**
  * Campaign: the quest points your character missed (from your latest /passives), then the
- * next steps.
+ * next steps. Its copy icon: a vendor search for the gems to buy at your next stop.
  */
 function renderCampaign() {
-  const { steps, missed } = campaignTip();
+  const { steps, missed, search } = campaignTip();
+  const row = head("Next", "", search ? [copyButton(search)] : []);
   const missedBox =
     missed.length > 0
       ? [
@@ -423,11 +437,10 @@ function renderCampaign() {
         ]
       : [];
   if (steps.length === 0) {
-    fill("Next", ...missedBox, el("div", "tipEmpty", "No steps"));
+    fillWith(row, [...missedBox, el("div", "tipEmpty", "No steps")]);
     return;
   }
-  fill(
-    "Next",
+  fillWith(row, [
     ...missedBox,
     ...steps.map((step) => {
       // An older guide page sends each step as its parts alone.
@@ -450,7 +463,7 @@ function renderCampaign() {
         ...(typeof step?.tick === "string" ? [doneBox(step.tick)] : []),
       );
     }),
-  );
+  ]);
 }
 
 /**
@@ -491,15 +504,8 @@ function renderGems() {
     fill("Gems", el("div", "tipEmpty", "No gems"));
     return;
   }
-  const search = gems.search;
-  const copy =
-    search &&
-    typeof search.text === "string" &&
-    search.text !== "" &&
-    typeof search.count === "number" &&
-    typeof search.total === "number"
-      ? [copyButton(search)]
-      : [];
+  const search = validSearch(gems.search);
+  const copy = search ? [copyButton(search)] : [];
   fillWith(
     head(gems.title, "", copy),
     gems.groups.map((group) =>

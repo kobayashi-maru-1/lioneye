@@ -14,11 +14,9 @@
 //!   account's own stream for the version, then `/poe1/api/profile/characters/<account>/<n>`),
 //!   for Settings to pick from.
 //!
-//! poe.ninja's own re-reads of a character can be an hour or more apart; loading the
-//! account's list (`characters()`, as its profile page does) seems to have it re-read the
-//! current character within seconds (observed, not documented), so the guide does that
-//! after a level-up. Its
-//! `account/refresh-character` needs a poe.ninja sign-in, so it isn't used.
+//! poe.ninja's own re-reads of a character can be an hour or more apart. Asking it to
+//! re-read now (`account/refresh-character`) needs your poe.ninja login, so that runs in
+//! Lioneye's poe.ninja window (ninja-window.rs), not here.
 
 use std::{
     io::{BufRead, BufReader},

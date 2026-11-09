@@ -21,6 +21,8 @@ mod guide_window;
 mod log_reader;
 #[path = "ninja-character.rs"]
 mod ninja_character;
+#[path = "ninja-window.rs"]
+mod ninja_window;
 #[cfg(windows)]
 mod overlay;
 mod pob;
@@ -174,7 +176,10 @@ fn main() -> ExitCode {
     let pob_links = std::sync::Arc::new(pob_files::Links::new());
     let pob_file_rx = pob_links.watched.subscribe();
     let (pob_saved_tx, _) = tokio::sync::broadcast::channel::<String>(4);
+    // The poe.ninja sign-in window (live character refreshes), run by the tray loop.
+    let (ninja, ninja_rx) = ninja_window::Handle::new();
     let state = server::AppState {
+        ninja,
         pob_links,
         pob_saved: pob_saved_tx.clone(),
         settings: settings.clone(),
@@ -202,13 +207,14 @@ fn main() -> ExitCode {
     #[cfg(windows)]
     let bar = Bar {
         overlay: overlay::Overlay::new(&url, overlay_rx, zone_rx, &saved_overlay),
+        ninja: ninja_window::NinjaWindow::new(ninja_rx),
         open_requests: open_rx,
         moving,
         saved,
         placement: guide_window::PlacementKeeper::load(placement_file(&url)),
     };
     #[cfg(not(windows))]
-    let _ = (overlay_rx, zone_rx, open_rx, saved);
+    let _ = (overlay_rx, zone_rx, open_rx, saved, ninja_rx);
 
     // A guide window left open from an earlier run reconnects by itself; bring it up instead.
     if opening && browser_now != Browser::None {
@@ -240,6 +246,8 @@ fn main() -> ExitCode {
 #[cfg(windows)]
 struct Bar {
     overlay: overlay::Overlay,
+    /// The poe.ninja sign-in window (hidden until needed).
+    ninja: ninja_window::NinjaWindow,
     open_requests: std::sync::mpsc::Receiver<()>,
     /// The one-time move of the guide's data from your Edge profiles, while it runs.
     moving: Option<guide_move::GuideMove>,
@@ -342,6 +350,7 @@ fn wait(
             }
             while bar.open_requests.try_recv().is_ok() {}
             bar.overlay.tick();
+            bar.ninja.tick();
             return;
         }
         if bar.open_requests.try_recv().is_ok()
@@ -352,6 +361,7 @@ fn wait(
         }
         while bar.open_requests.try_recv().is_ok() {}
         bar.overlay.tick();
+        bar.ninja.tick();
         bar.placement.tick();
     };
     match tray::run(status, stopped_rx, || show_guide(browser(), url), tick) {

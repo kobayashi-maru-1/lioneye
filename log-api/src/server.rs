@@ -50,6 +50,8 @@ pub struct AppState {
     pub pob_links: Arc<crate::pob_files::Links>,
     /// "pob-file:changed" after PoB saves that file.
     pub pob_saved: broadcast::Sender<String>,
+    /// The poe.ninja sign-in window: refreshes of the live character (ninja-window.rs).
+    pub ninja: crate::ninja_window::Handle,
 }
 
 pub type Tips = std::collections::BTreeMap<String, String>;
@@ -230,6 +232,9 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
         .route("/api/ninja/version", get(ninja_version))
         .route("/api/ninja/character", get(ninja_character))
         .route("/api/ninja/characters", get(ninja_characters))
+        .route("/api/ninja/signed-in", get(ninja_signed_in))
+        .route("/api/ninja/sign-in", post(ninja_sign_in))
+        .route("/api/ninja/refresh", post(ninja_refresh))
         .route("/api/app", get(app_info))
         .route("/api/character", get(character))
         .route("/api/settings", post(update_settings))
@@ -667,8 +672,7 @@ struct NinjaAccountQuery {
     account: String,
 }
 
-/// The characters on an account's public poe.ninja profile, for Settings to pick from
-/// (and loaded after a level-up, which has poe.ninja re-read the current character).
+/// The characters on an account's public poe.ninja profile, for Settings to pick from.
 async fn ninja_characters(
     headers: HeaderMap,
     Query(query): Query<NinjaAccountQuery>,
@@ -685,6 +689,60 @@ async fn ninja_characters(
         Ok(Err(msg)) => (StatusCode::BAD_GATEWAY, msg).into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
+}
+
+/// A request from a guide page on this PC (by its local name, and its own page for posts).
+fn guide_here(headers: &HeaderMap) -> bool {
+    local_origin(headers) && local_host(headers) && crate::pob_routes::same_origin(headers)
+}
+
+/// Whether you're signed in to poe.ninja in its window: `signedIn` true or false, or null
+/// when it couldn't tell (no WebView2, poe.ninja not reached).
+async fn ninja_signed_in(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if !guide_here(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    // 401 only: a 403 can be poe.ninja's bot check, not your login.
+    let signed_in = match state.ninja.status().await {
+        200..=299 => Some(true),
+        401 => Some(false),
+        _ => None,
+    };
+    Json(serde_json::json!({ "signedIn": signed_in })).into_response()
+}
+
+/// Shows the poe.ninja window on its account page, to sign in.
+async fn ninja_sign_in(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if !guide_here(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    if state.ninja.sign_in().await {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        (StatusCode::SERVICE_UNAVAILABLE, "Sign-in window unavailable").into_response()
+    }
+}
+
+/// Asks poe.ninja (signed in, in its window) to re-read the live character now. Answers
+/// `result`: "asked", "signed-out", "too-soon" or "failed".
+async fn ninja_refresh(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<NinjaQuery>,
+) -> Response {
+    if !guide_here(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let Some(character) = crate::ninja_character::parse_link(&query.link) else {
+        return (StatusCode::BAD_REQUEST, "Character link invalid. Pick again").into_response();
+    };
+    let result = match state.ninja.refresh(character.league, character.name).await {
+        200..=299 => "asked",
+        401 => "signed-out",
+        429 => "too-soon",
+        _ => "failed",
+    };
+    Json(serde_json::json!({ "result": result })).into_response()
 }
 
 /// Runs a poe.ninja request off the async runtime, for a guide page on this PC and a

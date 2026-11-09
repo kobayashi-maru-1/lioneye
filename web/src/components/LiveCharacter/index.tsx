@@ -3,16 +3,22 @@ import {
   type ListedCharacter,
   type LiveCharacter,
   characterLink,
+  askNinjaRefresh,
   fetchLiveCharacter,
   fetchLiveCharacters,
   fetchLiveVersion,
+  fetchNinjaSignedIn,
   liveAccountAtom,
   liveCharacterAtom,
   liveLinkAtom,
   liveRefreshAtom,
   liveStatsAtom,
   liveStatusAtom,
+  ninjaSignInUsedAtom,
+  ninjaSignedInAtom,
+  openNinjaSignIn,
 } from "../../state/live-character";
+import { liveViewAtom } from "../../state/live-view";
 import { pobCodeToXml } from "../../state/pob/process";
 import { formStyles } from "../../styles";
 import { PanelSelect } from "../PanelSelect";
@@ -24,19 +30,18 @@ import { useEffect, useRef, useState } from "react";
 
 /** How often poe.ninja is asked whether the character changed. */
 const CHECK_EVERY = 3 * 60 * 1000;
-/** After a level-up (and the nudge below), when to check for poe.ninja's re-read. */
-const AFTER_LEVEL_UP = [30 * 1000, 4 * 60 * 1000];
-
-/** The account part of a character's poe.ninja page ("…/profile/Name-1234/…"). */
-function accountOf(link: string) {
-  return /\/profile\/([^/]+)\//.exec(link)?.[1] ?? null;
-}
+/**
+ * After asking poe.ninja to re-read the character (a level-up, Refresh), when to check
+ * for the new data; poe.ninja reads it from the game in its own time.
+ */
+const AFTER_ASKING = [20 * 1000, 60 * 1000, 4 * 60 * 1000];
 
 /**
  * Keeps your live character current: reads it when the link is set or Refresh is
- * pressed, checks poe.ninja's version every few minutes and after a level-up (reading it
- * again only when it changed; a level-up also nudges poe.ninja to re-read it), and has
- * PoB calculate it when its code changes. Mounted with the app. Renders nothing.
+ * pressed, checks poe.ninja's version every few minutes (reading it again only when it
+ * changed), and has PoB calculate it when its code changes. Signed in to poe.ninja (its
+ * window, Settings → Build), a level-up or Refresh first asks poe.ninja to re-read the
+ * character, then checks for it a few times. Mounted with the app. Renders nothing.
  */
 export function LiveCharacterSync() {
   const link = useAtomValue(liveLinkAtom);
@@ -45,6 +50,7 @@ export function LiveCharacterSync() {
   const refresh = useAtomValue(liveRefreshAtom);
   const level = useAtomValue(characterLogAtom)?.level ?? null;
   const setStats = useSetAtom(liveStatsAtom);
+  const setLiveView = useSetAtom(liveViewAtom);
 
   // The newest answer only: a slow older read never replaces a newer one.
   const latest = useRef(0);
@@ -57,7 +63,13 @@ export function LiveCharacterSync() {
   // stale saved code isn't calculated just before the fresh one.
   const [settled, setSettled] = useState(false);
 
+  // The character followed now: a check scheduled for another one (picked before, or
+  // cleared since) never reads it back.
+  const linkNow = useRef(link);
+  linkNow.current = link;
+
   const read = async (target: string, onlyIfChanged: boolean) => {
+    if (target !== linkNow.current) return;
     if (onlyIfChanged && reading.current) return;
     const id = ++latest.current;
     if (!onlyIfChanged) reading.current = true;
@@ -68,7 +80,7 @@ export function LiveCharacterSync() {
       }
       setStatus({ kind: "loading" });
       const character = await fetchLiveCharacter(target);
-      if (id !== latest.current) return;
+      if (id !== latest.current || target !== linkNow.current) return;
       setLive(character);
       setStatus({ kind: "idle" });
     } catch (error) {
@@ -97,6 +109,8 @@ export function LiveCharacterSync() {
     if (link === null) {
       latest.current++;
       reading.current = false;
+      // No character to show: the guide shows the plan (a later one doesn't open in it).
+      setLiveView(false);
       setLive(null);
       setStatus({ kind: "idle" });
       setSettled(true);
@@ -116,22 +130,66 @@ export function LiveCharacterSync() {
     return () => window.clearInterval(timer);
   }, [link]);
 
-  // After a level-up: your profile's character list is loaded once, which has poe.ninja
-  // re-read your current character (as viewing your profile page does; its own checks
-  // can be an hour or more apart), then a couple of checks pick the new data up.
+  // Signed in to poe.ninja in its window? Only once you've used Sign in (the window, a
+  // hidden browser, isn't started for anyone who never does). Asked on start, and when the
+  // guide gets focus again while not signed in (after you sign in there), at most every
+  // 20 seconds.
+  const [signedIn, setSignedIn] = useAtom(ninjaSignedInAtom);
+  const signInUsed = useAtomValue(ninjaSignInUsedAtom);
+  const signedInNow = useRef(signedIn);
+  signedInNow.current = signedIn;
+  useEffect(() => {
+    if (link === null || !signInUsed) return;
+    let live = true;
+    let last = 0;
+    const check = () => {
+      if (Date.now() - last < 20_000) return;
+      last = Date.now();
+      fetchNinjaSignedIn().then((answer) => live && setSignedIn(answer));
+    };
+    const onFocus = () => {
+      if (signedInNow.current !== true) check();
+    };
+    check();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      live = false;
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [link, signInUsed]);
+
+  /** Signed in: has poe.ninja re-read the character, then checks a few times. */
+  const askAndCheck = (target: string) => {
+    if (signedInNow.current) {
+      askNinjaRefresh(target).then((result) => {
+        if (result === "signed-out") setSignedIn(false);
+      });
+    }
+    return AFTER_ASKING.map((delay) =>
+      window.setTimeout(() => read(target, true), delay),
+    );
+  };
+
+  // After a level-up.
   const lastLevel = useRef(level);
   useEffect(() => {
     const before = lastLevel.current;
     lastLevel.current = level;
     if (link === null || level === null || before === null || level <= before)
       return;
-    const account = accountOf(link);
-    if (account) fetchLiveCharacters(account).catch(() => {});
-    const timers = AFTER_LEVEL_UP.map((delay) =>
-      window.setTimeout(() => read(link, true), delay),
-    );
+    const timers = askAndCheck(link);
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [level, link]);
+
+  // After Refresh (not on start): it reads at once (above), and asks poe.ninja too.
+  const askedFor = useRef(refresh);
+  useEffect(() => {
+    if (askedFor.current === refresh) return;
+    askedFor.current = refresh;
+    if (link === null) return;
+    const timers = askAndCheck(link);
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [refresh]);
 
   // PoB's numbers, whenever the code changes (once the session's first read settled).
   const code = live?.code ?? null;
@@ -162,12 +220,10 @@ export function LiveCharacterSync() {
   const stats = useAtomValue(liveStatsAtom);
   const failed = useRef(false);
   failed.current = stats?.state === "error";
-  const firstRefresh = useRef(true);
+  const retriedFor = useRef(refresh);
   useEffect(() => {
-    if (firstRefresh.current) {
-      firstRefresh.current = false;
-      return;
-    }
+    if (retriedFor.current === refresh) return;
+    retriedFor.current = refresh;
     if (failed.current) setAttempt((n) => n + 1);
   }, [refresh]);
 
@@ -339,6 +395,52 @@ export function LiveCharacterForm() {
           )}
         </div>
       )}
+      {link !== null && <NinjaSignIn />}
     </>
+  );
+}
+
+/**
+ * Settings → Build → poe.ninja: signed in to poe.ninja in Lioneye's poe.ninja window, or
+ * Sign in (opens it). Signed in, a level-up and Refresh ask poe.ninja to re-read your
+ * character, instead of waiting for its own schedule.
+ */
+function NinjaSignIn() {
+  const signedIn = useAtomValue(ninjaSignedInAtom);
+  const [used, setUsed] = useAtom(ninjaSignInUsedAtom);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className={classNames(formStyles.formRow)}>
+      <label>poe.ninja</label>
+      <div className={classNames(styles.line)}>
+        <span>
+          {signedIn === true
+            ? "Signed in"
+            : signedIn === false || !used
+              ? "Not signed in"
+              : "Not checked"}
+        </span>
+        {signedIn !== true && (
+          <button
+            className={classNames(formStyles.formButton)}
+            onClick={async () => {
+              setUsed(true);
+              setError(
+                (await openNinjaSignIn())
+                  ? null
+                  : "Sign-in window unavailable. Install WebView2 and restart.",
+              );
+            }}
+          >
+            Sign in
+          </button>
+        )}
+      </div>
+      {error && (
+        <span className={classNames(styles.note, styles.error)} role="alert">
+          {error}
+        </span>
+      )}
+    </div>
   );
 }

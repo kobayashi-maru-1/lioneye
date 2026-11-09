@@ -54,7 +54,14 @@ export interface OverlayGems {
    * A vendor or stash search for the set's gems still unticked on the gem list
    * (state/gem-regex.ts): `count` of `total` fit. Absent when there are none.
    */
-  search?: { text: string; count: number; total: number };
+  search?: OverlaySearch;
+}
+
+/** A gem search for the bar's copy icon (state/gem-regex.ts): `count` of `total` fit. */
+export interface OverlaySearch {
+  text: string;
+  count: number;
+  total: number;
 }
 
 /**
@@ -98,6 +105,8 @@ export interface OverlayStep {
 export interface OverlayCampaign {
   steps: OverlayStep[];
   missed: MissedQuest[];
+  /** The gems to buy at your next vendor stop (the copy icon). Absent with none. */
+  search?: OverlaySearch;
 }
 
 /** Undefined until the guide page has worked it out. */

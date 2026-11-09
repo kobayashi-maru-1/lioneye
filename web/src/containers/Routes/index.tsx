@@ -33,7 +33,12 @@ import { TradeListPanel } from "../../components/TradeList";
 import type { TaskListProps } from "../../components/TaskList";
 import { currentActAtom, displaySetName } from "../../state/current-act";
 import { stripPob } from "../../components/PobText";
-import { gemLinksSelector } from "../../state/gem-links";
+import {
+  viewedGemLinksAtom,
+  viewedUrlTreesAtom,
+  viewingLiveAtom,
+} from "../../state/live-view";
+import { pobCodeToXml } from "../../state/pob/process";
 import { gemProgressFamily } from "../../state/gem-progress";
 import { gemsToGetSelector } from "../../state/gem";
 import { gemRegex } from "../../state/gem-regex";
@@ -57,7 +62,7 @@ import { searchStringsSelector } from "../../state/search-strings";
 import { TREE_DATA_LOOKUP } from "../../state/tree";
 import { treeTip } from "../../state/tree/next-points";
 import { lookAhead, treeProgressAtom } from "../../state/tree/progress";
-import { type UrlTree, urlTreesSelector } from "../../state/tree/url-tree";
+import type { UrlTree } from "../../state/tree/url-tree";
 import { interactiveStyles } from "../../styles";
 import styles from "./styles.module.css";
 import classNames from "classnames";
@@ -211,12 +216,19 @@ export default function RoutesContainer() {
  */
 function GuidePage({ campaign }: { campaign: ReactNode }) {
   const code = useAtomValue(pobAtom);
-  const pob = usePobStats();
-  const urlTrees = useAtomValue(urlTreesSelector);
-  const gemLinks = useAtomValue(gemLinksSelector);
+  // Gems and Tree show your live character while the Loadout dropdown does (else the plan).
+  const urlTrees = useAtomValue(viewedUrlTreesAtom);
+  const gemLinks = useAtomValue(viewedGemLinksAtom);
   const searchStrings = useAtomValue(searchStringsSelector);
-  const xml = pob?.xml ?? null;
-  const notes = useMemo(() => (xml ? buildNotes(xml) : null), [xml]);
+  // Notes are the plan's own, whatever the page shows.
+  const notes = useMemo(() => {
+    if (code === null) return null;
+    try {
+      return buildNotes(pobCodeToXml(code));
+    } catch {
+      return null;
+    }
+  }, [code]);
   const showStats = code !== null;
   const hasSearch = searchStrings !== null && searchStrings.length > 0;
   useCampaignInView();
@@ -245,16 +257,19 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
     ],
     [targetKey],
   );
+  // The in-game bar keeps the plan's buttons and tooltips while the page shows your live
+  // character (they guide the plan).
+  const viewingLive = useAtomValue(viewingLiveAtom);
   useEffect(() => {
     setTargets(targets);
-    setShownPanels(targets.map((target) => target.id));
-  }, [targets]);
+    if (!viewingLive) setShownPanels(targets.map((target) => target.id));
+  }, [targets, viewingLive]);
   useEffect(() => () => setTargets([]), []);
   // No gem links, so no Gems panel to set the bar's Gems tooltip: clear the last build's.
   const setOverlayGems = useSetAtom(overlayGemsAtom);
   useEffect(() => {
-    if (gemLinks.length === 0) setOverlayGems(null);
-  }, [gemLinks.length === 0]);
+    if (gemLinks.length === 0 && !viewingLive) setOverlayGems(null);
+  }, [gemLinks.length === 0, viewingLive]);
 
   // Wide screens: a column whose panels are all folded gives its width to the other.
   const campaignFolded = usePageSectionCollapsed("campaign");
@@ -407,7 +422,10 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
     const { regex, count, total } = gemRegex(wanted, ALL_GEM_NAMES);
     return count > 0 ? JSON.stringify({ text: regex, count, total }) : "";
   }, [gemLinks, title, toGet]);
+  // While the page shows your live character, the bar's Gems tooltip keeps the plan's.
+  const viewingLive = useAtomValue(viewingLiveAtom);
   useEffect(() => {
+    if (viewingLive) return;
     if (title === undefined) {
       setOverlayGems(null);
       return;
@@ -442,7 +460,7 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
         : {}),
     });
     // (Kept when you leave for Settings, so the bar still shows them.)
-  }, [gemLinks, title, search]);
+  }, [gemLinks, title, search, viewingLive]);
 
   return (
     <PageSection
@@ -590,7 +608,10 @@ function useTreeTip(
   character: string[] | null,
 ) {
   const setTip = useSetAtom(overlayTreeAtom);
+  // While the page shows your live character, the bar's Tree tooltip keeps the plan's.
+  const viewingLive = useAtomValue(viewingLiveAtom);
   useEffect(() => {
+    if (viewingLive) return;
     const tree = urlTrees[index];
     if (!tree) return;
     let live = true;
@@ -606,7 +627,7 @@ function useTreeTip(
     return () => {
       live = false;
     };
-  }, [urlTrees, index, character]);
+  }, [urlTrees, index, character, viewingLive]);
 }
 
 /**

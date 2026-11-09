@@ -16,6 +16,11 @@ import { routeProgressFamily } from "./route-progress";
  */
 const stepZones = new WeakMap<RouteData.Step, number>();
 
+/** A step's zone (edge index into `route.edges`); null when it has none. */
+export function stepZone(step: RouteData.Step) {
+  return stepZones.get(step) ?? null;
+}
+
 /**
  * A campaign step's key for its tick: its act, what it says (with the step before it, so a
  * repeated line like "Logout" stays tied to its place) and which time that pair comes up

@@ -29,9 +29,10 @@ import {
   overlayGearAtom,
 } from "../../state/overlay";
 import { displaySetName } from "../../state/current-act";
+import { viewingLiveAtom } from "../../state/live-view";
 import { stripPob } from "../PobText";
 import classNames from "classnames";
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo, useState } from "react";
 import { FaBalanceScale, FaRegClipboard } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -142,13 +143,16 @@ export function GearPanel() {
   );
   const { league, leagues, setLeague } = useTradeLeague();
 
-  // The in-game bar's Gear tooltip: the set shown here, with each item's mods.
+  // The in-game bar's Gear tooltip: the set shown here, with each item's mods. While the
+  // page shows your live character the tooltip keeps the plan's (it guides the plan).
   const setOverlayGear = useSetAtom(overlayGearAtom);
+  const viewingLive = useAtomValue(viewingLiveAtom);
   // None while a different build calculates (a save of the same one keeps its gear).
   useEffect(() => {
+    if (viewingLive) return;
     const set = gear?.sets[index];
     setOverlayGear(gear && set ? overlayGear(gear, set) : null);
-  }, [gear, index, setOverlayGear]);
+  }, [gear, index, setOverlayGear, viewingLive]);
 
   return (
     <PageSection

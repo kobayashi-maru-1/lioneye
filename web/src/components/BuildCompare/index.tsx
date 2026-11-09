@@ -103,9 +103,12 @@ function CompareDialog({ onClose }: { onClose: () => void }) {
   const [attempt, setAttempt] = useState(0);
   // The guide's shown loadout (the left column's Loadout), once PoB has answered for it.
   const pob = usePobStats();
-  const guide = pob?.stats ?? null;
-  const guideReady = guide !== null && !pob?.loading && !pob?.error;
-  const guideNote = pob?.error
+  // The plan's loadout, also while the page shows the live character.
+  const guide = pob?.planStats ?? null;
+  const planBusy = !!pob?.planLoading;
+  const planError = pob?.planError ?? null;
+  const guideReady = guide !== null && !planBusy && !planError;
+  const guideNote = planError
     ? "Not calculated. Pick the loadout again."
     : !guideReady
       ? "Calculating…"

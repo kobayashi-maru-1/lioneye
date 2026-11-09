@@ -1,10 +1,17 @@
+import { liveCharacterAtom } from "../../state/live-character";
+import { liveViewAtom } from "../../state/live-view";
 import type { MainSkillPick } from "../../state/main-skill";
 import { formStyles } from "../../styles";
+import { liveSummary } from "../LiveCharacter";
 import { PanelSelect } from "../PanelSelect";
 import { type SkillState, usePobStats } from "../PobStats";
 import { PobText, stripPob } from "../PobText";
 import styles from "./styles.module.css";
 import classNames from "classnames";
+import { useAtomValue, useSetAtom } from "jotai";
+
+/** The Loadout dropdown's first entry when a live character is set (Settings → Build). */
+const LIVE_OPTION = "Live character";
 
 /** PoB's "Minion:" / "Player:" lines become pob.codes-style headings. */
 const HEADING = /^(minion|player):?$/i;
@@ -15,30 +22,48 @@ const HEADING = /^(minion|player):?$/i;
  */
 export function StatsViewer() {
   const pob = usePobStats();
-  if (pob === null || pob.xml === null) {
+  const live = useAtomValue(liveCharacterAtom);
+  const setLiveView = useSetAtom(liveViewAtom);
+  if (pob === null || (pob.xml === null && !pob.live)) {
     return pob?.unreadable ? (
       <p className={classNames(styles.status)}>Build unreadable. Re-import.</p>
     ) : null;
   }
   const { stats, loading, error, retry, titles, index, setIndex } = pob;
+  // With a live character: "Live character" first, then the plan's loadouts (or "Plan"
+  // for a build without them).
+  const planOptions = titles.length > 0 ? titles : ["Plan"];
+  const options = live ? [LIVE_OPTION, ...planOptions] : titles;
+  const offset = live ? 1 : 0;
 
   return (
     <div className={classNames(styles.stats)}>
       {/* The loadout everything on the page shows; it follows your level or act. */}
-      {titles.length > 0 && (
+      {options.length > 0 && (
         <>
           <h2 className={classNames(styles.heading)}>Loadout</h2>
           <PanelSelect
             className={classNames(styles.loadout)}
             label="Loadout"
-            options={titles}
-            value={index}
-            onChange={setIndex}
+            options={options}
+            value={pob.live ? 0 : index + offset}
+            onChange={(i) => {
+              if (live && i === 0) {
+                setLiveView(true);
+                return;
+              }
+              setLiveView(false);
+              if (titles.length > 0) setIndex(i - offset);
+            }}
           />
+          {pob.live && live && (
+            <p className={classNames(styles.liveNote)}>{liveSummary(live)}</p>
+          )}
         </>
       )}
       <h2 className={classNames(styles.heading)}>Stats</h2>
-      {stats?.skill && stats.skill.groups.length > 0 && (
+      {/* The live character is calculated with PoB's own main skill. */}
+      {!pob.live && stats?.skill && stats.skill.groups.length > 0 && (
         <SkillPicker
           state={stats.skill}
           fallback={pob.fallback}

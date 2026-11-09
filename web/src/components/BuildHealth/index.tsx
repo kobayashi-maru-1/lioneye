@@ -46,14 +46,19 @@ export function BuildHealthPanel() {
   const onLive = live !== null && source === "live";
   const liveAnswer = onLive && liveStats?.code === live.code ? liveStats : null;
   // Never the old loadout's findings under the new loadout's name.
-  const planHealth = pob?.stats != null && !pob.error ? pob.stats.health : null;
+  // The plan's own numbers, also while the page shows the live character.
+  const planError = pob?.planError ?? null;
+  const planHealth =
+    pob?.planStats != null && !planError ? pob.planStats.health : null;
   const pobHealth = onLive
     ? liveAnswer?.state === "ready"
       ? liveAnswer.stats.health
       : null
     : planHealth;
-  const pobFailed = onLive ? liveAnswer?.state === "error" : !!pob?.error;
-  const pobLoading = onLive ? liveAnswer?.state !== "ready" : !!pob?.loading;
+  const pobFailed = onLive ? liveAnswer?.state === "error" : !!planError;
+  const pobLoading = onLive
+    ? liveAnswer?.state !== "ready"
+    : !!pob?.planLoading;
   // Missed quest points from your character's "/passives" list, read from the game's log.
   // (state/quest-points; the bar's Campaign badge shows the same.)
   // Not typed yet, or older than your act: ask for it.

@@ -4,8 +4,12 @@ import { decodeBase64Url } from "../../utility";
 import { buildTreesSelector } from "./build-tree";
 import type { RouteData, SkillTree } from "common";
 
-export const urlTreesSelector = atom(async (get) => {
-  const buildTrees = get(buildTreesSelector);
+export const urlTreesSelector = atom(async (get) =>
+  urlTreesFor(get(buildTreesSelector)),
+);
+
+/** A build's trees (its PoB specs) as the Tree panel draws them, on one tree version. */
+export async function urlTreesFor(buildTrees: RouteData.BuildTree[] | null) {
   if (buildTrees === null) {
     return [];
   }
@@ -28,7 +32,7 @@ export const urlTreesSelector = atom(async (get) => {
   }
 
   return urlTrees;
-});
+}
 
 export namespace UrlTree {
   export interface Data {

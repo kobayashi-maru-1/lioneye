@@ -116,6 +116,60 @@ async function ask<T>(path: string, link: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/**
+ * Signed in to poe.ninja in Lioneye's poe.ninja window (log-api/src/ninja-window.rs):
+ * then Lioneye can ask poe.ninja to re-read your character. Null until asked, or when it
+ * couldn't tell.
+ */
+export const ninjaSignedInAtom = atom<boolean | null>(null);
+
+/**
+ * You've used Sign in at least once: only then is the poe.ninja window (a hidden
+ * browser) started to check, so nobody who never signs in runs it.
+ */
+export const ninjaSignInUsedAtom = persistentAtom<boolean>(
+  "ninja-sign-in-used",
+  false,
+  0,
+);
+
+/** Whether you're signed in to poe.ninja there (null: couldn't tell). */
+export async function fetchNinjaSignedIn(): Promise<boolean | null> {
+  try {
+    const response = await fetch("/api/ninja/signed-in");
+    if (!response.ok) return null;
+    return ((await response.json()) as { signedIn: boolean | null }).signedIn;
+  } catch {
+    return null;
+  }
+}
+
+/** Opens the poe.ninja window on its account page, to sign in. */
+export async function openNinjaSignIn() {
+  try {
+    const response = await fetch("/api/ninja/sign-in", { method: "POST" });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Asks poe.ninja (signed in) to re-read the character now. */
+export async function askNinjaRefresh(
+  link: string,
+): Promise<"asked" | "signed-out" | "too-soon" | "failed"> {
+  try {
+    const response = await fetch(
+      `/api/ninja/refresh?link=${encodeURIComponent(link)}`,
+      { method: "POST" },
+    );
+    if (!response.ok) return "failed";
+    return ((await response.json()) as { result: "asked" }).result;
+  } catch {
+    return "failed";
+  }
+}
+
 /** The character's current data version on poe.ninja. */
 export async function fetchLiveVersion(link: string) {
   return (await ask<{ version: number }>("/api/ninja/version", link)).version;

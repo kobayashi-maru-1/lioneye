@@ -1,11 +1,17 @@
 import { characterLevelAtom } from "../../state/character-level";
 import { currentActAtom, indexForLevel } from "../../state/current-act";
+import {
+  liveCharacterAtom,
+  liveRefreshAtom,
+  liveStatsAtom,
+} from "../../state/live-character";
+import { viewingLiveAtom } from "../../state/live-view";
 import { type MainSkillPick, mainSkillPickAtom } from "../../state/main-skill";
 import { buildIdSelector, pobAtom } from "../../state/pob";
 import { pobCodeToXml } from "../../state/pob/process";
 import { stripPob } from "../PobText";
 import { useFollowAct } from "../SetPager";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import React, {
   createContext,
   useCallback,
@@ -195,6 +201,16 @@ export interface PobStatsValue {
   setPick: (pick: MainSkillPick) => void;
   /** Your remembered skill isn't in this loadout; PoB's own pick is shown. */
   fallback: boolean;
+  /**
+   * The page shows your live character (the Loadout dropdown's "Live character"): `xml`,
+   * `stats`, `loading` and `error` are its. The plan's own stay in `planStats`.
+   */
+  live: boolean;
+  /** The plan's shown loadout (Compare's Build 2), whatever the page shows. */
+  planStats: Stats | null;
+  /** The plan's own state: calculating (planStats may be the last loadout's), or failed. */
+  planLoading: boolean;
+  planError: string | null;
 }
 
 const PobStatsContext = createContext<PobStatsValue | null>(null);
@@ -268,25 +284,83 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
     return () => controller.abort();
   }, [xml, buildId, requested, pickKey, attempt]);
 
+  // Your live character, when the Loadout dropdown shows it: its numbers (calculated by
+  // LiveCharacterSync) in place of the plan's. The loadout list and your place in it
+  // stay the plan's, so picking a loadout again lands where you were.
+  const viewingLive = useAtomValue(viewingLiveAtom);
+  const live = useAtomValue(liveCharacterAtom);
+  const liveStats = useAtomValue(liveStatsAtom);
+  const setRefresh = useSetAtom(liveRefreshAtom);
+  const liveAnswer =
+    viewingLive && live !== null && liveStats?.code === live.code
+      ? liveStats
+      : null;
+  const liveXml = useMemo(() => {
+    if (!viewingLive || live === null) return null;
+    try {
+      return pobCodeToXml(live.code);
+    } catch {
+      return null;
+    }
+  }, [viewingLive, live?.code]);
+
   const value = useMemo<PobStatsValue>(
-    () => ({
+    () =>
+      viewingLive
+        ? {
+            xml: liveXml,
+            unreadable: false,
+            stats: liveAnswer?.state === "ready" ? liveAnswer.stats : null,
+            titles,
+            index,
+            setIndex,
+            loading: liveAnswer?.state !== "ready",
+            error: liveAnswer?.state === "error" ? "Live not calculated" : null,
+            retry: () => setRefresh((n) => n + 1),
+            pick,
+            setPick,
+            fallback: false,
+            live: true,
+            planStats: stats,
+            planLoading: loading,
+            planError: error,
+          }
+        : {
+            xml,
+            unreadable: code !== null && xml === null,
+            stats,
+            titles,
+            index,
+            setIndex,
+            loading,
+            error,
+            retry: () => setAttempt((n) => n + 1),
+            pick,
+            setPick,
+            fallback:
+              pick !== null &&
+              answer?.pickKey === pickKey &&
+              stats?.skill?.picked === false,
+            live: false,
+            planStats: stats,
+            planLoading: loading,
+            planError: error,
+          },
+    [
+      code,
       xml,
-      unreadable: code !== null && xml === null,
       stats,
       titles,
       index,
-      setIndex,
       loading,
       error,
-      retry: () => setAttempt((n) => n + 1),
       pick,
-      setPick,
-      fallback:
-        pick !== null &&
-        answer?.pickKey === pickKey &&
-        stats?.skill?.picked === false,
-    }),
-    [code, xml, stats, titles, index, loading, error, pick, pickKey, answer],
+      pickKey,
+      answer,
+      viewingLive,
+      liveXml,
+      liveAnswer,
+    ],
   );
 
   return (
