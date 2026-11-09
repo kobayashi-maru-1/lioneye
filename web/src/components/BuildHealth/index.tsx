@@ -3,6 +3,7 @@ import {
   liveCharacterAtom,
   liveStatsAtom,
 } from "../../state/live-character";
+import { type OverlayHealth, overlayHealthAtom } from "../../state/overlay";
 import { missedQuestsAtom, passivesStaleAtom } from "../../state/quest-points";
 import { liveSummary } from "../LiveCharacter";
 import { PanelSelect } from "../PanelSelect";
@@ -11,8 +12,8 @@ import { PageSection, useJumpToSection } from "../PageSection";
 import { type HealthFinding, usePobStats } from "../PobStats";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useAtom, useAtomValue } from "jotai";
-import { useMemo } from "react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useEffect, useMemo } from "react";
 
 /** The panel each finding's link jumps to. */
 const PANELS: Record<string, string> = {
@@ -85,6 +86,27 @@ export function BuildHealthPanel() {
         ? "Health unavailable"
         : "Calculating"
       : null;
+
+  // The same, for the in-game bar's Health tooltip; sent again only when it changes.
+  const overlay: OverlayHealth = {
+    ...(live !== null ? { source: onLive ? "Live" : "Plan" } : {}),
+    ...(pobStatus ? { status: pobStatus } : {}),
+    findings: (health ?? []).map(({ severity, message, fix }) => ({
+      severity,
+      message,
+      ...(fix ? { fix } : {}),
+    })),
+    passivesStale,
+    // Dimmed as the panel dims them: earlier findings while PoB works on new ones.
+    ...((onLive ? pobLoading && pobHealth !== null : pobLoading)
+      ? { stale: true }
+      : {}),
+  };
+  const overlayKey = JSON.stringify(overlay);
+  const setOverlayHealth = useSetAtom(overlayHealthAtom);
+  useEffect(() => {
+    setOverlayHealth(JSON.parse(overlayKey) as OverlayHealth);
+  }, [overlayKey, setOverlayHealth]);
 
   return (
     <PageSection

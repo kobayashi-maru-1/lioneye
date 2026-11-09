@@ -2,7 +2,7 @@
 // (log-api/src/overlay.rs). Buttons tell the exe, which tells the guide page to jump to that
 // panel. The exe sends the buttons ("overlay:" messages) from the guide's Settings, and the
 // guide's tooltips ("tips:"): the Gems panel's set, Campaign's next steps, the Tree's
-// next points, the Gear panel's items and the build's notes.
+// next points, the Gear panel's items, Build health's findings and the build's notes.
 import type { OverlayGear } from "../state/overlay";
 import { notesLines, pobSpans } from "../state/pob/colour";
 import { TREE_DATA_LOOKUP } from "../state/tree";
@@ -125,7 +125,7 @@ let shown = "";
 let barIds = new Set<string>();
 /**
  * The guide's tooltips by button: "gems" (OverlayGems | null), "campaign" ({ steps, missed }), "tree"
- * (TreeTip), "gear" (OverlayGear | null), "notes" (string | null).
+ * (TreeTip), "gear" (OverlayGear | null), "health" (OverlayHealth), "notes" (string | null).
  */
 let tips: Record<string, unknown> = {};
 /** Whether the first tooltips have arrived (a pinned one opens then). */
@@ -137,14 +137,54 @@ let up = false;
 
 /**
  * Buttons with a tooltip: Gems (the Gems panel's links), Campaign (the next steps), Tree,
- * Gear (the items' mods) and Notes. Every tooltip gets the pin and the flip.
+ * Gear (the items' mods), Health (Build health's findings) and Notes. Every tooltip gets
+ * the pin and the flip.
  */
 const TIPS: Record<string, () => void> = {
   gems: renderGems,
   campaign: renderCampaign,
   tree: renderTree,
   gear: renderGear,
+  health: renderHealth,
   notes: renderNotes,
+};
+
+/** Draws a bar icon: 16px strokes in the button's colour. */
+const barIcon = (paths: string) =>
+  `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+
+/** Each panel's icon on the bar; a panel without one shows its label. */
+const BAR_ICONS: Record<string, string> = {
+  // A flag: the route.
+  campaign: barIcon('<path d="M3.5 14.5v-13M3.5 2.5h9l-2 3 2 3h-9"/>'),
+  // A breastplate (a cog would read as Settings).
+  gear: barIcon(
+    '<path d="M5.5 1.5C6 3 7 3.75 8 3.75S10 3 10.5 1.5L14 3l-1 4.5.5 6C12 14.5 10 15 8 15s-4-.5-5.5-1.5l.5-6L2 3zM8 3.75V15M4 8.5c1.5 1 2.75 1 4 0 1.25 1 2.5 1 4 0"/>',
+  ),
+  // A cut gem.
+  gems: barIcon(
+    '<path d="M4.5 2h7l3 4L8 14.5 1.5 6zM1.5 6h13M6 6l2 8.5L10 6M4.5 2L6 6l2-4 2 4 1.5-4"/>',
+  ),
+  // Two arrows, opposite ways.
+  trade: barIcon('<path d="M2 5h11M10 2l3 3-3 3M14 11H3M6 8l-3 3 3 3"/>'),
+  // Sliders.
+  config: barIcon(
+    '<path d="M2 4h1.5M6.5 4H14M2 8h7.5M12.5 8H14M2 12h3.5M8.5 12H14"/><circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="8" r="1.5"/><circle cx="7" cy="12" r="1.5"/>',
+  ),
+  // Three linked nodes: the passive tree.
+  tree: barIcon(
+    '<circle cx="8" cy="3.5" r="2"/><circle cx="3.5" cy="12" r="2"/><circle cx="12.5" cy="12" r="2"/><path d="M7 5.3l-2.5 4.9M9 5.3l2.5 4.9M5.5 12h5"/>',
+  ),
+  // A heart with a pulse.
+  health: barIcon(
+    '<path d="M8 14S1.5 10 1.5 5.75A3.25 3.25 0 0 1 8 4a3.25 3.25 0 0 1 6.5 1.75C14.5 10 8 14 8 14z"/><path d="M4 8h1.75l1-1.5 1.5 3 1-1.5H12"/>',
+  ),
+  // A page of text.
+  notes: barIcon(
+    '<path d="M3.5 1.5h6l3 3v10h-9zM9.5 1.5v3h3M5.5 8h5M5.5 10.5h5M5.5 13h3"/>',
+  ),
+  // A magnifier.
+  search: barIcon('<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l4 4"/>'),
 };
 
 /** One tooltip can be pinned open, kept across restarts. */
@@ -237,8 +277,20 @@ function render(config: OverlayConfig) {
     ...config.buttons.map(({ id, label }) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "button";
-      button.textContent = label;
+      // Own keys only: a panel id like "constructor" has no icon.
+      const icon = Object.prototype.hasOwnProperty.call(BAR_ICONS, id)
+        ? BAR_ICONS[id]
+        : undefined;
+      if (icon) {
+        // The icon alone: its panel's name on hover and for screen readers.
+        button.className = "button iconic";
+        button.innerHTML = icon;
+        button.setAttribute("aria-label", label);
+        button.title = label;
+      } else {
+        button.className = "button";
+        button.textContent = label;
+      }
       button.dataset.id = id;
       button.addEventListener("click", () => {
         if (socket?.readyState === WebSocket.OPEN) socket.send(`jump:${id}`);
@@ -588,6 +640,69 @@ function renderGear() {
   fill(
     typeof gear.title === "string" && gear.title ? gear.title : "Gear",
     el("div", "tipScroll", el("div", "tipGear", ...items)),
+  );
+}
+
+const SEVERITIES = new Set(["high", "medium", "low"]);
+
+/**
+ * Health: Build health's findings in the panel's order, each with its fix; "Live" or "Plan"
+ * by the title when a live character is set. PoB's state while it works (earlier findings
+ * dimmed meanwhile, as the panel does), and the /passives ask.
+ */
+function renderHealth() {
+  const value = tips.health as
+    | {
+        source?: unknown;
+        status?: unknown;
+        findings?: unknown;
+        passivesStale?: unknown;
+        stale?: unknown;
+      }
+    | null
+    | undefined;
+  if (value === null || typeof value !== "object") {
+    fill("Build health", el("div", "tipEmpty", "No build"));
+    return;
+  }
+  const findings = (Array.isArray(value.findings) ? value.findings : []).filter(
+    (
+      finding,
+    ): finding is { severity: string; message: string; fix?: unknown } =>
+      typeof finding?.message === "string",
+  );
+  const status = typeof value.status === "string" ? value.status : "";
+  const content: Node[] = [];
+  if (status) content.push(el("div", "tipEmpty", status));
+  else if (findings.length === 0)
+    content.push(el("div", "tipEmpty", "No issues"));
+  for (const finding of findings) {
+    const severity = SEVERITIES.has(finding.severity)
+      ? finding.severity
+      : "low";
+    content.push(
+      el(
+        "div",
+        value.stale === true ? "tipFinding stale" : "tipFinding",
+        el("span", `tipSeverity ${severity}`),
+        el(
+          "div",
+          "tipStepText",
+          el("div", "", finding.message),
+          ...(typeof finding.fix === "string" && finding.fix
+            ? [el("div", "tipFix", finding.fix)]
+            : []),
+        ),
+      ),
+    );
+  }
+  if (value.passivesStale === true)
+    content.push(
+      el("div", "tipEmpty", "Type /passives in game to check quest points."),
+    );
+  fillWith(
+    head("Build health", typeof value.source === "string" ? value.source : ""),
+    [el("div", "tipScroll", ...content)],
   );
 }
 

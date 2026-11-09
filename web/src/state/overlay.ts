@@ -12,6 +12,7 @@ export const OVERLAY_PANELS = [
   { id: "trade", label: "Trade" },
   { id: "config", label: "Config" },
   { id: "tree", label: "Tree" },
+  { id: "health", label: "Health" },
   { id: "notes", label: "Notes" },
   { id: "search", label: "Search" },
 ] as const;
@@ -24,7 +25,7 @@ export interface OverlaySettings {
 
 export const overlaySettingsAtom = persistentAtom<OverlaySettings>(
   "overlay",
-  { on: true, panels: ["campaign", "gear", "gems", "tree", "notes"] },
+  { on: true, panels: ["campaign", "gear", "gems", "tree", "health", "notes"] },
   0,
 );
 
@@ -131,6 +132,32 @@ export interface OverlayGear {
   title: string;
   items: OverlayItem[];
 }
+
+/** A Build health finding as the in-game bar's Health tooltip shows it. */
+export interface OverlayFinding {
+  severity: "high" | "medium" | "low";
+  message: string;
+  fix?: string;
+}
+
+/** What the Build health panel shows, for the in-game bar's Health tooltip. */
+export interface OverlayHealth {
+  /** "Live" or "Plan": what it checks, when a live character is set. */
+  source?: string;
+  /** PoB's state while it hasn't answered ("Calculating", "Health unavailable"). */
+  status?: string;
+  findings: OverlayFinding[];
+  /** Your /passives list is missing or older than your act. */
+  passivesStale: boolean;
+  /** The findings are PoB's earlier answer; it's working on a new one. */
+  stale?: boolean;
+}
+
+/**
+ * Set by the Build health panel. Undefined until the panel has shown, so a guide opened on
+ * Settings doesn't clear what another page sent.
+ */
+export const overlayHealthAtom = atom<OverlayHealth | undefined>(undefined);
 
 /**
  * Set by the Gear panel; null when the build has no gear. Undefined until the Gear panel

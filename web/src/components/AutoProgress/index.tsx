@@ -8,6 +8,7 @@ import {
   overlayCampaignAtom,
   overlayGearAtom,
   overlayGemsAtom,
+  overlayHealthAtom,
   overlaySettingsAtom,
   overlayTreeAtom,
   shownPanelsAtom,
@@ -247,7 +248,7 @@ export function useAutoProgress() {
     sendMessage(`overlay:${JSON.stringify({ on: settings.on, buttons })}`);
   }, [talks, settings, shown]);
   // The bar's tooltips: the Gems panel's set, Campaign's next steps, the Tree's next
-  // points, the Gear panel's items and the build's notes.
+  // points, the Gear panel's items, Build health's findings and the build's notes.
   const gems = useAtomValue(overlayGemsAtom);
   useEffect(() => {
     if (talks && gems !== undefined)
@@ -268,6 +269,11 @@ export function useAutoProgress() {
     if (talks && gear !== undefined)
       sendMessage(`tip:gear:${JSON.stringify(gear)}`);
   }, [talks, gear]);
+  const health = useAtomValue(overlayHealthAtom);
+  useEffect(() => {
+    if (talks && health !== undefined)
+      sendMessage(`tip:health:${JSON.stringify(health)}`);
+  }, [talks, health]);
   const code = useAtomValue(pobAtom);
   const notes = useMemo(() => notesFor(code), [code]);
   // Only a page that has had a build speaks for the notes (and clears them on Unload), so

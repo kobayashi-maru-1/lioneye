@@ -354,6 +354,56 @@ body {
   min-width: 0;
 }
 
+/* Health: one finding a row, its severity dot as in the guide's Build health. */
+.tipFinding {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 6px;
+  background-color: #171e2a;
+  border: 1px solid #2f3b4d;
+  border-radius: 6px;
+}
+
+.tipFinding + .tipFinding {
+  margin-top: 4px;
+}
+
+/* PoB's earlier answer, while it works on a new one. */
+.tipFinding.stale {
+  opacity: 0.5;
+}
+
+.tipEmpty + .tipFinding,
+.tipFinding + .tipEmpty {
+  margin-top: 4px;
+}
+
+.tipSeverity {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+}
+
+.tipSeverity.high {
+  background-color: #e05050;
+}
+
+.tipSeverity.medium {
+  background-color: #e8a040;
+}
+
+.tipSeverity.low {
+  background-color: #8f8f8f;
+}
+
+.tipFix {
+  color: #8a96a8;
+  font-size: 11px;
+}
+
 /* Marks the step done: small and at the row's edge, so a stray click misses it. */
 .tipDone {
   flex: none;
@@ -441,6 +491,16 @@ body {
   cursor: pointer;
 }
 
+/* A panel's icon in place of its label: a square button. */
+.button.iconic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+}
+
 .button:hover {
   color: var(--gold-hover);
   border-color: var(--border);
@@ -466,6 +526,14 @@ body {
   vertical-align: 1px;
   background-color: #e0902a;
   border-radius: 7px;
+}
+
+/* On an icon: at its top-right corner, over the button's edge. */
+.button.iconic .badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  margin-left: 0;
 }
 
 /* Its tooltip is pinned (right-click, or the tooltip's pin). */

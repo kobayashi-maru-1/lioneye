@@ -242,8 +242,11 @@ settings; otherwise it leaves it alone and says so.
 
 - While Path of Exile is the window in front and you're playing a character, the exe shows a
   small bar over the game (hidden on the login and character select screens, as the game's
-  log tells: a zone shows it, logging in or out hides it) with a
-  button per guide panel. A button opens that panel in the guide (on your other monitor) and
+  log tells: a zone shows it, logging in or out hides it) with an
+  icon button per guide panel: a flag for **Campaign**, chest armour for **Gear**, a cut
+  gem for **Gems**, two arrows for **Trade**, sliders for **Config**, linked nodes for
+  **Tree**, a heart with a pulse for **Health**, a page for **Notes** and a magnifier for
+  **Search** (hover one for its name). A button opens that panel in the guide (on your other monitor) and
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
 - Hover **Gems** for the Gems panel's links (the set it shows for your loadout; each
@@ -257,8 +260,11 @@ settings; otherwise it leaves it alone and says so.
   anchored to the name's start or end where that helps, as [poe.re](https://poe.re/gems)
   does: Arc is `arc$`, so Arctic Armour stays dark),
   **Gear** for the Gear panel's items with their PoB mods (enchants and implicits, then
-  explicits; crafted lighter), **Notes** for the build's PoB notes in PoB's colours (both
-  scroll with the mouse wheel when long),
+  explicits; crafted lighter), **Health** for Build health's findings as the panel lists
+  them, each with its severity dot and fix (**Live** or **Plan** by the title when a live
+  character is set, as the panel's dropdown picks; dimmed while PoB recalculates),
+  **Notes** for the build's PoB notes in PoB's
+  colours (all three scroll with the mouse wheel when long),
   **Campaign** for your next 3 steps (each with a small checkbox at its right that marks it
   done in the guide, for what the log can't tell, like a bandit killed early; the next step
   then shows; quest points your character missed in finished acts, from your latest
@@ -288,7 +294,8 @@ settings; otherwise it leaves it alone and says so.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
 - **Settings** → **App** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,
-  Gems, Tree and Notes to start). Panels the build doesn't have are left off.
+  Gems, Tree, Health and Notes to start; tick **Health** to add it to a bar set up
+  before it existed). Panels the build doesn't have are left off.
 - The bar is a page of the guide (`overlay.html`) in WebView2, the engine Edge uses (part of
   Windows 11; its data is kept in `%LOCALAPPDATA%\exile-leveling\webview2`).
 - PoE must run in **Windowed** or **Windowed Fullscreen** mode: nothing can show over its
