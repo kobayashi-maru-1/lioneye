@@ -252,7 +252,13 @@ export function useAutoProgress() {
             (panel) =>
               settings.panels.includes(panel.id) && shown.includes(panel.id),
           ).map(({ id, label }) => ({ id, label }));
-    sendMessage(`overlay:${JSON.stringify({ on: settings.on, buttons })}`);
+    sendMessage(
+      `overlay:${JSON.stringify({
+        on: settings.on,
+        autoTree: settings.autoTree !== false,
+        buttons,
+      })}`,
+    );
   }, [talks, settings, shown]);
   // The bar's tooltips: the Gems panel's set, Campaign's next steps, the Tree's next
   // points, the Gear panel's items, Build health's findings and the build's notes.

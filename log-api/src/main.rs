@@ -36,6 +36,8 @@ mod web_data;
 mod server;
 #[cfg(windows)]
 mod tray;
+#[path = "tree-screen.rs"]
+mod tree_screen;
 mod watcher;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]

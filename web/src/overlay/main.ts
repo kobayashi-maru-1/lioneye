@@ -24,6 +24,8 @@ interface OverlayConfig {
 declare global {
   interface Window {
     ipc?: { postMessage(message: string): void };
+    /** The exe: the game's passive tree opened or closed. */
+    lioneyeTree?: (open: boolean) => void;
   }
 }
 
@@ -286,6 +288,23 @@ function pinnedShown() {
   return pinned !== null && barIds.has(pinned) ? pinned : null;
 }
 
+/**
+ * The game's passive tree is open, as the exe sees it (Settings → Auto tree): the Tree
+ * tooltip shows as if hovered, and the pinned one comes back once the tree closes.
+ */
+let treeOpen = false;
+
+window.lioneyeTree = (open: boolean) => {
+  treeOpen = open === true;
+  // A hovered tooltip stays; the pointer leaving the bar settles it.
+  if (!frame.matches(":hover")) rest();
+};
+
+/** What shows with nothing hovered: Tree while the game's tree is open, else the pinned one. */
+function restingId() {
+  return treeOpen && barIds.has("tree") ? "tree" : pinnedShown();
+}
+
 function render(config: OverlayConfig) {
   const key = JSON.stringify(config.buttons);
   if (key === shown) return;
@@ -332,8 +351,14 @@ function render(config: OverlayConfig) {
   );
   markPinned();
   markBadges();
-  // Open the pinned tooltip, or close one whose button left; a hovered one stays.
-  if (tip.hidden || (openId !== null && !barIds.has(openId))) rest();
+  // Open the pinned tooltip (Tree while the game's tree is open), or close one whose button
+  // left; a hovered one stays.
+  if (
+    tip.hidden ||
+    (openId !== null && !barIds.has(openId)) ||
+    (openId !== restingId() && !frame.matches(":hover"))
+  )
+    rest();
 }
 
 /** Builds an element with a class and children. */
@@ -1055,10 +1080,10 @@ function closeTip() {
   openId = null;
 }
 
-/** Nothing hovered: back to the pinned tooltip, else closed. */
+/** Nothing hovered: back to Tree while the game's tree is open, else the pinned tooltip, else closed. */
 function rest() {
   if (flipping || !sized) return;
-  const id = pinnedShown();
+  const id = restingId();
   if (id === null) closeTip();
   else openTip(id);
 }
@@ -1154,3 +1179,5 @@ document.addEventListener("contextmenu", (event) => event.preventDefault());
 
 setState("offline");
 connect();
+// A new page doesn't know whether the game's tree is open: the exe says again.
+window.ipc?.postMessage("loaded");

@@ -319,9 +319,18 @@ settings; otherwise it leaves it alone and says so.
   button shows its tooltip until the pointer leaves the bar and its tooltip.
 - Right-clicking a button pins or unpins its tooltip, like the pin. A pinned tooltip's
   button has a gold border.
+- With **Auto tree** on, the Tree tooltip opens by itself while the game's passive tree is
+  open, and the pinned tooltip (if any) comes back about a second after the tree closes.
+  Hovering another button still shows its tooltip meanwhile. The exe spots the tree by its
+  **Skills** header at the top center of the game window, read off the screen a few times
+  a second while the bar shows (the game scales it with the window's height, so this works
+  at any resolution; only with the **Tree** button on the bar). While the bar or its tooltip
+  covers too much of that header to read around (a tooltip opened over it, say), Windows
+  leaves the bar out of screenshots and recordings, so the check sees the game under it;
+  otherwise the bar shows in them as usual.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
-- **Settings** → **App** → **Overlay**: **Show in game**, and which panels get a button (Campaign, Gear,
+- **Settings** → **App** → **Overlay**: **Show in game**, **Auto tree** (on to start), and which panels get a button (Campaign, Gear,
   Gems, Tree, Health and Notes to start; a bar set up before Health existed gets it once,
   and unticking it keeps it off). Panels the build doesn't have are left off.
 - The bar is a page of the guide (`overlay.html`) in WebView2, the engine Edge uses (part of

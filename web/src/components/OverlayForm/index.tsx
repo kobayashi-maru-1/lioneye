@@ -5,8 +5,9 @@ import classNames from "classnames";
 import { useAtom } from "jotai";
 
 /**
- * Settings for the in-game bar: whether it shows over the game, and which
- * panels get a button. Panels the build doesn't have are left off the bar.
+ * Settings for the in-game bar: whether it shows over the game, whether its Tree tooltip
+ * opens with the game's passive tree, and which panels get a button. Panels the build
+ * doesn't have are left off the bar.
  */
 export function OverlayForm() {
   const [settings, setSettings] = useAtom(overlaySettingsAtom);
@@ -33,6 +34,20 @@ export function OverlayForm() {
           }
         />
         Show in game
+      </label>
+      <label
+        className={classNames(styles.option)}
+        title="Tree tooltip opens with the game's tree"
+      >
+        <input
+          type="checkbox"
+          checked={settings.autoTree !== false}
+          disabled={!settings.on}
+          onChange={(event) =>
+            setSettings({ ...settings, autoTree: event.target.checked })
+          }
+        />
+        Auto tree
       </label>
       <fieldset
         className={classNames(styles.panels)}

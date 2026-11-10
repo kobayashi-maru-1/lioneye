@@ -96,6 +96,14 @@ pub struct OverlayButton {
 pub struct OverlayConfig {
     pub on: bool,
     pub buttons: Vec<OverlayButton>,
+    /// The Tree tooltip opens by itself while the game's passive tree is open
+    /// (tree-screen.rs); on unless Settings turns it off.
+    #[serde(default = "auto_tree_default", rename = "autoTree")]
+    pub auto_tree: bool,
+}
+
+fn auto_tree_default() -> bool {
+    true
 }
 
 impl Default for OverlayConfig {
@@ -114,6 +122,7 @@ impl Default for OverlayConfig {
                 button("tree", "Tree"),
                 button("notes", "Notes"),
             ],
+            auto_tree: true,
         }
     }
 }
@@ -124,6 +133,9 @@ impl Default for OverlayConfig {
 struct OverlayUpdate {
     on: bool,
     buttons: Option<Vec<OverlayButton>>,
+    /// Left out by a guide from before Auto tree: the last setting is kept.
+    #[serde(default, rename = "autoTree")]
+    auto_tree: Option<bool>,
 }
 
 /// The open guide pages, so a bar button can open one when there's none.
@@ -491,6 +503,9 @@ async fn serve_client(
                             state.overlay.send_if_modified(|config| {
                                 let mut next = config.clone();
                                 next.on = update.on;
+                                if let Some(auto_tree) = update.auto_tree {
+                                    next.auto_tree = auto_tree;
+                                }
                                 if let Some(buttons) = update.buttons {
                                     next.buttons = buttons
                                         .into_iter()

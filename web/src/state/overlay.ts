@@ -23,6 +23,8 @@ export interface OverlaySettings {
   panels: string[];
   /** NEW_PANELS already put on this bar once (untick one and it stays off). */
   added?: string[];
+  /** The Tree tooltip opens with the game's passive tree; unset is on. */
+  autoTree?: boolean;
 }
 
 /** Panels newer than many saved bars: each goes on a saved bar once. */

@@ -5,6 +5,9 @@
 //!
 //! The window never takes focus: clicking it leaves the game focused. If WebView2 takes focus
 //! anyway, it's handed straight back to the game.
+//!
+//! While it shows, it also watches for the game's passive tree (tree-screen.rs), and tells
+//! the page so its Tree tooltip opens with the tree (Settings → Auto tree).
 
 use std::{
     num::NonZeroIsize,
@@ -13,6 +16,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         mpsc,
     },
+    time::{Duration, Instant},
 };
 
 use raw_window_handle::{
@@ -40,9 +44,9 @@ use windows_sys::Win32::{
             GetSystemMetrics, GetWindowRect, HTCAPTION, HWND_TOPMOST, IDC_ARROW, IsWindow,
             LoadCursorW, MA_NOACTIVATE, PostMessageW, RegisterClassExW, SM_CXSCREEN, SW_HIDE,
             SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
-            SetForegroundWindow, SetWindowPos, ShowWindow, WM_DPICHANGED, WM_ENTERSIZEMOVE,
+            SetForegroundWindow, SetWindowDisplayAffinity, SetWindowPos, ShowWindow, WM_DPICHANGED, WM_ENTERSIZEMOVE,
             WM_EXITSIZEMOVE, WM_MOUSEACTIVATE, WM_NCLBUTTONDOWN, WNDCLASSEXW, WS_EX_NOACTIVATE,
-            WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+            WDA_EXCLUDEFROMCAPTURE, WDA_NONE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
         },
     },
 };
@@ -59,6 +63,13 @@ const ALWAYS_ENV: &str = "EXILE_LEVELING_OVERLAY_ALWAYS";
 const START_SIZE: (f64, f64) = (420.0, 52.0);
 /// The bar page's background (web/src/overlay/styles.css), so the window doesn't flash white while it loads.
 const NAVY: (u8, u8, u8) = (22, 22, 22);
+
+/// How often the bar looks for the game's passive tree: every tick (about 250 ms), with room
+/// for a tick that wakes a little early.
+const TREE_EVERY: Duration = Duration::from_millis(200);
+/// Checks in a row without the tree before it counts as closed: one of its node tooltips
+/// can cover the header for a moment.
+const TREE_MISSES: u8 = 3;
 
 /// Set by the window procedure when a drag ends, so the new position is saved.
 static MOVED: AtomicBool = AtomicBool::new(false);
@@ -98,12 +109,14 @@ enum Ipc {
     /// The page's size in CSS pixels; `up`: it grew upwards (a tooltip open above the bar),
     /// so the bottom edge stays put; `bar`: the bar's own height, when the page sends it.
     Size { width: f64, height: f64, up: bool, bar: Option<f64> },
+    /// The page (re)loaded: it doesn't know whether the game's tree is open.
+    Loaded,
 }
 
 struct Window {
     hwnd: HWND,
     // Dropped before the context it was built with.
-    _webview: WebView,
+    webview: WebView,
     _context: WebContext,
     /// Shown once the page has reported its size, so it never shows at the wrong size.
     sized: bool,
@@ -130,6 +143,17 @@ pub struct Overlay {
     /// The bar's height (CSS pixels) while a tooltip is open above it: the window's top is
     /// then the tooltip's, and the bar's place is that far above the bottom.
     above: Option<f64>,
+    /// The game's passive tree is open, as last seen.
+    tree_open: bool,
+    /// Checks in a row that didn't see the tree while it was open.
+    tree_misses: u8,
+    /// When the bar last looked.
+    tree_checked: Option<Instant>,
+    /// What the page was last told; None until its first size (the page is loaded), and
+    /// again whenever the page (re)loads.
+    tree_sent: Option<bool>,
+    /// The bar is left out of screen reads (it's over the tree's header).
+    read_hidden: bool,
 }
 
 impl Overlay {
@@ -160,6 +184,11 @@ impl Overlay {
             ipc_tx,
             ipc_rx,
             above: None,
+            tree_open: false,
+            tree_misses: 0,
+            tree_checked: None,
+            tree_sent: None,
+            read_hidden: false,
         }
     }
 
@@ -221,12 +250,15 @@ impl Overlay {
                         resize(window.hwnd, width, height, up);
                         if !window.sized {
                             window.sized = true;
+                            // The page is up: it hears the tree's state from now on.
+                            self.tree_sent = None;
                             if self.position.is_none() {
                                 place_default(window.hwnd);
                             }
                         }
                     }
                 }
+                Ipc::Loaded => self.tree_sent = None,
             }
         }
 
@@ -250,6 +282,75 @@ impl Overlay {
                         ShowWindow(window.hwnd, SW_HIDE);
                     }
                 }
+            }
+        }
+        self.watch_tree();
+    }
+
+    /// The Tree tooltip follows the game's passive tree: looked for a few times a second
+    /// while the bar shows over the game, with Auto tree on. Hidden, it counts as closed.
+    fn watch_tree(&mut self) {
+        let Some(window) = &self.window else { return };
+        let watching = {
+            let config = self.config.borrow();
+            config.auto_tree && config.buttons.iter().any(|b| b.id == "tree")
+        } && window.visible
+            && unsafe { IsWindow(self.game) } != 0;
+        let open = if !watching {
+            self.tree_misses = 0;
+            self.tree_checked = None;
+            set_read_hidden(window.hwnd, &mut self.read_hidden, false);
+            false
+        } else if self.tree_checked.is_some_and(|at| at.elapsed() < TREE_EVERY) {
+            self.tree_open
+        } else {
+            self.tree_checked = Some(Instant::now());
+            let mut rect: RECT = unsafe { std::mem::zeroed() };
+            let bar = (unsafe { GetWindowRect(window.hwnd, &mut rect) } != 0).then_some(rect);
+            match crate::tree_screen::screen_spot(self.game) {
+                // Minimized or too small: as it was.
+                None => {
+                    set_read_hidden(window.hwnd, &mut self.read_hidden, false);
+                    self.tree_open
+                }
+                Some(spot) => {
+                    // Covering too much of the header to read around (a tooltip over it,
+                    // say), the bar leaves screen reads while it's there, so the check sees
+                    // the game under it. Otherwise it stays in screenshots and recordings.
+                    let blocks = bar.is_some_and(|b| {
+                        overlaps(&b, &spot) && !crate::tree_screen::can_answer(spot, b)
+                    });
+                    if set_read_hidden(window.hwnd, &mut self.read_hidden, blocks) {
+                        // Windows takes a moment to redraw reads without it: next check.
+                        self.tree_checked = Some(Instant::now());
+                        self.tree_open
+                    } else {
+                        let cover = if self.read_hidden { None } else { bar };
+                        match crate::tree_screen::tree_open(spot, cover) {
+                            Some(true) => {
+                                self.tree_misses = 0;
+                                true
+                            }
+                            Some(false) if self.tree_open => {
+                                self.tree_misses = self.tree_misses.saturating_add(1);
+                                self.tree_misses < TREE_MISSES
+                            }
+                            Some(false) => false,
+                            // Can't tell (the bar covers the header and couldn't leave
+                            // screen reads): as it was.
+                            None => self.tree_open,
+                        }
+                    }
+                }
+            }
+        };
+        self.tree_open = open;
+        if window.sized && self.tree_sent != Some(open) {
+            let script = format!("window.lioneyeTree?.({open})");
+            match window.webview.evaluate_script(&script) {
+                Ok(()) => self.tree_sent = Some(open),
+                // Tried again next tick: debug, not warn, so a broken page doesn't fill the log.
+                Err(err) => tracing::debug!("Couldn't tell the bar about the tree: {err}"),
             }
         }
     }
@@ -280,6 +381,8 @@ impl Overlay {
                 let body = request.body();
                 if body == "drag" {
                     start_drag(target as HWND);
+                } else if body == "loaded" {
+                    let _ = tx.send(Ipc::Loaded);
                 } else if let Some(text) = body.strip_prefix("copy:") {
                     // The Gems tooltip's search. The page can't use its own clipboard:
                     // this window never has focus.
@@ -313,7 +416,7 @@ impl Overlay {
         info!("Overlay ready");
         Ok(Window {
             hwnd,
-            _webview: webview,
+            webview,
             _context: context,
             sized: false,
             visible: false,
@@ -333,6 +436,27 @@ unsafe extern "system" fn keep_focus_on_drag(
         return 0;
     }
     unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
+}
+
+/// True when two screen rectangles share any pixels.
+fn overlaps(a: &RECT, b: &RECT) -> bool {
+    a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+}
+
+/// Leaves the bar out of screen reads (screenshots, recordings and the tree check) or puts
+/// it back; `hidden` is its current state. True when that changed.
+fn set_read_hidden(hwnd: HWND, hidden: &mut bool, hide: bool) -> bool {
+    if *hidden == hide {
+        return false;
+    }
+    let affinity = if hide { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE };
+    // Should it fail, the bar stays in reads and is left out of the comparison instead
+    // (before Windows 10 2004 this reads it as black, which these Windows don't run).
+    if unsafe { SetWindowDisplayAffinity(hwnd, affinity) } == 0 {
+        return false;
+    }
+    *hidden = hide;
+    true
 }
 
 /// True for the game's window.
