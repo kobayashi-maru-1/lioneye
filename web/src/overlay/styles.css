@@ -168,20 +168,6 @@ body {
   cursor: grabbing;
 }
 
-/* Under the tree: the ascendancy notables to take next. */
-.tipAscend {
-  margin-top: 4px;
-  padding: 4px 6px;
-  background-color: #171e2a;
-  border: 1px solid #2f3b4d;
-  border-radius: 6px;
-}
-
-.tipAscendName {
-  color: #e8c47a;
-  font-weight: 600;
-}
-
 .tipGroup {
   padding: 4px 6px;
   background-color: #171e2a;

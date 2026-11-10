@@ -783,10 +783,7 @@ function renderTree() {
   }
   if (data.next.length === 0) {
     // Its set is done: the arrows step on to the next one.
-    fillWith(treeHead(data), [
-      el("div", "tipEmpty", "Set done"),
-      ...ascendancyRow(data),
-    ]);
+    fillWith(treeHead(data), [el("div", "tipEmpty", "Set done")]);
     return;
   }
   if (treeView?.version === data.version) {
@@ -847,30 +844,7 @@ function drawTree(view: TreeView, data: TreeTip) {
   }
   drawnTree = key;
   showArea(view.box, treeArea);
-  fillWith(treeHead(data), [view.css, view.box, ...ascendancyRow(data)]);
-}
-
-/**
- * Under the tree: the set's ascendancy notables you haven't taken, nearest its start
- * first (your next lab's pick). Hover one for what it does. None when all are taken.
- */
-function ascendancyRow(data: TreeTip) {
-  const next = (
-    Array.isArray(data.ascendancyNext) ? data.ascendancyNext : []
-  ).filter((notable) => typeof notable?.name === "string");
-  if (next.length === 0) return [];
-  return [
-    el(
-      "div",
-      "tipAscend",
-      el("div", "tipLabel", "Next ascendancy"),
-      ...next.map((notable) => {
-        const name = el("div", "tipAscendName", notable.name);
-        name.title = texts(notable.stats).join("\n");
-        return name;
-      }),
-    ),
-  ];
+  fillWith(treeHead(data), [view.css, view.box]);
 }
 
 /** The points the zoom belongs to. */

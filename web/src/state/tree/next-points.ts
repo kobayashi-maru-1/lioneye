@@ -22,55 +22,6 @@ export interface TreeTip {
   /** Where the set is among the build's tree sets (the tooltip's ‹ › arrows). */
   index?: number;
   count?: number;
-  /** The set's ascendancy notables you don't have yet, nearest the start first. */
-  ascendancyNext?: { name: string; stats: string[] }[];
-}
-
-/** The tree's ascendancy notables still to take, in path order from its start. */
-function ascendancyNext(
-  tree: UrlTree.Data,
-  haveSet: Set<string>,
-  skillTree: SkillTree.Data,
-) {
-  const graph =
-    tree.ascendancy !== undefined
-      ? skillTree.graphs[tree.ascendancy.graphIndex]
-      : undefined;
-  if (!graph || !tree.ascendancy) return [];
-  const want = new Set(
-    tree.nodes.filter(
-      (id) => graph.nodes[id]?.k === "Notable" && !haveSet.has(id),
-    ),
-  );
-  if (want.size === 0) return [];
-  const neighbours = new Map<string, string[]>();
-  for (const { a, b } of graph.connections) {
-    neighbours.set(a, [...(neighbours.get(a) ?? []), b]);
-    neighbours.set(b, [...(neighbours.get(b) ?? []), a]);
-  }
-  // Walk out from the start: nearer notables come first.
-  const order: string[] = [];
-  const seen = new Set([tree.ascendancy.startNodeId]);
-  let frontier = [tree.ascendancy.startNodeId];
-  while (frontier.length > 0) {
-    const reached: string[] = [];
-    for (const id of frontier) {
-      if (want.has(id)) order.push(id);
-      for (const other of neighbours.get(id) ?? []) {
-        if (!seen.has(other)) {
-          seen.add(other);
-          reached.push(other);
-        }
-      }
-    }
-    frontier = reached;
-  }
-  // Any the walk missed (no path in the data), after the rest.
-  for (const id of want) if (!order.includes(id)) order.push(id);
-  return order.map((id) => ({
-    name: graph.nodes[id].text,
-    stats: graph.nodes[id].stats ?? [],
-  }));
 }
 
 /** Space around the next points, and the smallest area shown (tree units). */
@@ -149,7 +100,6 @@ export function treeTip(
     next: [...next],
     later,
     view: bounds(shown, main.nodes),
-    ascendancyNext: ascendancyNext(tree, haveSet, skillTree),
   };
 }
 

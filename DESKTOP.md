@@ -291,9 +291,7 @@ settings; otherwise it leaves it alone and says so.
   log; before the log has any, the set before stands in for them (for the first set, all
   its points are next). In the Tree tooltip the mouse wheel zooms around the pointer,
   dragging moves the tree and a double-click goes back to the next points; the zoom stays
-  until your next points change. Under the tree, **Next ascendancy** names the set's
-  ascendancy notables you haven't taken, nearest the start first (your next lab's pick;
-  hover one for what it does). All need the guide open.
+  until your next points change. All need the guide open.
 - Every tooltip's title row sits on its edge next to the bar, with two icons: the pin at
   its left keeps that tooltip open while you play (one at a time, kept after a restart),
   and the flip (**Show above** / **Show below**) at its right moves tooltips to the other
