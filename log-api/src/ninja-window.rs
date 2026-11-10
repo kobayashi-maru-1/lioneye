@@ -166,8 +166,9 @@ mod imp {
         events_tx: mpsc::Sender<Event>,
         events_rx: mpsc::Receiver<Event>,
         window: Option<Window>,
-        /// WebView2 couldn't start; requests answer 0 from then on.
-        failed: bool,
+        /// When WebView2 last couldn't start; requests answer 0 until it's tried again
+        /// 10 s later.
+        failed: Option<Instant>,
         /// A page has finished loading (requests wait until then).
         loaded: bool,
         /// The address the window is on.
@@ -185,7 +186,7 @@ mod imp {
                 events_tx,
                 events_rx,
                 window: None,
-                failed: false,
+                failed: None,
                 loaded: false,
                 url: String::new(),
                 queue: VecDeque::new(),
@@ -307,17 +308,20 @@ mod imp {
             if self.window.is_some() {
                 return true;
             }
-            if self.failed {
+            // Tried again later: right after an update, the old copy's WebView2 can still be
+            // closing on the same folder.
+            if self.failed.is_some_and(|t| t.elapsed() < Duration::from_secs(10)) {
                 return false;
             }
             match self.create() {
                 Ok(window) => {
                     self.window = Some(window);
+                    self.failed = None;
                     true
                 }
                 Err(err) => {
                     warn!("poe.ninja sign-in unavailable: {err}");
-                    self.failed = true;
+                    self.failed = Some(std::time::Instant::now());
                     false
                 }
             }
@@ -364,6 +368,8 @@ mod imp {
                 })
                 .build(&crate::overlay::Handle(hwnd))
                 .map_err(|err| {
+                    // Tried again later: don't leave this window behind each time.
+                    unsafe { windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd) };
                     format!("WebView2 didn't start ({err}). Install the WebView2 runtime.")
                 })?;
             info!("poe.ninja window ready");

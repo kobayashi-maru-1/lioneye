@@ -33,6 +33,14 @@ since, so switching never brings back old progress.
 The thin line at the bottom shows the app's version, the bundled Path of Building's, and
 the date of the exile-leveling route data merged in, with **Update** when GitHub has a
 newer release (checked on start, every 6 hours, and when you come back to the window).
+**Update** opens the release's page; the download icon beside it, or **Update** in the tray
+menu, installs it: the exe downloads `lioneye.zip`, checks it against GitHub's SHA-256,
+renames itself to `lioneye.exe.old`, puts the new exe in its place and starts it (the new
+copy deletes the `.old` file). The open guide window reloads; your data carries over. If
+it fails, the icon's tooltip says why and clicking it tries again; the exe log has the
+details. The exe's folder must be writable (the `Lioneye` folder in Downloads is). If the
+new exe doesn't start within a minute, the old one is put back. Should `lioneye.exe` ever
+be missing after an update, rename `lioneye.exe.old` back to it.
 
 | Option | Default | What it does |
 | --- | --- | --- |
@@ -375,7 +383,7 @@ Pushing a tag such as `v1.0.0` attaches `lioneye.zip` (the exe, zipped) to a rel
 The footer shows the version and the build's commit (`0.4.1 (1a2b3c4)`). To release: raise
 `version` in `log-api\Cargo.toml` (and its entry in `Cargo.lock`), commit, push a matching
 tag (`v0.4.2`), then add the notes to the release the workflow made. Copies on an older
-version show **Update** in the footer. The zip keeps its name every release, so
+version show **Update** in the footer and the tray, and can install it from there. The zip keeps its name every release, so
 `releases/latest/download/lioneye.zip` always downloads the newest.
 
 For UI work, run the exe, then `npm -w web run dev` and open the address it prints;

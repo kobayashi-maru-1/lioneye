@@ -38,6 +38,7 @@ mod server;
 mod tray;
 #[path = "tree-screen.rs"]
 mod tree_screen;
+mod update;
 mod watcher;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
@@ -67,6 +68,9 @@ struct Args {
     /// How to open the guide. Left out: as set in Settings (else app)
     #[arg(long, value_enum)]
     browser: Option<Browser>,
+    /// Set by an update: the old copy's process id, to wait for before serving
+    #[arg(long, hide = true)]
+    after_update: Option<u32>,
 }
 
 impl Browser {
@@ -135,18 +139,29 @@ fn main() -> ExitCode {
         Err(err) => return fail(console, &format!("Could not start: {err}")),
     };
 
-    let (listener, url) = match runtime.block_on(listen(&args)) {
+    // Started by an update: tell the old copy this one runs (else it puts itself back), then
+    // wait for it to let go of the port.
+    if let Some(pid) = args.after_update {
+        update::signal_started(pid);
+        update::wait_for_exit(pid, Duration::from_secs(20));
+    }
+
+    let (listener, url) = match runtime.block_on(listen(&args, args.after_update.is_some())) {
         Ok(Some(found)) => found,
         Ok(None) => return ExitCode::SUCCESS,
         Err(msg) => return fail(console, &msg),
     };
 
-    // Only the copy that serves starts a fresh log; a second launch must not wipe it.
-    if let Some(file) = log {
+    // Only the copy that serves starts a fresh log; a second launch must not wipe it, and
+    // after an update the old copy's last lines stay above the new one's.
+    if let Some(file) = log.filter(|_| args.after_update.is_none()) {
         let _ = file.set_len(0);
     }
     info!("Guide: {}", url);
     info!("Log: {}", log_file().display());
+    update::remove_old_exe();
+    let updater = update::Updater::new(env!("CARGO_PKG_VERSION"), restart_for_update);
+    updater.start_checks();
 
     let (lines_tx, _) = broadcast::channel::<String>(256);
     let (status_tx, status_rx) = watch::channel(watcher::Status::Waiting);
@@ -192,6 +207,7 @@ fn main() -> ExitCode {
         guides,
         tips: std::sync::Arc::new(watch::channel(server::Tips::new()).0),
         saved: saved.clone(),
+        updater: updater.clone(),
     };
     // First run since the guide got its own profile: move its data from the old profiles.
     // A lock left by a copy stopped mid-move is stale: only one copy serves an address.
@@ -219,7 +235,8 @@ fn main() -> ExitCode {
     let _ = (overlay_rx, zone_rx, open_rx, saved, ninja_rx);
 
     // A guide window left open from an earlier run reconnects by itself; bring it up instead.
-    if opening && browser_now != Browser::None {
+    // After an update, leave it where it is: it reloads by itself, and the game keeps focus.
+    if opening && browser_now != Browser::None && args.after_update.is_none() {
         show_guide(browser_now, &url);
     }
 
@@ -237,7 +254,7 @@ fn main() -> ExitCode {
     });
 
     #[cfg(windows)]
-    let code = wait(&url, console, status_rx, done_rx, bar, settings);
+    let code = wait(&url, console, status_rx, done_rx, bar, settings, &updater);
     #[cfg(not(windows))]
     let code = wait(&url, console, status_rx, done_rx);
     runtime.shutdown_timeout(Duration::from_secs(1));
@@ -275,8 +292,12 @@ fn placement_file(url: &str) -> PathBuf {
     })
 }
 
-/// Binds the address. `Ok(None)` means another copy is already running and was brought up instead.
-async fn listen(args: &Args) -> Result<Option<(tokio::net::TcpListener, String)>, String> {
+/// Binds the address. `Ok(None)` means another copy is already running and was brought up
+/// instead. After an update, the copy on the port is the old one quitting: wait for it.
+async fn listen(
+    args: &Args,
+    after_update: bool,
+) -> Result<Option<(tokio::net::TcpListener, String)>, String> {
     let addr: SocketAddr = args
         .address
         .parse()
@@ -294,7 +315,19 @@ async fn listen(args: &Args) -> Result<Option<(tokio::net::TcpListener, String)>
     };
     let url = format!("http://{}/", local);
 
-    match tokio::net::TcpListener::bind(addr).await {
+    let mut bound = tokio::net::TcpListener::bind(addr).await;
+    if after_update {
+        for _ in 0..60 {
+            match &bound {
+                Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => {
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                    bound = tokio::net::TcpListener::bind(addr).await;
+                }
+                _ => break,
+            }
+        }
+    }
+    match bound {
         Ok(listener) => Ok(Some((listener, url))),
         Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => {
             if already_running(local).await {
@@ -324,6 +357,7 @@ fn wait(
     done: std::sync::mpsc::Receiver<Result<(), String>>,
     mut bar: Bar,
     settings: std::sync::Arc<app_settings::AppSettings>,
+    updater: &std::sync::Arc<update::Updater>,
 ) -> ExitCode {
     // As set now (Settings can change it). Open from the tray always shows a window, even
     // with --browser none.
@@ -366,15 +400,24 @@ fn wait(
         bar.ninja.tick();
         bar.placement.tick();
     };
-    match tray::run(status, stopped_rx, || show_guide(browser(), url), tick) {
+    match tray::run(status, stopped_rx, updater, || show_guide(browser(), url), tick) {
         Ok(tray::Exit::Quit) => {
             // The guide is a separate Edge window; Quit closes it too (and drops the lock of
             // a move it stopped, which then runs again next start).
+            update::wait_for_swap();
             guide_window::close_all();
             guide_move::clear_lock(url);
             ExitCode::SUCCESS
         }
-        Ok(tray::Exit::Stopped) => match result_rx.try_recv() {
+        // The new exe is waiting for this one; the guide window stays open and reloads.
+        Ok(tray::Exit::Restart) => {
+            guide_move::clear_lock(url);
+            ExitCode::SUCCESS
+        }
+        Ok(tray::Exit::Stopped) => match {
+            update::wait_for_swap();
+            result_rx.try_recv()
+        } {
             Ok(Err(msg)) => fail(console, &msg),
             _ => ExitCode::SUCCESS,
         },
@@ -401,6 +444,19 @@ fn wait(
         Ok(Err(msg)) => fail(console, &msg),
         _ => ExitCode::SUCCESS,
     }
+}
+
+/// An update started the new exe: quit through the tray loop. If that loop isn't running
+/// (no tray icon), quit anyway so the new copy gets the port.
+fn restart_for_update() {
+    #[cfg(windows)]
+    tray::request_restart();
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_secs(10));
+        warn!("Tray loop still running after the update; exiting");
+        std::thread::sleep(Duration::from_millis(200));
+        std::process::exit(0);
+    });
 }
 
 /// Logs the error and, with no console to show it, puts it in a message box.

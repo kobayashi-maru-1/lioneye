@@ -28,9 +28,32 @@
   text-decoration: underline;
 }
 
+/* A newer release: its page, then the install icon (or "Updating…"). */
 .update {
-  color: var(--gold) !important;
+  display: flex;
+  align-items: center;
+  gap: var(--size-1);
+  color: var(--gold);
   font-weight: var(--font-heavy);
+}
+
+.footer .update a {
+  color: var(--gold);
+}
+
+.install {
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+  font-size: 0.85rem;
+  color: var(--gold);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.install:hover {
+  color: var(--on-primary);
 }
 
 /* GitHub and Credits at the right. */

@@ -52,6 +52,8 @@ pub struct AppState {
     pub pob_saved: broadcast::Sender<String>,
     /// The poe.ninja sign-in window: refreshes of the live character (ninja-window.rs).
     pub ninja: crate::ninja_window::Handle,
+    /// A newer release on GitHub, and installing it (update.rs).
+    pub updater: Arc<crate::update::Updater>,
 }
 
 pub type Tips = std::collections::BTreeMap<String, String>;
@@ -80,6 +82,8 @@ fn build_message() -> &'static str {
         if let Some(index) = Assets::get("index.html") {
             index.data.hash(&mut hasher);
         }
+        // A release that changed only the exe still reloads the page (its footer's version).
+        env!("CARGO_PKG_VERSION").hash(&mut hasher);
         format!("build:{:016x}", hasher.finish())
     })
 }
@@ -248,6 +252,7 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
         .route("/api/ninja/sign-in", post(ninja_sign_in))
         .route("/api/ninja/refresh", post(ninja_refresh))
         .route("/api/app", get(app_info))
+        .route("/api/update", get(update_view).post(update_install))
         .route("/api/character", get(character))
         .route("/api/settings", post(update_settings))
         .merge(crate::pob_routes::routes())
@@ -278,6 +283,48 @@ async fn app_info(State(state): State<AppState>, headers: HeaderMap) -> Response
         "settings": state.settings.view(),
     }))
     .into_response()
+}
+
+#[derive(Deserialize)]
+struct UpdateQuery {
+    /// Ask GitHub again when the last answer is older than this (seconds).
+    #[serde(rename = "maxAge")]
+    max_age: Option<u64>,
+}
+
+/// A newer release, if GitHub has one, and how installing it is going.
+async fn update_view(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<UpdateQuery>,
+) -> Response {
+    if !local_origin(&headers) || !local_host(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    // At least a minute apart, whatever the page asks.
+    let max_age = Duration::from_secs(query.max_age.unwrap_or(u64::MAX).max(60));
+    let updater = state.updater.clone();
+    match tokio::task::spawn_blocking(move || updater.check(max_age)).await {
+        Ok(view) => Json(view).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+/// The footer's install icon: installs the newer release and restarts. Only the guide's
+/// own page on this PC may ask (not another device, with --address 0.0.0.0).
+async fn update_install(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    ConnectInfo(peer): ConnectInfo<std::net::SocketAddr>,
+) -> Response {
+    if !peer.ip().is_loopback() || !guide_here(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    if state.updater.install() {
+        (StatusCode::ACCEPTED, Json(state.updater.view())).into_response()
+    } else {
+        (StatusCode::CONFLICT, "No update.").into_response()
+    }
 }
 
 #[derive(Deserialize)]

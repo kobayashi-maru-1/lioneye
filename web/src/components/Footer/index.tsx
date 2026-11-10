@@ -2,67 +2,56 @@ import { useAppInfo } from "../../state/app-info";
 import upstream from "../../upstream.json";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { FiDownload } from "react-icons/fi";
 
 const REPO = "kobayashi-maru-1/lioneye";
 
-/** "v0.4.1" is newer than "0.4.0". */
-export function newer(tag: string, version: string) {
-  const parts = (v: string) =>
-    v.replace(/^v/, "").split(/[.-]/).slice(0, 3).map(Number);
-  const [a, b] = [parts(tag), parts(version)];
-  for (let i = 0; i < 3; i++) {
-    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
-  }
-  return false;
-}
-
-/** How often a running guide asks GitHub again: every 6 h, and on focus after an hour. */
+/** How old the exe's answer may get: 6 h, and 1 h when the window gets focus. */
 const RECHECK = 6 * 60 * 60 * 1000;
 const RECHECK_ON_FOCUS = 60 * 60 * 1000;
+/** How often to read the exe's answer (cheap: GitHub is asked only past `RECHECK`), so an
+ * update found or started from the tray shows here too. */
+const POLL = 15 * 1000;
+/** While installing: how often to look for a failure (success restarts the exe). */
+const POLL_INSTALL = 1000;
+/** Installing and the exe gone this long: it didn't come back. */
+const INSTALL_GONE = 60 * 1000;
 
-/** The latest release on GitHub, asked at most once per `maxAge`; null when it can't be read. */
-let latest: Promise<{ tag: string; url: string } | null> | null = null;
-let checkedAt = 0;
-function latestRelease(maxAge = RECHECK) {
-  if (latest !== null && Date.now() - checkedAt < maxAge) return latest;
-  checkedAt = Date.now();
-  latest = fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+/** The exe's view of the latest release (log-api/src/update.rs). */
+interface UpdateView {
+  /** Only when newer than this exe. */
+  latest: { tag: string; url: string } | null;
+  state: "idle" | "installing" | "failed";
+  error?: string;
+}
+
+/** The exe's answer; it asks GitHub when its last answer is older than `maxAge` ms. */
+function fetchUpdate(maxAge?: number): Promise<UpdateView | null> {
+  const query =
+    maxAge === undefined ? "" : `?maxAge=${Math.round(maxAge / 1000)}`;
+  return fetch(`/api/update${query}`)
     .then((response) => (response.ok ? response.json() : null))
-    .then((release) =>
-      release && typeof release.tag_name === "string"
-        ? { tag: release.tag_name as string, url: release.html_url as string }
-        : null,
-    )
     .catch(() => null);
-  return latest;
 }
 
 /**
  * PoB Redux-style status line at the bottom of the window: the app's version, the bundled
  * Path of Building's, the date of the merged exile-leveling route data, a newer release
- * when there is one, and links.
+ * when there is one (its page, and an icon that installs it), and links.
  */
 export function Footer() {
   const { info } = useAppInfo();
-  const [update, setUpdate] = useState<{ tag: string; url: string } | null>(
-    null,
-  );
-  // On load, every 6 h, and when the window gets focus after an hour without a check: the
-  // guide can stay open for days.
+  const [update, setUpdate] = useState<UpdateView | null>(null);
+  // On load, every 15 s, and on focus: the guide can stay open for days. The exe asks
+  // GitHub at most every 6 h (every hour on focus); the tray shows the same.
   useEffect(() => {
     if (!info) return;
     let live = true;
     const check = (maxAge?: number) =>
-      latestRelease(maxAge).then(
-        (release) =>
-          live &&
-          release &&
-          newer(release.tag, info.version) &&
-          setUpdate(release),
-      );
-    check();
-    const timer = window.setInterval(() => check(RECHECK - 60_000), RECHECK);
+      fetchUpdate(maxAge).then((found) => live && found && setUpdate(found));
+    check(RECHECK);
+    const timer = window.setInterval(() => check(RECHECK), POLL);
     const onFocus = () => check(RECHECK_ON_FOCUS);
     window.addEventListener("focus", onFocus);
     return () => {
@@ -71,6 +60,52 @@ export function Footer() {
       window.removeEventListener("focus", onFocus);
     };
   }, [info?.version]);
+  // Installing (from here or the tray): watch for a failure. On success the new exe starts
+  // and the page reloads itself (AutoProgress); an exe gone for a minute didn't come back.
+  const installing = update?.state === "installing";
+  useEffect(() => {
+    if (!installing) return;
+    let live = true;
+    let lastSeen = Date.now();
+    let timer = 0;
+    // Each poll after the last answer, so slow answers never pile up.
+    const poll = () =>
+      fetchUpdate().then((found) => {
+        if (!live) return;
+        if (found) {
+          lastSeen = Date.now();
+          setUpdate(found);
+        } else if (Date.now() - lastSeen > INSTALL_GONE) {
+          setUpdate(
+            (current) =>
+              current && {
+                ...current,
+                state: "failed",
+                error: "Lioneye not reached",
+              },
+          );
+          return;
+        }
+        timer = window.setTimeout(poll, POLL_INSTALL);
+      });
+    timer = window.setTimeout(poll, POLL_INSTALL);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [installing]);
+  const install = useCallback(() => {
+    const failed = (error: string) =>
+      setUpdate((current) => current && { ...current, state: "failed", error });
+    setUpdate((current) => current && { ...current, state: "installing" });
+    fetch("/api/update", { method: "POST" })
+      .then(async (response) => {
+        if (response.ok) setUpdate((await response.json()) as UpdateView);
+        else
+          failed(response.status === 409 ? "No update" : "Install not started");
+      })
+      .catch(() => failed("Lioneye not reached"));
+  }, []);
   // Room for it at the bottom of the page (index.css).
   useEffect(() => {
     if (!info) return;
@@ -82,6 +117,13 @@ export function Footer() {
   }, [info !== null]);
 
   if (!info) return null;
+  // Says it restarts: the bar and guide reload, so not mid-fight.
+  const installTitle =
+    update?.state !== "failed"
+      ? "Install and restart"
+      : update.error
+        ? `Not updated: ${update.error}. Click to retry.`
+        : "Not updated. Click to retry.";
   return (
     <footer className={classNames(styles.footer)}>
       <span title={info.commit ? `Build ${info.commit}` : undefined}>
@@ -96,15 +138,24 @@ export function Footer() {
       >
         Route {upstream.exileLeveling.date}
       </span>
-      {update && (
-        <a
-          className={classNames(styles.update)}
-          href={update.url}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Update {update.tag.replace(/^v/, "")}
-        </a>
+      {update?.latest && (
+        <span className={classNames(styles.update)}>
+          <a href={update.latest.url} target="_blank" rel="noreferrer">
+            Update {update.latest.tag.replace(/^v/, "")}
+          </a>
+          {installing ? (
+            <span>Updating…</span>
+          ) : (
+            <button
+              className={classNames(styles.install)}
+              onClick={install}
+              title={installTitle}
+              aria-label={installTitle}
+            >
+              <FiDownload />
+            </button>
+          )}
+        </span>
       )}
       <span className={classNames(styles.links)}>
         <a href={`https://github.com/${REPO}`} target="_blank" rel="noreferrer">

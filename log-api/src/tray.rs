@@ -18,7 +18,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     TranslateMessage,
 };
 
-use crate::watcher::Status;
+use crate::{update::Phase, update::Updater, watcher::Status};
 
 /// 32x32 RGBA pixels of web/public/favicon-32x32.png.
 const ICON: &[u8] = include_bytes!("../assets/tray-icon.rgba");
@@ -30,6 +30,13 @@ pub fn request_quit() {
     QUIT.store(true, Ordering::SeqCst);
 }
 
+/// Set once an update has started the new exe; the loop then ends as `Exit::Restart`.
+static RESTART: AtomicBool = AtomicBool::new(false);
+
+pub fn request_restart() {
+    RESTART.store(true, Ordering::SeqCst);
+}
+
 /// A double-click sends two clicks; one guide window is enough.
 const OPEN_GAP: Duration = Duration::from_secs(1);
 
@@ -38,6 +45,8 @@ pub enum Exit {
     Quit,
     /// The server or watcher stopped on its own.
     Stopped,
+    /// An update started the new exe, which takes over (the guide window stays open).
+    Restart,
 }
 
 fn tooltip(status: &Status) -> &'static str {
@@ -49,23 +58,29 @@ fn tooltip(status: &Status) -> &'static str {
 
 /// Shows the icon and runs the window message loop on this thread until Quit or `stopped` fires.
 /// Left-click or Open calls `open`. `tick` runs after each round of window messages (at least
-/// every 250 ms) for the in-game bar, whose window lives on this thread too.
+/// every 250 ms) for the in-game bar, whose window lives on this thread too. An Update item
+/// shows at the top of the menu while GitHub has a newer release.
 pub fn run(
     mut status: watch::Receiver<Status>,
     stopped: Receiver<()>,
+    updater: &std::sync::Arc<Updater>,
     open: impl Fn(),
     mut tick: impl FnMut(),
 ) -> anyhow::Result<Exit> {
     let open_item = MenuItem::new("Open", true, None);
     let quit_item = MenuItem::new("Quit", true, None);
+    let update_item = MenuItem::new("Update", true, None);
     let menu = Menu::new();
     menu.append_items(&[&open_item, &quit_item])?;
+    // Generation of the updater last shown, and whether the Update item is in the menu.
+    let mut update_seen = u64::MAX;
+    let mut update_shown = false;
 
     let icon = Icon::from_rgba(ICON.to_vec(), 32, 32)?;
     // Copy the text out first so the watch lock isn't held while the icon is created.
     let tip = tooltip(&status.borrow_and_update());
     let tray = TrayIconBuilder::new()
-        .with_menu(Box::new(menu))
+        .with_menu(Box::new(menu.clone()))
         .with_menu_on_left_click(false)
         .with_tooltip(tip)
         .with_icon(icon)
@@ -92,6 +107,9 @@ pub fn run(
         if QUIT.load(Ordering::SeqCst) {
             return Ok(Exit::Quit);
         }
+        if RESTART.load(Ordering::SeqCst) {
+            return Ok(Exit::Restart);
+        }
 
         tick();
 
@@ -101,6 +119,34 @@ pub fn run(
             }
             if event.id == *open_item.id() {
                 open_once();
+            }
+            if event.id == *update_item.id() {
+                updater.install();
+            }
+        }
+
+        let generation = updater.generation();
+        if generation != update_seen {
+            update_seen = generation;
+            let view = updater.view();
+            match &view.latest {
+                Some(latest) => {
+                    let version = latest.tag.trim_start_matches('v');
+                    match view.state {
+                        Phase::Idle => update_item.set_text(format!("Update {version}")),
+                        Phase::Installing => update_item.set_text("Updating…"),
+                        Phase::Failed => update_item.set_text("Retry update"),
+                    }
+                    update_item.set_enabled(view.state != Phase::Installing);
+                    if !update_shown {
+                        update_shown = menu.prepend(&update_item).is_ok();
+                    }
+                }
+                None => {
+                    if update_shown {
+                        update_shown = menu.remove(&update_item).is_err();
+                    }
+                }
             }
         }
 

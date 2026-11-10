@@ -67,6 +67,8 @@ const NAVY: (u8, u8, u8) = (22, 22, 22);
 /// How often the bar looks for the game's passive tree: every tick (about 250 ms), with room
 /// for a tick that wakes a little early.
 const TREE_EVERY: Duration = Duration::from_millis(200);
+/// How long after a failed WebView2 start the bar tries again.
+const WEBVIEW_RETRY: Duration = Duration::from_secs(10);
 /// Checks in a row without the tree before it counts as closed: one of its node tooltips
 /// can cover the header for a moment.
 const TREE_MISSES: u8 = 3;
@@ -132,8 +134,9 @@ pub struct Overlay {
     position: Option<(i32, i32)>,
     always: bool,
     window: Option<Window>,
-    /// WebView2 couldn't start; don't retry every tick.
-    failed: bool,
+    /// When WebView2 last couldn't start, and the wait before the next try (doubling from
+    /// `WEBVIEW_RETRY` up to 5 minutes), not every tick.
+    failed: Option<(Instant, Duration)>,
     /// The game window last seen in front, to hand focus back to.
     game: HWND,
     /// The window in front at the last tick: focus goes back to the game only if it was there.
@@ -178,7 +181,7 @@ impl Overlay {
             position: saved.position.filter(|&(x, y)| on_screen(x, y)),
             always,
             window: None,
-            failed: false,
+            failed: None,
             game: std::ptr::null_mut(),
             last_front: std::ptr::null_mut(),
             ipc_tx,
@@ -232,12 +235,21 @@ impl Overlay {
         // character select screens.
         let playing = *self.zone.borrow() != Some(false);
         let wanted = on && (self.always || ((own || is_game(front)) && playing));
-        if wanted && self.window.is_none() && !self.failed {
+        // A failure is tried again later: right after an update, the old copy's WebView2 can
+        // still be closing on the same folder.
+        let retry = self.failed.is_none_or(|(at, wait)| at.elapsed() >= wait);
+        if wanted && self.window.is_none() && retry {
             match self.create() {
-                Ok(window) => self.window = Some(window),
+                Ok(window) => {
+                    self.window = Some(window);
+                    self.failed = None;
+                }
                 Err(err) => {
-                    warn!("Overlay unavailable: {err}");
-                    self.failed = true;
+                    let wait = self.failed.map_or(WEBVIEW_RETRY, |(_, wait)| {
+                        (wait * 2).min(Duration::from_secs(5 * 60))
+                    });
+                    warn!("Overlay unavailable: {err} (next try in {}s)", wait.as_secs());
+                    self.failed = Some((Instant::now(), wait));
                 }
             }
         }
@@ -408,6 +420,8 @@ impl Overlay {
             })
             .build(&Handle(hwnd))
             .map_err(|err| {
+                // Tried again later: don't leave this window behind each time.
+                unsafe { windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd) };
                 format!("WebView2 didn't start ({err}). Install the WebView2 runtime.")
             })?;
         // wry focuses WebView2 when a drag starts, which would take focus from the game. A
@@ -512,19 +526,22 @@ fn create_window(position: Option<(i32, i32)>) -> Result<HWND, String> {
     let title = wide("Lioneye Overlay");
     unsafe {
         let instance = GetModuleHandleW(std::ptr::null());
-        let wc = WNDCLASSEXW {
-            cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
-            lpfnWndProc: Some(window_proc),
-            hInstance: instance,
-            hCursor: LoadCursorW(std::ptr::null_mut(), IDC_ARROW),
-            hbrBackground: CreateSolidBrush(
-                NAVY.0 as u32 | (NAVY.1 as u32) << 8 | (NAVY.2 as u32) << 16,
-            ),
-            lpszClassName: class.as_ptr(),
-            ..std::mem::zeroed()
-        };
-        // Fails harmlessly if already registered.
-        RegisterClassExW(&wc);
+        // Once: a brush made for each try (after a failed start) would leak.
+        static REGISTER: std::sync::Once = std::sync::Once::new();
+        REGISTER.call_once(|| {
+            let wc = WNDCLASSEXW {
+                cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+                lpfnWndProc: Some(window_proc),
+                hInstance: instance,
+                hCursor: LoadCursorW(std::ptr::null_mut(), IDC_ARROW),
+                hbrBackground: CreateSolidBrush(
+                    NAVY.0 as u32 | (NAVY.1 as u32) << 8 | (NAVY.2 as u32) << 16,
+                ),
+                lpszClassName: class.as_ptr(),
+                ..std::mem::zeroed()
+            };
+            RegisterClassExW(&wc);
+        });
 
         // Off screen until the page reports its size; then moved to its saved place.
         let (x, y) = position

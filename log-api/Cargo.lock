@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "exile-leveling-local"
-version = "0.4.35"
+version = "0.4.36"
 dependencies = [
  "anyhow",
  "axum",
@@ -659,6 +659,7 @@ dependencies = [
  "rust-embed",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "sysinfo",
  "tokio",
  "tracing",
