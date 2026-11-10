@@ -103,7 +103,8 @@ check it (**Build health**).
   PoB calculates it. Under it: the character's name, level and class, or why it wasn't read.
 - It stays current by itself: every 3 minutes the exe asks poe.ninja whether the
   character changed and reads it only if so. **Refresh** reads it now. poe.ninja re-reads a
-  character from the game on its own schedule, which can be an hour or more apart.
+  character from the game on its own schedule, which can be an hour or more apart. The
+  header's Live row has the same Refresh (⟳).
 - **poe.ninja: Sign in** opens Lioneye's own poe.ninja window on its account page; sign in
   there with poe.ninja's own Path of Exile sign-in, then close it (closing only hides it;
   the login is kept in `%LOCALAPPDATA%\exile-leveling\ninja-webview2`). Signed in, a
@@ -160,8 +161,13 @@ settings; otherwise it leaves it alone and says so.
   open until you fold it). The
   Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while
   Campaign is on screen.
-- The card at the top shows the build (skill, ascendancy, PoB's level), your level from the
-  game log (**Char lvl**) and its headline numbers. The **Loadout** dropdown heads the left
+- The card at the top shows the build (skill, ascendancy) and two rows of headline numbers.
+  **Plan**: the shown loadout as PoB calculates it, with PoB's level. **Live**: your
+  character, with your level from the game log (it's never behind poe.ninja's) and the
+  numbers from poe.ninja's copy; without a live character, just the log's level. Live's
+  ⟳ (once a live character is set) does what **Refresh** in Settings does, and opens the
+  poe.ninja sign-in first while you're not signed in. It turns amber while poe.ninja's
+  copy is from a lower level than the log's. The **Loadout** dropdown heads the left
   column, above **Stats**. The loadout follows your
   level when PoB titles name levels (`Lvl 30`, `Level 12-28`), else your act (`Act 2`,
   `Act 4-6 - 50 pts`). When no title names a level or act (`Early`, `27 points`), it

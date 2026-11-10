@@ -59,6 +59,66 @@
   cursor: default;
 }
 
+/* Plan and Live, one row each: a tag, the numbers, Live's refresh at the end. */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+}
+
+.tag {
+  flex: none;
+  width: 2.6rem;
+  color: #8f8f8f;
+  font-size: 0.75rem;
+  font-weight: var(--font-heavy);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.row .numbers {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Square, after Live's numbers. */
+.refresh {
+  flex: none;
+  justify-content: center;
+  width: 2rem;
+  padding: 0;
+}
+
+/* poe.ninja's copy is behind your level: the bar's amber warning. */
+.refresh.behind,
+.refresh.behind:hover {
+  color: #f0a030;
+  border-color: #8a5a1e;
+  background-color: #2a1f12;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+}
+
 .numbers {
   display: flex;
   flex-wrap: wrap;

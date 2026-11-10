@@ -9,12 +9,21 @@ export function format(value: number) {
   });
 }
 
-/** "Skill / Ascendancy (Class) (Level n)", as on pob.codes. */
-export function BuildTitle({ headline }: { headline: Headline }) {
+/**
+ * "Skill / Ascendancy (Class) (Level n)", as on pob.codes. `level` false: the level
+ * shows elsewhere (the build header's Plan and Live rows).
+ */
+export function BuildTitle({
+  headline,
+  level = true,
+}: {
+  headline: Headline;
+  level?: boolean;
+}) {
   return (
     <>
       {title(headline)}
-      {headline.level !== undefined && (
+      {level && headline.level !== undefined && (
         <span className={classNames(styles.level)}>
           {" "}
           (Level {headline.level})
