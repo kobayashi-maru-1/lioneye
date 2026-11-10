@@ -17,6 +17,8 @@ export interface TreeTip {
   next: string[];
   /** The guide's other points still to take (dim green). */
   later: string[];
+  /** The set's ascendancy points you don't have yet (green). */
+  ascend?: string[];
   /** The area to show, in tree coordinates. */
   view: { x: number; y: number; w: number; h: number };
   /** Where the set is among the build's tree sets (the tooltip's ‹ › arrows). */
@@ -85,6 +87,20 @@ export function treeTip(
   if (next.size === 0) for (const id of toTake) next.add(id);
   const later = [...toTake].filter((id) => !next.has(id));
 
+  // The ascendancy's points to take, at the next labs. They're far from the main tree, so
+  // they don't count towards the area shown, nor towards the set being done.
+  const ascendGraph = tree.ascendancy
+    ? skillTree.graphs[tree.ascendancy.graphIndex]
+    : undefined;
+  const ascend = ascendGraph
+    ? tree.nodes.filter(
+        (id) =>
+          ascendGraph.nodes[id] !== undefined &&
+          ascendGraph.nodes[id].k !== "Ascendancy_Start" &&
+          !haveSet.has(id),
+      )
+    : [];
+
   // The next points and the points of yours they start from.
   const shown = [...next];
   for (const id of next) {
@@ -99,6 +115,7 @@ export function treeTip(
     have,
     next: [...next],
     later,
+    ascend,
     view: bounds(shown, main.nodes),
   };
 }

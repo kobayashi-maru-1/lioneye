@@ -945,8 +945,9 @@ function zoomable(box: HTMLElement) {
 }
 
 /**
- * The Tree panel's colours: yours blue, the next points bright green, the guide's later
- * points dim green (in the "removed" slot, which this tooltip has no use for).
+ * The Tree panel's colours: yours blue, the next points and the ascendancy's points to
+ * take bright green, the guide's later points dim green (in the "removed" slot, which this
+ * tooltip has no use for).
  */
 function treeStyle(
   data: TreeTip,
@@ -956,10 +957,22 @@ function treeStyle(
   const have = new Set(data.have);
   const next = new Set(data.next);
   const later = new Set(data.later);
+  const graphs = [skillTree.graphs[skillTree.graphIndex]];
+  const ascendancy = data.ascendancy
+    ? skillTree.ascendancies[data.ascendancy]
+    : undefined;
+  if (ascendancy) {
+    // Its start is yours once you've ascended, as in the Tree panel.
+    have.add(ascendancy.startNodeId);
+    for (const id of Array.isArray(data.ascend) ? data.ascend : [])
+      next.add(id);
+    const graph = skillTree.graphs[ascendancy.graphIndex];
+    if (graph) graphs.push(graph);
+  }
   const active: string[] = [];
   const added: string[] = [];
   const dim: string[] = [];
-  for (const { a, b } of skillTree.graphs[skillTree.graphIndex].connections) {
+  for (const { a, b } of graphs.flatMap((graph) => graph.connections)) {
     const id = `${a}-${b}`;
     if (have.has(a) && have.has(b)) active.push(id);
     else if (
@@ -985,8 +998,8 @@ function treeStyle(
     connectionActiveColor: "hsl(200, 80%, 40%)",
     connectionAddedColor: "hsl(120, 90%, 40%)",
     connectionRemovedColor: "hsl(120, 45%, 26%)",
-    nodesActive: data.have,
-    nodesAdded: data.next,
+    nodesActive: [...have],
+    nodesAdded: [...next],
     nodesRemoved: data.later,
     connectionsActive: active,
     connectionsAdded: added,
