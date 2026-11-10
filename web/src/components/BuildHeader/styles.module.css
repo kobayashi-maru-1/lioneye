@@ -26,6 +26,22 @@
   color: #8f8f8f;
 }
 
+/* The title inside its builds dropdown: one line, cut short when the tools need room. */
+.titleText {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Square, icon only (Save). */
+.icon {
+  justify-content: center;
+  width: 2rem;
+  padding: 0;
+}
+
 /* Compare, Desktop PoB and Copy, at the right of the title. */
 .tools {
   display: flex;

@@ -1,0 +1,118 @@
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2);
+  max-width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Looks like whatever it wraps (the build title). No weight (:where), so a passed
+   class (the empty page's button) wins whichever stylesheet loads last. */
+:where(.trigger) {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+}
+
+.trigger:hover .chevron,
+.trigger[aria-expanded="true"] .chevron {
+  color: var(--gold);
+}
+
+/* A build loading: not disabled, so the keyboard stays on it. */
+.trigger[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.chevron {
+  flex: none;
+  color: #8f8f8f;
+}
+
+/* Placed by the script under its button. Above the pinned panel headers and the app bar
+   (2-3), under dialogs (6). */
+.menu {
+  position: fixed;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2);
+  width: min(28rem, 90vw);
+  padding: var(--size-2);
+  font-size: 0.9rem;
+  font-weight: normal;
+  color: #dad5cd;
+  background-color: #1c1a17;
+  border: var(--border-width) solid #3d372f;
+  border-radius: var(--border-radius);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 50%);
+}
+
+.search {
+  padding: var(--size-1) var(--size-2);
+  font: inherit;
+  color: inherit;
+  background-color: #12110f;
+  border: var(--border-width) solid #3d372f;
+  border-radius: var(--border-radius);
+}
+
+.list {
+  max-height: min(24rem, 60vh);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-3);
+  width: 100%;
+  padding: var(--size-1) var(--size-2);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.row:hover,
+.row:focus-visible {
+  background-color: #26221c;
+}
+
+.current {
+  color: var(--gold);
+  font-weight: var(--font-heavy);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date {
+  flex: none;
+  color: #8f8f8f;
+  font-size: 0.8rem;
+}
+
+.note {
+  padding: var(--size-1) var(--size-2);
+  color: #8f8f8f;
+}
+
+.error {
+  color: #e05030;
+}

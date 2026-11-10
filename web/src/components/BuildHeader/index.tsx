@@ -11,14 +11,15 @@ import {
 } from "../../state/live-character";
 import { pobAtom } from "../../state/pob";
 import { BuildCompare } from "../BuildCompare";
-import { DesktopPob } from "../DesktopPob";
+import { BuildPicker } from "../BuildPicker";
+import { DesktopPob, SaveToPob } from "../DesktopPob";
 import { type Headline, usePobStats } from "../PobStats";
 import { BuildTitle, HeadlineNumbers, Stat } from "./headline";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRef } from "react";
-import { FaDesktop, FaRegClipboard, FaSyncAlt } from "react-icons/fa";
+import { FaDesktop, FaRegClipboard, FaSave, FaSyncAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 /** The imported build's PoB code to the clipboard, as pob.codes' Copy does. */
@@ -32,11 +33,12 @@ async function copyCode(code: string) {
 }
 
 /**
- * pob.codes-style card above the guide: the build's title, then a Plan row (the shown
- * loadout's PoB numbers) and a Live row (your character: its level from the game log,
- * its numbers from poe.ninja, with Refresh). Compare, Desktop PoB (opens it in the
- * chosen PoB) and Copy at the right of the title. The Loadout dropdown is at the top of
- * the left column (StatsViewer).
+ * pob.codes-style card above the guide: the build's title (a dropdown of the builds in
+ * PoB's builds folder), then a Plan row (the shown loadout's PoB numbers) and a Live row
+ * (your character: its level from the game log, its numbers from poe.ninja, with
+ * Refresh). Compare, Desktop PoB (opens it in the chosen PoB), Save (a pasted build to
+ * PoB's builds folder) and Copy at the right of the title. The Loadout dropdown is at the
+ * top of the left column (StatsViewer).
  */
 export function BuildHeader() {
   const pob = usePobStats();
@@ -51,7 +53,11 @@ export function BuildHeader() {
     <section className={classNames(styles.header)}>
       <div className={classNames(styles.titleRow)}>
         <h1 className={classNames(styles.title)}>
-          <BuildTitle headline={shown.headline ?? {}} level={false} />
+          <BuildPicker label="Builds">
+            <span className={classNames(styles.titleText)}>
+              <BuildTitle headline={shown.headline ?? {}} level={false} />
+            </span>
+          </BuildPicker>
         </h1>
         <div className={classNames(styles.tools)}>
           <BuildCompare buttonClassName={classNames(styles.tool)} />
@@ -59,6 +65,9 @@ export function BuildHeader() {
             <FaDesktop aria-hidden />
             Desktop PoB
           </DesktopPob>
+          <SaveToPob className={classNames(styles.tool, styles.icon)}>
+            <FaSave aria-hidden />
+          </SaveToPob>
           {code !== null && (
             <button
               className={classNames(styles.tool)}

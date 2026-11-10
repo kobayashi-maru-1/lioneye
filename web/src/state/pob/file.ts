@@ -86,6 +86,24 @@ export function openBuildFile() {
   return call<BuildFile | null>("/api/pob/open", {}, "Open failed");
 }
 
+/** A build in the chosen PoB's builds folder. */
+export interface BuildEntry {
+  /** The file name without .xml. */
+  name: string;
+  path: string;
+  /** Last saved (ms since 1970; 0 unknown). */
+  modified: number;
+}
+
+/** The builds at the top of the chosen PoB's builds folder, last saved first. */
+export function listBuildFiles(editor: PobEditor) {
+  return call<{ dir: string; builds: BuildEntry[] }>(
+    `/api/pob/builds?editor=${editor}`,
+    undefined,
+    "Builds not listed",
+  );
+}
+
 export function readBuildFile(path: string) {
   return call<BuildFile>("/api/pob/read", { path }, "File not read");
 }

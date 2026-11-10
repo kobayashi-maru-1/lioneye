@@ -1,0 +1,21 @@
+/* Small and square, beside the Act dropdown, in its colours. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  font-size: 0.75rem;
+  color: #8f8f8f;
+  background-color: var(--input);
+  border: var(--border-width) solid var(--input-border);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.button:hover {
+  color: var(--on-primary);
+  border-color: #3a3a3a;
+}

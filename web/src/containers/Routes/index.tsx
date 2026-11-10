@@ -1,4 +1,6 @@
 import { BuildHeader } from "../../components/BuildHeader";
+import { BuildPicker } from "../../components/BuildPicker";
+import { CampaignReset } from "../../components/CampaignReset";
 import { BuildNotes, buildNotes } from "../../components/BuildNotes";
 import { ConfigList } from "../../components/ConfigList";
 import { FragmentStep } from "../../components/FragmentStep";
@@ -7,10 +9,7 @@ import { GemLinkViewer } from "../../components/GemLinkViewer";
 import { GemReward } from "../../components/ItemReward";
 import { jumpTargetsAtom } from "../../components/AppBar";
 import { settingsTabAtom } from "../../state/settings-tab";
-import {
-  characterNodesNowAtom,
-  treeCompareAtom,
-} from "../../state/character";
+import { characterNodesNowAtom, treeCompareAtom } from "../../state/character";
 import {
   PageSection,
   pageSectionId,
@@ -165,9 +164,7 @@ export default function RoutesContainer() {
           taskItems.push({
             edgeIndex: step.edgeIndex,
             orderIndex: orderIndex++,
-            isCompletedState: routeProgressFamily(
-              stepKey(step),
-            ),
+            isCompletedState: routeProgressFamily(stepKey(step)),
             children: <FragmentStep key={stepIndex} step={step} />,
           });
 
@@ -314,7 +311,12 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
               <PageSection
                 id="campaign"
                 title="Campaign"
-                actions={<ActPicker />}
+                actions={
+                  <>
+                    <ActPicker />
+                    <CampaignReset />
+                  </>
+                }
               >
                 {campaign}
               </PageSection>
@@ -547,8 +549,7 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   // Your character's tree, once the exe has read it from the game's log.
   const character = useAtomValue(characterNodesNowAtom);
   const [compare, setCompare] = useAtom(treeCompareAtom);
-  const against =
-    compare === "character" && character ? character.nodes : null;
+  const against = compare === "character" && character ? character.nodes : null;
   useTreeTip(urlTrees, index, character?.nodes ?? null);
   return (
     <PageSection
@@ -729,6 +730,17 @@ function EmptyHint() {
       >
         Import
       </button>
+      {/* PoB's builds folder, when PoB is installed. */}
+      <BuildPicker
+        label="Builds"
+        hideWithoutPob
+        className={classNames(
+          styles.emptyButton,
+          interactiveStyles.hoverPrimary,
+        )}
+      >
+        Builds
+      </BuildPicker>
     </div>
   );
 }

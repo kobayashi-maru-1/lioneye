@@ -12,6 +12,7 @@
 //! - `open_dialog()`: Windows' Open dialog for a build file, in that folder (else Downloads).
 //! - `read_build()`, `save_build()`: a build file read, or a new one written (never over an
 //!   existing file), checked to be PoB's XML.
+//! - `list_builds()`: the builds at the top of a builds folder, last saved first.
 //! - `edit()`: PoB opened on a build. PoB reopens the build its `Settings.xml` names as the
 //!   last one open, so that entry is set first. A PoB already running stays as it is; a
 //!   second PoB window opens on the build.
@@ -410,6 +411,55 @@ pub fn save_build(dir: &Path, name: &str, xml: &str) -> Result<PathBuf, String> 
     Err("Name in use. Try another name".into())
 }
 
+/// A build file in a builds folder, for the guide's build list.
+#[derive(Debug, serde::Serialize)]
+pub struct BuildEntry {
+    /// The file name without `.xml`, as PoB lists it.
+    pub name: String,
+    pub path: String,
+    /// Last saved, in milliseconds since 1970 (0 when Windows doesn't say).
+    pub modified: u64,
+}
+
+/// The builds in `dir` itself (not its subfolders, such as an archive), last saved first.
+/// A missing or unreadable folder has none.
+pub fn list_builds(dir: &Path) -> Vec<BuildEntry> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut builds: Vec<BuildEntry> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let path = entry.path();
+            // A link's own details on Windows: follow it to the build, as reading does.
+            let meta = if entry.file_type().ok()?.is_symlink() {
+                std::fs::metadata(&path).ok()?
+            } else {
+                entry.metadata().ok()?
+            };
+            if !meta.is_file() || !is_xml(&path) {
+                return None;
+            }
+            let modified = meta
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(SystemTime::UNIX_EPOCH).ok())
+                .map_or(0, |since| since.as_millis() as u64);
+            Some(BuildEntry {
+                name: path.file_stem()?.to_string_lossy().into_owned(),
+                path: path.to_string_lossy().into_owned(),
+                modified,
+            })
+        })
+        .collect();
+    builds.sort_by(|a, b| {
+        b.modified
+            .cmp(&a.modified)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    builds
+}
+
 /// Opens PoB on `build`: sets it as PoB's last open build, then starts PoB. PoB's settings
 /// are only changed when they read cleanly; otherwise nothing is written.
 pub fn edit(pob: &Pob, build: &Path) -> Result<(), String> {
@@ -759,6 +809,26 @@ mod tests {
         std::fs::write(&bom, format!("\u{feff}{xml}")).unwrap();
         assert_eq!(read_build(&bom).unwrap(), xml);
         assert!(read_build(&dir.join("missing.xml")).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn lists_top_level_builds_newest_first() {
+        let dir = std::env::temp_dir().join(format!("lioneye-list-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("Archived")).unwrap();
+        let xml = "<PathOfBuilding><Build/></PathOfBuilding>";
+        let old = dir.join("Old.xml");
+        std::fs::write(&old, xml).unwrap();
+        let file = std::fs::File::options().write(true).open(&old).unwrap();
+        file.set_modified(SystemTime::now() - Duration::from_secs(3600)).unwrap();
+        drop(file);
+        std::fs::write(dir.join("New.XML"), xml).unwrap();
+        std::fs::write(dir.join("notes.txt"), "not a build").unwrap();
+        std::fs::write(dir.join("Archived").join("Gone.xml"), xml).unwrap();
+        let names: Vec<_> = list_builds(&dir).into_iter().map(|b| b.name).collect();
+        assert_eq!(names, ["New", "Old"]);
+        assert!(list_builds(&dir.join("missing")).is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

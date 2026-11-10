@@ -15,9 +15,15 @@ import { Modal } from "../Modal";
 import { PanelSelect } from "../PanelSelect";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+
+/**
+ * A pasted build being saved to PoB (Desktop PoB's or Save's): the other holds off, so the
+ * build isn't saved twice.
+ */
+const savingAtom = atom(false);
 
 /** What an error says, ready to show; `failed` ("Not saved") when it says nothing. */
 export function errorMessage(error: unknown, failed: string) {
@@ -57,7 +63,7 @@ export function usePobHome() {
 }
 
 /** The chosen editor (anything stored that isn't Redux reads as PoB Community). */
-function usePobEditor() {
+export function usePobEditor() {
   const [stored, setEditor] = useAtom(pobEditorAtom);
   const editor: PobEditor = stored === "redux" ? "redux" : "community";
   return [editor, setEditor] as const;
@@ -126,6 +132,7 @@ export function DesktopPob({
     setOwnBusy(on);
     onBusy?.(on);
   };
+  const [saving, setSaving] = useAtom(savingAtom);
   /** The name a pasted build gets as a PoB file, while "Save to PoB?" is open. */
   const [saveName, setSaveName] = useState<string | null>(null);
 
@@ -153,12 +160,134 @@ export function DesktopPob({
     if (saveName === null) return;
     setSaveName(null);
     setBusy(true);
+    setSaving(true);
     try {
       const path = await saveBuildFile(saveName, pobCodeToXml(code), editor);
       // Only if the same build is still loaded (not unloaded or replaced meanwhile).
-      if (!linkFile(path, code)) return;
+      if (!linkFile(path, code)) {
+        toast.info("Saved to PoB");
+        return;
+      }
       await editBuildFile(path, editor);
       toast.info("Saved. PoB opening");
+    } catch (error) {
+      toast.error(errorMessage(error, "Not saved"));
+    } finally {
+      setBusy(false);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        className={className}
+        title={`Open in ${editorLabel}`}
+        disabled={disabled || busy || saving}
+        onClick={open}
+      >
+        {children}
+      </button>
+      <SaveNameModal
+        id="pob-save-name"
+        name={saveName}
+        onChange={setSaveName}
+        onSave={saveAndOpen}
+      />
+    </>
+  );
+}
+
+/** "Save to PoB?" with the new file's name; `name` null: closed. */
+function SaveNameModal({
+  id,
+  name,
+  onChange,
+  onSave,
+}: {
+  id: string;
+  name: string | null;
+  onChange: (name: string | null) => void;
+  onSave: () => void;
+}) {
+  return (
+    <Modal
+      size="small"
+      isOpen={name !== null}
+      onRequestClose={() => onChange(null)}
+      contentLabel="Save to PoB?"
+    >
+      <form
+        className={classNames(formStyles.form)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave();
+        }}
+      >
+        <div className={classNames(formStyles.formRow)}>
+          <label htmlFor={id}>Save to PoB?</label>
+        </div>
+        <p>New file in PoB's builds folder.</p>
+        <input
+          id={id}
+          className={classNames(formStyles.formInput)}
+          aria-label="Name"
+          value={name ?? ""}
+          autoFocus
+          maxLength={80}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <div className={classNames(formStyles.groupRight)}>
+          <button
+            type="button"
+            className={classNames(formStyles.formButton)}
+            onClick={() => onChange(null)}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className={classNames(formStyles.formButton)}
+            disabled={(name ?? "").trim() === ""}
+          >
+            Save
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/**
+ * Saves a pasted build as a new file in the chosen PoB's builds folder, without opening
+ * PoB; the guide then follows the file. Shows only for a pasted build (no file yet) with
+ * that PoB installed.
+ */
+export function SaveToPob({
+  className,
+  children,
+}: React.PropsWithChildren<{ className: string }>) {
+  const home = usePobHome();
+  const [editor] = usePobEditor();
+  const code = useAtomValue(pobAtom);
+  const file = useAtomValue(pobFileSelector);
+  const linkFile = useSetAtom(linkBuildFileAtom);
+  const [busy, setBusy] = useAtom(savingAtom);
+  const [saveName, setSaveName] = useState<string | null>(null);
+
+  if (!editorInstalled(home, editor) || code === null || file !== null)
+    return null;
+
+  const save = async () => {
+    if (saveName === null) return;
+    setSaveName(null);
+    setBusy(true);
+    try {
+      const path = await saveBuildFile(saveName, pobCodeToXml(code), editor);
+      // Linked only if the same build is still loaded (not unloaded or replaced meanwhile);
+      // saved either way.
+      linkFile(path, code);
+      toast.success("Saved to PoB");
     } catch (error) {
       toast.error(errorMessage(error, "Not saved"));
     } finally {
@@ -170,56 +299,19 @@ export function DesktopPob({
     <>
       <button
         className={className}
-        title={`Open in ${editorLabel}`}
-        disabled={disabled || busy}
-        onClick={open}
+        title="Save to PoB"
+        aria-label="Save to PoB"
+        disabled={busy}
+        onClick={() => setSaveName(defaultName(code))}
       >
         {children}
       </button>
-      <Modal
-        size="small"
-        isOpen={saveName !== null}
-        onRequestClose={() => setSaveName(null)}
-        contentLabel="Save to PoB?"
-      >
-        <form
-          className={classNames(formStyles.form)}
-          onSubmit={(event) => {
-            event.preventDefault();
-            saveAndOpen();
-          }}
-        >
-          <div className={classNames(formStyles.formRow)}>
-            <label htmlFor="pob-save-name">Save to PoB?</label>
-          </div>
-          <p>New file in PoB's builds folder.</p>
-          <input
-            id="pob-save-name"
-            className={classNames(formStyles.formInput)}
-            aria-label="Name"
-            value={saveName ?? ""}
-            autoFocus
-            maxLength={80}
-            onChange={(event) => setSaveName(event.target.value)}
-          />
-          <div className={classNames(formStyles.groupRight)}>
-            <button
-              type="button"
-              className={classNames(formStyles.formButton)}
-              onClick={() => setSaveName(null)}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={classNames(formStyles.formButton)}
-              disabled={(saveName ?? "").trim() === ""}
-            >
-              Save
-            </button>
-          </div>
-        </form>
-      </Modal>
+      <SaveNameModal
+        id="pob-save-only-name"
+        name={saveName}
+        onChange={setSaveName}
+        onSave={save}
+      />
     </>
   );
 }

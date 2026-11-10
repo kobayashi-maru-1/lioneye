@@ -74,14 +74,16 @@ In ⚙ **Settings → Build**:
   For a pasted code, **Save to PoB?** first saves it as a new file in the editor's builds
   folder (never over an existing one) under the name you give; from then on it's an opened
   file. Redux's builds folder is the PoE 1 folder set in Redux, else
-  `Documents\Path of Building\Builds`. Pasted codes are never saved anywhere otherwise.
+  `Documents\Path of Building\Builds`. The header's 💾 icon saves a pasted code the same
+  way without opening PoB. Pasted codes are never saved anywhere otherwise.
 - **Unload**: removes the build (code, file, tree, links and gem list).
 
 Loading a different build (Import or Open) brings its gem list, class and bandit (Settings →
 **Route**) and keeps your progress. A save of the same file in PoB updates only what comes
 from PoB (stats, tree, gear, links); the gem list, class and bandit stay as you set them, so
 Open the file again to take PoB's. To start over, **Settings → Route** has
-**Reset campaign** (campaign ticks, your place and level) and **Reset gems** (gem ticks).
+**Reset campaign** (campaign ticks, your place and level; also ↺ on the Campaign panel)
+and **Reset gems** (gem ticks).
 
 Campaign ticks are kept by what each step says (with the step before it), not by its place,
 so a different gem list, bandit or route option never moves a tick onto another step. Ticks
@@ -128,7 +130,7 @@ change on poe.ninja's side can break it until Lioneye is updated. The bundled Po
 build at a time, so after the live character is calculated, the guide's next loadout
 change takes a few seconds longer (as after a Compare).
 
-Open, Edit and the file watch work only from the guide on this PC: never from another
+Open, Edit, the builds list and the file watch work only from the guide on this PC: never from another
 device (`--address 0.0.0.0`) or another website, and only for local `.xml` files (not
 network paths). Edit changes PoB's `Settings.xml` only when it reads cleanly as PoB's own
 settings; otherwise it leaves it alone and says so.
@@ -159,10 +161,17 @@ settings; otherwise it leaves it alone and says so.
   pinned at its top that jumps to each and underlines the one you're in: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded build: **Unload**, **Copy**, **Open**, **Edit**, **Import**; **Editor**; **PoE account** and **Live character**; search strings; see [Your build](#your-build)), **Route** (Edit
   route, Export, **Reset campaign**, **Reset gems**, class, bandits, League Start, Library, Gems Only, hints, and the gem list,
   open until you fold it). The
-  Campaign header's dropdown jumps to an act. Auto-progress only scrolls to your zone while
+  Campaign header's dropdown jumps to an act, and its ↺ is **Reset campaign** (it asks
+  first; gem ticks stay). Auto-progress only scrolls to your zone while
   Campaign is on screen.
 - The card at the top shows the build (skill, ascendancy) and two rows of headline numbers.
-  **Plan**: the shown loadout as PoB calculates it, with PoB's level. **Live**: your
+  With the chosen editor installed, the title is a dropdown of the builds in its builds
+  folder (the top of the folder, not subfolders such as `Archived`; last saved first, with
+  a search box). Picking one opens it as **Open** does, and the guide follows the file; the
+  one loaded is gold. With no build loaded, the same list is under **Builds** beside
+  **Import**. For a pasted code, the 💾 icon beside **Desktop PoB** saves it to the builds
+  folder (**Save to PoB?**, the same as Edit's) without opening PoB; from then on it's an
+  opened file and the icon goes. **Plan**: the shown loadout as PoB calculates it, with PoB's level. **Live**: your
   character, with your level from the game log (it's never behind poe.ninja's) and the
   numbers from poe.ninja's copy; without a live character, just the log's level. Live's
   ⟳ (once a live character is set) does what **Refresh** in Settings does, and opens the

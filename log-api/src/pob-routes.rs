@@ -1,5 +1,6 @@
 //! The guide's requests for PoB build files (pob-files.rs): whether PoB Community and PoB
-//! Redux are installed, Open (Windows' dialog), reading the linked file again, saving a
+//! Redux are installed, the builds in its builds folder, Open (Windows' dialog), reading a
+//! build file (a listed one, or the linked file again), saving a
 //! pasted build as a file, and Edit (the chosen PoB opened on the file). They read or write files and start PoB, so
 //! only a page on this PC itself may make them: never another device (`--address
 //! 0.0.0.0`) or a site pointed here by name.
@@ -11,7 +12,7 @@ use std::{
 
 use axum::{
     Json, Router,
-    extract::{ConnectInfo, DefaultBodyLimit},
+    extract::{ConnectInfo, DefaultBodyLimit, Query},
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -24,6 +25,7 @@ use crate::server::{AppState, local_host, local_origin};
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/pob/home", get(home))
+        .route("/api/pob/builds", get(builds))
         .route("/api/pob/open", post(open))
         .route("/api/pob/read", post(read))
         // A big build's XML can pass axum's 2 MB default.
@@ -80,6 +82,38 @@ async fn home(ConnectInfo(peer): ConnectInfo<SocketAddr>, headers: HeaderMap) ->
     .await;
     match home {
         Ok(home) => Json(home).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct BuildsQuery {
+    /// Whose builds folder (missing: PoB Community's).
+    #[serde(default)]
+    editor: pob_files::Editor,
+}
+
+/// The builds in the chosen PoB's builds folder (not its subfolders), last saved first:
+/// the guide's build title list.
+async fn builds(
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Query(query): Query<BuildsQuery>,
+) -> Response {
+    if !this_pc(&peer, &headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let listed = tokio::task::spawn_blocking(move || {
+        let dir = pob_files::builds_dir(query.editor)?;
+        Ok::<_, String>(serde_json::json!({
+            "dir": dir.to_string_lossy(),
+            "builds": pob_files::list_builds(&dir),
+        }))
+    })
+    .await;
+    match listed {
+        Ok(Ok(list)) => Json(list).into_response(),
+        Ok(Err(msg)) => failed(msg),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
