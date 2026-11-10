@@ -19,7 +19,7 @@ export interface TreeTip {
   later: string[];
   /** The set's ascendancy points you don't have yet (green). */
   ascend?: string[];
-  /** The area to show, in tree coordinates. */
+  /** The area to show, in tree coordinates: the next points, or a finished set's points. */
   view: { x: number; y: number; w: number; h: number };
   /** Where the set is among the build's tree sets (the tooltip's ‹ › arrows). */
   index?: number;
@@ -101,13 +101,16 @@ export function treeTip(
       )
     : [];
 
-  // The next points and the points of yours they start from.
+  // The next points and the points of yours they start from. A finished set (none left):
+  // the set's own points, all yours now.
   const shown = [...next];
   for (const id of next) {
     for (const other of neighbours.get(id) ?? []) {
       if (haveSet.has(other)) shown.push(other);
     }
   }
+  if (shown.length === 0)
+    shown.push(...tree.nodes.filter((id) => main.nodes[id] !== undefined));
   return {
     version: tree.version,
     set: tree.name,

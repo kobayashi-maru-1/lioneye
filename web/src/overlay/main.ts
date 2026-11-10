@@ -433,7 +433,9 @@ function treeArrows(data: TreeTip) {
 
 /** The Tree tooltip's title row: its set name, with the arrows to step it. */
 function treeHead(data: TreeTip) {
-  return head(TREE_TITLE, setName(data.set), [], treeArrows(data));
+  // A finished set has no next points: just its tree.
+  const title = data.next.length > 0 ? TREE_TITLE : "Tree";
+  return head(title, setName(data.set), [], treeArrows(data));
 }
 
 const COPY_ICON =
@@ -781,9 +783,17 @@ function renderTree() {
     fill(TREE_TITLE, el("div", "tipEmpty", "No tree"));
     return;
   }
-  if (data.next.length === 0) {
-    // Its set is done: the arrows step on to the next one.
-    fillWith(treeHead(data), [el("div", "tipEmpty", "Set done")]);
+  // A finished set draws its points as yours (its area is the set's points). Only a set
+  // with no main-tree points at all has nothing to draw. The title row stays either way,
+  // so its ‹ › still step to another set.
+  if (tipArea(data) === null) {
+    fillWith(treeHead(data), [
+      el(
+        "div",
+        "tipEmpty",
+        data.next.length === 0 ? "No points" : "Not available",
+      ),
+    ]);
     return;
   }
   if (treeView?.version === data.version) {
@@ -808,7 +818,7 @@ function renderTree() {
         drawTree(treeView, data);
       } catch {
         // A malformed tip: renderTip's catch can't see this one.
-        fill(TREE_TITLE, el("div", "tipEmpty", "Not available"));
+        fillWith(treeHead(data), [el("div", "tipEmpty", "Not available")]);
       }
     },
     () => {
@@ -816,6 +826,15 @@ function renderTree() {
         fill(TREE_TITLE, el("div", "tipEmpty", "Not available"));
     },
   );
+}
+
+/** The tip's area to show, or null when it has none it can draw. */
+function tipArea(data: TreeTip): Area | null {
+  const { x, y, w, h } = (data.view ?? {}) as Partial<Area>;
+  const area = [x, y, w, h];
+  if (!area.every((n) => typeof n === "number" && Number.isFinite(n)))
+    return null;
+  return w! > 0 && h! > 0 ? { x: x!, y: y!, w: w!, h: h! } : null;
 }
 
 /** What the tree was last drawn for: redrawing it restyles about 6,000 elements. */
@@ -831,9 +850,9 @@ function drawTree(view: TreeView, data: TreeTip) {
     else tip.prepend(treeHead(data));
     return;
   }
-  const { x, y, w, h } = data.view;
-  if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0)
-    throw new Error("No tree area");
+  const area = tipArea(data);
+  if (area === null) throw new Error("No tree area");
+  const { x, y, w, h } = area;
   view.css.textContent = treeStyle(data, view.skillTree, view.compiled);
   // New points: back to their area. The same points again (reopened, or after another
   // tooltip) keep your zoom.
@@ -854,9 +873,14 @@ type Area = { x: number; y: number; w: number; h: number };
 /** The area the tooltip zooms to for the next points, and the area shown now. */
 let treeHome: Area | null = null;
 let treeArea: Area | null = null;
-/** Zooming stops at this much closer or farther than the next points' area. */
+/**
+ * Zooming stops at this much closer or farther than the area it opens on. Closer is
+ * measured from the usual area at most (a finished set's area can span the tree).
+ */
 const ZOOM_IN = 6;
 const ZOOM_OUT = 12;
+/** The smallest area treeTip opens on (state/tree/next-points.ts MIN_WIDTH). */
+const HOME_WIDTH = 2400;
 
 function showArea(box: HTMLElement, area: Area) {
   treeArea = area;
@@ -897,7 +921,10 @@ function zoomable(box: HTMLElement) {
       const step = Math.exp(Math.max(-100, Math.min(100, pixels)) * 0.002);
       const scale =
         Math.min(
-          Math.max(treeArea.w * step, treeHome.w / ZOOM_IN),
+          Math.max(
+            treeArea.w * step,
+            Math.min(treeHome.w, HOME_WIDTH) / ZOOM_IN,
+          ),
           treeHome.w * ZOOM_OUT,
         ) / treeArea.w;
       showArea(box, {

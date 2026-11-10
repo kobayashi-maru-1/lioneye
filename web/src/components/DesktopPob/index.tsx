@@ -49,6 +49,35 @@ function defaultName(code: string) {
   }
 }
 
+/**
+ * "Save to PoB?"'s state: the name, and the pasted build it was opened for. It closes by
+ * itself once that build is no longer the loaded, unsaved one (unloaded, replaced, or
+ * saved meanwhile, e.g. from another guide window), so Save never writes another build.
+ */
+function useSaveDialog(code: string | null, file: string | null) {
+  const [dialog, setDialog] = useState<{ name: string; code: string } | null>(
+    null,
+  );
+  const stale = dialog !== null && (dialog.code !== code || file !== null);
+  useEffect(() => {
+    if (stale) setDialog(null);
+  }, [stale]);
+  const shown = stale ? null : dialog;
+  return {
+    /** The name typed so far; null while closed. */
+    name: shown?.name ?? null,
+    /** The build it saves; null while closed. */
+    code: shown?.code ?? null,
+    open: (build: string) =>
+      setDialog({ name: defaultName(build), code: build }),
+    /** A new name, or null to close. */
+    rename: (name: string | null) =>
+      setDialog((was) =>
+        name === null || was === null ? null : { ...was, name },
+      ),
+  };
+}
+
 /** Path of Building on this PC (null until the exe answers, or without an exe). */
 export function usePobHome() {
   const [home, setHome] = useState<PobHome | null>(null);
@@ -133,8 +162,8 @@ export function DesktopPob({
     onBusy?.(on);
   };
   const [saving, setSaving] = useAtom(savingAtom);
-  /** The name a pasted build gets as a PoB file, while "Save to PoB?" is open. */
-  const [saveName, setSaveName] = useState<string | null>(null);
+  /** "Save to PoB?" for a pasted build, before PoB opens it. */
+  const dialog = useSaveDialog(code, file);
 
   if (!editorInstalled(home, editor) || code === null) return null;
   const editorLabel =
@@ -142,7 +171,7 @@ export function DesktopPob({
 
   const open = async () => {
     if (file === null) {
-      setSaveName(defaultName(code));
+      dialog.open(code);
       return;
     }
     setBusy(true);
@@ -157,14 +186,15 @@ export function DesktopPob({
   };
 
   const saveAndOpen = async () => {
-    if (saveName === null) return;
-    setSaveName(null);
+    const { name, code: build } = dialog;
+    if (name === null || build === null || saving) return;
+    dialog.rename(null);
     setBusy(true);
     setSaving(true);
     try {
-      const path = await saveBuildFile(saveName, pobCodeToXml(code), editor);
+      const path = await saveBuildFile(name, pobCodeToXml(build), editor);
       // Only if the same build is still loaded (not unloaded or replaced meanwhile).
-      if (!linkFile(path, code)) {
+      if (!linkFile(path, build)) {
         toast.info("Saved to PoB");
         return;
       }
@@ -190,8 +220,8 @@ export function DesktopPob({
       </button>
       <SaveNameModal
         id="pob-save-name"
-        name={saveName}
-        onChange={setSaveName}
+        name={dialog.name}
+        onChange={dialog.rename}
         onSave={saveAndOpen}
       />
     </>
@@ -260,8 +290,9 @@ function SaveNameModal({
 
 /**
  * Saves a pasted build as a new file in the chosen PoB's builds folder, without opening
- * PoB; the guide then follows the file. Shows only for a pasted build (no file yet) with
- * that PoB installed.
+ * PoB; the guide then follows the file. Always shown beside the build's name; greyed out,
+ * with why as its tooltip, when it can't save: that PoB isn't installed, the build is
+ * already a PoB file, or a save is running.
  */
 export function SaveToPob({
   className,
@@ -273,20 +304,34 @@ export function SaveToPob({
   const file = useAtomValue(pobFileSelector);
   const linkFile = useSetAtom(linkBuildFileAtom);
   const [busy, setBusy] = useAtom(savingAtom);
-  const [saveName, setSaveName] = useState<string | null>(null);
+  const dialog = useSaveDialog(code, file);
+  const editorLabel =
+    POB_EDITORS.find((option) => option.value === editor)?.label ?? "PoB";
 
-  if (!editorInstalled(home, editor) || code === null || file !== null)
-    return null;
+  // Why it can't save. Without an answer from the exe (or no exe), PoB isn't found.
+  const blocked = busy
+    ? "Saving"
+    : home === null
+      ? "PoB not found"
+      : !editorInstalled(home, editor)
+        ? `${editorLabel} not installed`
+        : code === null
+          ? "No build"
+          : file !== null
+            ? "Already in PoB"
+            : null;
+  const label = blocked ?? "Save to PoB";
 
   const save = async () => {
-    if (saveName === null) return;
-    setSaveName(null);
+    const { name, code: build } = dialog;
+    if (name === null || build === null || busy) return;
+    dialog.rename(null);
     setBusy(true);
     try {
-      const path = await saveBuildFile(saveName, pobCodeToXml(code), editor);
+      const path = await saveBuildFile(name, pobCodeToXml(build), editor);
       // Linked only if the same build is still loaded (not unloaded or replaced meanwhile);
       // saved either way.
-      linkFile(path, code);
+      linkFile(path, build);
       toast.success("Saved to PoB");
     } catch (error) {
       toast.error(errorMessage(error, "Not saved"));
@@ -299,17 +344,21 @@ export function SaveToPob({
     <>
       <button
         className={className}
-        title="Save to PoB"
+        // Its name stays Save to PoB; the tooltip says why it's greyed out.
+        title={label}
         aria-label="Save to PoB"
-        disabled={busy}
-        onClick={() => setSaveName(defaultName(code))}
+        // aria-disabled, not disabled: the tooltip still shows why.
+        aria-disabled={blocked !== null || undefined}
+        onClick={() => {
+          if (blocked === null && code !== null) dialog.open(code);
+        }}
       >
         {children}
       </button>
       <SaveNameModal
         id="pob-save-only-name"
-        name={saveName}
-        onChange={setSaveName}
+        name={dialog.name}
+        onChange={dialog.rename}
         onSave={save}
       />
     </>

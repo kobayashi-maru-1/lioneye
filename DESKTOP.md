@@ -169,9 +169,12 @@ settings; otherwise it leaves it alone and says so.
   folder (the top of the folder, not subfolders such as `Archived`; last saved first, with
   a search box). Picking one opens it as **Open** does, and the guide follows the file; the
   one loaded is gold. With no build loaded, the same list is under **Builds** beside
-  **Import**. For a pasted code, the 💾 icon beside **Desktop PoB** saves it to the builds
-  folder (**Save to PoB?**, the same as Edit's) without opening PoB; from then on it's an
-  opened file and the icon goes. **Plan**: the shown loadout as PoB calculates it, with PoB's level. **Live**: your
+  **Import**. The 💾 icon beside the title saves a pasted code to the builds folder
+  (**Save to PoB?**, the same as Edit's) without opening PoB; from then on it's an opened
+  file. It's greyed out, with why as its tooltip, when it can't save: **PoB not found**
+  (no answer from the exe yet), **PoB Community not installed** (or **PoB Redux**, the
+  chosen editor), **No build**, **Already in PoB** (an opened file) or **Saving**. An
+  open **Save to PoB?** closes by itself if the build changes or gets saved meanwhile. **Plan**: the shown loadout as PoB calculates it, with PoB's level. **Live**: your
   character, with your level from the game log (it's never behind poe.ninja's) and the
   numbers from poe.ninja's copy; without a live character, just the log's level. Live's
   ⟳ (once a live character is set) does what **Refresh** in Settings does, and opens the
@@ -300,7 +303,8 @@ settings; otherwise it leaves it alone and says so.
   window), or **Tree** for the tree zoomed to your next points
   (for the set the Tree panel shows, named beside the title; the small ‹ › after the name
   step the Tree panel to the set before or after, as picking it in the panel does, until
-  your loadout, act or level set changes; a finished set shows **Set done**):
+  your loadout, act or level set changes; a finished set is titled **Tree** and shows its
+  points, all yours):
   yours blue, the guide's points up to 3 away from yours
   along its paths bright green, its later ones dim green. Your points come from the game's
   log; before the log has any, the set before stands in for them (for the first set, all

@@ -34,11 +34,11 @@ async function copyCode(code: string) {
 
 /**
  * pob.codes-style card above the guide: the build's title (a dropdown of the builds in
- * PoB's builds folder), then a Plan row (the shown loadout's PoB numbers) and a Live row
- * (your character: its level from the game log, its numbers from poe.ninja, with
- * Refresh). Compare, Desktop PoB (opens it in the chosen PoB), Save (a pasted build to
- * PoB's builds folder) and Copy at the right of the title. The Loadout dropdown is at the
- * top of the left column (StatsViewer).
+ * PoB's builds folder) with Save beside it (a pasted build to PoB's builds folder;
+ * greyed out when it can't), then a Plan row (the shown loadout's PoB numbers) and a
+ * Live row (your character: its level from the game log, its numbers from poe.ninja,
+ * with Refresh). Compare, Desktop PoB (opens it in the chosen PoB) and Copy at the right
+ * of the title. The Loadout dropdown is at the top of the left column (StatsViewer).
  */
 export function BuildHeader() {
   const pob = usePobStats();
@@ -52,22 +52,25 @@ export function BuildHeader() {
   return (
     <section className={classNames(styles.header)}>
       <div className={classNames(styles.titleRow)}>
-        <h1 className={classNames(styles.title)}>
-          <BuildPicker label="Builds">
-            <span className={classNames(styles.titleText)}>
-              <BuildTitle headline={shown.headline ?? {}} level={false} />
-            </span>
-          </BuildPicker>
-        </h1>
+        {/* The name (the builds dropdown) and Save beside it. */}
+        <div className={classNames(styles.name)}>
+          <h1 className={classNames(styles.title)}>
+            <BuildPicker label="Builds">
+              <span className={classNames(styles.titleText)}>
+                <BuildTitle headline={shown.headline ?? {}} level={false} />
+              </span>
+            </BuildPicker>
+          </h1>
+          <SaveToPob className={classNames(styles.tool, styles.icon)}>
+            <FaSave aria-hidden />
+          </SaveToPob>
+        </div>
         <div className={classNames(styles.tools)}>
           <BuildCompare buttonClassName={classNames(styles.tool)} />
           <DesktopPob className={classNames(styles.tool)}>
             <FaDesktop aria-hidden />
             Desktop PoB
           </DesktopPob>
-          <SaveToPob className={classNames(styles.tool, styles.icon)}>
-            <FaSave aria-hidden />
-          </SaveToPob>
           {code !== null && (
             <button
               className={classNames(styles.tool)}
