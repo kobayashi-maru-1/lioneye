@@ -327,6 +327,70 @@ body {
   height: 0.6em;
 }
 
+/* Loadout: the guide's loadouts, one row each; the shown one gold, the followed one
+   tagged Auto. */
+.tipLoadouts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tipLoadout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  color: inherit;
+  background-color: #171e2a;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tipLoadout:hover {
+  border-color: var(--gold-hover);
+}
+
+.tipLoadout.on {
+  color: var(--gold-hover);
+  border-color: var(--gold);
+  cursor: default;
+}
+
+.tipLoadoutDot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #6b7686;
+  border-radius: 50%;
+}
+
+.tipLoadout.on .tipLoadoutDot {
+  background-color: var(--gold);
+  border-color: var(--gold);
+}
+
+.tipLoadoutName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tipLoadoutAuto {
+  flex: none;
+  padding: 0 5px;
+  font-size: 10.5px;
+  color: #8a96a8;
+  border: 1px solid #3a4658;
+  border-radius: 999px;
+}
+
 /* Campaign: the next steps, coloured as in the guide's Campaign. */
 .tipStep {
   display: flex;

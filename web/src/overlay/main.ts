@@ -3,7 +3,7 @@
 // panel. The exe sends the buttons ("overlay:" messages) from the guide's Settings, and the
 // guide's tooltips ("tips:"): the Gems panel's set, Campaign's next steps, the Tree's
 // next points, the Gear panel's items, Build health's findings and the build's notes.
-import type { OverlayGear } from "../state/overlay";
+import type { OverlayGear, OverlayLoadout } from "../state/overlay";
 import { notesLines, pobSpans } from "../state/pob/colour";
 import { TREE_DATA_LOOKUP } from "../state/tree";
 import type { TreeTip } from "../state/tree/next-points";
@@ -148,7 +148,8 @@ let shown = "";
 let barIds = new Set<string>();
 /**
  * The guide's tooltips by button: "gems" (OverlayGems | null), "campaign" ({ steps, missed }), "tree"
- * (TreeTip), "gear" (OverlayGear | null), "health" (OverlayHealth), "notes" (string | null).
+ * (TreeTip), "gear" (OverlayGear | null), "health" (OverlayHealth), "notes" (string | null),
+ * "loadout" (OverlayLoadout | null).
  */
 let tips: Record<string, unknown> = {};
 /** Whether the first tooltips have arrived (a pinned one opens then). */
@@ -160,8 +161,8 @@ let up = false;
 
 /**
  * Buttons with a tooltip: Gems (the Gems panel's links), Campaign (the next steps), Tree,
- * Gear (the items' mods), Health (Build health's findings) and Notes. Every tooltip gets
- * the pin and the flip.
+ * Gear (the items' mods), Health (Build health's findings), Notes and Loadout (the
+ * loadouts, to switch). Every tooltip gets the pin and the flip.
  */
 const TIPS: Record<string, () => void> = {
   gems: renderGems,
@@ -170,7 +171,11 @@ const TIPS: Record<string, () => void> = {
   gear: renderGear,
   health: renderHealth,
   notes: renderNotes,
+  loadout: renderLoadout,
 };
+
+/** Buttons with no guide panel: a click opens their tooltip instead of jumping. */
+const NO_PANEL = new Set(["loadout"]);
 
 /** Draws a bar icon: 16px strokes in the button's colour. */
 const barIcon = (paths: string) =>
@@ -208,6 +213,10 @@ const BAR_ICONS: Record<string, string> = {
   ),
   // A magnifier.
   search: barIcon('<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l4 4"/>'),
+  // Stacked layers: the loadouts.
+  loadout: barIcon(
+    '<path d="M8 1.75 14.5 5 8 8.25 1.5 5z"/><path d="M1.5 8 8 11.25 14.5 8M1.5 11 8 14.25 14.5 11"/>',
+  ),
 };
 
 /** One tooltip can be pinned open, kept across restarts. */
@@ -333,7 +342,9 @@ function render(config: OverlayConfig) {
       }
       button.dataset.id = id;
       button.addEventListener("click", () => {
-        if (socket?.readyState === WebSocket.OPEN) socket.send(`jump:${id}`);
+        if (NO_PANEL.has(id)) openTip(id);
+        else if (socket?.readyState === WebSocket.OPEN)
+          socket.send(`jump:${id}`);
       });
       // Hovering Gems, Campaign or Tree shows what they'd jump to, without leaving the game.
       button.addEventListener("mouseenter", () =>
@@ -437,10 +448,14 @@ const NEXT_ICON =
   '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M5.5 2.5L11 8l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
 
 /**
- * A tooltip's ‹ › beside its set name (Tree, Gems): the guide's panel shows the set before
- * or after, and sends this tooltip back for it. None for a one-set build.
+ * A tooltip's ‹ › beside its set name (Tree, Gems, Gear): the guide's panel shows the set
+ * before or after, and sends this tooltip back for it. None for a one-set build.
  */
-function setArrows(panel: "tree" | "gems", index: unknown, count: unknown) {
+function setArrows(
+  panel: "tree" | "gems" | "gear",
+  index: unknown,
+  count: unknown,
+) {
   if (typeof index !== "number" || typeof count !== "number" || count < 2)
     return [];
   const arrow = (step: "prev" | "next") => {
@@ -695,10 +710,52 @@ function renderGear() {
       ...explicit,
     );
   });
-  fill(
-    typeof gear.title === "string" && gear.title ? gear.title : "Gear",
-    el("div", "tipScroll", el("div", "tipGear", ...items)),
+  fillWith(
+    head(
+      typeof gear.title === "string" && gear.title ? gear.title : "Gear",
+      "",
+      [],
+      setArrows("gear", gear.index, gear.count),
+    ),
+    [el("div", "tipScroll", el("div", "tipGear", ...items))],
   );
+}
+
+/**
+ * The guide's loadouts: the one shown marked, the one your level, act or tree points to
+ * tagged Auto. Clicking another shows it in the guide, as its Loadout dropdown does (until
+ * your level, act or tree moves on), and the guide sends this tooltip back.
+ */
+function renderLoadout() {
+  const data = (tips.loadout ?? null) as OverlayLoadout | null;
+  const titles =
+    data !== null && Array.isArray(data.titles)
+      ? data.titles.map((title) => setName(title))
+      : [];
+  if (data === null || titles.length === 0) {
+    fill("Loadout", el("div", "tipEmpty", "No loadouts"));
+    return;
+  }
+  const rows = titles.map((title, i) => {
+    // While the guide shows your live character, every row goes back to the plan.
+    const current = i === data.index && data.live !== true;
+    const row = el(
+      "button",
+      current ? "tipLoadout on" : "tipLoadout",
+      el("span", "tipLoadoutDot"),
+      el("span", "tipLoadoutName", title),
+      ...(i === data.auto ? [el("span", "tipLoadoutAuto", "Auto")] : []),
+    ) as HTMLButtonElement;
+    row.type = "button";
+    row.title = title;
+    if (current) row.setAttribute("aria-current", "true");
+    row.addEventListener("click", () => {
+      if (!current && socket?.readyState === WebSocket.OPEN)
+        socket.send(`loadout:${i}`);
+    });
+    return row;
+  });
+  fill("Loadout", el("div", "tipScroll", el("div", "tipLoadouts", ...rows)));
 }
 
 const SEVERITIES = new Set(["high", "medium", "low"]);

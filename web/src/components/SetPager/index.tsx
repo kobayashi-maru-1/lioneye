@@ -106,7 +106,14 @@ export function useFollowAct(titles: string[]) {
     [],
   );
   const safeIndex = current.index < titles.length ? current.index : 0;
-  return [safeIndex, setIndex] as const;
+  // The set your level, act or tree points to (null when none does).
+  const followedIndex =
+    current.followed === null ? null : titles.indexOf(current.followed);
+  return [
+    safeIndex,
+    setIndex,
+    followedIndex === null || followedIndex < 0 ? null : followedIndex,
+  ] as const;
 }
 
 interface SetPagerProps {

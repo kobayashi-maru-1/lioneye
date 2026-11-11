@@ -578,6 +578,14 @@ async fn serve_client(
                     } else if let Some(step @ ("prev" | "next")) = text.strip_prefix("gems:") {
                         // The bar's Gems tooltip arrows, the same for the Gems panel.
                         let _ = state.lines.send(format!("gems:{step}"));
+                    } else if let Some(step @ ("prev" | "next")) = text.strip_prefix("gear:") {
+                        // The bar's Gear tooltip arrows, the same for the Gear panel.
+                        let _ = state.lines.send(format!("gear:{step}"));
+                    } else if let Some(index) = text.strip_prefix("loadout:").filter(|index| {
+                        (1..=3).contains(&index.len()) && index.bytes().all(|b| b.is_ascii_digit())
+                    }) {
+                        // A loadout picked in the bar's Loadout tooltip: the guide shows it.
+                        let _ = state.lines.send(format!("loadout:{index}"));
                     } else if let Some(rest) = text.strip_prefix("tip:") {
                         // "tip:<panel>:<json>": a button's tooltip, passed on to the bar as
                         // is (checked to be JSON, kept small). One too big or not JSON

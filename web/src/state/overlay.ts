@@ -4,7 +4,10 @@ import type { StepPart } from "./step-text";
 import type { TreeTip } from "./tree/next-points";
 import { atom } from "jotai";
 
-/** Every guide panel that can have a button on the in-game bar, in page order. */
+/**
+ * Every guide panel that can have a button on the in-game bar, in page order, then
+ * Loadout (no panel: its tooltip switches the guide's loadout).
+ */
 export const OVERLAY_PANELS = [
   { id: "campaign", label: "Campaign" },
   { id: "gear", label: "Gear" },
@@ -15,6 +18,7 @@ export const OVERLAY_PANELS = [
   { id: "health", label: "Health" },
   { id: "notes", label: "Notes" },
   { id: "search", label: "Search" },
+  { id: "loadout", label: "Loadout" },
 ] as const;
 
 export interface OverlaySettings {
@@ -28,13 +32,13 @@ export interface OverlaySettings {
 }
 
 /** Panels newer than many saved bars: each goes on a saved bar once. */
-const NEW_PANELS = ["health"];
+const NEW_PANELS = ["health", "loadout"];
 
 export const overlaySettingsAtom = persistentAtom<OverlaySettings>(
   "overlay",
   {
     on: true,
-    panels: ["campaign", "gear", "gems", "tree", "health", "notes"],
+    panels: ["campaign", "gear", "gems", "tree", "health", "notes", "loadout"],
     added: NEW_PANELS,
   },
   0,
@@ -117,6 +121,33 @@ export const treeStepAtom = atom(0);
 /** The bar's Gems tooltip arrows, added up the same way, for the Gems panel's set. */
 export const gemsStepAtom = atom(0);
 
+/** The bar's Gear tooltip arrows, the same, for the Gear panel's item set. */
+export const gearStepAtom = atom(0);
+
+/** The bar's Loadout tooltip: the plan's loadouts, the one shown, and the one followed. */
+export interface OverlayLoadout {
+  titles: string[];
+  index: number;
+  /** The one your level, act or tree points to (tagged Auto); null when none does. */
+  auto: number | null;
+  /** The page shows your live character: no row is the one shown, so any goes back. */
+  live?: boolean;
+}
+
+/**
+ * Set by the page's PobStatsProvider for the bar's Loadout tooltip (and its button, shown
+ * when there are two or more); null without a build, undefined until it has looked.
+ */
+export const overlayLoadoutAtom = atom<OverlayLoadout | null | undefined>(
+  undefined,
+);
+
+/**
+ * A loadout picked in the bar's Loadout tooltip; `n` counts picks, so picking the same
+ * one again still counts. PobStatsProvider shows it, as the Loadout dropdown does.
+ */
+export const loadoutPickAtom = atom<{ index: number; n: number } | null>(null);
+
 /** How many upcoming steps the bar's Campaign tooltip shows. */
 export const CAMPAIGN_TIP_STEPS = 3;
 
@@ -163,6 +194,9 @@ export interface OverlayItem {
 export interface OverlayGear {
   title: string;
   items: OverlayItem[];
+  /** Where the set is among the build's item sets (the tooltip's ‹ › arrows). */
+  index?: number;
+  count?: number;
 }
 
 /** A Build health finding as the in-game bar's Health tooltip shows it. */

@@ -5,7 +5,8 @@ import {
   liveRefreshAtom,
   liveStatsAtom,
 } from "../../state/live-character";
-import { viewingLiveAtom } from "../../state/live-view";
+import { liveViewAtom, viewingLiveAtom } from "../../state/live-view";
+import { loadoutPickAtom, overlayLoadoutAtom } from "../../state/overlay";
 import { type MainSkillPick, mainSkillPickAtom } from "../../state/main-skill";
 import { buildIdSelector, pobAtom } from "../../state/pob";
 import { pobCodeToXml } from "../../state/pob/process";
@@ -18,6 +19,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -254,7 +256,7 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
   const loadouts = stats?.loadouts ?? NONE;
   // PoB's names carry its colour codes ("^2Act 1 - 12 pts"); match and show them without.
   const titles = useMemo(() => loadouts.map(stripPob), [loadouts]);
-  const [index, setIndex] = useFollowAct(titles);
+  const [index, setIndex, followed] = useFollowAct(titles);
   const requested = loadouts[index] ?? null;
 
   const [pick, setPick] = useAtom(mainSkillPickAtom);
@@ -303,6 +305,34 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
       return null;
     }
   }, [viewingLive, live?.code]);
+
+  // The bar's Loadout tooltip: the plan's loadouts, kept while the same build's are read
+  // again. None without a build, for one PoB found no loadouts in, while a different
+  // build calculates, or when PoB couldn't read it.
+  const setOverlayLoadout = useSetAtom(overlayLoadoutAtom);
+  const otherBuild = answer !== null && answer.buildId !== buildId;
+  useEffect(() => {
+    if (
+      code === null ||
+      (stats !== null && titles.length === 0) ||
+      (stats === null && (error !== null || otherBuild))
+    )
+      setOverlayLoadout(null);
+    else if (titles.length > 0)
+      setOverlayLoadout({ titles, index, auto: followed, live: viewingLive });
+  }, [code, stats, error, otherBuild, titles, index, followed, viewingLive]);
+  // A loadout picked there: shown as if from the Loadout dropdown (back on the plan, too,
+  // so the bar's other tooltips follow it).
+  const loadoutPick = useAtomValue(loadoutPickAtom);
+  const handledPick = useRef(loadoutPick?.n ?? 0);
+  const setLiveView = useSetAtom(liveViewAtom);
+  useEffect(() => {
+    if (loadoutPick === null || loadoutPick.n === handledPick.current) return;
+    handledPick.current = loadoutPick.n;
+    if (loadoutPick.index < 0 || loadoutPick.index >= titles.length) return;
+    setLiveView(false);
+    setIndex(loadoutPick.index);
+  }, [loadoutPick]);
 
   const value = useMemo<PobStatsValue>(
     () =>

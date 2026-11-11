@@ -301,12 +301,13 @@ settings; otherwise it leaves it alone and says so.
   log tells: a zone shows it, logging in or out hides it) with an
   icon button per guide panel: a flag for **Campaign**, plate armour for **Gear**, a cut
   gem for **Gems**, two arrows for **Trade**, sliders for **Config**, linked nodes for
-  **Tree**, a heart with a pulse for **Health**, a page for **Notes** and a magnifier for
-  **Search** (hover one for its name). **Health** turns red with a high finding and amber
+  **Tree**, a heart with a pulse for **Health**, a page for **Notes**, a magnifier for
+  **Search** and stacked layers for **Loadout** (hover one for its name). **Health** turns red with a high finding and amber
   with a medium one; **Campaign** turns amber with missed quest points (which then don't
   colour **Health** too). A button opens that panel in the guide (on your other monitor) and
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
+  **Loadout** has no panel: clicking it opens its tooltip.
 - Hover **Gems** for the Gems panel's links (the set it shows for your loadout, named in
   the title; the small ‹ › after the name step the Gems panel to the set before or after,
   as picking it in the panel does, until your loadout, act or level set changes; each
@@ -320,7 +321,14 @@ settings; otherwise it leaves it alone and says so.
   anchored to the name's start or end where that helps, as [poe.re](https://poe.re/gems)
   does: Arc is `arc$`, so Arctic Armour stays dark),
   **Gear** for the Gear panel's items with their PoB mods (enchants and implicits, then
-  explicits; crafted lighter), **Health** for Build health's findings as the panel lists
+  explicits; crafted lighter; the small ‹ › after the set name step the Gear panel's item
+  set, as Gems' do),
+  **Loadout** for the guide's loadouts (its button shows when the build has two or more;
+  the one shown is gold, the one your level, act or tree points to is tagged **Auto**;
+  click another to show it in the guide, as its **Loadout** dropdown does, back on the
+  plan if the page showed your live character, until your level, act or tree moves on;
+  click the **Auto** one to follow again),
+  **Health** for Build health's findings as the panel lists
   them, each with its severity dot and fix (**Live** or **Plan** by the title when a live
   character is set, as the panel's dropdown picks; dimmed while PoB recalculates),
   **Notes** for the build's PoB notes in PoB's
@@ -369,8 +377,9 @@ settings; otherwise it leaves it alone and says so.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
 - **Settings** → **App** → **Overlay**: **Show in game**, **Auto tree** (on to start), and
   **Buttons**: which panels get a button (Campaign, Gear,
-  Gems, Tree, Health and Notes to start; a bar set up before Health existed gets it once,
-  and unticking it keeps it off). Panels the build doesn't have are left off.
+  Gems, Tree, Health, Notes and Loadout to start; a bar set up before Health or Loadout
+  existed gets it once, and unticking it keeps it off). Panels the build doesn't have are
+  left off, and Loadout with fewer than two loadouts.
 - The bar is a page of the guide (`overlay.html`) in WebView2, the engine Edge uses (part of
   Windows 11; its data is kept in `%LOCALAPPDATA%\exile-leveling\webview2`).
 - PoE must run in **Windowed** or **Windowed Fullscreen** mode: nothing can show over its

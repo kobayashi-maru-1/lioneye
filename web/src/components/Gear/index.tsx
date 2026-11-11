@@ -26,6 +26,7 @@ import { type TradeIndex, tradeIndex, tradeUrl } from "./trade-query";
 import {
   type OverlayGear,
   type OverlayItem,
+  gearStepAtom,
   overlayGearAtom,
 } from "../../state/overlay";
 import { displaySetName } from "../../state/current-act";
@@ -33,7 +34,7 @@ import { viewingLiveAtom } from "../../state/live-view";
 import { stripPob } from "../PobText";
 import classNames from "classnames";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaBalanceScale, FaRegClipboard } from "react-icons/fa";
 import { toast } from "react-toastify";
 
@@ -147,12 +148,28 @@ export function GearPanel() {
   // page shows your live character the tooltip keeps the plan's (it guides the plan).
   const setOverlayGear = useSetAtom(overlayGearAtom);
   const viewingLive = useAtomValue(viewingLiveAtom);
+  // The tooltip's ‹ › arrows: the set before or after the one shown, picked here as if
+  // from the dropdown (until the loadout, act or level set changes). Not while the page
+  // shows your live character: the tooltip's sets are the plan's, not these.
+  const gearStep = useAtomValue(gearStepAtom);
+  const handledStep = useRef(gearStep);
+  useEffect(() => {
+    const delta = gearStep - handledStep.current;
+    handledStep.current = gearStep;
+    if (viewingLive || delta === 0 || titles.length === 0) return;
+    const next = Math.min(Math.max(index + delta, 0), titles.length - 1);
+    if (next !== index) choose(next);
+  }, [gearStep]);
   // None while a different build calculates (a save of the same one keeps its gear).
   useEffect(() => {
     if (viewingLive) return;
     const set = gear?.sets[index];
-    setOverlayGear(gear && set ? overlayGear(gear, set) : null);
-  }, [gear, index, setOverlayGear, viewingLive]);
+    setOverlayGear(
+      gear && set
+        ? { ...overlayGear(gear, set), index, count: titles.length }
+        : null,
+    );
+  }, [gear, index, titles.length, setOverlayGear, viewingLive]);
 
   return (
     <PageSection

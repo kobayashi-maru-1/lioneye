@@ -14,6 +14,9 @@ import {
   shownPanelsAtom,
   treeStepAtom,
   gemsStepAtom,
+  gearStepAtom,
+  loadoutPickAtom,
+  overlayLoadoutAtom,
   withNewPanels,
 } from "../../state/overlay";
 import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
@@ -111,6 +114,8 @@ export function useAutoProgress() {
   const tickStep = useSetAtom(tickStepAtom);
   const setTreeStep = useSetAtom(treeStepAtom);
   const setGemsStep = useSetAtom(gemsStepAtom);
+  const setGearStep = useSetAtom(gearStepAtom);
+  const setLoadoutPick = useSetAtom(loadoutPickAtom);
   const refreshFromFile = useSetAtom(refreshFromFileAtom);
 
   const { readyState, sendMessage } = useWebSocket({
@@ -153,6 +158,19 @@ export function useAutoProgress() {
       if (event.data === "gems:prev" || event.data === "gems:next") {
         const delta = event.data === "gems:next" ? 1 : -1;
         setGemsStep((total) => total + delta);
+        return;
+      }
+      // An arrow in the bar's Gear tooltip: the Gear panel steps its item set.
+      if (event.data === "gear:prev" || event.data === "gear:next") {
+        const delta = event.data === "gear:next" ? 1 : -1;
+        setGearStep((total) => total + delta);
+        return;
+      }
+      // A loadout picked in the bar's Loadout tooltip.
+      const picked = /^loadout:(\d{1,3})$/.exec(event.data);
+      if (picked) {
+        const index = Number(picked[1]);
+        setLoadoutPick((last) => ({ index, n: (last?.n ?? 0) + 1 }));
         return;
       }
       // A new exe (an update) serves a new guide: reload to get it.
@@ -201,6 +219,14 @@ export function useAutoProgress() {
   // and send the bar's settings whenever they or the build's panels change.
   const [settings, setSettings] = useAtom(overlaySettingsAtom);
   const shown = useAtomValue(shownPanelsAtom);
+  // Loadout has no panel: its button shows when the build has two or more loadouts.
+  // The last count while the page hasn't said yet (PoB calculating after a reload), so the
+  // button doesn't drop off and come back.
+  const loadoutTip = useAtomValue(overlayLoadoutAtom);
+  const loadoutCount = useRef(0);
+  if (loadoutTip !== undefined)
+    loadoutCount.current = loadoutTip?.titles.length ?? 0;
+  const loadouts = loadoutCount.current;
   const talks = readyState === ReadyState.OPEN && pageMode !== "migrate";
   useEffect(() => {
     if (talks) sendMessage("guide");
@@ -258,7 +284,10 @@ export function useAutoProgress() {
         ? undefined
         : OVERLAY_PANELS.filter(
             (panel) =>
-              settings.panels.includes(panel.id) && shown.includes(panel.id),
+              settings.panels.includes(panel.id) &&
+              (panel.id === "loadout"
+                ? loadouts > 1
+                : shown.includes(panel.id)),
           ).map(({ id, label }) => ({ id, label }));
     sendMessage(
       `overlay:${JSON.stringify({
@@ -267,7 +296,7 @@ export function useAutoProgress() {
         buttons,
       })}`,
     );
-  }, [talks, settings, shown]);
+  }, [talks, settings, shown, loadouts > 1]);
   // The bar's tooltips: the Gems panel's set, Campaign's next steps, the Tree's next
   // points, the Gear panel's items, Build health's findings and the build's notes.
   const gems = useAtomValue(overlayGemsAtom);
@@ -290,6 +319,11 @@ export function useAutoProgress() {
     if (talks && gear !== undefined)
       sendMessage(`tip:gear:${JSON.stringify(gear)}`);
   }, [talks, gear]);
+  const loadout = useAtomValue(overlayLoadoutAtom);
+  useEffect(() => {
+    if (talks && loadout !== undefined)
+      sendMessage(`tip:loadout:${JSON.stringify(loadout)}`);
+  }, [talks, loadout]);
   const health = useAtomValue(overlayHealthAtom);
   useEffect(() => {
     if (talks && health !== undefined)
