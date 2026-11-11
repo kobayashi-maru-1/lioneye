@@ -47,6 +47,9 @@ interface OverlayGems {
   }[];
   /** A vendor or stash search for the gems still to get. */
   search?: { text: string; count: number; total: number };
+  /** Where the set is among the build's skill sets (the ‹ › arrows). */
+  index?: number;
+  count?: number;
 }
 
 const frame = document.getElementById("frame")!;
@@ -392,7 +395,7 @@ function head(
   title: string,
   sub = "",
   extra: HTMLElement[] = [],
-  /** Small controls right after the title (the Tree's set arrows). */
+  /** Small controls right after the title (the Tree's and Gems' set arrows). */
   afterTitle: HTMLElement[] = [],
 ) {
   const id = openId;
@@ -434,11 +437,10 @@ const NEXT_ICON =
   '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M5.5 2.5L11 8l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
 
 /**
- * The Tree tooltip's ‹ › beside its set name: the guide's Tree panel shows the set before
+ * A tooltip's ‹ › beside its set name (Tree, Gems): the guide's panel shows the set before
  * or after, and sends this tooltip back for it. None for a one-set build.
  */
-function treeArrows(data: TreeTip) {
-  const { index, count } = data;
+function setArrows(panel: "tree" | "gems", index: unknown, count: unknown) {
   if (typeof index !== "number" || typeof count !== "number" || count < 2)
     return [];
   const arrow = (step: "prev" | "next") => {
@@ -449,7 +451,8 @@ function treeArrows(data: TreeTip) {
     );
     button.disabled = step === "prev" ? index <= 0 : index >= count - 1;
     button.addEventListener("click", () => {
-      if (socket?.readyState === WebSocket.OPEN) socket.send(`tree:${step}`);
+      if (socket?.readyState === WebSocket.OPEN)
+        socket.send(`${panel}:${step}`);
     });
     return button;
   };
@@ -460,7 +463,17 @@ function treeArrows(data: TreeTip) {
 function treeHead(data: TreeTip) {
   // A finished set has no next points: just its tree.
   const title = data.next.length > 0 ? TREE_TITLE : "Tree";
-  return head(title, setName(data.set), [], treeArrows(data));
+  // Your points the set doesn't take (red on the tree), counted after the arrows.
+  const remove = Array.isArray(data.remove) ? data.remove.length : 0;
+  return head(
+    title,
+    setName(data.set),
+    [],
+    [
+      ...setArrows("tree", data.index, data.count),
+      ...(remove > 0 ? [el("span", "tipRemove", `${remove} to remove`)] : []),
+    ],
+  );
 }
 
 const COPY_ICON =
@@ -605,7 +618,7 @@ function renderGems() {
   const search = validSearch(gems.search);
   const copy = search ? [copyButton(search)] : [];
   fillWith(
-    head(gems.title, "", copy),
+    head(gems.title, "", copy, setArrows("gems", gems.index, gems.count)),
     gems.groups.map((group) =>
       el(
         "div",
@@ -1038,25 +1051,63 @@ function treeStyle(
     )
       dim.push(id);
   }
-  return compiled({
-    styleId: "tree-tip",
-    backgroundColor: "#11161f",
-    ascendancy: data.ascendancy,
-    nodeColor: "hsl(215, 15%, 50%)",
-    nodeActiveColor: "hsl(200, 80%, 50%)",
-    nodeAddedColor: "hsl(120, 90%, 50%)",
-    nodeRemovedColor: "hsl(120, 45%, 32%)",
-    connectionColor: "hsl(215, 15%, 40%)",
-    connectionActiveColor: "hsl(200, 80%, 40%)",
-    connectionAddedColor: "hsl(120, 90%, 40%)",
-    connectionRemovedColor: "hsl(120, 45%, 26%)",
-    nodesActive: [...have],
-    nodesAdded: [...next],
-    nodesRemoved: data.later,
-    connectionsActive: active,
-    connectionsAdded: added,
-    connectionsRemoved: dim,
-  });
+  return (
+    compiled({
+      styleId: "tree-tip",
+      backgroundColor: "#11161f",
+      ascendancy: data.ascendancy,
+      nodeColor: "hsl(215, 15%, 50%)",
+      nodeActiveColor: "hsl(200, 80%, 50%)",
+      nodeAddedColor: "hsl(120, 90%, 50%)",
+      nodeRemovedColor: "hsl(120, 45%, 32%)",
+      connectionColor: "hsl(215, 15%, 40%)",
+      connectionActiveColor: "hsl(200, 80%, 40%)",
+      connectionAddedColor: "hsl(120, 90%, 40%)",
+      connectionRemovedColor: "hsl(120, 45%, 26%)",
+      nodesActive: [...have],
+      nodesAdded: [...next],
+      nodesRemoved: data.later,
+      connectionsActive: active,
+      connectionsAdded: added,
+      connectionsRemoved: dim,
+    }) + refundStyle(data, graphs, have)
+  );
+}
+
+/** Red for your points the set doesn't take, and the lines a respec drops with them. */
+const REFUND_NODE = "hsl(0, 85%, 55%)";
+const REFUND_LINE = "hsl(0, 85%, 45%)";
+
+/**
+ * Your points the set doesn't take, red over the tooltip's usual colours (the template
+ * has no fourth colour; this comes after it, so it wins). Their lines to your other
+ * points go red too: refunding the point drops them.
+ */
+function refundStyle(
+  data: TreeTip,
+  graphs: SkillTree.Graph[],
+  have: Set<string>,
+) {
+  // Ids only: they go into a selector.
+  const remove = new Set(
+    (Array.isArray(data.remove) ? data.remove : []).filter(
+      (id): id is string => typeof id === "string" && /^\d+$/.test(id),
+    ),
+  );
+  if (remove.size === 0) return "";
+  const lines: string[] = [];
+  for (const { a, b } of graphs.flatMap((graph) => graph.connections)) {
+    if (
+      (remove.has(a) && (remove.has(b) || have.has(b))) ||
+      (remove.has(b) && have.has(a))
+    )
+      lines.push(`#c${a}-${b}`);
+  }
+  const nodes = [...remove].map((id) => `#n${id}`).join(", ");
+  let css = `\n#tree-tip :is(${nodes}) { fill: ${REFUND_NODE}; stroke: ${REFUND_NODE}; }`;
+  if (lines.length > 0)
+    css += `\n#tree-tip :is(${lines.join(", ")}) { stroke: ${REFUND_LINE}; }`;
+  return css;
 }
 
 function openTip(id: string) {

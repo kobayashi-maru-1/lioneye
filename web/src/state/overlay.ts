@@ -82,6 +82,9 @@ export interface OverlayGems {
    * (state/gem-regex.ts): `count` of `total` fit. Absent when there are none.
    */
   search?: OverlaySearch;
+  /** Where the set is among the build's skill sets (the tooltip's ‹ › arrows). */
+  index?: number;
+  count?: number;
 }
 
 /** A gem search for the bar's copy icon (state/gem-regex.ts): `count` of `total` fit. */
@@ -110,6 +113,9 @@ export const overlayTreeAtom = atom<TreeTip | undefined>(undefined);
  * all count.
  */
 export const treeStepAtom = atom(0);
+
+/** The bar's Gems tooltip arrows, added up the same way, for the Gems panel's set. */
+export const gemsStepAtom = atom(0);
 
 /** How many upcoming steps the bar's Campaign tooltip shows. */
 export const CAMPAIGN_TIP_STEPS = 3;

@@ -47,6 +47,7 @@ import {
   overlayTreeAtom,
   shownPanelsAtom,
   treeStepAtom,
+  gemsStepAtom,
 } from "../../state/overlay";
 import { pageSectionCollapseFamily } from "../../state/page-section-collapse";
 import { pobAtom } from "../../state/pob";
@@ -396,6 +397,20 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
     [gemLinks],
   );
   const [index, choose] = usePanelSet(titles, titleIndex(titles, sets?.skills));
+  // While the page shows your live character, the bar's Gems tooltip keeps the plan's.
+  const viewingLive = useAtomValue(viewingLiveAtom);
+  // The in-game Gems tooltip's ‹ › arrows: the set before or after the one shown, picked
+  // here as if from the dropdown (until the loadout, act or level set changes). Not while
+  // the page shows your live character: the tooltip's sets are the plan's, not these.
+  const gemsStep = useAtomValue(gemsStepAtom);
+  const handledGemsStep = useRef(gemsStep);
+  useEffect(() => {
+    const delta = gemsStep - handledGemsStep.current;
+    handledGemsStep.current = gemsStep;
+    if (viewingLive || delta === 0 || titles.length === 0) return;
+    const next = Math.min(Math.max(index + delta, 0), titles.length - 1);
+    if (next !== index) choose(next);
+  }, [gemsStep]);
 
   // The set shown here, for the in-game bar's Gems tooltip, with a search for its gems
   // still on the gem list unticked (soonest first; gems you took off the list stay off).
@@ -424,8 +439,6 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
     const { regex, count, total } = gemRegex(wanted, ALL_GEM_NAMES);
     return count > 0 ? JSON.stringify({ text: regex, count, total }) : "";
   }, [gemLinks, title, toGet]);
-  // While the page shows your live character, the bar's Gems tooltip keeps the plan's.
-  const viewingLive = useAtomValue(viewingLiveAtom);
   useEffect(() => {
     if (viewingLive) return;
     if (title === undefined) {
@@ -461,9 +474,11 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
       ...(search
         ? { search: JSON.parse(search) as OverlayGems["search"] }
         : {}),
+      index,
+      count: titles.length,
     });
     // (Kept when you leave for Settings, so the bar still shows them.)
-  }, [gemLinks, title, search, viewingLive]);
+  }, [gemLinks, title, search, viewingLive, index, titles.length]);
 
   return (
     <PageSection
@@ -536,13 +551,15 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   const index = picked ? panelIndex : lookAhead(titles, panelIndex, progress);
   const ahead = index !== panelIndex;
   // The in-game Tree tooltip's ‹ › arrows: the set before or after the one shown, picked
-  // here as if from the dropdown (until the loadout, act or level set changes).
+  // here as if from the dropdown (until the loadout, act or level set changes). Not while
+  // the page shows your live character: the tooltip's sets are the plan's, not these.
+  const viewingLive = useAtomValue(viewingLiveAtom);
   const treeStep = useAtomValue(treeStepAtom);
   const handledStep = useRef(treeStep);
   useEffect(() => {
     const delta = treeStep - handledStep.current;
     handledStep.current = treeStep;
-    if (delta === 0 || titles.length === 0) return;
+    if (viewingLive || delta === 0 || titles.length === 0) return;
     const next = Math.min(Math.max(index + delta, 0), titles.length - 1);
     if (next !== index) choose(next);
   }, [treeStep]);
@@ -621,7 +638,7 @@ function useTreeTip(
     TREE_DATA_LOOKUP[tree.version]?.then(([skillTree]) => {
       if (live)
         setTip({
-          ...treeTip(tree, have, skillTree),
+          ...treeTip(tree, have, skillTree, index === urlTrees.length - 1),
           index,
           count: urlTrees.length,
         });

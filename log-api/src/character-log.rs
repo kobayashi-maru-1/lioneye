@@ -6,8 +6,9 @@
 //! - Its history starts at its "is now level 2" line, else at its first line the log still
 //!   has. Party members' level-ups and deaths are logged too, so other names are ignored.
 //! - "Successfully allocated passive skill id: <id>, name: <name>" lines are always the
-//!   player's own (they name no character): all of them from the start count. A point taken
-//!   on another of your characters in between would count too, and refunds aren't logged.
+//!   player's own (they name no character): all of them from the start count, less the ones
+//!   a "Successfully unallocated passive skill id: …" line (a refund) takes back. A point
+//!   taken on another of your characters in between would count too.
 //! - "/passives" in game writes "N Passive Skill Points from quests:" and one "(N from
 //!   <quest>)" line per quest: the latest such list is kept.
 
@@ -72,6 +73,13 @@ pub fn level_up(message: &str) -> Option<(&str, &str, u32)> {
 /// "Successfully allocated passive skill id: dexterity869, name: Dexterity" → the id.
 pub fn allocated(message: &str) -> Option<&str> {
     let rest = message.strip_prefix("Successfully allocated passive skill id: ")?;
+    let (id, _) = rest.split_once(", name: ")?;
+    (!id.is_empty()).then_some(id)
+}
+
+/// "Successfully unallocated passive skill id: life1409, name: Life" (a refund) → the id.
+pub fn unallocated(message: &str) -> Option<&str> {
+    let rest = message.strip_prefix("Successfully unallocated passive skill id: ")?;
     let (id, _) = rest.split_once(", name: ")?;
     (!id.is_empty()).then_some(id)
 }
@@ -158,6 +166,11 @@ pub fn scan(path: &Path, name: Option<&str>) -> std::io::Result<Option<Character
         }
         if let Some(id) = allocated(message) {
             log.allocated.push(id.to_string());
+        } else if let Some(id) = unallocated(message) {
+            // Refunded: the latest time it was taken no longer counts.
+            if let Some(at) = log.allocated.iter().rposition(|taken| taken == id) {
+                log.allocated.remove(at);
+            }
         } else if quests_header(message) {
             list = Some(Vec::new());
             list_area = area.clone();
@@ -266,6 +279,17 @@ mod tests {
             ))),
             Some("dexterity869")
         );
+        assert_eq!(
+            unallocated(message(&format!(
+                "{P} Successfully unallocated passive skill id: life1409, name: Life"
+            ))),
+            Some("life1409")
+        );
+        // Each line is one or the other.
+        assert!(allocated(message(&format!(
+            "{P} Successfully unallocated passive skill id: life1409, name: Life"
+        )))
+        .is_none());
         assert!(quests_header(message(&format!("{P} : 22 Passive Skill Points from quests:"))));
         assert_eq!(
             quest_line(message(&format!("{P} : (0 from The Dweller of the Deep)"))),
@@ -320,6 +344,26 @@ mod tests {
         // Typed in a hideout: the campaign area before it counts.
         assert_eq!(log.quests_area.as_deref(), Some("1_2_town"));
         assert_eq!(latest.name, "Friend");
+    }
+
+    #[test]
+    fn takes_back_refunded_points() {
+        let path = write(
+            &[
+                ": New (Witch) is now level 2",
+                "Successfully allocated passive skill id: a1, name: A",
+                "Successfully allocated passive skill id: b1, name: B",
+                "Successfully unallocated passive skill id: a1, name: A",
+                // Never taken (another character's): nothing to take back.
+                "Successfully unallocated passive skill id: zz9, name: Z",
+                "Successfully allocated passive skill id: c1, name: C",
+                "Successfully allocated passive skill id: a1, name: A",
+            ],
+            "refund",
+        );
+        let log = scan(&path, Some("New")).unwrap().unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(log.allocated, ["b1", "c1", "a1"]);
     }
 
     #[test]

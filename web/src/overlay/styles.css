@@ -106,7 +106,7 @@ body {
   flex: 1;
 }
 
-/* The Tree's set arrows, right after its set name: smaller than the row's icons. */
+/* The Tree's and Gems' set arrows, right after the set name: smaller than the row's icons. */
 .icon.step {
   width: 16px;
   height: 16px;
@@ -127,6 +127,15 @@ body {
 .tipSub {
   color: #8a96a8;
   font-weight: 400;
+}
+
+/* The Tree's count of your points the set doesn't take (red on the tree). */
+.tipRemove {
+  flex: none;
+  margin-left: 4px;
+  color: hsl(0, 85%, 62%);
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .icon {

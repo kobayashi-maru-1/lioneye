@@ -19,6 +19,8 @@ export interface TreeTip {
   later: string[];
   /** The set's ascendancy points you don't have yet (green). */
   ascend?: string[];
+  /** Your main-tree points the set doesn't have: to refund (red). */
+  remove?: string[];
   /** The area to show, in tree coordinates: the next points, or a finished set's points. */
   view: { x: number; y: number; w: number; h: number };
   /** Where the set is among the build's tree sets (the tooltip's ‹ › arrows). */
@@ -35,14 +37,20 @@ const MIN_HEIGHT = 1600;
  * The guide's main-tree points you don't have yet that are within NEXT_DEPTH points of
  * yours, walking only through points the guide takes. With none in reach (a new
  * character, the first set, a branch from the class start), every point to take is next.
+ *
+ * Also your main-tree points the set doesn't take, to refund. Not for a finished set
+ * before the build's last (`last` false): you're past it, so yours it lacks are later
+ * sets' points.
  */
 export function treeTip(
   tree: UrlTree.Data,
   have: string[],
   skillTree: SkillTree.Data,
+  last = true,
 ): TreeTip {
   const main = skillTree.graphs[skillTree.graphIndex];
   const haveSet = new Set(have);
+  const setNodes = new Set(tree.nodes);
   // Masteries have no connections to walk; they're picked with their notables.
   const toTake = new Set(
     tree.nodes.filter(
@@ -64,7 +72,10 @@ export function treeTip(
     link(b, a);
   }
 
-  const seeds = have.filter((id) => main.nodes[id] !== undefined);
+  // Walk from your points the set keeps: not from ones it refunds.
+  const seeds = have.filter(
+    (id) => main.nodes[id] !== undefined && setNodes.has(id),
+  );
   const next = new Set<string>();
   if (seeds.length > 0) {
     let frontier = seeds;
@@ -101,8 +112,16 @@ export function treeTip(
       )
     : [];
 
+  // Your main-tree points the set doesn't take (masteries too): a respec refunds them.
+  const finished = toTake.size === 0;
+  const remove =
+    finished && !last
+      ? []
+      : have.filter((id) => main.nodes[id] !== undefined && !setNodes.has(id));
+
   // The next points and the points of yours they start from. A finished set (none left):
-  // the set's own points, all yours now.
+  // the set's own points, all yours now. Either way, with the points to refund near them
+  // (a stray one across the tree would shrink the rest; the title counts them all).
   const shown = [...next];
   for (const id of next) {
     for (const other of neighbours.get(id) ?? []) {
@@ -111,6 +130,7 @@ export function treeTip(
   }
   if (shown.length === 0)
     shown.push(...tree.nodes.filter((id) => main.nodes[id] !== undefined));
+  shown.push(...near(remove, shown, main.nodes));
   return {
     version: tree.version,
     set: tree.name,
@@ -119,8 +139,24 @@ export function treeTip(
     next: [...next],
     later,
     ascend,
+    remove,
     view: bounds(shown, main.nodes),
   };
+}
+
+/** Of `ids`, those within MIN_WIDTH of the middle of `around`. */
+function near(ids: string[], around: string[], nodes: SkillTree.NodeLookup) {
+  const { x, y, w, h } = bounds(around, nodes);
+  // No area to be near (none of `around` on the main tree): none.
+  if (w === 0) return [];
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  return ids.filter((id) => {
+    const node = nodes[id];
+    return (
+      node !== undefined && Math.hypot(node.x - cx, node.y - cy) <= MIN_WIDTH
+    );
+  });
 }
 
 function bounds(ids: string[], nodes: SkillTree.NodeLookup) {

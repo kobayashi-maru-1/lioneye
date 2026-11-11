@@ -307,7 +307,9 @@ settings; otherwise it leaves it alone and says so.
   colour **Health** too). A button opens that panel in the guide (on your other monitor) and
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
-- Hover **Gems** for the Gems panel's links (the set it shows for your loadout; each
+- Hover **Gems** for the Gems panel's links (the set it shows for your loadout, named in
+  the title; the small ‹ › after the name step the Gems panel to the set before or after,
+  as picking it in the panel does, until your loadout, act or level set changes; each
   group's header names the gear slot PoB socketed it in, as in the Gems panel; its copy
   icon puts a search for the set's gems still unticked on the gem list on the clipboard,
   or for all the set's gems once none are left to get,
@@ -337,7 +339,11 @@ settings; otherwise it leaves it alone and says so.
   your loadout, act or level set changes; a finished set is titled **Tree** and shows its
   points, all yours):
   yours blue, the guide's points up to 3 away from yours
-  along its paths bright green, its later ones dim green. Your points come from the game's
+  along its paths bright green, its later ones dim green, and yours the set doesn't take
+  red (a respec refunds them; their lines go red too, the view takes in those near the
+  next points, and the title row counts them all, e.g. **3 to remove**; none for a finished
+  set before the build's last, since yours past it are later sets' points). A refund in
+  game takes the point off at once. Your points come from the game's
   log; before the log has any, the set before stands in for them (for the first set, all
   its points are next). In the Tree tooltip the mouse wheel zooms around the pointer,
   dragging moves the tree and a double-click goes back to the next points; the zoom stays

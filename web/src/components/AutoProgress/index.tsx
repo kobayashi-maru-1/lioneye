@@ -13,6 +13,7 @@ import {
   overlayTreeAtom,
   shownPanelsAtom,
   treeStepAtom,
+  gemsStepAtom,
   withNewPanels,
 } from "../../state/overlay";
 import { activeEdgeAtom, bossKillAtom, edgeId } from "../../state/route";
@@ -109,6 +110,7 @@ export function useAutoProgress() {
   const jump = useJumpFromGame();
   const tickStep = useSetAtom(tickStepAtom);
   const setTreeStep = useSetAtom(treeStepAtom);
+  const setGemsStep = useSetAtom(gemsStepAtom);
   const refreshFromFile = useSetAtom(refreshFromFileAtom);
 
   const { readyState, sendMessage } = useWebSocket({
@@ -145,6 +147,12 @@ export function useAutoProgress() {
       if (event.data === "tree:prev" || event.data === "tree:next") {
         const delta = event.data === "tree:next" ? 1 : -1;
         setTreeStep((total) => total + delta);
+        return;
+      }
+      // An arrow in the bar's Gems tooltip: the Gems panel steps its set.
+      if (event.data === "gems:prev" || event.data === "gems:next") {
+        const delta = event.data === "gems:next" ? 1 : -1;
+        setGemsStep((total) => total + delta);
         return;
       }
       // A new exe (an update) serves a new guide: reload to get it.
