@@ -116,6 +116,10 @@ export function useAutoProgress() {
   const setGemsStep = useSetAtom(gemsStepAtom);
   const setGearStep = useSetAtom(gearStepAtom);
   const setLoadoutPick = useSetAtom(loadoutPickAtom);
+  // What the bar's Loadout tooltip shows, to tie a pick there to its loadout by title.
+  const shownLoadout = useAtomValue(overlayLoadoutAtom);
+  const shownLoadoutRef = useRef(shownLoadout);
+  shownLoadoutRef.current = shownLoadout;
   const refreshFromFile = useSetAtom(refreshFromFileAtom);
 
   const { readyState, sendMessage } = useWebSocket({
@@ -170,7 +174,21 @@ export function useAutoProgress() {
       const picked = /^loadout:(\d{1,3})$/.exec(event.data);
       if (picked) {
         const index = Number(picked[1]);
-        setLoadoutPick((last) => ({ index, n: (last?.n ?? 0) + 1 }));
+        // Only against this page's own list: a page that hasn't shown the loadouts yet
+        // (or is calculating another build) can't tell which loadout it was.
+        const shown = shownLoadoutRef.current;
+        const title = shown?.titles[index];
+        if (!shown || title === undefined || shown.buildId === undefined)
+          return;
+        const auto =
+          shown.auto === null ? null : (shown.titles[shown.auto] ?? null);
+        setLoadoutPick((last) => ({
+          index,
+          n: (last?.n ?? 0) + 1,
+          title,
+          buildId: shown.buildId!,
+          auto,
+        }));
         return;
       }
       // A new exe (an update) serves a new guide: reload to get it.

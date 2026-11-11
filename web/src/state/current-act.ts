@@ -48,6 +48,56 @@ export function actRange(title: string): [number, number] | null {
   return [start, Math.min(end, 10)];
 }
 
+/**
+ * The highest level still counted as being in each act (index 0: Act 1): a typical level
+ * at the act's end (13, 23, 33, 40, 45, 50, 55, 60, 64, 68) plus 10, or 5 from Act 8,
+ * where mapping starts. Never lower than the act before, so a marker that moves on never
+ * sends sets back.
+ */
+const ACT_MAX_LEVEL = [23, 33, 43, 50, 55, 60, 65, 65, 69, 73];
+
+/**
+ * Your level is past what the act the campaign marker is in allows (you're mapping, or
+ * played the campaign without the guide following).
+ */
+export function pastCampaign(act: number | null, level: number | null) {
+  if (act === null || level === null) return false;
+  const clamped = Math.min(Math.max(act, 1), 10);
+  return level > ACT_MAX_LEVEL[clamped - 1];
+}
+
+/**
+ * The act sets follow: the campaign marker's, or while it's left behind (pastCampaign),
+ * the first act your level still counts as being in; "end" past Act 10's (sets then
+ * follow indexForEndgame). Never goes back as the marker or your level moves on.
+ */
+export function followedAct(
+  act: number | null,
+  level: number | null,
+): number | "end" | null {
+  if (level === null || !pastCampaign(act, level)) return act;
+  const index = ACT_MAX_LEVEL.findIndex((max) => level <= max);
+  return index < 0 ? "end" : index + 1;
+}
+
+/**
+ * Past the campaign: the first set after the last act-named one ("Early Maps" after
+ * "Act 7-10") when it names no act or level, else that last act-named one. Null when no
+ * title names an act.
+ */
+export function indexForEndgame(titles: string[]) {
+  let last = -1;
+  for (const [index, title] of titles.entries())
+    if (actRange(title) !== null) last = index;
+  if (last < 0) return null;
+  const next = titles[last + 1];
+  return next !== undefined &&
+    actRange(next) === null &&
+    levelRange(next) === null
+    ? last + 1
+    : last;
+}
+
 /** Index of the first title whose act range covers `act`, else null. */
 export function indexForAct(titles: string[], act: number | null) {
   if (act === null) return null;

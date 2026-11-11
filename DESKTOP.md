@@ -211,13 +211,17 @@ settings; otherwise it leaves it alone and says so.
   ⟳ (once a live character is set) does what **Refresh** in Settings does, and opens the
   poe.ninja sign-in first while you're not signed in. It turns amber while poe.ninja's
   copy is from a lower level than the log's. The **Loadout** dropdown heads the left
-  column, above **Stats**. The loadout follows your
-  level when PoB titles name levels (`Lvl 30`, `Level 12-28`), else your act (`Act 2`,
-  `Act 4-6 - 50 pts`). When no title names a level or act (`Early`, `27 points`), it
-  follows your tree: the set after the last one whose main-tree points you all have (from
-  the game's log; matched by name, else by position when the counts match; the last set
-  once all are done). Pick another until your level, act or tree moves on. A zone's suggested
-  level (`12+`) turns red while you're below it.
+  column, above **Stats**. The loadout follows your level when PoB titles name levels
+  (`Lvl 30`, `Level 12-28`), else your act (`Act 2`, `Act 4-6 - 50 pts`). Once your level
+  is more than 10 past the usual level for the end of the act the campaign marker is in
+  (5 from Act 8; mapping, or a campaign the guide didn't follow), it follows the first act
+  your level still fits instead, and above level 73 the set after the act ones
+  (`SRS Early Maps`), or the last act one when none follows. When no title names a level
+  or act (`Early`, `27 points`), it follows your tree: the set after the last one whose
+  main-tree points you all have (from the game's log; matched by name, else by position
+  when the counts match; the last set once all are done). Pick another until your level,
+  act or tree moves on; the loadout you pick is kept through Settings and restarts until
+  then. A zone's suggested level (`12+`) turns red while you're below it.
 - When you have every main-tree point of the shown tree set, the **Tree** panel (and the
   in-game Tree tooltip) shows the next set you haven't finished, with "… done" in its
   hint. Stats, gear and gems stay on the loadout's set. Picking a set in the panel turns

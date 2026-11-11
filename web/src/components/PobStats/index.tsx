@@ -1,17 +1,26 @@
 import { characterLevelAtom } from "../../state/character-level";
-import { currentActAtom, indexForLevel } from "../../state/current-act";
+import {
+  currentActAtom,
+  indexForLevel,
+  followedAct,
+} from "../../state/current-act";
 import {
   liveCharacterAtom,
   liveRefreshAtom,
   liveStatsAtom,
 } from "../../state/live-character";
 import { liveViewAtom, viewingLiveAtom } from "../../state/live-view";
-import { loadoutPickAtom, overlayLoadoutAtom } from "../../state/overlay";
+import {
+  loadoutPickAtom,
+  loadoutPickShownAtom,
+  overlayLoadoutAtom,
+} from "../../state/overlay";
 import { type MainSkillPick, mainSkillPickAtom } from "../../state/main-skill";
 import { buildIdSelector, pobAtom } from "../../state/pob";
 import { pobCodeToXml } from "../../state/pob/process";
 import { stripPob } from "../PobText";
-import { useFollowAct } from "../SetPager";
+import { type SetPick, useFollowAct } from "../SetPager";
+import { persistentAtom } from "../../state";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import React, {
   createContext,
@@ -19,7 +28,6 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
@@ -219,6 +227,13 @@ const PobStatsContext = createContext<PobStatsValue | null>(null);
 
 const NONE: string[] = [];
 
+/** The loadout you picked, kept through Settings and restarts (see useFollowAct). */
+const loadoutMemoryAtom = persistentAtom<SetPick | null>(
+  "loadout-pick",
+  null,
+  0,
+);
+
 /**
  * Asks the exe's Path of Building for the imported build's stats, for one loadout at a
  * time. The loadout follows your act; everything on the page that shows a loadout
@@ -256,7 +271,7 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
   const loadouts = stats?.loadouts ?? NONE;
   // PoB's names carry its colour codes ("^2Act 1 - 12 pts"); match and show them without.
   const titles = useMemo(() => loadouts.map(stripPob), [loadouts]);
-  const [index, setIndex, followed] = useFollowAct(titles);
+  const [index, setIndex, followed] = useFollowAct(titles, loadoutMemoryAtom);
   const requested = loadouts[index] ?? null;
 
   const [pick, setPick] = useAtom(mainSkillPickAtom);
@@ -319,20 +334,48 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
     )
       setOverlayLoadout(null);
     else if (titles.length > 0)
-      setOverlayLoadout({ titles, index, auto: followed, live: viewingLive });
-  }, [code, stats, error, otherBuild, titles, index, followed, viewingLive]);
+      setOverlayLoadout({
+        titles,
+        index,
+        auto: followed,
+        live: viewingLive,
+        buildId,
+      });
+  }, [
+    code,
+    stats,
+    error,
+    otherBuild,
+    titles,
+    index,
+    followed,
+    viewingLive,
+    buildId,
+  ]);
   // A loadout picked there: shown as if from the Loadout dropdown (back on the plan, too,
-  // so the bar's other tooltips follow it).
+  // so the bar's other tooltips follow it). One picked while this page was away (on
+  // Settings) is shown once PoB has answered with the loadouts again, unless the build,
+  // that loadout or the Auto one has changed since.
   const loadoutPick = useAtomValue(loadoutPickAtom);
-  const handledPick = useRef(loadoutPick?.n ?? 0);
+  const [shownPick, setShownPick] = useAtom(loadoutPickShownAtom);
   const setLiveView = useSetAtom(liveViewAtom);
   useEffect(() => {
-    if (loadoutPick === null || loadoutPick.n === handledPick.current) return;
-    handledPick.current = loadoutPick.n;
-    if (loadoutPick.index < 0 || loadoutPick.index >= titles.length) return;
+    if (
+      loadoutPick === null ||
+      loadoutPick.n === shownPick ||
+      titles.length === 0
+    )
+      return;
+    setShownPick(loadoutPick.n);
+    const { index: at, title, buildId: pickBuild, auto } = loadoutPick;
+    if (pickBuild !== buildId) return;
+    const target = titles[at] === title ? at : titles.indexOf(title);
+    if (target < 0 || target >= titles.length) return;
+    const autoNow = followed === null ? null : (titles[followed] ?? null);
+    if (auto !== autoNow) return;
     setLiveView(false);
-    setIndex(loadoutPick.index);
-  }, [loadoutPick]);
+    setIndex(target);
+  }, [loadoutPick, titles.length]);
 
   const value = useMemo<PobStatsValue>(
     () =>
@@ -440,7 +483,9 @@ export function usePanelSet(titles: string[], loadoutIndex: number | null) {
   const level = useAtomValue(characterLevelAtom)?.level ?? null;
   const levelIndex = indexForLevel(titles, level) ?? "";
   const [followIndex] = useFollowAct(titles);
-  const key = `${loadout}|${act ?? ""}|${levelIndex}|${titles.join("\n")}`;
+  // The act sets follow (useFollowAct): the marker's, or the one your level suggests.
+  const actKey = followedAct(act, level) ?? "";
+  const key = `${loadout}|${actKey}|${levelIndex}|${titles.join("\n")}`;
   // A panel pick belongs to one loadout, act and level set; it's dropped when they change.
   const [override, setOverride] = useState<{
     key: string;

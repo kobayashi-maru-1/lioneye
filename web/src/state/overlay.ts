@@ -134,6 +134,8 @@ export interface OverlayLoadout {
   auto: number | null;
   /** The page shows your live character: no row is the one shown, so any goes back. */
   live?: boolean;
+  /** The build these are of (buildIdSelector), for a pick made in the bar. */
+  buildId?: number;
 }
 
 /**
@@ -148,7 +150,26 @@ export const overlayLoadoutAtom = atom<OverlayLoadout | null | undefined>(
  * A loadout picked in the bar's Loadout tooltip; `n` counts picks, so picking the same
  * one again still counts. PobStatsProvider shows it, as the Loadout dropdown does.
  */
-export const loadoutPickAtom = atom<{ index: number; n: number } | null>(null);
+export const loadoutPickAtom = atom<LoadoutPick | null>(null);
+
+export interface LoadoutPick {
+  index: number;
+  n: number;
+  /**
+   * What this page last sent the bar when you picked: the loadout's title, the build, and
+   * the Auto one's title. A pick shown later (the page was on Settings) is dropped when
+   * the build, the list or the Auto one has changed.
+   */
+  title: string;
+  buildId: number;
+  auto: string | null;
+}
+
+/**
+ * The last of those picks shown (its `n`). Kept here, not in PobStatsProvider, so a pick
+ * made while the guide is on Settings is shown on coming back.
+ */
+export const loadoutPickShownAtom = atom(0);
 
 /** How many upcoming steps the bar's Campaign tooltip shows. */
 export const CAMPAIGN_TIP_STEPS = 3;
