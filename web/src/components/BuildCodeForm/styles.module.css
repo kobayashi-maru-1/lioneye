@@ -32,8 +32,34 @@
   overflow-wrap: anywhere;
 }
 
-.buttons {
-  margin-top: var(--size-2);
+/* Load (Import code, Open file) at the left, Loaded (Edit in PoB, Copy code, Unload) at
+   the right; Loaded wraps under Load, at the left, when narrow. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--size-2) var(--size-4);
+  margin-top: var(--size-3);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-1);
+}
+
+.groupLabel {
+  color: #8a96a8;
+  font-size: 0.7rem;
+  font-weight: var(--font-heavy);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.groupButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-2);
 }
 
 /* The loaded code as placeholder: dim, so it doesn't read as typed text. */

@@ -13,14 +13,16 @@ build's stats, gear, gems, tree and trade searches for the loadout that matches 
    Windows SmartScreen may warn that it's unrecognized (the exe isn't signed): pick
    **More info** → **Run anyway**.
 2. It runs in the tray (by the clock) and opens the guide in its own Edge window.
-3. In **Settings** (⚙ in the top bar, after the panel buttons), import your Path of Building code, or **Open** a
-   build file PoB saved.
+3. In **Settings** (⚙ in the top bar, after the panel buttons), paste your Path of Building code and pick
+   **Import code**, or **Open file** for a build file PoB saved.
 4. Start Path of Exile in **Windowed** or **Windowed Fullscreen** mode. The guide follows
    your zones from the game's log.
 
-New versions don't install themselves. When the footer shows **Update**, quit Lioneye from
-its tray icon, download the zip again and replace `lioneye.exe`. Your progress and
-imported build carry over.
+When a new version is out, the footer shows **Update** with a download icon beside it, and
+the tray menu shows **Update** too: either installs it and restarts Lioneye. Updates are
+signed, and only signed ones install. Your progress and imported build carry over.
+Versions before 0.4.36 update by hand: quit Lioneye from its tray icon, download the zip
+again and replace `lioneye.exe`.
 
 ## What's in it
 
@@ -30,8 +32,8 @@ imported build carry over.
 - **Gear** with item tooltips (Copy, Trade), **Gems** with Wiki and Trade links, a
   **Trade List** with pob.codes' search options, **Build health**, **Config** (with Custom
   Modifiers), the passive **Tree** and the build's **Notes**.
-- **Open** a build file from Path of Building and the guide follows it: each save in PoB
-  updates the guide. **Desktop PoB** (or **Edit** in Settings) opens the build in PoB
+- **Open file**: a build file from Path of Building, and the guide follows it: each save in
+  PoB updates the guide. **Desktop PoB** (or **Edit in PoB** in Settings) opens the build in PoB
   Community or PoB Redux (Settings → Build → **Editor**).
 - **Compare** any PoB code or build link with the guide's loadout: Stats, Passives,
   Skills and Items.

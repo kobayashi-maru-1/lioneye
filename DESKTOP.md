@@ -36,8 +36,8 @@ newer release (checked on start, every 6 hours, and when you come back to the wi
 **Update** opens the release's page; the download icon beside it, or **Update** in the tray
 menu, installs it: the exe downloads `lioneye.zip`, checks it against GitHub's SHA-256 and
 the release key's signature (below), renames itself to `lioneye.exe.old`, puts the new exe
-in its place and starts it (the new copy deletes the `.old` file). The open guide window reloads; your data carries over. If
-it fails, the icon's tooltip says why and clicking it tries again; the exe log has the
+in its place and starts it (the new copy deletes the `.old` file). The open guide window
+reloads; your data carries over. If it fails, the icon's tooltip says why and clicking it tries again; the exe log has the
 details. The exe's folder must be writable (the `Lioneye` folder in Downloads is). If the
 new exe doesn't start within a minute, the old one is put back. Should `lioneye.exe` ever
 be missing after an update, rename `lioneye.exe.old` back to it.
@@ -67,22 +67,24 @@ once in **Settings** (the ⚙ in the top bar, after the panel buttons).
 
 ## Your build
 
-In ⚙ **Settings → Build**:
+In ⚙ **Settings → Build**, under the code box, **Load** brings a build in and **Loaded**
+acts on the one you have:
 
-- **Import**: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link.
-- **Open**: pick a build file Path of Building saved. The dialog starts in PoB Community's
+- **Import code** (Load): paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll
+  link into the box first.
+- **Open file** (Load): pick a build file Path of Building saved. The dialog starts in PoB Community's
   builds folder (its "Build save path" if you set one, else
   `Documents\Path of Building\Builds`), else PoB Redux's, or Downloads when there's none. The file's full path
   shows under the code, and the guide follows it: each save in PoB (Ctrl+S) updates the guide
   within a couple of seconds, with a **Build updated** note. The loadout you're on stays (by
   its name) while the new numbers calculate. Saves made while the guide was closed are
   picked up when it opens.
-- **Editor**: which Path of Building **Edit** and **Desktop PoB** open, **PoB Community**
-  (the default) or **PoB Redux**. **Not installed** under it means the chosen one isn't on
-  this PC, and neither button shows.
-- **Edit** (when the chosen editor is installed; also **Desktop PoB** next to **Compare** at
-  the top of the guide): opens PoB on the build. For an opened file, PoB opens straight into
-  it. PoB Community: Lioneye sets the file as PoB's last open build (the `<Mode>` entry in
+- **Editor**: which Path of Building **Edit in PoB** and **Desktop PoB** open, **PoB
+  Community** (the default) or **PoB Redux**. **Not installed** under it means the chosen
+  one isn't on this PC, and neither button shows.
+- **Edit in PoB** (Loaded; when the chosen editor is installed; also **Desktop PoB** next
+  to **Compare** at the top of the guide): opens PoB on the build. For an opened file, PoB
+  opens straight into it. PoB Community: Lioneye sets the file as PoB's last open build (the `<Mode>` entry in
   PoB's `Settings.xml`), then starts PoB. PoB Redux: Lioneye starts Redux with the file.
   With PoB already open, a second PoB window opens. A save updates the guide when the editor
   writes it back to the same file.
@@ -91,9 +93,10 @@ In ⚙ **Settings → Build**:
   file. Redux's builds folder is the PoE 1 folder set in Redux, else
   `Documents\Path of Building\Builds`. The header's 💾 icon saves a pasted code the same
   way without opening PoB. Pasted codes are never saved anywhere otherwise.
-- **Unload**: removes the build (code, file, tree, links and gem list).
+- **Copy code** (Loaded): copies the build's PoB code.
+- **Unload** (Loaded): removes the build (code, file, tree, links and gem list).
 
-Loading a different build (Import or Open) brings its gem list, class and bandit (Settings →
+Loading a different build (Import code or Open file) brings its gem list, class and bandit (Settings →
 **Route**) and keeps your progress. A save of the same file in PoB updates only what comes
 from PoB (stats, tree, gear, links); the gem list, class and bandit stay as you set them, so
 Open the file again to take PoB's. To start over, **Settings → Route** has
@@ -145,9 +148,9 @@ change on poe.ninja's side can break it until Lioneye is updated. The bundled Po
 build at a time, so after the live character is calculated, the guide's next loadout
 change takes a few seconds longer (as after a Compare).
 
-Open, Edit, the builds list and the file watch work only from the guide on this PC: never from another
+Open file, Edit in PoB, the builds list and the file watch work only from the guide on this PC: never from another
 device (`--address 0.0.0.0`) or another website, and only for local `.xml` files (not
-network paths). Edit changes PoB's `Settings.xml` only when it reads cleanly as PoB's own
+network paths). Edit in PoB changes PoB's `Settings.xml` only when it reads cleanly as PoB's own
 settings; otherwise it leaves it alone and says so.
 
 ## Using the guide
@@ -173,7 +176,7 @@ settings; otherwise it leaves it alone and says so.
   click it (or use the bar). **Reset campaign** opens Campaign again.
 - The one bar at the top jumps to each panel and holds the auto-progress pill (at the right)
   and ⚙ **Settings** (right after the panel buttons): one list in three sections, with a bar
-  pinned at its top that jumps to each and underlines the one you're in: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the loaded build: **Unload**, **Copy**, **Open**, **Edit**, **Import**; **Editor**; **PoE account** and **Live character**; search strings; see [Your build](#your-build)), **Route** (Edit
+  pinned at its top that jumps to each and underlines the one you're in: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the code box; Load: **Import code**, **Open file**; Loaded: **Edit in PoB**, **Copy code**, **Unload**; **Editor**; **PoE account** and **Live character**; search strings; see [Your build](#your-build)), **Route** (Edit
   route, Export, **Reset campaign**, **Reset gems**, class, bandits, League Start, Library, Gems Only, hints, and the gem list,
   open until you fold it). The
   Campaign header's dropdown jumps to an act, and its ↺ is **Reset campaign** (it asks
@@ -182,10 +185,10 @@ settings; otherwise it leaves it alone and says so.
 - The card at the top shows the build (skill, ascendancy) and two rows of headline numbers.
   With the chosen editor installed, the title is a dropdown of the builds in its builds
   folder (the top of the folder, not subfolders such as `Archived`; last saved first, with
-  a search box). Picking one opens it as **Open** does, and the guide follows the file; the
+  a search box). Picking one opens it as **Open file** does, and the guide follows the file; the
   one loaded is gold. With no build loaded, the same list is under **Builds** beside
   **Import**. The 💾 icon beside the title saves a pasted code to the builds folder
-  (**Save to PoB?**, the same as Edit's) without opening PoB; from then on it's an opened
+  (**Save to PoB?**, the same as Edit in PoB's) without opening PoB; from then on it's an opened
   file. It's greyed out, with why as its tooltip, when it can't save: **PoB not found**
   (no answer from the exe yet), **PoB Community not installed** (or **PoB Redux**, the
   chosen editor), **No build**, **Already in PoB** (an opened file) or **Saving**. An

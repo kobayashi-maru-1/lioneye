@@ -58,10 +58,16 @@
   cursor: pointer;
 }
 
-.formButton:hover {
+.formButton:hover:not(:disabled) {
   background-color: #26221c;
 }
 
-.formButton:active {
+.formButton:active:not(:disabled) {
   background-color: var(--highlight-primary);
+}
+
+/* Dim when it can't act yet (Import code before anything is pasted). */
+.formButton:disabled {
+  opacity: 0.6;
+  cursor: default;
 }

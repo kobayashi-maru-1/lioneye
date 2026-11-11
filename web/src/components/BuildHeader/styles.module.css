@@ -43,12 +43,16 @@
   white-space: nowrap;
 }
 
-/* Square, icon only (Save). Doubled so it beats .tool's padding below. */
+/* Square, icon only (Save), smaller than the title's tools so it doesn't compete with the
+   name. Doubled so it beats .tool's size and padding below. */
 .tool.icon {
   flex: none;
   justify-content: center;
-  width: 2rem;
+  width: 1.5rem;
+  min-height: 1.5rem;
+  height: 1.5rem;
   padding: 0;
+  font-size: 0.7rem;
 }
 
 /* Compare, Desktop PoB and Copy, at the right of the title. */

@@ -14,7 +14,7 @@ import { Modal } from "../Modal";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
 /** True when PoB's code reads as a build. */
@@ -27,10 +27,10 @@ function readable(code: string) {
 }
 
 /**
- * The build: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link and
- * Import it, or Open a build file PoB saved (then each save in PoB updates the guide).
- * Edit opens the build in the PoB chosen under Editor, when it's installed
- * (components/DesktopPob).
+ * The build. Load: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link and
+ * Import code, or Open file for a build file PoB saved (then each save in PoB updates the
+ * guide). Loaded: Edit in PoB opens the build in the PoB chosen under Editor, when it's
+ * installed (components/DesktopPob); Copy code; Unload.
  * Loading a build keeps your progress; Unload removes it.
  */
 export function BuildCodeForm() {
@@ -45,6 +45,10 @@ export function BuildCodeForm() {
   const [importing, setImporting] = useState(false);
   const [confirmUnload, setConfirmUnload] = useState(false);
   const home = usePobHome();
+  // Unique, should the form ever show twice.
+  const loadId = useId();
+  const loadedId = useId();
+  const codeRef = useRef<HTMLTextAreaElement>(null);
   // A new build loaded (or unloaded): its code shows as the placeholder. What you were
   // typing stays (a save in PoB refreshes the code too).
   useEffect(() => {
@@ -114,6 +118,7 @@ export function BuildCodeForm() {
     <div className={classNames(formStyles.formRow)}>
       <label htmlFor="pob-code">PoB code</label>
       <textarea
+        ref={codeRef}
         id="pob-code"
         className={classNames(formStyles.formInput, styles.code, {
           [styles.loaded]: code !== null,
@@ -143,49 +148,82 @@ export function BuildCodeForm() {
           {error}
         </span>
       )}
-      <div className={classNames(formStyles.groupRight, styles.buttons)}>
-        <button
-          className={classNames(formStyles.formButton)}
-          disabled={code === null || busy}
-          onClick={() => setConfirmUnload(true)}
+      {/* Two groups: bring a build in, and act on the one loaded. */}
+      <div className={classNames(styles.actions)}>
+        <div
+          className={classNames(styles.group)}
+          role="group"
+          aria-labelledby={loadId}
         >
-          Unload
-        </button>
-        <button
-          className={classNames(formStyles.formButton)}
-          disabled={code === null}
-          onClick={copy}
-        >
-          Copy
-        </button>
-        {home !== null && (
-          <button
-            className={classNames(formStyles.formButton)}
-            disabled={busy}
-            onClick={openFile}
+          <span id={loadId} className={classNames(styles.groupLabel)}>
+            Load
+          </span>
+          <div className={classNames(styles.groupButtons)}>
+            <button
+              className={classNames(formStyles.formButton)}
+              disabled={!changed || busy}
+              onClick={importCode}
+            >
+              {importing ? "Importing…" : "Import code"}
+            </button>
+            {home !== null && (
+              <button
+                className={classNames(formStyles.formButton)}
+                disabled={busy}
+                onClick={openFile}
+              >
+                Open file
+              </button>
+            )}
+          </div>
+        </div>
+        {code !== null && (
+          <div
+            className={classNames(styles.group)}
+            role="group"
+            aria-labelledby={loadedId}
           >
-            Open
-          </button>
+            <span id={loadedId} className={classNames(styles.groupLabel)}>
+              Loaded
+            </span>
+            <div className={classNames(styles.groupButtons)}>
+              {/* Three words: "Edit" alone didn't say it opens Path of Building. */}
+              <DesktopPob
+                className={classNames(formStyles.formButton)}
+                disabled={busy}
+                onBusy={setBusy}
+              >
+                Edit in PoB
+              </DesktopPob>
+              <button
+                className={classNames(formStyles.formButton)}
+                onClick={copy}
+              >
+                Copy code
+              </button>
+              <button
+                className={classNames(formStyles.formButton)}
+                disabled={busy}
+                onClick={() => setConfirmUnload(true)}
+              >
+                Unload
+              </button>
+            </div>
+          </div>
         )}
-        <DesktopPob
-          className={classNames(formStyles.formButton)}
-          disabled={busy}
-          onBusy={setBusy}
-        >
-          Edit
-        </DesktopPob>
-        <button
-          className={classNames(formStyles.formButton)}
-          disabled={!changed || busy}
-          onClick={importCode}
-        >
-          {importing ? "Importing…" : "Import"}
-        </button>
       </div>
       <Modal
         size="small"
         isOpen={confirmUnload}
         onRequestClose={() => setConfirmUnload(false)}
+        // After Unload its button is gone (the Loaded group hides): focus the code box.
+        onAfterClose={() => {
+          if (
+            !document.activeElement ||
+            document.activeElement === document.body
+          )
+            codeRef.current?.focus();
+        }}
         contentLabel="Unload build?"
       >
         <div className={classNames(formStyles.form)}>
