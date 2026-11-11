@@ -280,8 +280,11 @@ settings; otherwise it leaves it alone and says so.
   **In Person**, **Any**), **Min mods** (the share of a rare's mods a listing must have)
   and **Min values** (each mod's minimum, as a share of yours). The settings apply to the
   tooltip Trade buttons too.
-- Gem rows show level/quality from the PoB code. Builds imported before this version show
-  them after you import the build again.
+- Gem rows show level/quality from the PoB code.
+- Gems turned off in PoB are dimmed, in the Gems panel (its tooltip says **Off in PoB**)
+  and the in-game bar's Gems tooltip. They still count on the gem list, its searches and
+  Trade. A build loaded before this version is read again once on start to pick them up
+  (and its level/quality, if it predates those).
 - Gear, Gems, Config and Tree show the loadout's sets; each has its own dropdown to look at
   another set until the loadout or act changes. **Config** lists only the options a set
   changes from PoB's defaults, and its Custom Modifiers (lines PoB doesn't apply, such as

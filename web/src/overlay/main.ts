@@ -43,6 +43,8 @@ interface OverlayGems {
       primary: boolean;
       level?: number;
       quality?: number;
+      /** Turned off in PoB: dimmed. */
+      off?: boolean;
     }[];
   }[];
   /** A vendor or stash search for the gems still to get. */
@@ -653,15 +655,18 @@ function renderGems() {
         ...group.gems.map((gem) => {
           const swatch = el("span", "tipDot");
           swatch.style.backgroundColor = gem.colour;
-          return el(
+          const row = el(
             "div",
-            gem.primary ? "tipGem" : "tipGem support",
+            (gem.primary ? "tipGem" : "tipGem support") +
+              (gem.off === true ? " off" : ""),
             swatch,
             el("span", "tipName", gem.name),
             ...(gem.level !== undefined
               ? [el("span", "tipLevel", `${gem.level}/${gem.quality ?? 0}`)]
               : []),
           );
+          if (gem.off === true) row.title = "Off in PoB";
+          return row;
         }),
       ),
     ),

@@ -145,9 +145,9 @@ function GemLink({ gemLink, isPrimary, open, handlers }: GemLinkProps) {
       className={classNames(
         styles.gemLink,
         isPrimary ? styles.gemPrimary : styles.gemSecondary,
-        { [styles.open]: open },
+        { [styles.open]: open, [styles.off]: gemLink.off },
       )}
-      aria-label={gem.name}
+      aria-label={gemLink.off ? `${gem.name}, off in PoB` : gem.name}
       {...handlers}
     >
       <span>
@@ -180,6 +180,9 @@ export function GemTooltip({ gemLink }: GemTooltipProps) {
   return (
     <PoeTooltip kind="gem" name={gem.name}>
       <>
+        {gemLink.off && (
+          <div className={classNames(tooltipStyles.note)}>Off in PoB</div>
+        )}
         {gemLink.level !== undefined && (
           <TooltipProperty label="Level:" value={gemLink.level} />
         )}

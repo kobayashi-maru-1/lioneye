@@ -136,6 +136,19 @@ function sameXml(code: string, xml: string) {
   }
 }
 
+/** What the stored gem links hold; bumped when processPob adds to them (1: gems off). */
+const GEM_LINKS_FORMAT = 1;
+const gemLinksFormatAtom = persistentAtom("gem-links-format", 0, 0);
+
+/** Gem links stored by an older Lioneye: read once more from the loaded build's code. */
+export const upgradeGemLinksAtom = atom(null, (get, set) => {
+  if (get(gemLinksFormatAtom) >= GEM_LINKS_FORMAT) return;
+  const code = get(pobCodeAtom);
+  const pob = code === null ? null : readPob(code);
+  if (pob !== null) set(gemLinksSelector, pob.gemLinks);
+  set(gemLinksFormatAtom, GEM_LINKS_FORMAT);
+});
+
 /** Links the loaded build to the file it was saved as (Edit on a pasted code). */
 export const linkBuildFileAtom = atom(
   null,

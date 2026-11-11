@@ -91,10 +91,16 @@ function processSkills(
     const gemElements = Array.from(skillElement.getElementsByTagName("Gem"));
     if (gemElements.length == 0) recentEmptySkillLabel = skillLabel;
 
-    let primaryGemIds: string[] = [];
-    let secondaryGemIds: string[] = [];
-    // The level and quality PoB sets for each gem in this group.
-    const gemProps = new Map<string, { level?: number; quality?: number }>();
+    // Each gem in PoB's order, with the level and quality PoB sets for it, and whether
+    // it's turned off there.
+    type GemEntry = {
+      id: string;
+      level?: number;
+      quality?: number;
+      off?: boolean;
+    };
+    const primaryGems: GemEntry[] = [];
+    const secondaryGems: GemEntry[] = [];
     const number = (value: string | null) =>
       value !== null && value !== "" && !isNaN(Number(value))
         ? Number(value)
@@ -103,12 +109,13 @@ function processSkills(
       const attribute = gemElement.attributes.getNamedItem("gemId");
       if (attribute) {
         const gemId = MapGemId(attribute.value);
+        const entry: GemEntry = { id: gemId };
         // A Vaal or Awakened gem shows as its normal gem; its level isn't that gem's.
-        if (gemId === (GEM_ID_REMAP[attribute.value] ?? attribute.value))
-          gemProps.set(gemId, {
-            level: number(gemElement.getAttribute("level")),
-            quality: number(gemElement.getAttribute("quality")),
-          });
+        if (gemId === (GEM_ID_REMAP[attribute.value] ?? attribute.value)) {
+          entry.level = number(gemElement.getAttribute("level"));
+          entry.quality = number(gemElement.getAttribute("quality"));
+        }
+        if (gemElement.getAttribute("enabled") === "false") entry.off = true;
         const note = cleanPobText(
           recentEmptySkillLabel || parentTitle || skillLabel || "",
         );
@@ -124,8 +131,8 @@ function processSkills(
 
         const gem = Data.Gems[gemId];
         if (gem !== undefined) {
-          if (gem.is_support) secondaryGemIds.push(gemId);
-          else primaryGemIds.push(gemId);
+          if (gem.is_support) secondaryGems.push(entry);
+          else primaryGems.push(entry);
         }
       }
     }
@@ -133,29 +140,24 @@ function processSkills(
     const gemLinkTitle = cleanPobText(
       parentTitle || recentEmptySkillLabel || "Default",
     );
-    if (primaryGemIds.length > 0)
+    const toGemLink = ({ id, ...props }: GemEntry): RouteData.GemLink => ({
+      ...gemIdToGemLink(id, characterClass),
+      ...props,
+    });
+    if (primaryGems.length > 0)
       gemLinks.push({
         title: gemLinkTitle,
         label: skillLabel ? cleanPobText(skillLabel) : undefined,
         slot,
-        primaryGems: primaryGemIds.map((x) => ({
-          ...gemIdToGemLink(x, characterClass),
-          ...gemProps.get(x),
-        })),
-        secondaryGems: secondaryGemIds.map((x) => ({
-          ...gemIdToGemLink(x, characterClass),
-          ...gemProps.get(x),
-        })),
+        primaryGems: primaryGems.map(toGemLink),
+        secondaryGems: secondaryGems.map(toGemLink),
       });
-    else if (secondaryGemIds.length > 0)
+    else if (secondaryGems.length > 0)
       gemLinks.push({
         title: gemLinkTitle,
         label: skillLabel ? cleanPobText(skillLabel) : undefined,
         slot,
-        primaryGems: secondaryGemIds.map((x) => ({
-          ...gemIdToGemLink(x, characterClass),
-          ...gemProps.get(x),
-        })),
+        primaryGems: secondaryGems.map(toGemLink),
         secondaryGems: [],
       });
   }

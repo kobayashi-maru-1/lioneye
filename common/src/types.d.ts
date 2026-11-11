@@ -126,6 +126,8 @@ export namespace RouteData {
     /** Level and quality the PoB build sets for this gem. */
     level?: number;
     quality?: number;
+    /** Turned off in PoB (still listed, shown dimmed). */
+    off?: boolean;
   }
 }
 

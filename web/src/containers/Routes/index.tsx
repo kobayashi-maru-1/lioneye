@@ -455,6 +455,7 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
               primary,
               level: link.level,
               quality: link.quality,
+              ...(link.off ? { off: true } : {}),
             },
           ]
         : [];

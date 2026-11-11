@@ -5,6 +5,7 @@ import { AppBar } from "../components/AppBar";
 import { CampaignTip } from "../components/CampaignTip";
 import { Footer } from "../components/Footer";
 import { LiveCharacterSync } from "../components/LiveCharacter";
+import { upgradeGemLinksAtom } from "../state/pob";
 import { moveOldTicksAtom } from "../state/route-progress";
 import { pageMode } from "../state/saved-state";
 import { pipe } from "../utility";
@@ -28,8 +29,13 @@ export function App() {
   useAutoProgress();
   // Campaign ticks saved before 0.4.7, moved to their new keys once.
   const moveOldTicks = useSetAtom(moveOldTicksAtom);
+  // Gem links saved before gems turned off in PoB were marked, read again once.
+  const upgradeGemLinks = useSetAtom(upgradeGemLinksAtom);
   useEffect(() => {
-    if (pageMode !== "migrate") moveOldTicks();
+    if (pageMode !== "migrate") {
+      moveOldTicks();
+      upgradeGemLinks();
+    }
   }, []);
 
   return (
@@ -47,9 +53,7 @@ export function App() {
           <Routes>
             <Route
               path="/"
-              element={
-                <Page title="Lioneye" component={<RoutesContainer />} />
-              }
+              element={<Page title="Lioneye" component={<RoutesContainer />} />}
             />
             {/* Settings (was "Build"); /build kept for old links. */}
             {["/settings", "/build"].map((path) => (

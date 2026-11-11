@@ -75,6 +75,8 @@ export interface OverlayGem {
   primary: boolean;
   level?: number;
   quality?: number;
+  /** Turned off in PoB: shown dimmed. */
+  off?: boolean;
 }
 
 /** The skill set the Gems panel shows, for the in-game bar's Gems tooltip. */
