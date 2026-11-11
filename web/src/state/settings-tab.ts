@@ -16,10 +16,3 @@ export const pobEditorAtom = persistentAtom<PobEditor>(
   "community",
   0,
 );
-
-/** The Route section's gem list: open until you fold it, then as you left it. */
-export const gemListOpenAtom = persistentAtom<boolean>(
-  "settings-gems-open",
-  true,
-  0,
-);

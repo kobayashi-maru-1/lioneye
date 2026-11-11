@@ -24,7 +24,8 @@ Windows 10 and 11 PC, whichever browser you use).
 
 Running the exe again while it's already open brings its window to the front.
 
-**Settings** → **App** → **Game log** and **Browser** set the same as `--log-path` and `--browser`,
+**Settings** → **App** → **Game** → **Game log** and **Browser** set the same as `--log-path`
+and `--browser`,
 saved in `%LOCALAPPDATA%\exile-leveling\settings.json`; the command line wins when given.
 A new game log applies at once; a new browser when the guide next opens. Whichever browser
 opens it, the guide loads the exe's copy of your data (below) when another browser saved it
@@ -94,12 +95,13 @@ acts on the one you have:
   `Documents\Path of Building\Builds`. The header's 💾 icon saves a pasted code the same
   way without opening PoB. Pasted codes are never saved anywhere otherwise.
 - **Copy code** (Loaded): copies the build's PoB code.
-- **Unload** (Loaded): removes the build (code, file, tree, links and gem list).
+- **Clear build** (Loaded): removes the build (code, file, tree, links and gem list), after
+  **Clear build?**. Your progress stays.
 
 Loading a different build (Import code or Open file) brings its gem list, class and bandit (Settings →
 **Route**) and keeps your progress. A save of the same file in PoB updates only what comes
 from PoB (stats, tree, gear, links); the gem list, class and bandit stay as you set them, so
-Open the file again to take PoB's. To start over, **Settings → Route** has
+Open the file again to take PoB's. To start over, **Settings → Route → Reset** has
 **Reset campaign** (campaign ticks, your place and level; also ↺ on the Campaign panel)
 and **Reset gems** (gem ticks).
 
@@ -109,7 +111,7 @@ saved before 0.4.7 are moved over once, the first time the guide opens.
 
 ### Live character (poe.ninja)
 
-Also in **Settings → Build**, for the character you're playing: the guide can show it
+Also in **Settings → Build** (the **Character** card), for the character you're playing: the guide can show it
 (the Loadout dropdown's **Live character**), compare it with the plan (**Compare**) and
 check it (**Build health**).
 
@@ -176,9 +178,20 @@ settings; otherwise it leaves it alone and says so.
   click it (or use the bar). **Reset campaign** opens Campaign again.
 - The one bar at the top jumps to each panel and holds the auto-progress pill (at the right)
   and ⚙ **Settings** (right after the panel buttons): one list in three sections, with a bar
-  pinned at its top that jumps to each and underlines the one you're in: **App** (Overlay, Game log, Browser; Settings opens here), **Build** (the code box; Load: **Import code**, **Open file**; Loaded: **Edit in PoB**, **Copy code**, **Unload**; **Editor**; **PoE account** and **Live character**; search strings; see [Your build](#your-build)), **Route** (Edit
-  route, Export, **Reset campaign**, **Reset gems**, class, bandits, League Start, Library, Gems Only, hints, and the gem list,
-  open until you fold it). The
+  pinned at its top that jumps to each and underlines the one you're in. Each section is a
+  set of cards, two side by side when the window is wide enough, each setting a row with its
+  label at the left:
+  - **App** (Settings opens here): **Overlay** (**Show in game**, **Auto tree**, **Buttons**)
+    and **Game** (**Game log**, **Browser**; with the exe).
+  - **Build**: **Build** (the code box; Load: **Import code**, **Open file**; Loaded:
+    **Edit in PoB**, **Copy code**, **Clear build**; **Editor**; see [Your build](#your-build)),
+    **Character** (**PoE account**, **Live character**, **poe.ninja**) and **Search**
+    (your search strings, with a link to poe.re).
+  - **Route**: **Route** (class, bandits, **League start**, **Library**, **Gems only**,
+    **All hints**, **Edit route**, **Export**), **Gems** (the gem list, scrolling inside its
+    card) and **Reset** (**Reset campaign**, **Reset gems**).
+
+  The
   Campaign header's dropdown jumps to an act, and its ↺ is **Reset campaign** (it asks
   first; gem ticks stay). Auto-progress only scrolls to your zone while
   Campaign is on screen.
@@ -348,7 +361,8 @@ settings; otherwise it leaves it alone and says so.
   otherwise the bar shows in them as usual.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
-- **Settings** → **App** → **Overlay**: **Show in game**, **Auto tree** (on to start), and which panels get a button (Campaign, Gear,
+- **Settings** → **App** → **Overlay**: **Show in game**, **Auto tree** (on to start), and
+  **Buttons**: which panels get a button (Campaign, Gear,
   Gems, Tree, Health and Notes to start; a bar set up before Health existed gets it once,
   and unticking it keeps it off). Panels the build doesn't have are left off.
 - The bar is a page of the guide (`overlay.html`) in WebView2, the engine Edge uses (part of

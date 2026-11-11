@@ -2,6 +2,7 @@ import { useAppInfo, type ExeSettings } from "../../state/app-info";
 import { autoProgressAtom } from "../../state/auto-progress";
 import { formStyles } from "../../styles";
 import { PanelSelect } from "../PanelSelect";
+import { SettingRow, SettingsCard } from "../SettingsCard";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useAtomValue } from "jotai";
@@ -14,8 +15,9 @@ const BROWSERS: { value: ExeSettings["browser"]; label: string }[] = [
 ];
 
 /**
- * The exe's own settings: which Client.txt it follows (found from the running game unless
- * set) and which browser opens the guide. A command-line --log-path or --browser wins.
+ * Settings → App → Game, the exe's own settings: which Client.txt it follows (found from
+ * the running game unless set) and which browser opens the guide. A command-line
+ * --log-path or --browser wins. The whole card; nothing without the exe.
  */
 export function AppSettingsForm() {
   const { info, update } = useAppInfo();
@@ -39,9 +41,8 @@ export function AppSettingsForm() {
   };
 
   return (
-    <div className={classNames(formStyles.form)}>
-      <div className={classNames(formStyles.formRow)}>
-        <label htmlFor="game-log">Game log</label>
+    <SettingsCard title="Game">
+      <SettingRow label="Game log" htmlFor="game-log">
         <div className={classNames(styles.line)}>
           <input
             id="game-log"
@@ -65,7 +66,7 @@ export function AppSettingsForm() {
             Save
           </button>
         </div>
-        <span className={classNames(styles.note)}>
+        <div className={classNames(styles.note)}>
           {logLocked
             ? "Set by --log-path"
             : status.kind === "watching"
@@ -73,36 +74,33 @@ export function AppSettingsForm() {
               : status.kind === "waiting"
                 ? "Waiting for the game"
                 : "App offline"}
-        </span>
-        {error && <span className={classNames(styles.error)}>{error}</span>}
-      </div>
-      <div className={classNames(formStyles.formRow)}>
-        <label>Browser</label>
-        <div className={classNames(styles.line)}>
-          {browserLocked ? (
-            <span>{settings.browserFromCommandLine}</span>
-          ) : (
-            <PanelSelect
-              label="Browser"
-              options={BROWSERS.map((browser) => browser.label)}
-              value={Math.max(
-                0,
-                BROWSERS.findIndex(
-                  (browser) =>
-                    browser.value ===
-                    (settings.browserFromCommandLine ?? settings.browser),
-                ),
-              )}
-              onChange={(i) => save({ browser: BROWSERS[i].value })}
-            />
-          )}
         </div>
-        <span className={classNames(styles.note)}>
+        {error && <div className={classNames(styles.error)}>{error}</div>}
+      </SettingRow>
+      <SettingRow label="Browser">
+        {browserLocked ? (
+          <span>{settings.browserFromCommandLine}</span>
+        ) : (
+          <PanelSelect
+            label="Browser"
+            options={BROWSERS.map((browser) => browser.label)}
+            value={Math.max(
+              0,
+              BROWSERS.findIndex(
+                (browser) =>
+                  browser.value ===
+                  (settings.browserFromCommandLine ?? settings.browser),
+              ),
+            )}
+            onChange={(i) => save({ browser: BROWSERS[i].value })}
+          />
+        )}
+        <div className={classNames(styles.note)}>
           {browserLocked
             ? "Set by --browser"
             : "Applies when the guide next opens"}
-        </span>
-      </div>
-    </div>
+        </div>
+      </SettingRow>
+    </SettingsCard>
   );
 }

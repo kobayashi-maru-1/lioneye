@@ -1,0 +1,232 @@
+/* Settings' cards: one column, two when the section is wide enough. */
+.holder {
+  container-type: inline-size;
+  padding: var(--size-3);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  /* Side by side cards are the same height. */
+  align-items: stretch;
+}
+
+@container (min-width: 56rem) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.card {
+  /* Rows stack (label above) when the card itself is narrow. */
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background-color: var(--navy);
+  border: var(--border-width) solid var(--navy-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  padding: var(--size-3) 0.875rem;
+  background-color: var(--navy-deep);
+  border-bottom: var(--border-width) solid var(--navy-border);
+}
+
+.title {
+  margin: 0;
+  color: var(--on-secondary);
+  font-size: 0.85rem;
+  font-weight: var(--font-heavy);
+}
+
+.aside {
+  margin-left: auto;
+  color: #8f8f8f;
+  font-size: 0.8rem;
+}
+
+.aside a {
+  color: inherit;
+}
+
+.aside a:hover {
+  color: var(--on-primary);
+}
+
+.body {
+  flex: 1;
+  padding: var(--size-2) 0.875rem var(--size-3);
+}
+
+/* The resets: red, so they don't read as everyday buttons. */
+.danger {
+  background-color: #1a1312;
+  border-color: #4a2b28;
+}
+
+.danger .header {
+  background-color: #160f0e;
+  border-color: #4a2b28;
+}
+
+.danger .title {
+  color: #d9655b;
+}
+
+/* Label at the left, control at the right; every card uses the same label width, so
+   labels and controls line up down the page. */
+.row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--size-2) var(--size-4);
+  padding: var(--size-3) 0;
+  align-items: start;
+}
+
+.row + .row {
+  border-top: var(--border-width) solid #222b3a;
+}
+
+.label {
+  /* Level with the text of the input beside it. */
+  padding-top: 0.3rem;
+  color: var(--on-primary);
+}
+
+.inline {
+  align-items: center;
+}
+
+.inline .label {
+  padding-top: 0;
+}
+
+.control {
+  min-width: 0;
+}
+
+@container (max-width: 22rem) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .row.inline {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .label {
+    padding-top: 0;
+  }
+}
+
+/* On/off: a gold switch when on. */
+.switch {
+  position: relative;
+  flex: none;
+  width: 2.125rem;
+  height: 1.125rem;
+  padding: 0;
+  background-color: #2d2d2d;
+  border: var(--border-width) solid #3a3a3a;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  background-color: #8f8f8f;
+  border-radius: 50%;
+  transition: left 0.15s;
+}
+
+.switch[aria-checked="true"] {
+  background-color: #3d2e18;
+  border-color: var(--gold);
+}
+
+.switch[aria-checked="true"]::after {
+  left: 1.125rem;
+  background-color: #c99550;
+}
+
+/* Focus ring outside the gold border (the global one is drawn inside, so it would vanish
+   on a gold switch or a ticked box). */
+.switch:focus-visible,
+.check input:focus-visible {
+  outline-offset: 2px;
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Several of a list: checkboxes in even columns, as many as fit. */
+.checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: var(--size-3) var(--size-4);
+  margin: 0;
+  padding: 0.3rem 0 0;
+  border: none;
+  min-width: 0;
+}
+
+.checks:disabled {
+  opacity: 0.5;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  color: #8f8f8f;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.check:has(input:checked) {
+  color: var(--on-primary);
+}
+
+.checks:disabled .check {
+  cursor: default;
+}
+
+.check input {
+  appearance: none;
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin: 0;
+  background-color: var(--input);
+  border: var(--border-width) solid #4a4a4a;
+  border-radius: 0.1875rem;
+  cursor: inherit;
+}
+
+.check input:checked {
+  background: var(--gold) no-repeat center / 0.625rem 0.625rem
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.5l2.2 2.2 4.8-5' fill='none' stroke='%23161616' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  border-color: var(--gold);
+}
+
+.check:hover input:not(:disabled) {
+  border-color: #c99550;
+}

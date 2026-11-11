@@ -1,7 +1,7 @@
 import { useAtom } from "jotai";
 import { searchStringsAtom } from "../../state/search-strings";
-import { formStyles } from "../../styles";
 import { CodeEditor } from "../CodeEditor";
+import { SettingRow } from "../SettingsCard";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { type Grammar } from "prismjs";
@@ -10,21 +10,15 @@ const SearchStringGrammar: Grammar = {
   comment: /#.*/,
 };
 
+/** Settings → Build → Search (the row; the card, with its poe.re link, is Settings'). */
 export function SearchStringsEditor() {
   const [searchStrings, setSearchStrings] = useAtom(searchStringsAtom);
 
   return (
-    <div className={classNames(formStyles.formRow)}>
-      <label>
-        Search Strings {"("}
-        <a href="https://poe.re/" target="_blank">
-          Path of Exile Regex
-        </a>
-        {/* TODO Should add some hints for alias format */}
-        {")"}
-      </label>
+    <SettingRow label="Strings" htmlFor="search-strings">
       <CodeEditor
         className={classNames(styles.input)}
+        textareaId="search-strings"
         grammar={SearchStringGrammar}
         placeholder={"# MS boots\nnne|rint"}
         value={searchStrings?.join("\n") || ""}
@@ -33,6 +27,9 @@ export function SearchStringsEditor() {
           else setSearchStrings(value.split(/\r\n|\r|\n/));
         }}
       />
-    </div>
+      <div className={classNames(styles.hint)}>
+        A # line names the string below it.
+      </div>
+    </SettingRow>
   );
 }

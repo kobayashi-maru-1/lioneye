@@ -32,13 +32,12 @@
   overflow-wrap: anywhere;
 }
 
-/* Load (Import code, Open file) at the left, Loaded (Edit in PoB, Copy code, Unload) at
-   the right; Loaded wraps under Load, at the left, when narrow. */
+/* Load (Import code, Open file), then Loaded (Edit in PoB, Copy code, Clear build) beside
+   it; Loaded wraps under Load when narrow. */
 .actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--size-2) var(--size-4);
+  gap: var(--size-3) 1.75rem;
   margin-top: var(--size-3);
 }
 

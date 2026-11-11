@@ -22,6 +22,7 @@ import { liveViewAtom } from "../../state/live-view";
 import { pobCodeToXml } from "../../state/pob/process";
 import { formStyles } from "../../styles";
 import { PanelSelect } from "../PanelSelect";
+import { SettingRow } from "../SettingsCard";
 import { fetchBuildStats } from "../PobStats";
 import styles from "./styles.module.css";
 import classNames from "classnames";
@@ -241,7 +242,7 @@ function listedLabel(character: ListedCharacter) {
 }
 
 /**
- * Settings → Build: your PoE account (its poe.ninja profile must be public), the
+ * Settings → Build → Character (the rows; the card is Settings'): your PoE account (its poe.ninja profile must be public), the
  * characters poe.ninja lists for it, and the one Compare and Build health use (Live
  * character), with Refresh.
  */
@@ -325,8 +326,7 @@ export function LiveCharacterForm() {
 
   return (
     <>
-      <div className={classNames(formStyles.formRow)}>
-        <label htmlFor="live-account">PoE account</label>
+      <SettingRow label="PoE account" htmlFor="live-account">
         <div className={classNames(styles.line)}>
           <input
             id="live-account"
@@ -349,14 +349,13 @@ export function LiveCharacterForm() {
           </button>
         </div>
         {listError && (
-          <span className={classNames(styles.note, styles.error)} role="alert">
+          <div className={classNames(styles.note, styles.error)} role="alert">
             {listError}
-          </span>
+          </div>
         )}
-      </div>
+      </SettingRow>
       {(list !== null || link !== null) && (
-        <div className={classNames(formStyles.formRow)}>
-          <label>Live character</label>
+        <SettingRow label="Live character">
           <div className={classNames(styles.line)}>
             {loaded !== null ? (
               <PanelSelect
@@ -384,16 +383,16 @@ export function LiveCharacterForm() {
             </button>
           </div>
           {note && link !== null && (
-            <span
+            <div
               className={classNames(styles.note, {
                 [styles.error]: status.kind === "error",
               })}
               role={status.kind === "error" ? "alert" : undefined}
             >
               {note}
-            </span>
+            </div>
           )}
-        </div>
+        </SettingRow>
       )}
       {link !== null && <NinjaSignIn />}
     </>
@@ -401,7 +400,7 @@ export function LiveCharacterForm() {
 }
 
 /**
- * Settings → Build → poe.ninja: signed in to poe.ninja in Lioneye's poe.ninja window, or
+ * Settings → Build → Character → poe.ninja: signed in to poe.ninja in Lioneye's poe.ninja window, or
  * Sign in (opens it). Signed in, a level-up and Refresh ask poe.ninja to re-read your
  * character, instead of waiting for its own schedule.
  */
@@ -410,8 +409,7 @@ function NinjaSignIn() {
   const [used, setUsed] = useAtom(ninjaSignInUsedAtom);
   const [error, setError] = useState<string | null>(null);
   return (
-    <div className={classNames(formStyles.formRow)}>
-      <label>poe.ninja</label>
+    <SettingRow label="poe.ninja" inline={signedIn === true}>
       <div className={classNames(styles.line)}>
         <span>
           {signedIn === true
@@ -437,10 +435,10 @@ function NinjaSignIn() {
         )}
       </div>
       {error && (
-        <span className={classNames(styles.note, styles.error)} role="alert">
+        <div className={classNames(styles.note, styles.error)} role="alert">
           {error}
-        </span>
+        </div>
       )}
-    </div>
+    </SettingRow>
   );
 }

@@ -13,6 +13,7 @@ import { pobEditorAtom } from "../../state/settings-tab";
 import { formStyles } from "../../styles";
 import { Modal } from "../Modal";
 import { PanelSelect } from "../PanelSelect";
+import { SettingRow } from "../SettingsCard";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
@@ -99,7 +100,7 @@ export function usePobEditor() {
 }
 
 /**
- * Settings' Editor: which PoB Edit and Desktop PoB open. Shows with the exe; "Not
+ * Settings' Editor (a row of the Build card): which PoB Edit and Desktop PoB open. Shows with the exe; "Not
  * installed" under it when the chosen one isn't on this PC (then neither button shows).
  */
 export function PobEditorSelect() {
@@ -108,26 +109,23 @@ export function PobEditorSelect() {
   if (home === null) return null;
   const installed = editorInstalled(home, editor);
   return (
-    <div className={classNames(formStyles.formRow)}>
-      <label>Editor</label>
-      <div>
-        <PanelSelect
-          label="Editor"
-          describedBy={installed ? undefined : "pob-editor-note"}
-          options={POB_EDITORS.map((option) => option.label)}
-          value={Math.max(
-            0,
-            POB_EDITORS.findIndex((option) => option.value === editor),
-          )}
-          onChange={(i) => setEditor(POB_EDITORS[i].value)}
-        />
-      </div>
+    <SettingRow label="Editor">
+      <PanelSelect
+        label="Editor"
+        describedBy={installed ? undefined : "pob-editor-note"}
+        options={POB_EDITORS.map((option) => option.label)}
+        value={Math.max(
+          0,
+          POB_EDITORS.findIndex((option) => option.value === editor),
+        )}
+        onChange={(i) => setEditor(POB_EDITORS[i].value)}
+      />
       {!installed && (
-        <span id="pob-editor-note" className={classNames(styles.note)}>
+        <div id="pob-editor-note" className={classNames(styles.note)}>
           Not installed
-        </span>
+        </div>
       )}
-    </div>
+    </SettingRow>
   );
 }
 

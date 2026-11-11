@@ -1,16 +1,16 @@
 import { OVERLAY_PANELS, overlaySettingsAtom } from "../../state/overlay";
-import { formStyles } from "../../styles";
-import styles from "./styles.module.css";
-import classNames from "classnames";
+import { CheckGrid, SettingRow, SwitchRow } from "../SettingsCard";
 import { useAtom } from "jotai";
+import { useId } from "react";
 
 /**
- * Settings for the in-game bar: whether it shows over the game, whether its Tree tooltip
- * opens with the game's passive tree, and which panels get a button. Panels the build
- * doesn't have are left off the bar.
+ * Settings → App → Overlay (the rows; the card is Settings'): whether the in-game bar
+ * shows over the game, whether its Tree tooltip opens with the game's passive tree, and
+ * which panels get a button. Panels the build doesn't have are left off the bar.
  */
 export function OverlayForm() {
   const [settings, setSettings] = useAtom(overlaySettingsAtom);
+  const buttonsId = useId();
 
   const toggle = (id: string, checked: boolean) =>
     setSettings({
@@ -21,50 +21,31 @@ export function OverlayForm() {
     });
 
   return (
-    <div className={classNames(formStyles.form)}>
-      <div className={classNames(formStyles.formRow)}>
-        <label>Overlay</label>
-      </div>
-      <label className={classNames(styles.option)}>
-        <input
-          type="checkbox"
-          checked={settings.on}
-          onChange={(event) =>
-            setSettings({ ...settings, on: event.target.checked })
-          }
-        />
-        Show in game
-      </label>
-      <label
-        className={classNames(styles.option)}
+    <>
+      <SwitchRow
+        label="Show in game"
+        checked={settings.on}
+        onChange={(on) => setSettings({ ...settings, on })}
+      />
+      <SwitchRow
+        label="Auto tree"
         title="Tree tooltip opens with the game's tree"
-      >
-        <input
-          type="checkbox"
-          checked={settings.autoTree !== false}
-          disabled={!settings.on}
-          onChange={(event) =>
-            setSettings({ ...settings, autoTree: event.target.checked })
-          }
-        />
-        Auto tree
-      </label>
-      <fieldset
-        className={classNames(styles.panels)}
+        checked={settings.autoTree !== false}
         disabled={!settings.on}
-        aria-label="Buttons"
-      >
-        {OVERLAY_PANELS.map((panel) => (
-          <label key={panel.id} className={classNames(styles.option)}>
-            <input
-              type="checkbox"
-              checked={settings.panels.includes(panel.id)}
-              onChange={(event) => toggle(panel.id, event.target.checked)}
-            />
-            {panel.label}
-          </label>
-        ))}
-      </fieldset>
-    </div>
+        onChange={(autoTree) => setSettings({ ...settings, autoTree })}
+      />
+      <SettingRow label="Buttons" labelId={buttonsId}>
+        <CheckGrid
+          labelledBy={buttonsId}
+          disabled={!settings.on}
+          items={OVERLAY_PANELS.map((panel) => ({
+            id: panel.id,
+            label: panel.label,
+            checked: settings.panels.includes(panel.id),
+          }))}
+          onChange={toggle}
+        />
+      </SettingRow>
+    </>
   );
 }

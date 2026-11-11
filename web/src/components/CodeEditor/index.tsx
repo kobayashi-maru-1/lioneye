@@ -13,27 +13,43 @@ interface CodeEditorProps {
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
+  /** The textarea's id, for a <label htmlFor>. */
+  textareaId?: string;
 }
 
 export const CodeEditor = React.forwardRef<
   HTMLDivElement,
   CodeEditorProps & React.HTMLAttributes<HTMLDivElement>
->(({ grammar, value, onValueChange, className, placeholder, ...rest }, ref) => {
-  return (
-    <div
-      ref={ref}
-      className={classNames(className, formStyles.formInput, styles.editor)}
-      {...rest}
-    >
-      <Editor
-        highlight={(value) => highlight(value, grammar, "")}
-        tabSize={4}
-        className={classNames(styles.editorDiv)}
-        textareaClassName={classNames(styles.editorTextArea)}
-        value={value}
-        onValueChange={onValueChange}
-        placeholder={placeholder}
-      />
-    </div>
-  );
-});
+>(
+  (
+    {
+      grammar,
+      value,
+      onValueChange,
+      className,
+      placeholder,
+      textareaId,
+      ...rest
+    },
+    ref,
+  ) => {
+    return (
+      <div
+        ref={ref}
+        className={classNames(className, formStyles.formInput, styles.editor)}
+        {...rest}
+      >
+        <Editor
+          highlight={(value) => highlight(value, grammar, "")}
+          tabSize={4}
+          className={classNames(styles.editorDiv)}
+          textareaClassName={classNames(styles.editorTextArea)}
+          textareaId={textareaId}
+          value={value}
+          onValueChange={onValueChange}
+          placeholder={placeholder}
+        />
+      </div>
+    );
+  },
+);

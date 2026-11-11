@@ -71,26 +71,28 @@
   letter-spacing: 0.02em;
 }
 
-/* The gem list under its count: open until folded, then as left. */
+/* The gem list: long, so it scrolls inside its card. */
 .gems {
-  padding: var(--size-3);
+  max-height: 22rem;
+  margin-top: var(--size-2);
+  overflow-y: auto;
+  scrollbar-color: #3a3a3a transparent;
 }
 
-.gems > summary {
-  color: var(--gold);
-  font-size: 0.8rem;
-  font-weight: var(--font-heavy);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  cursor: pointer;
+/* Reset campaign, Reset gems: one line, red. */
+.resets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-3);
+  padding: var(--size-2) 0;
 }
 
-.gems[open] > summary {
-  margin-bottom: var(--size-3);
+.reset {
+  color: #d9655b;
+  background-color: #1e1413;
+  border-color: #4a2b28;
 }
 
-.hint {
-  margin-top: calc(-1 * var(--size-2));
-  color: #8f8f8f;
-  font-size: 0.8rem;
+.reset:hover:not(:disabled) {
+  background-color: #2a1917;
 }

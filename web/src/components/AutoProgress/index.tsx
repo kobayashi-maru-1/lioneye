@@ -289,7 +289,7 @@ export function useAutoProgress() {
   }, [talks, health]);
   const code = useAtomValue(pobAtom);
   const notes = useMemo(() => notesFor(code), [code]);
-  // Only a page that has had a build speaks for the notes (and clears them on Unload), so
+  // Only a page that has had a build speaks for the notes (and clears them on Clear build), so
   // another page without one doesn't blank the bar's.
   const hadBuild = useRef(false);
   if (code !== null) hadBuild.current = true;

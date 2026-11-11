@@ -10,8 +10,12 @@ import { Modal } from "../../components/Modal";
 import { OverlayForm } from "../../components/OverlayForm";
 import { SearchStringsEditor } from "../../components/SearchStringsEditor";
 import {
+  CardGrid,
+  SettingRow,
+  SettingsCard,
+} from "../../components/SettingsCard";
+import {
   type SettingsTab as Tab,
-  gemListOpenAtom,
   settingsTabAtom,
 } from "../../state/settings-tab";
 import { buildDataSelector } from "../../state/build-data";
@@ -34,9 +38,9 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 /**
- * One list, in this order. App: the exe's own. Build: your PoB, its editor and search
- * strings. Route: what the campaign shows. The bar at the top jumps to each section and
- * marks the one you're in.
+ * One list, in this order, each section a grid of cards. App: Overlay, Game. Build: Build
+ * (code, Editor), Character, Search. Route: Route, Gems, Reset. The bar at the top jumps to
+ * each section and marks the one you're in.
  */
 const SECTIONS: { id: Tab; label: string }[] = [
   { id: "app", label: "App" },
@@ -80,7 +84,7 @@ function jump(id: Tab, behavior: ScrollBehavior) {
 /**
  * The section you're in: the last one whose top has reached the jump bar's bottom (the
  * last section is at least a screen tall, so each can). Checked on scroll and whenever the
- * list's height changes (rows that load late, the gem list folding).
+ * list's height changes (rows that load late, cards that grow).
  */
 function useCurrentSection(
   bar: React.RefObject<HTMLElement | null>,
@@ -168,7 +172,6 @@ export default function BuildContainer() {
   const list = useRef<HTMLDivElement>(null);
   const current = useCurrentSection(bar, list);
   useOpeningJump(list);
-  const [gemsOpen, setGemsOpen] = useAtom(gemListOpenAtom);
 
   return (
     <div ref={list}>
@@ -200,61 +203,114 @@ export default function BuildContainer() {
         ))}
       </nav>
       <Section id="app" label="App">
-        <OverlayForm />
-        <hr />
-        <AppSettingsForm />
+        <CardGrid>
+          <SettingsCard title="Overlay">
+            <OverlayForm />
+          </SettingsCard>
+          <AppSettingsForm />
+        </CardGrid>
       </Section>
       <Section id="build" label="Build">
-        <div className={classNames(formStyles.form)}>
-          <BuildCodeForm />
-          <PobEditorSelect />
-          <LiveCharacterForm />
-          <SearchStringsEditor />
-          <span className={classNames(styles.hint)}>
-            A # line names the string below it.
-          </span>
-        </div>
+        <CardGrid>
+          <SettingsCard title="Build" wide>
+            <BuildCodeForm />
+            <PobEditorSelect />
+          </SettingsCard>
+          <SettingsCard title="Character">
+            <LiveCharacterForm />
+          </SettingsCard>
+          <SettingsCard
+            title="Search"
+            aside={
+              <a
+                href="https://poe.re/"
+                target="_blank"
+                rel="noreferrer"
+                title="Path of Exile Regex"
+              >
+                poe.re
+              </a>
+            }
+          >
+            <SearchStringsEditor />
+          </SettingsCard>
+        </CardGrid>
       </Section>
       <Section id="route" label="Route">
-        <RouteActions />
-        <hr />
-        <BuildInfoForm
-          buildData={buildData}
-          onSubmit={(buildData) => {
-            setBuildData(buildData);
-          }}
-        />
-        <hr />
-        <ConfigForm
-          config={config}
-          onSubmit={(config) => {
-            setConfig(config);
-          }}
-        />
-        {requiredGems.length > 0 && (
-          <>
-            <hr />
-            {/* Long: open until you fold it, then as you left it. */}
-            <details
-              className={classNames(styles.gems)}
-              open={gemsOpen}
-              onToggle={(event) => {
-                const open = event.currentTarget.open;
-                if (open !== gemsOpen) setGemsOpen(open);
+        <CardGrid>
+          {/* Alone (no gem list yet): full width, not half a row. */}
+          <SettingsCard title="Route" wide={requiredGems.length === 0}>
+            <BuildInfoForm
+              buildData={buildData}
+              onSubmit={(buildData) => {
+                setBuildData(buildData);
               }}
-            >
-              <summary>Gems ({requiredGems.length})</summary>
-              <GemEditForm
-                requiredGems={requiredGems}
-                onUpdate={(requiredGems) => {
-                  setRequiredGems(requiredGems);
-                }}
-              />
-            </details>
-          </>
-        )}
+            />
+            <ConfigForm
+              config={config}
+              onSubmit={(config) => {
+                setConfig(config);
+              }}
+            />
+            <RouteButtons />
+          </SettingsCard>
+          {requiredGems.length > 0 && (
+            <SettingsCard title="Gems" aside={requiredGems.length}>
+              {/* Long: it scrolls inside the card. */}
+              <div className={classNames(styles.gems)}>
+                <GemEditForm
+                  requiredGems={requiredGems}
+                  onUpdate={(requiredGems) => {
+                    setRequiredGems(requiredGems);
+                  }}
+                />
+              </div>
+            </SettingsCard>
+          )}
+          <SettingsCard title="Reset" wide danger>
+            <Resets />
+          </SettingsCard>
+        </CardGrid>
       </Section>
     </div>
+  );
+}
+
+/** Edit route, and the export for other tools (the old menu bar's). */
+function RouteButtons() {
+  const navigate = useNavigate();
+  const exportRoute = useAtomCallback(
+    useCallback(async (get) => {
+      const route = await get(routeSelector);
+      const pobCode = get(pobAtom);
+      const output = [...route.sections, `pob-code:${pobCode ?? "none"}`];
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(output));
+        toast.success("Exported to Clipboard");
+      } catch {
+        toast.error("Export failed. Try again.");
+      }
+    }, []),
+  );
+
+  return (
+    <SettingRow label="">
+      <div className={classNames(formStyles.groupLeft)}>
+        <button
+          className={classNames(formStyles.formButton)}
+          onClick={() => navigate("/edit-route")}
+        >
+          Edit route
+        </button>
+        <button
+          className={classNames(formStyles.formButton)}
+          title="Copy the route and build for other tools"
+          onClick={() => exportRoute()}
+        >
+          Export
+        </button>
+      </div>
+    </SettingRow>
   );
 }
 
@@ -272,51 +328,24 @@ const RESETS = {
   },
 } as const;
 
-/** Route editing, the export for other tools (the old menu bar's), and the resets. */
-function RouteActions() {
-  const navigate = useNavigate();
+/** The Reset card's buttons. Each asks first. */
+function Resets() {
   const resetCampaign = useSetAtom(resetCampaignAtom);
   const resetGems = useSetAtom(resetGemsAtom);
   const [confirm, setConfirm] = useState<keyof typeof RESETS | null>(null);
   const asking = confirm === null ? null : RESETS[confirm];
-  const exportRoute = useAtomCallback(
-    useCallback(async (get) => {
-      const route = await get(routeSelector);
-      const pobCode = get(pobAtom);
-      const output = [...route.sections, `pob-code:${pobCode ?? "none"}`];
-      try {
-        await navigator.clipboard.writeText(JSON.stringify(output));
-        toast.success("Exported to Clipboard");
-      } catch {
-        toast.error("Export failed. Try again.");
-      }
-    }, []),
-  );
 
   return (
-    <div className={classNames(formStyles.form)}>
-      <div className={classNames(formStyles.groupLeft)}>
+    <>
+      <div className={classNames(styles.resets)}>
         <button
-          className={classNames(formStyles.formButton)}
-          onClick={() => navigate("/edit-route")}
-        >
-          Edit route
-        </button>
-        <button
-          className={classNames(formStyles.formButton)}
-          title="Copy the route and build for other tools"
-          onClick={() => exportRoute()}
-        >
-          Export
-        </button>
-        <button
-          className={classNames(formStyles.formButton)}
+          className={classNames(formStyles.formButton, styles.reset)}
           onClick={() => setConfirm("campaign")}
         >
           Reset campaign
         </button>
         <button
-          className={classNames(formStyles.formButton)}
+          className={classNames(formStyles.formButton, styles.reset)}
           onClick={() => setConfirm("gems")}
         >
           Reset gems
@@ -355,6 +384,6 @@ function RouteActions() {
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   );
 }

@@ -1,6 +1,4 @@
-import { SplitRow } from "../SplitRow";
-import styles from "./styles.module.css";
-import classNames from "classnames";
+import { SettingRow, SwitchRow } from "../SettingsCard";
 import type { RouteData } from "common";
 
 interface BuildInfoFormProps {
@@ -8,61 +6,26 @@ interface BuildInfoFormProps {
   onSubmit: (buildData: RouteData.BuildData) => void;
 }
 
+/** Settings → Route: the build's class and bandit (from PoB), League start and Library. */
 export function BuildInfoForm({ buildData, onSubmit }: BuildInfoFormProps) {
   return (
-    <div className={classNames(styles.form)}>
-      <SplitRow
-        left={<div className={classNames(styles.label)}>Class</div>}
-        right={
-          <div className={classNames(styles.value)}>
-            {buildData.characterClass}
-          </div>
-        }
+    <>
+      <SettingRow label="Class" inline>
+        {buildData.characterClass}
+      </SettingRow>
+      <SettingRow label="Bandits" inline>
+        {buildData.bandit == "None" ? "Kill all" : buildData.bandit}
+      </SettingRow>
+      <SwitchRow
+        label="League start"
+        checked={buildData.leagueStart}
+        onChange={(leagueStart) => onSubmit({ ...buildData, leagueStart })}
       />
-      <SplitRow
-        left={<div className={classNames(styles.label)}>Bandits</div>}
-        right={
-          <div className={classNames(styles.value)}>
-            {buildData.bandit == "None" ? "Kill All" : buildData.bandit}
-          </div>
-        }
+      <SwitchRow
+        label="Library"
+        checked={buildData.library}
+        onChange={(library) => onSubmit({ ...buildData, library })}
       />
-      <SplitRow
-        left={<div className={classNames(styles.label)}>League Start</div>}
-        right={
-          <div className={classNames(styles.value)}>
-            <input
-              type="checkbox"
-              checked={buildData.leagueStart}
-              onChange={(evt) => {
-                onSubmit({
-                  ...buildData,
-                  leagueStart: evt.target.checked,
-                });
-              }}
-              aria-label="League Start"
-            />
-          </div>
-        }
-      />
-      <SplitRow
-        left={<div className={classNames(styles.label)}>Library</div>}
-        right={
-          <div className={classNames(styles.value)}>
-            <input
-              type="checkbox"
-              checked={buildData.library}
-              onChange={(evt) => {
-                onSubmit({
-                  ...buildData,
-                  library: evt.target.checked,
-                });
-              }}
-              aria-label="Library"
-            />
-          </div>
-        }
-      />
-    </div>
+    </>
   );
 }

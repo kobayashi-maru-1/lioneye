@@ -11,6 +11,7 @@ import { fetchStringOrUrl, getRewriteUrl } from "../../utility";
 import { URL_REWRITERS } from "../BuildImportForm";
 import { DesktopPob, errorMessage, usePobHome } from "../DesktopPob";
 import { Modal } from "../Modal";
+import { SettingRow } from "../SettingsCard";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useAtomValue, useSetAtom } from "jotai";
@@ -30,8 +31,9 @@ function readable(code: string) {
  * The build. Load: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link and
  * Import code, or Open file for a build file PoB saved (then each save in PoB updates the
  * guide). Loaded: Edit in PoB opens the build in the PoB chosen under Editor, when it's
- * installed (components/DesktopPob); Copy code; Unload.
- * Loading a build keeps your progress; Unload removes it.
+ * installed (components/DesktopPob); Copy code; Clear build (asks first).
+ * Loading a build keeps your progress; Clear build removes the build, not the progress.
+ * The PoB code row of Settings' Build card.
  */
 export function BuildCodeForm() {
   const code = useAtomValue(pobAtom);
@@ -43,13 +45,13 @@ export function BuildCodeForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [confirmUnload, setConfirmUnload] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const home = usePobHome();
   // Unique, should the form ever show twice.
   const loadId = useId();
   const loadedId = useId();
   const codeRef = useRef<HTMLTextAreaElement>(null);
-  // A new build loaded (or unloaded): its code shows as the placeholder. What you were
+  // A new build loaded (or cleared): its code shows as the placeholder. What you were
   // typing stays (a save in PoB refreshes the code too).
   useEffect(() => {
     setError(null);
@@ -115,8 +117,7 @@ export function BuildCodeForm() {
   };
 
   return (
-    <div className={classNames(formStyles.formRow)}>
-      <label htmlFor="pob-code">PoB code</label>
+    <SettingRow label="PoB code" htmlFor="pob-code">
       <textarea
         ref={codeRef}
         id="pob-code"
@@ -140,13 +141,13 @@ export function BuildCodeForm() {
         </div>
       )}
       {error && (
-        <span
+        <div
           id="pob-code-error"
           role="alert"
           className={classNames(styles.error)}
         >
           {error}
-        </span>
+        </div>
       )}
       {/* Two groups: bring a build in, and act on the one loaded. */}
       <div className={classNames(styles.actions)}>
@@ -204,9 +205,9 @@ export function BuildCodeForm() {
               <button
                 className={classNames(formStyles.formButton)}
                 disabled={busy}
-                onClick={() => setConfirmUnload(true)}
+                onClick={() => setConfirmClear(true)}
               >
-                Unload
+                Clear build
               </button>
             </div>
           </div>
@@ -214,9 +215,9 @@ export function BuildCodeForm() {
       </div>
       <Modal
         size="small"
-        isOpen={confirmUnload}
-        onRequestClose={() => setConfirmUnload(false)}
-        // After Unload its button is gone (the Loaded group hides): focus the code box.
+        isOpen={confirmClear}
+        onRequestClose={() => setConfirmClear(false)}
+        // After Clear build its button is gone (the Loaded group hides): focus the code box.
         onAfterClose={() => {
           if (
             !document.activeElement ||
@@ -224,34 +225,34 @@ export function BuildCodeForm() {
           )
             codeRef.current?.focus();
         }}
-        contentLabel="Unload build?"
+        contentLabel="Clear build?"
       >
         <div className={classNames(formStyles.form)}>
           <div className={classNames(formStyles.formRow)}>
-            <label>Unload build?</label>
+            <label>Clear build?</label>
           </div>
           <p>Progress stays.</p>
           <div className={classNames(formStyles.groupRight)}>
             <button
               className={classNames(formStyles.formButton)}
               autoFocus
-              onClick={() => setConfirmUnload(false)}
+              onClick={() => setConfirmClear(false)}
             >
               Cancel
             </button>
             <button
               className={classNames(formStyles.formButton)}
               onClick={() => {
-                setConfirmUnload(false);
+                setConfirmClear(false);
                 unload();
-                toast.success("Build unloaded");
+                toast.success("Build cleared");
               }}
             >
-              Unload
+              Clear
             </button>
           </div>
         </div>
       </Modal>
-    </div>
+    </SettingRow>
   );
 }
