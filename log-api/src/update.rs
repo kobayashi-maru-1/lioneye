@@ -1,6 +1,10 @@
 //! Self-update: finds a newer release on GitHub, and on request (the tray's Update item or
-//! the footer's install icon) downloads it, checks it against GitHub's checksum, swaps the
-//! exe and restarts.
+//! the footer's install icon) downloads it, checks it against GitHub's checksum and the
+//! release key's signature, swaps the exe and restarts.
+//!
+//! The signature (`lioneye.zip.minisig`, made by tools/sign-release on the publisher's PC)
+//! is what makes an update trusted: the secret key never reaches GitHub, so a taken-over
+//! GitHub account can't ship one. A release without it isn't offered.
 //!
 //! Windows won't overwrite a running exe but lets it be renamed: the running copy becomes
 //! `lioneye.exe.old`, the new one takes its name, and is started with `--after-update <pid>`
@@ -26,6 +30,11 @@ use tracing::{info, warn};
 
 const REPO: &str = "kobayashi-maru-1/lioneye";
 const ASSET: &str = "lioneye.zip";
+/// lioneye.zip's minisign signature, uploaded with each release.
+const SIGNATURE: &str = "lioneye.zip.minisig";
+/// The release key's public half (minisign's format). An update installs only when signed
+/// with its secret half, and only for the tag the signature names.
+const RELEASE_KEY: &str = include_str!("../release-key.pub");
 const EXE_IN_ZIP: &str = "lioneye.exe";
 /// How often the exe asks GitHub by itself.
 pub const RECHECK: Duration = Duration::from_secs(6 * 60 * 60);
@@ -64,6 +73,15 @@ pub struct Release {
     pub url: String,
     /// lioneye.zip's SHA-256, lowercase hex, from GitHub.
     pub sha256: Option<String>,
+    /// Has lioneye.zip.minisig: only a signed release is offered.
+    pub signed: bool,
+}
+
+impl Release {
+    /// One this exe would install: newer, and signed.
+    fn installable(&self, version: &str) -> bool {
+        self.signed && newer(&self.tag, version)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -77,7 +95,7 @@ pub enum Phase {
 /// What the footer and the tray show.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct View {
-    /// A release newer than this exe, if GitHub has one.
+    /// A signed release newer than this exe, if GitHub has one.
     pub latest: Option<LatestView>,
     pub state: Phase,
     /// Why the last install failed, a short phrase ("GitHub not reached").
@@ -158,7 +176,7 @@ impl Updater {
             latest: inner
                 .latest
                 .as_ref()
-                .filter(|r| newer(&r.tag, self.version))
+                .filter(|r| r.installable(self.version))
                 .map(|r| LatestView {
                     tag: r.tag.clone(),
                     url: r.url.clone(),
@@ -201,6 +219,9 @@ impl Updater {
                 Ok(release) => {
                     if inner.latest.as_ref() != Some(&release) {
                         info!("Latest release: {}", release.tag);
+                        if newer(&release.tag, self.version) && !release.signed {
+                            warn!("Release {} not signed; not offered", release.tag);
+                        }
                         inner.set_latest(release);
                     }
                 }
@@ -215,7 +236,7 @@ impl Updater {
     pub fn install(self: &Arc<Self>) -> bool {
         let release = {
             let mut inner = self.inner.lock().unwrap();
-            let Some(release) = inner.latest.clone().filter(|r| newer(&r.tag, self.version)) else {
+            let Some(release) = inner.latest.clone().filter(|r| r.installable(self.version)) else {
                 return false;
             };
             if inner.phase == Phase::Installing {
@@ -246,10 +267,12 @@ impl Updater {
                     }
                 };
                 info!("Updating to {}", release.tag);
-                let result = if newer(&release.tag, updater.version) {
-                    install(&release)
-                } else {
+                let result = if !newer(&release.tag, updater.version) {
                     Err("No update".to_string())
+                } else if !release.signed {
+                    Err("Release not signed".to_string())
+                } else {
+                    install(&release)
                 };
                 match result {
                     Ok(()) => {
@@ -331,16 +354,34 @@ fn parse_release(body: &[u8]) -> Result<Release, String> {
         .and_then(|d| d.strip_prefix("sha256:"))
         .filter(|d| d.len() == 64 && d.chars().all(|c| c.is_ascii_hexdigit()))
         .map(str::to_ascii_lowercase);
-    Ok(Release { tag, url, sha256 })
+    let signed = json["assets"]
+        .as_array()
+        .is_some_and(|assets| assets.iter().any(|a| a["name"] == SIGNATURE));
+    Ok(Release {
+        tag,
+        url,
+        sha256,
+        signed,
+    })
 }
 
 fn install(release: &Release) -> Result<(), String> {
     let sha256 = release.sha256.as_deref().ok_or("No checksum on GitHub")?;
-    let zip = http_get(
-        "github.com",
-        &format!("/{REPO}/releases/download/{}/{ASSET}", release.tag),
-        None,
-    )?;
+    let download = |name: &str| {
+        http_get(
+            "github.com",
+            &format!("/{REPO}/releases/download/{}/{name}", release.tag),
+            None,
+        )
+    };
+    let signature = download(SIGNATURE)?;
+    let zip = download(ASSET)?;
+    // A damaged download says so; then the signature, before the zip is even opened (a
+    // zip GitHub vouches for isn't enough).
+    if hex(&Sha256::digest(&zip)) != sha256 {
+        return Err("Download corrupt".into());
+    }
+    check_signature(RELEASE_KEY, &zip, &signature, &release.tag)?;
     let new_exe = exe_from_zip(&zip, sha256)?;
     let exe = std::env::current_exe().map_err(|err| denied("Exe not found", err))?;
     let pid = std::process::id();
@@ -378,6 +419,28 @@ fn exe_from_zip(zip: &[u8], sha256: &str) -> Result<Vec<u8>, String> {
         return Err("Exe in the zip damaged".into());
     }
     Ok(exe)
+}
+
+/// Ok when `signature` is the release key's (`key`) over `zip`, made for release `tag`.
+/// The tag is in the signed comment, so an old signed zip can't pass as a newer release.
+fn check_signature(key: &str, zip: &[u8], signature: &[u8], tag: &str) -> Result<(), String> {
+    let invalid = |why: &dyn std::fmt::Display| {
+        warn!("Signature of {tag} rejected: {why}");
+        "Signature invalid".to_string()
+    };
+    let key = minisign_verify::PublicKey::decode(key).map_err(|e| invalid(&e))?;
+    let text = std::str::from_utf8(signature).map_err(|e| invalid(&e))?;
+    let signature = minisign_verify::Signature::decode(text).map_err(|e| invalid(&e))?;
+    key.verify(zip, &signature, false)
+        .map_err(|e| invalid(&e))?;
+    let expected = format!("{ASSET} {tag}");
+    if signature.trusted_comment() != expected {
+        return Err(invalid(&format_args!(
+            "signed for {:?}, not {expected:?}",
+            signature.trusted_comment()
+        )));
+    }
+    Ok(())
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -790,6 +853,8 @@ mod tests {
                       {"name":"lioneye.zip","digest":"sha256:B78E0B1FC9972FFDB262F0530175A23ED2C58B55B20C22EDFFF8970DE78937BC"}]}"#;
         let release = parse_release(body).unwrap();
         assert_eq!(release.tag, "v0.4.36");
+        assert!(!release.signed);
+        assert!(!release.installable("0.4.35"));
         assert_eq!(
             release.sha256.as_deref(),
             Some("b78e0b1fc9972ffdb262f0530175a23ed2c58b55b20c22edfff8970de78937bc")
@@ -804,6 +869,78 @@ mod tests {
             "https://github.com/kobayashi-maru-1/lioneye/releases/tag/v1.0.0"
         );
         assert_eq!(elsewhere.sha256, None);
+        // With its signature: offered when newer.
+        let signed = parse_release(
+            br#"{"tag_name":"v0.4.37","assets":[{"name":"lioneye.zip"},{"name":"lioneye.zip.minisig"}]}"#,
+        )
+        .unwrap();
+        assert!(signed.signed);
+        assert!(signed.installable("0.4.36"));
+        assert!(!signed.installable("0.4.37"));
+    }
+
+    /// The key built into the exe reads.
+    #[test]
+    fn reads_the_release_key() {
+        minisign_verify::PublicKey::decode(RELEASE_KEY).unwrap();
+        // Not a stand-in: an all-zero key would refuse every update.
+        let line = RELEASE_KEY.lines().nth(1).unwrap();
+        assert!(
+            !line.starts_with("RWQAAAAAAAAAAAAA"),
+            "placeholder release key"
+        );
+        assert!(
+            !RELEASE_KEY.contains("placeholder"),
+            "placeholder release key"
+        );
+    }
+
+    #[test]
+    fn checks_the_signature() {
+        use minisign::{KeyPair, PublicKeyBox};
+        let KeyPair { pk, sk } = KeyPair::generate_unencrypted_keypair().unwrap();
+        let key = PublicKeyBox::to_string(&pk.to_box().unwrap());
+        let sign = |data: &[u8], comment: &str| {
+            minisign::sign(None, &sk, std::io::Cursor::new(data), Some(comment), None)
+                .unwrap()
+                .to_string()
+        };
+        let zip = b"zip bytes".as_slice();
+        let good = sign(zip, "lioneye.zip v1.2.3");
+        assert_eq!(
+            check_signature(&key, zip, good.as_bytes(), "v1.2.3"),
+            Ok(())
+        );
+
+        let invalid = Err("Signature invalid".to_string());
+        // Another zip, another tag, or a signature made for another tag.
+        assert_eq!(
+            check_signature(&key, b"other", good.as_bytes(), "v1.2.3"),
+            invalid
+        );
+        assert_eq!(
+            check_signature(&key, zip, good.as_bytes(), "v1.2.4"),
+            invalid
+        );
+        let old = sign(zip, "lioneye.zip v1.2.2");
+        assert_eq!(
+            check_signature(&key, zip, old.as_bytes(), "v1.2.3"),
+            invalid
+        );
+        // Another key, or not a signature at all.
+        let other = KeyPair::generate_unencrypted_keypair().unwrap().pk;
+        let other = PublicKeyBox::to_string(&other.to_box().unwrap());
+        assert_eq!(
+            check_signature(&other, zip, good.as_bytes(), "v1.2.3"),
+            invalid
+        );
+        assert_eq!(check_signature(&key, zip, b"Not Found", "v1.2.3"), invalid);
+        // A signature edited to name a newer tag no longer verifies.
+        let edited = good.replace("lioneye.zip v1.2.3", "lioneye.zip v9.9.9");
+        assert_eq!(
+            check_signature(&key, zip, edited.as_bytes(), "v9.9.9"),
+            invalid
+        );
     }
 
     #[test]
@@ -897,20 +1034,27 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// The real latest release: checksum, zip and exe. `cargo test -- --ignored live_release`
+    /// The real latest release: checksum, zip, exe and (once signed) signature.
+    /// `cargo test -- --ignored live_release`
     #[test]
     #[ignore]
     fn live_release() {
         let release = latest_release().unwrap();
         println!("{release:?}");
-        let zip = http_get(
-            "github.com",
-            &format!("/{REPO}/releases/download/{}/{ASSET}", release.tag),
-            None,
-        )
-        .unwrap();
+        let download = |name: &str| {
+            http_get(
+                "github.com",
+                &format!("/{REPO}/releases/download/{}/{name}", release.tag),
+                None,
+            )
+            .unwrap()
+        };
+        let zip = download(ASSET);
         let exe = exe_from_zip(&zip, release.sha256.as_deref().unwrap()).unwrap();
         println!("zip {} bytes, exe {} bytes", zip.len(), exe.len());
+        assert!(release.signed, "latest release has no signature");
+        check_signature(RELEASE_KEY, &zip, &download(SIGNATURE), &release.tag).unwrap();
+        println!("signature good");
     }
 
     #[test]

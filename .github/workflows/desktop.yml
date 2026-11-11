@@ -2,7 +2,9 @@ name: Desktop exe
 
 # Builds lioneye.exe: the guide plus the log watcher in one program. (Cargo builds it as
 # exile-leveling.exe, the name before 0.4; the "Name the exe" step renames it.)
-# Run it from the Actions tab, or push a tag like v1.0.0 to attach lioneye.zip to a release.
+# Run it from the Actions tab, or push a tag like v1.0.0 to attach lioneye.zip to a draft
+# release. The draft is signed on the publisher's PC (DESKTOP.md, Releases), then published:
+# the signing key never comes here.
 # Actions are pinned to commit SHAs so a moved tag can't change what runs.
 on:
   workflow_dispatch:
@@ -45,7 +47,10 @@ jobs:
         with:
           toolchain: stable
 
+      # Not for a release: a cached target folder isn't checked against anything, so a
+      # cache saved by another run could slip code into a release that then gets signed.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         with:
           workspaces: log-api
 
@@ -72,7 +77,26 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # The provenance attestation: proves lioneye.zip came from this workflow and commit,
+      # which the publisher checks before signing (tools/sign-release/sign-draft.ps1).
+      id-token: write
+      attestations: write
     steps:
+      # Only a tag with no release yet: a re-run must not replace a signed or published zip
+      # (the signature would no longer match) or add a second draft. To rebuild an unsigned
+      # draft, delete it first. Any other gh error stops here too.
+      - name: Stop if the tag has a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if out=$(gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --json tagName 2>&1); then
+            echo "::error::$GITHUB_REF_NAME already has a release (draft or published)."
+            exit 1
+          elif ! grep -q "release not found" <<< "$out"; then
+            echo "::error::Release lookup failed: $out"
+            exit 1
+          fi
+
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: lioneye-windows
@@ -82,7 +106,13 @@ jobs:
       - name: Zip the exe
         run: zip -j lioneye.zip lioneye.exe
 
-      - name: Attach to release
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: lioneye.zip
+
+      # A draft: installed copies only see it once it's signed and published.
+      - name: Attach to a draft release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: lioneye.zip
+          draft: true

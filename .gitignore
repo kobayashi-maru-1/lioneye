@@ -27,3 +27,4 @@ dist-ssr
 /common/data/tree/*.json
 # Desktop build output
 /exile-leveling.exe
+/tools/sign-release/target/

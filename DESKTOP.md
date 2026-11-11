@@ -34,13 +34,20 @@ The thin line at the bottom shows the app's version, the bundled Path of Buildin
 the date of the exile-leveling route data merged in, with **Update** when GitHub has a
 newer release (checked on start, every 6 hours, and when you come back to the window).
 **Update** opens the release's page; the download icon beside it, or **Update** in the tray
-menu, installs it: the exe downloads `lioneye.zip`, checks it against GitHub's SHA-256,
-renames itself to `lioneye.exe.old`, puts the new exe in its place and starts it (the new
-copy deletes the `.old` file). The open guide window reloads; your data carries over. If
+menu, installs it: the exe downloads `lioneye.zip`, checks it against GitHub's SHA-256 and
+the release key's signature (below), renames itself to `lioneye.exe.old`, puts the new exe
+in its place and starts it (the new copy deletes the `.old` file). The open guide window reloads; your data carries over. If
 it fails, the icon's tooltip says why and clicking it tries again; the exe log has the
 details. The exe's folder must be writable (the `Lioneye` folder in Downloads is). If the
 new exe doesn't start within a minute, the old one is put back. Should `lioneye.exe` ever
 be missing after an update, rename `lioneye.exe.old` back to it.
+
+Only a release signed with the release key is offered: `lioneye.zip.minisig`, signed on the
+publisher's PC (Releases, below). The exe has the public key built in
+(`log-api\release-key.pub`) and checks that the signature covers that zip and names that
+release's tag. The secret key never reaches GitHub, so someone who took over the GitHub
+account still couldn't ship an update. Copies older than 0.4.37 don't check signatures
+yet; they do once they've updated to it.
 
 | Option | Default | What it does |
 | --- | --- | --- |
@@ -380,11 +387,47 @@ outside the repo, so a synced folder such as OneDrive doesn't copy it. Set
 Or run **Desktop exe** from the GitHub Actions tab and download the artifact.
 Pushing a tag such as `v1.0.0` attaches `lioneye.zip` (the exe, zipped) to a release.
 
-The footer shows the version and the build's commit (`0.4.1 (1a2b3c4)`). To release: raise
-`version` in `log-api\Cargo.toml` (and its entry in `Cargo.lock`), commit, push a matching
-tag (`v0.4.2`), then add the notes to the release the workflow made. Copies on an older
-version show **Update** in the footer and the tray, and can install it from there. The zip keeps its name every release, so
-`releases/latest/download/lioneye.zip` always downloads the newest.
+The footer shows the version and the build's commit (`0.4.1 (1a2b3c4)`).
+
+### Releases
+
+1. Raise `version` in `log-api\Cargo.toml` (and its entry in `Cargo.lock`), commit, and push
+   a matching tag (`v0.4.2`). The workflow builds the exe (without the Rust cache, which
+   nothing checks), attaches `lioneye.zip` to a **draft** release that nobody sees yet, and
+   records a provenance attestation: which workflow and commit built it. A re-run stops if
+   the tag already has a release; to rebuild an unsigned draft, delete the draft first.
+2. Sign it on the publisher's PC: `.\tools\sign-release\sign-draft.ps1 -Tag v0.4.2`. It
+   checks the tag is the same commit here and on GitHub, verifies the attestation (built by
+   `desktop.yml` from that commit), checks the exe carries `log-api\release-key.pub`, then
+   signs and uploads `lioneye.zip.minisig`. Signing GitHub's zip without those checks would
+   sign whatever a taken-over account put there.
+3. Add the notes and publish:
+   `gh release edit v0.4.2 -R kobayashi-maru-1/lioneye --draft=false --latest --notes-file ...`.
+
+Copies on an older version then show **Update** in the footer and the tray. The zip keeps
+its name every release, so `releases/latest/download/lioneye.zip` always downloads the newest.
+
+**The release key.** The tool is `tools\sign-release`, not part of the exe or CI. Build it
+outside OneDrive:
+
+```powershell
+cd tools\sign-release
+$env:CARGO_TARGET_DIR = "$env:LOCALAPPDATA\exile-leveling\cargo-target-sign"
+cargo build --release   # sign-release.exe lands in that folder's release\
+Remove-Item Env:CARGO_TARGET_DIR
+```
+
+Its key folder, `%USERPROFILE%\Downloads\lioneye-signing`, holds:
+
+- `release.key`: the secret key, password-protected. The backup: keep a copy and its
+  password off this PC.
+- `release.key.dpapi`: the same key locked to this Windows account, so signing asks nothing.
+- `release.pub`: the public key, the same as `log-api\release-key.pub`.
+
+`sign-release.exe keygen` made them once. On a new PC, copy `release.key` into that folder
+and run `sign-release.exe restore` (it asks the password). `sign` refuses a key that isn't the one in
+`log-api\release-key.pub`. Losing the key means a new one: installed copies refuse releases
+signed with it, so everyone installs that release by hand once.
 
 For UI work, run the exe, then `npm -w web run dev` and open the address it prints;
 the dev page uses the running exe for auto-progress.

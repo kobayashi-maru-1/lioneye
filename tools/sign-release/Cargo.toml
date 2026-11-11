@@ -1,0 +1,18 @@
+[package]
+name = "sign-release"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Signs lioneye.zip for the self-update; the key stays on the publisher's PC."
+
+# Not part of the exe's build or CI: the secret key must never reach GitHub.
+[workspace]
+
+[dependencies]
+# Minisign keys and signatures (the format the exe's minisign-verify checks).
+minisign = "0.10"
+rpassword = "7"
+
+[target.'cfg(windows)'.dependencies]
+# DPAPI: the signing key, locked to this Windows account.
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
