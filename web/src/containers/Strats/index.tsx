@@ -17,9 +17,11 @@ const CHECK_WAIT_MS = 10000;
 const LIST_WAIT_MS = 15000;
 
 /**
- * The league cheat sheet from GitHub Pages, live in a frame, under its own bar of section
+ * The League page (the route and code keep its old name, Strats): the page from GitHub
+ * Pages with the cheat sheet, builds and trade searches, live in a frame, under its own bar of section
  * buttons. The page lists its sections for that bar, scrolls when one is picked, and hands
- * its links over to open in your Edge profile (all by postMessage).
+ * its links over to open in your Edge profile (all by postMessage). Its copy buttons
+ * write to the clipboard themselves (clipboard-write).
  */
 export default function StratsContainer() {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -114,7 +116,7 @@ export default function StratsContainer() {
 
   return (
     <div className={classNames(styles.page)}>
-      <nav className={classNames(styles.sections)} aria-label="Strats">
+      <nav className={classNames(styles.sections)} aria-label="League">
         {sections.map((section) => (
           <button
             key={section.id}
@@ -128,11 +130,13 @@ export default function StratsContainer() {
       <iframe
         ref={frame}
         className={classNames(styles.frame)}
-        title="Strats"
+        title="League"
         src={STRATS_URL}
         // allow-same-origin keeps the frame's real origin, which the message checks need.
         // No allow-top-navigation: the sheet can't move the app window elsewhere.
         sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        // Its Copy code / Copy link buttons (only write, never read the clipboard).
+        allow="clipboard-write"
         onLoad={onFrameLoad}
       />
     </div>

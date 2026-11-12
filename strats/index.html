@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Covens of Umbra Cheat Sheet</title>
-<meta name="description" content="Path of Exile 3.30 trade league cheat sheet: leveling, voidstones, atlas quadrants, swap gems, farms, investing and crafts.">
+<meta name="description" content="Path of Exile 3.30 trade league page: builds, leveling, voidstones, atlas quadrants, swap gems, farms, investing, crafts and trade searches.">
 <!--
-  Lioneye's Strats page shows this file in a frame (web/src/containers/Strats).
-  Each <section> with an id and data-jump becomes a jump button in the app's bar.
-  Edit the content freely; keep those two attributes on the sections.
+  Lioneye's League page shows this file in a frame (web/src/containers/Strats).
+  Each <section> with an id and data-jump becomes a jump button in the app's bar, and its
+  .ph header bar folds it (state kept per section id). Edit the content freely; keep those
+  two attributes and the .ph > h2 header on the sections.
+  Builds and Trade are Lioneye's own sections, not part of the cheat sheet artifact: keep
+  them, builds/ and the script when copying a new version of the sheet in.
   Fonts are served from fonts/ (SIL OFL, licenses there), not Google Fonts.
 -->
 <style>
@@ -139,6 +142,29 @@
   .quad dd { margin: 0; color: var(--bone); }
   .quad p { margin: 0; font-size: 14.5px; }
   @media (max-width: 420px) { .quad dl { grid-template-columns: 1fr; } .quad dd { margin-bottom: 4px; } }
+
+  /* Folding (Lioneye): a section's header bar folds it; each section's state is kept in this browser. */
+  html.js .ph { cursor: pointer; }
+  .fold { all: unset; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .fold:focus-visible { outline: 2px solid var(--spectral); outline-offset: 3px; border-radius: 2px; }
+  .fold svg { width: 16px; height: 16px; flex: none; stroke: var(--gilt); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
+  .panel.folded .fold svg { transform: rotate(-90deg); }
+  .panel.folded > :not(.ph) { display: none; }
+  .panel.folded .ph { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+
+  /* Builds and Trade (Lioneye): cards with a copy button */
+  .card .top { align-items: center; }
+  .card a.t { color: #f3efe6; text-decoration: none; }
+  .card a.t:hover { color: var(--spectral); text-decoration: underline; }
+  .copy { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 4px 8px; border: 1px solid rgba(201,162,74,0.45); border-radius: 4px;
+          background: transparent; color: var(--gilt); font: 700 12.5px var(--font-body); cursor: pointer; }
+  .copy svg { width: 12px; height: 16px; fill: currentColor; }
+  .copy:hover { color: #f0d58a; border-color: var(--gilt); }
+  .copy:focus-visible { outline: 2px solid var(--spectral); outline-offset: 2px; }
+  .copy.done { color: var(--verdant); border-color: var(--verdant); }
+  .copy.failed { color: var(--blackfire); border-color: var(--blackfire); }
+  .copy .state:empty { display: none; }
+  html:not(.js) .copy { display: none; } /* the script makes them work */
 </style>
 </head>
 <body>
@@ -147,6 +173,18 @@
     <div class="eyebrow">Path of Exile 3.30 · Trade league</div>
     <h1>Covens of Umbra Cheat Sheet</h1>
   </header>
+
+  <!-- Builds (Lioneye, not part of the cheat sheet artifact): each code is a file in builds/,
+       made from the PoB file without its character-import details. -->
+  <section class="panel" id="builds" data-jump="Builds" aria-labelledby="h-builds">
+    <div class="ph"><h2 id="h-builds">Builds</h2><span class="sub">PoB codes</span></div>
+    <div class="farms">
+      <div class="farm card"><div class="top"><span class="t">Kinetic Blast of Clustering</span><button class="copy" type="button" data-code="builds/kinetic-blast-necro.txt" aria-label="Copy code" title="Copy code"></button></div><ul><li>Necromancer · 9 loadouts</li><li>Early maps to mirror tier</li><li>From Redviles, lifewithoutpants, Ben</li></ul></div>
+      <div class="farm card"><div class="top"><span class="t">Holy Relic · SRS start</span><button class="copy" type="button" data-code="builds/hroc-necro-srs.txt" aria-label="Copy code" title="Copy code"></button></div><ul><li>Necromancer · Holy Relic of Conviction</li><li>BalorMage's poison SRS leveling</li><li>HRoC from level 53, Spectre Defilers</li></ul></div>
+      <div class="farm card"><div class="top"><span class="t">Holy Relic · Absolution start</span><button class="copy" type="button" data-code="builds/hroc-necro-absolution.txt" aria-label="Copy code" title="Copy code"></button></div><ul><li>Necromancer · Holy Relic of Conviction</li><li>BalorMage's Absolution leveling</li><li>HRoC from level 53, Spectre Defilers</li></ul></div>
+      <div class="farm card"><div class="top"><span class="t">Frostbearer Spectres</span><button class="copy" type="button" data-code="builds/frostbearer-necro-srs.txt" aria-label="Copy code" title="Copy code"></button></div><ul><li>Necromancer · SRS start</li><li>BalorMage's poison SRS leveling</li><li>Frostbearers once you have corpses, Spectre Defilers</li></ul></div>
+    </div>
+  </section>
 
   <section class="panel" id="leveling" data-jump="Leveling" aria-labelledby="h-level">
     <div class="ph"><h2 id="h-level">Leveling</h2><span class="sub">Every character</span></div>
@@ -317,20 +355,168 @@
     </div>
   </section>
 
-  <details class="sources">
+  <!-- Trade (Lioneye, not part of the cheat sheet artifact): each link is built from its
+       data-query (official trade JSON) and the section's data-league. New league: change
+       data-league to its trade name ("Standard" until it's listed). -->
+  <section class="panel" id="trade" data-jump="Trade" aria-labelledby="h-trade" data-league="Standard">
+    <div class="ph"><h2 id="h-trade">Trade</h2><span class="sub">League: <b class="league-name">Standard</b></span></div>
+    <div class="farms">
+      <div class="farm card"><div class="top"><a class="t" href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"available"},"name":"Elegant Hubris","type":"Timeless Jewel","stats":[{"type":"count","value":{"min":1},"filters":[{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":5440,"max":5440}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":29980,"max":29980}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":41240,"max":41240}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":48560,"max":48560}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":84620,"max":84620}}]}]},"sort":{"price":"asc"}}'>Elegant Hubris: best 5</a><button class="copy" type="button" data-copy-link aria-label="Copy link" title="Copy link"></button></div><ul><li>HRoC socket by Arcanist's Dominion</li><li>Caspiro: Supreme Ostentation</li><li>Slum Lord + Eternal Resilience in 11 points</li><li>Seeds 5440, 29980, 41240, 48560, 84620</li></ul></div>
+      <div class="farm card"><div class="top"><a class="t" href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"available"},"name":"Elegant Hubris","type":"Timeless Jewel","stats":[{"type":"count","value":{"min":1},"filters":[{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":5440,"max":5440}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":29980,"max":29980}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":41240,"max":41240}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":48560,"max":48560}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":84620,"max":84620}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":38740,"max":38740}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":46640,"max":46640}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":54380,"max":54380}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":59360,"max":59360}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":62780,"max":62780}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":74660,"max":74660}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":89260,"max":89260}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":92400,"max":92400}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":107960,"max":107960}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":113600,"max":113600}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":124120,"max":124120}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":124440,"max":124440}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":131680,"max":131680}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":135600,"max":135600}},{"id":"explicit.pseudo_timeless_jewel_caspiro","value":{"min":140860,"max":140860}}]}]},"sort":{"price":"asc"}}'>Elegant Hubris: 20 seeds</a><button class="copy" type="button" data-copy-link aria-label="Copy link" title="Copy link"></button></div><ul><li>Same socket and keystone</li><li>Slum Lord + Eternal Resilience in 11–12 points</li><li>The best 5 plus 15 more</li></ul></div>
+    </div>
+  </section>
+
+  <details class="sources" id="sources">
     <summary>Sources</summary>
     <p><a href="https://www.pathofexile.com/forum/view-thread/4013680" target="_blank" rel="noopener">3.30 patch notes</a> · tytykiller's 3.30 starter list · WizChamp's League Start Wealth Plan · <a href="https://poedb.tw/us/atlas-skill-tree/" target="_blank" rel="noopener">poedb 3.30 Atlas tree</a> · <a href="https://www.poewiki.net/wiki/Atlas_anomaly" target="_blank" rel="noopener">PoE Wiki: Atlas anomaly</a> · <a href="https://www.poewiki.net/wiki/Templar_Vault" target="_blank" rel="noopener">Memory vaults</a> · <a href="https://poe.ninja/poe1/economy" target="_blank" rel="noopener">poe.ninja</a>. Gem prices: Mirage (3.28) days 5–14. Built Nov 11, 2026, before launch.</p>
   </details>
 </main>
 <script>
-  // Lioneye's Strats page frames this file. It asks for the jump list ("strats-list")
+  // Lioneye's League page frames this file. It asks for the jump list ("strats-list")
   // and asks to scroll to a section ("strats-jump"). When framed, links are handed to it
   // ("strats-open") so they open in your own browser profile. Nothing else is sent.
+  // Also: folding sections, building the trade links, and the copy buttons.
   (function () {
     var framed = window.parent !== window;
     var sections = Array.prototype.slice.call(document.querySelectorAll("section[id][data-jump]"));
     var list = sections.map(function (s) { return { id: s.id, label: s.getAttribute("data-jump") }; });
     var parentOrigin = null;
+
+    // Folding: the header bar of each section folds it. Kept per section id in this browser
+    // (storage can be blocked, e.g. private windows: then it just starts unfolded).
+    document.documentElement.classList.add("js");
+    // Specific key: every kobayashi-maru-1.github.io page shares this origin's storage.
+    var FOLD_KEY = "lioneye-league-folded";
+    var folded = {};
+    try { folded = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); } catch (err) { folded = {}; }
+    if (!folded || typeof folded !== "object" || Array.isArray(folded)) folded = {};
+    function saveFolds() { try { localStorage.setItem(FOLD_KEY, JSON.stringify(folded)); } catch (err) { /* not kept */ } }
+    var CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+    function setFolded(section, value, save) {
+      section.classList.toggle("folded", value);
+      var button = section.querySelector(".fold");
+      if (button) button.setAttribute("aria-expanded", value ? "false" : "true");
+      if (save) { folded[section.id] = value; saveFolds(); }
+    }
+    sections.forEach(function (section) {
+      var bar = section.querySelector(".ph");
+      var heading = bar && bar.querySelector("h2");
+      if (!heading) return;
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "fold";
+      button.innerHTML = CHEVRON;
+      button.appendChild(document.createTextNode(heading.textContent));
+      heading.textContent = "";
+      heading.appendChild(button);
+      setFolded(section, folded[section.id] === true, false);
+      bar.addEventListener("click", function (e) {
+        if (e.target instanceof Element && e.target.closest("a, .copy")) return;
+        setFolded(section, !section.classList.contains("folded"), true);
+      });
+    });
+    // A link to a section (#trade) opens it when it's folded.
+    function openFromHash() {
+      var target = location.hash ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+      if (target && target.classList.contains("folded") && sections.indexOf(target) >= 0) {
+        setFolded(target, false, true);
+        target.scrollIntoView({ block: "start" });
+      }
+    }
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    var sources = document.getElementById("sources");
+    if (sources) {
+      if (typeof folded.sources === "boolean") sources.open = !folded.sources;
+      sources.addEventListener("toggle", function () { folded.sources = !sources.open; saveFolds(); });
+    }
+
+    // Trade links: built from each link's data-query and the Trade section's data-league.
+    var trade = document.getElementById("trade");
+    var league = (trade && trade.getAttribute("data-league")) || "Standard";
+    Array.prototype.forEach.call(document.querySelectorAll("a[data-query]"), function (link) {
+      link.href = "https://www.pathofexile.com/trade/search/" + encodeURIComponent(league) +
+        "?q=" + encodeURIComponent(link.getAttribute("data-query"));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".league-name"), function (el) { el.textContent = league; });
+
+    // Copy buttons: a build's PoB code (data-code, a file in builds/) or the trade link
+    // next to the button. Codes are fetched up front so the copy happens on the click itself.
+    var COPY_ICON = '<svg viewBox="0 0 384 512" aria-hidden="true"><path d="M336 64h-80c0-35.3-28.7-64-64-64s-64 28.7-64 64H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h288c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48zM192 40c13.3 0 24 10.7 24 24s-10.7 24-24 24-24-10.7-24-24 10.7-24 24-24zm144 418c0 3.3-2.7 6-6 6H54c-3.3 0-6-2.7-6-6V118c0-3.3 2.7-6 6-6h42v36c0 6.6 5.4 12 12 12h168c6.6 0 12-5.4 12-12v-36h42c3.3 0 6 2.7 6 6z"></path></svg>';
+    // Icon: Font Awesome Free 5.15.4 "clipboard" (regular), CC BY 4.0, as in the app.
+    var codes = {};
+    function loadCode(file) {
+      if (!codes[file]) {
+        codes[file] = fetch(file, { cache: "no-cache" }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.text();
+        }).then(function (text) { codes[file].text = text.trim(); return text.trim(); });
+        codes[file].catch(function () { delete codes[file]; });
+      }
+      return codes[file];
+    }
+    function fallbackCopy(text) {
+      var focused = document.activeElement;
+      var area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed"; area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+      area.remove();
+      // Back to the button, so keyboard and screen reader users keep their place.
+      if (focused && focused.focus) focused.focus();
+      return ok;
+    }
+    function writeText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).catch(function () {
+          if (!fallbackCopy(text)) throw new Error("blocked");
+        });
+      }
+      return fallbackCopy(text) ? Promise.resolve() : Promise.reject(new Error("blocked"));
+    }
+    function copyCode(file) {
+      var pending = loadCode(file);
+      if (typeof pending.text === "string") return writeText(pending.text);
+      // Not fetched yet: hand the clipboard a promise so the click still counts. Blocked
+      // (an app before v0.4.48 doesn't grant the frame clipboard-write): the other ways.
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        var blob = pending.then(function (text) { return new Blob([text], { type: "text/plain" }); });
+        return navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })])
+          .catch(function () { return pending.then(writeText); });
+      }
+      return pending.then(writeText);
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("button.copy"), function (button) {
+      var state = document.createElement("span");
+      state.className = "state";
+      state.setAttribute("aria-live", "polite");
+      button.innerHTML = COPY_ICON;
+      button.appendChild(state);
+      var file = button.getAttribute("data-code");
+      if (file) loadCode(file);
+      var timer = null;
+      button.addEventListener("click", function () {
+        var job;
+        if (file) job = copyCode(file);
+        else {
+          var link = button.closest(".top") && button.closest(".top").querySelector("a[href]");
+          job = link ? writeText(link.href) : Promise.reject(new Error("no link"));
+        }
+        job.then(function () { show("done", "Copied"); }, function () { show("failed", "Not copied. Retry."); });
+      });
+      function show(kind, text) {
+        clearTimeout(timer);
+        button.classList.remove("done", "failed");
+        button.classList.add(kind);
+        state.textContent = text;
+        timer = setTimeout(function () { button.classList.remove(kind); state.textContent = ""; }, 2000);
+      }
+    });
+
     window.addEventListener("message", function (e) {
       var d = e.data;
       if (!framed || e.source !== window.parent || e.origin === "null") return;
@@ -340,7 +526,12 @@
         window.parent.postMessage({ type: "strats-sections", sections: list }, e.origin);
       } else if (d.type === "strats-jump" && typeof d.id === "string") {
         for (var i = 0; i < sections.length; i++) {
-          if (sections[i].id === d.id) { sections[i].scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+          if (sections[i].id === d.id) {
+            // A jump to a folded section opens it.
+            if (sections[i].classList.contains("folded")) setFolded(sections[i], false, true);
+            sections[i].scrollIntoView({ behavior: "smooth", block: "start" });
+            return;
+          }
         }
       }
     });

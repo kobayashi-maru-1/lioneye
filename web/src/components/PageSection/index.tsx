@@ -165,7 +165,7 @@ let pendingJump: ReturnType<typeof setTimeout> | undefined;
 const onGuide = () => location.hash === "" || location.hash === "#/";
 
 /**
- * Jumps to a guide panel from any page: from another page (Strats, Settings), back to the
+ * Jumps to a guide panel from any page: from another page (League, Settings), back to the
  * guide first; it loads lazily, so the jump waits for the panel (up to 5 s). It gives up
  * when you leave the guide meanwhile, or when the guide is open without that panel (a
  * build changed elsewhere). `then` runs once it has jumped.

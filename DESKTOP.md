@@ -301,16 +301,30 @@ settings; otherwise it leaves it alone and says so.
   timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub the first time.
   Specs on an older tree are calculated on the latest one (noted under the stats).
 
-## Strats
+## League
 
-- **Strats** in the top bar opens the league cheat sheet, loaded live from
-  <https://kobayashi-maru-1.github.io/lioneye/strats/>. The top bar stays as it is (its
-  panel buttons take you back to the guide, at that panel); under it, the page pins its
-  own bar with a button per section of the sheet (Leveling, Voidstones, ...), which the
-  sheet lists itself.
+- **League** in the top bar (called Strats before v0.4.48) opens the league page: our
+  builds, the league cheat sheet and trade searches, loaded live from
+  <https://kobayashi-maru-1.github.io/lioneye/strats/>. It works in any browser too, so
+  friends without Lioneye can use the same link. The top bar stays as it is (its panel
+  buttons take you back to the guide, at that panel); under it, the page pins its own bar
+  with a button per section (Builds, Leveling, ..., Trade), which the page lists itself.
+- Each section's header bar folds it; the page remembers which are folded (per browser).
+  Jumping to a folded section opens it.
+- **Builds**: a card per build with a copy button for its PoB code (paste into PoB's
+  Import or Lioneye's Settings). The codes are files in `strats/builds/`, made from the PoB
+  files without their character-import details (account, character, realm) or item
+  Unique IDs.
+- **Trade**: a card per search with a copy button for its link. Each link is built from
+  the card's `data-query` (official trade search JSON) and the section's `data-league`;
+  at a new league, change `data-league` to the league's trade name and every link follows.
+  The full links run past Discord's 2,000-character limit for big searches: share the
+  page instead.
+- The copy buttons need the frame's `clipboard-write` permission, which the app grants
+  from v0.4.48; older versions fall back to the browser's copy command.
 - It needs a connection: offline, or when the page doesn't answer, it shows **Not loaded**
-  with **Retry**. Links in the sheet open in your last-used Edge profile, like the guide's.
-- The sheet is `strats/index.html` in this repo. A push to `main` that changes `strats/`
+  with **Retry**. Links in the page open in your last-used Edge profile, like the guide's.
+- The page is `strats/index.html` in this repo. A push to `main` that changes `strats/`
   publishes it (workflow **Strats page**, `.github/workflows/strats.yml`), and the app shows
   the new version without a release (GitHub caches it for up to 10 minutes). Each
   `<section>` needs an `id` and a `data-jump` label for its bar button; keep the script at
@@ -323,8 +337,9 @@ settings; otherwise it leaves it alone and says so.
   (5 s), so a changed page can't open links on load or a pile of tabs. Left and middle
   clicks both go to your Edge profile.
 - Its fonts (Cinzel, Alegreya Sans, SIL OFL) are in `strats/fonts/`, so the page loads
-  nothing from Google. When copying a new version of the sheet in, keep the `@font-face`
-  rules instead of a Google Fonts link.
+  nothing from Google. When copying a new version of the cheat sheet in, keep the
+  `@font-face` rules instead of a Google Fonts link, and keep the Builds and Trade sections,
+  `builds/` and the script: they aren't part of the cheat sheet artifact.
 
 ## Overlay
 
@@ -500,7 +515,7 @@ the dev page uses the running exe for auto-progress.
 
 - `web`, `common`, `seeding`: [HeartofPhos/exile-leveling](https://github.com/HeartofPhos/exile-leveling) (remote `upstream`)
 - `log-api`: [HeartofPhos/exile-log-api](https://github.com/HeartofPhos/exile-log-api) (remote `upstream-log-api`, a git subtree), extended to serve the guide
-- `strats`: this repo's own league cheat sheet, published to GitHub Pages (see Strats)
+- `strats`: this repo's own league page (builds, cheat sheet, trade searches), published to GitHub Pages (see League)
 
 ## Pull upstream updates
 

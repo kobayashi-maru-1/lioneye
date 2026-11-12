@@ -73,12 +73,12 @@ export function App() {
                 }
               />
             ))}
-            {/* The league cheat sheet, live from GitHub Pages. */}
+            {/* The League page (cheat sheet, builds, trade), live from GitHub Pages. */}
             <Route
               path="/strats"
               element={
                 <Page
-                  title="Lioneye - Strats"
+                  title="Lioneye - League"
                   component={<StratsContainer />}
                 />
               }
