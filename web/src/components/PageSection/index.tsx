@@ -5,6 +5,7 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
 import React, { useCallback, useRef } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /** Whether a page section is folded. */
 export function usePageSectionCollapsed(id: string) {
@@ -155,5 +156,50 @@ export function useJumpToSection() {
         ),
       );
     }, []),
+  );
+}
+
+/** The jump still waiting for the guide to open, if any: a newer jump replaces it. */
+let pendingJump: ReturnType<typeof setTimeout> | undefined;
+
+const onGuide = () => location.hash === "" || location.hash === "#/";
+
+/**
+ * Jumps to a guide panel from any page: from another page (Strats, Settings), back to the
+ * guide first; it loads lazily, so the jump waits for the panel (up to 5 s). It gives up
+ * when you leave the guide meanwhile, or when the guide is open without that panel (a
+ * build changed elsewhere). `then` runs once it has jumped.
+ */
+export function useJumpToPanel() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const jumpToSection = useJumpToSection();
+  return useCallback(
+    (id: string, then?: () => void) => {
+      clearTimeout(pendingJump);
+      pendingJump = undefined;
+      const go = () => {
+        jumpToSection(id);
+        then?.();
+      };
+      if (pathname === "/" && onGuide()) {
+        go();
+        return;
+      }
+      if (!onGuide()) navigate("/");
+      let tries = 0;
+      let without = 0;
+      const wait = () => {
+        pendingJump = undefined;
+        if (!onGuide()) return;
+        if (document.getElementById(pageSectionId(id))) return go();
+        // Campaign is always there once the guide is: then the panel isn't coming.
+        if (document.getElementById(pageSectionId("campaign")) && ++without > 3)
+          return;
+        if (++tries < 50) pendingJump = setTimeout(wait, 100);
+      };
+      wait();
+    },
+    [pathname, navigate, jumpToSection],
   );
 }

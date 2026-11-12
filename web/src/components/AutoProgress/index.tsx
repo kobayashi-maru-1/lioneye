@@ -1,7 +1,6 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useAtomCallback } from "jotai/utils";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { bossesKilledBy } from "../../state/boss-kills";
 import {
   OVERLAY_PANELS,
@@ -34,7 +33,7 @@ import {
   storageSnapshot,
   takeReset,
 } from "../../state/saved-state";
-import { pageSectionId, useJumpToSection } from "../PageSection";
+import { useJumpToPanel } from "../PageSection";
 import { autoProgressAtom } from "../../state/auto-progress";
 import {
   characterLogAtom,
@@ -430,13 +429,11 @@ function uploadSavedState(send: (message: string) => void) {
 }
 
 /**
- * Jumps to a panel for the in-game bar: from Settings, back to the guide first. Campaign
+ * Jumps to a panel for the in-game bar: from another page, back to the guide first. Campaign
  * goes to your current step rather than the panel's top.
  */
 function useJumpFromGame() {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const jumpToSection = useJumpToSection();
+  const jumpToPanel = useJumpToPanel();
   const scrollToStep = useAtomCallback(
     useCallback((get) => {
       const element = document.getElementById(edgeId(get(activeEdgeAtom)[0]));
@@ -444,25 +441,12 @@ function useJumpFromGame() {
     }, []),
   );
   return useCallback(
-    (id: string) => {
-      const go = () => {
-        jumpToSection(id);
+    (id: string) =>
+      jumpToPanel(id, () => {
         // Once the panel has opened.
         if (id === "campaign") setTimeout(scrollToStep, 50);
-      };
-      if (pathname === "/") go();
-      else {
-        navigate("/");
-        // The guide page loads lazily: jump once its panel is there (up to 5 s).
-        let tries = 0;
-        const wait = () => {
-          if (document.getElementById(pageSectionId(id))) go();
-          else if (++tries < 50) setTimeout(wait, 100);
-        };
-        wait();
-      }
-    },
-    [pathname, navigate, jumpToSection, scrollToStep],
+      }),
+    [jumpToPanel, scrollToStep],
   );
 }
 

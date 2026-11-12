@@ -262,7 +262,8 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
     setTargets(targets);
     if (!viewingLive) setShownPanels(targets.map((target) => target.id));
   }, [targets, viewingLive]);
-  useEffect(() => () => setTargets([]), []);
+  // Kept when the page closes: the bar shows the panels on every page (Strats, Settings)
+  // and takes you back here. A build changed meanwhile updates them once this page opens.
   // No gem links, so no Gems panel to set the bar's Gems tooltip: clear the last build's.
   const setOverlayGems = useSetAtom(overlayGemsAtom);
   useEffect(() => {

@@ -1,5 +1,3 @@
-import { atom } from "jotai";
-
 /** The league cheat sheet, published from strats/ to GitHub Pages (strats.yml). */
 export const STRATS_URL = "https://kobayashi-maru-1.github.io/lioneye/strats/";
 export const STRATS_ORIGIN = new URL(STRATS_URL).origin;
@@ -8,12 +6,6 @@ export interface StratsSection {
   id: string;
   label: string;
 }
-
-/** The Strats page's sections, as the page itself lists them, for the bar's jump buttons. */
-export const stratsSectionsAtom = atom<StratsSection[]>([]);
-
-/** The section the bar asked to jump to: a new object per click, so the same one can repeat. */
-export const stratsJumpAtom = atom<{ id: string } | null>(null);
 
 const SECTION_ID = /^[A-Za-z0-9_-]{1,40}$/;
 

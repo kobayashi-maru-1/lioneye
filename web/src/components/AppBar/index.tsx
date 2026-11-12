@@ -1,9 +1,8 @@
-import { stratsJumpAtom, stratsSectionsAtom } from "../../state/strats";
 import { AutoProgressStatus } from "../AutoProgress";
-import { useJumpToSection } from "../PageSection";
+import { useJumpToPanel } from "../PageSection";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { atom, useAtomValue, useSetAtom } from "jotai";
+import { atom, useAtomValue } from "jotai";
 import { FiArrowLeft, FiSettings } from "react-icons/fi";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -16,24 +15,22 @@ export interface JumpTarget {
 export const jumpTargetsAtom = atom<JumpTarget[]>([]);
 
 /**
- * The app's one bar, pinned at the top: on the guide, a button per panel (opens it if
- * folded and scrolls to it); elsewhere, the way back to the guide, and on Strats a button
- * per cheat-sheet section. Strats and Settings right after them, and the auto-progress
- * pill at the right.
+ * The app's one bar, pinned at the top, the same on every page: a button per guide panel
+ * (opens it if folded and scrolls to it; from another page, back to the guide first),
+ * then Strats and Settings, and the auto-progress pill at the right. Before the guide
+ * has listed its panels (the app opened on another page), a Guide button instead.
  */
 export function AppBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const targets = useAtomValue(jumpTargetsAtom);
-  const jump = useJumpToSection();
-  const stratsSections = useAtomValue(stratsSectionsAtom);
-  const setStratsJump = useSetAtom(stratsJumpAtom);
-  const onGuide = pathname === "/";
+  const jump = useJumpToPanel();
   const onStrats = pathname === "/strats";
+  const onSettings = pathname === "/settings" || pathname === "/build";
 
   return (
     <nav className={classNames(styles.bar)} aria-label="Main">
-      {onGuide ? (
+      {targets.length > 0 ? (
         targets.map((target) => (
           <button
             key={target.id}
@@ -43,27 +40,15 @@ export function AppBar() {
             {target.label}
           </button>
         ))
-      ) : (
-        <>
-          <button
-            className={classNames(styles.button)}
-            onClick={() => navigate("/")}
-          >
-            <FiArrowLeft aria-hidden />
-            Guide
-          </button>
-          {onStrats &&
-            stratsSections.map((section) => (
-              <button
-                key={section.id}
-                className={classNames(styles.button)}
-                onClick={() => setStratsJump({ id: section.id })}
-              >
-                {section.label}
-              </button>
-            ))}
-        </>
-      )}
+      ) : pathname !== "/" ? (
+        <button
+          className={classNames(styles.button)}
+          onClick={() => navigate("/")}
+        >
+          <FiArrowLeft aria-hidden />
+          Guide
+        </button>
+      ) : null}
       <button
         className={classNames(styles.button, { [styles.active]: onStrats })}
         aria-current={onStrats ? "page" : undefined}
@@ -73,11 +58,9 @@ export function AppBar() {
       </button>
       <button
         className={classNames(styles.button, styles.icon, {
-          [styles.active]: pathname === "/settings" || pathname === "/build",
+          [styles.active]: onSettings,
         })}
-        aria-current={
-          pathname === "/settings" || pathname === "/build" ? "page" : undefined
-        }
+        aria-current={onSettings ? "page" : undefined}
         aria-label="Settings"
         title="Settings"
         onClick={() => navigate("/settings")}

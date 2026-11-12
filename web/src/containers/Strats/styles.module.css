@@ -1,10 +1,50 @@
-/* The cheat sheet fills the window below the bar (less the footer); it scrolls itself. */
-.frame {
-  display: block;
-  width: 100%;
+/* The page fills the window below the app bar (less the footer): its own section bar on
+   top, the cheat sheet below it, which scrolls itself, so the section bar stays put. */
+.page {
+  display: flex;
+  flex-direction: column;
   height: calc(
     100vh - var(--app-bar-height) - var(--size-2) - var(--footer-height)
   );
+}
+
+/* The sheet's sections: the same jump bar as Settings' (containers/Build), without its
+   underline, since the sheet doesn't say which section is in view. */
+.sections {
+  display: flex;
+  flex: none;
+  gap: var(--size-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  height: var(--settings-jump-height);
+  padding: 0 var(--size-3);
+  background-color: var(--primary);
+  border-bottom: var(--border-width) solid var(--panel-border);
+}
+
+.section {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  padding: 0 var(--size-3) var(--size-2);
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: var(--font-heavy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.section:hover {
+  color: #c99550;
+}
+
+.frame {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
   border: none;
 }
 

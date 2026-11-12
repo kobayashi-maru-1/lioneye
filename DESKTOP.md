@@ -304,8 +304,10 @@ settings; otherwise it leaves it alone and says so.
 ## Strats
 
 - **Strats** in the top bar opens the league cheat sheet, loaded live from
-  <https://kobayashi-maru-1.github.io/lioneye/strats/>. The bar then shows a button per
-  section of the sheet (Leveling, Voidstones, ...); the sheet lists them itself.
+  <https://kobayashi-maru-1.github.io/lioneye/strats/>. The top bar stays as it is (its
+  panel buttons take you back to the guide, at that panel); under it, the page pins its
+  own bar with a button per section of the sheet (Leveling, Voidstones, ...), which the
+  sheet lists itself.
 - It needs a connection: offline, or when the page doesn't answer, it shows **Not loaded**
   with **Retry**. Links in the sheet open in your last-used Edge profile, like the guide's.
 - The sheet is `strats/index.html` in this repo. A push to `main` that changes `strats/`

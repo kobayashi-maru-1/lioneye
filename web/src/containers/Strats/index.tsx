@@ -3,12 +3,10 @@ import {
   readSections,
   STRATS_ORIGIN,
   STRATS_URL,
-  stratsJumpAtom,
-  stratsSectionsAtom,
+  type StratsSection,
 } from "../../state/strats";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useAtom, useSetAtom } from "jotai";
 import { useEffect, useRef, useState } from "react";
 
 type Status = "checking" | "online" | "offline" | "missing";
@@ -19,14 +17,13 @@ const CHECK_WAIT_MS = 10000;
 const LIST_WAIT_MS = 15000;
 
 /**
- * The league cheat sheet from GitHub Pages, live in a frame. The page lists its sections
- * for the bar's jump buttons, scrolls when one is picked, and hands its links over to
- * open in your Edge profile (all by postMessage).
+ * The league cheat sheet from GitHub Pages, live in a frame, under its own bar of section
+ * buttons. The page lists its sections for that bar, scrolls when one is picked, and hands
+ * its links over to open in your Edge profile (all by postMessage).
  */
 export default function StratsContainer() {
   const frame = useRef<HTMLIFrameElement>(null);
-  const setSections = useSetAtom(stratsSectionsAtom);
-  const [jump, setJump] = useAtom(stratsJumpAtom);
+  const [sections, setSections] = useState<StratsSection[]>([]);
   const [status, setStatus] = useState<Status>("checking");
   const [listed, setListed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -39,6 +36,7 @@ export default function StratsContainer() {
     const timer = setTimeout(() => abort.abort(), CHECK_WAIT_MS);
     setStatus("checking");
     setListed(false);
+    setSections([]);
     fetch(STRATS_URL, {
       method: "HEAD",
       mode: "no-cors",
@@ -85,20 +83,14 @@ export default function StratsContainer() {
       }
     };
     window.addEventListener("message", onMessage);
-    return () => {
-      window.removeEventListener("message", onMessage);
-      setSections([]);
-      setJump(null);
-    };
+    return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  useEffect(() => {
-    if (jump === null) return;
+  const jumpTo = (id: string) =>
     frame.current?.contentWindow?.postMessage(
-      { type: "strats-jump", id: jump.id },
+      { type: "strats-jump", id },
       STRATS_ORIGIN,
     );
-  }, [jump]);
 
   if (status === "offline" || status === "missing") {
     return (
@@ -121,16 +113,29 @@ export default function StratsContainer() {
   if (status === "checking") return <Loading />;
 
   return (
-    <iframe
-      ref={frame}
-      className={classNames(styles.frame)}
-      title="Strats"
-      src={STRATS_URL}
-      // allow-same-origin keeps the frame's real origin, which the message checks need.
-      // No allow-top-navigation: the sheet can't move the app window elsewhere.
-      sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-      onLoad={onFrameLoad}
-    />
+    <div className={classNames(styles.page)}>
+      <nav className={classNames(styles.sections)} aria-label="Strats">
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            className={classNames(styles.section)}
+            onClick={() => jumpTo(section.id)}
+          >
+            {section.label}
+          </button>
+        ))}
+      </nav>
+      <iframe
+        ref={frame}
+        className={classNames(styles.frame)}
+        title="Strats"
+        src={STRATS_URL}
+        // allow-same-origin keeps the frame's real origin, which the message checks need.
+        // No allow-top-navigation: the sheet can't move the app window elsewhere.
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        onLoad={onFrameLoad}
+      />
+    </div>
   );
 }
 
