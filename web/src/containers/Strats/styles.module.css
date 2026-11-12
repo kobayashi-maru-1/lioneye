@@ -1,0 +1,35 @@
+/* The cheat sheet fills the window below the bar (less the footer); it scrolls itself. */
+.frame {
+  display: block;
+  width: 100%;
+  height: calc(
+    100vh - var(--app-bar-height) - var(--size-2) - var(--footer-height)
+  );
+  border: none;
+}
+
+/* The frame scrolls itself: no second scrollbar for the page beside it. */
+:global(html):has(.frame) {
+  overflow-y: hidden;
+}
+
+.offline {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  margin: var(--size-4) auto 0;
+  color: var(--on-primary);
+}
+
+.retry {
+  padding: var(--size-1) var(--size-3);
+  color: var(--gold);
+  font-weight: var(--font-heavy);
+  border: var(--border-width) solid var(--panel-border);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.retry:hover {
+  color: #c99550;
+}

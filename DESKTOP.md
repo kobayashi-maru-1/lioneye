@@ -301,6 +301,23 @@ settings; otherwise it leaves it alone and says so.
   timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub the first time.
   Specs on an older tree are calculated on the latest one (noted under the stats).
 
+## Strats
+
+- **Strats** in the top bar opens the league cheat sheet, loaded live from
+  <https://kobayashi-maru-1.github.io/lioneye/strats/>. The bar then shows a button per
+  section of the sheet (Leveling, Voidstones, ...); the sheet lists them itself.
+- It needs a connection: offline, or when the page doesn't answer, it shows **Not loaded**
+  with **Retry**. Links in the sheet open in your last-used Edge profile, like the guide's.
+- The sheet is `strats/index.html` in this repo. A push to `main` that changes `strats/`
+  publishes it (workflow **Strats page**, `.github/workflows/strats.yml`), and the app shows
+  the new version without a release (GitHub caches it for up to 10 minutes). Each
+  `<section>` needs an `id` and a `data-jump` label for its bar button; keep the script at
+  the end of the file. This is the only thing published to GitHub Pages: upstream's website
+  build stays out.
+- Pages was turned on once for the repo with the source **GitHub Actions** (Settings >
+  Pages, or `gh api -X POST repos/kobayashi-maru-1/lioneye/pages -f build_type=workflow`).
+- The page runs in a sandboxed frame that can't navigate the app window.
+
 ## Overlay
 
 - While Path of Exile is the window in front and you're playing a character, the exe shows a
@@ -475,6 +492,7 @@ the dev page uses the running exe for auto-progress.
 
 - `web`, `common`, `seeding`: [HeartofPhos/exile-leveling](https://github.com/HeartofPhos/exile-leveling) (remote `upstream`)
 - `log-api`: [HeartofPhos/exile-log-api](https://github.com/HeartofPhos/exile-log-api) (remote `upstream-log-api`, a git subtree), extended to serve the guide
+- `strats`: this repo's own league cheat sheet, published to GitHub Pages (see Strats)
 
 ## Pull upstream updates
 

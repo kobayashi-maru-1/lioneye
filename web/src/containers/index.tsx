@@ -24,6 +24,7 @@ const RoutesContainer = pipe(
 )(lazy(() => import("./Routes")));
 const BuildContainer = withBlank(lazy(() => import("./Build")));
 const EditRouteContainer = withBlank(lazy(() => import("./EditRoute")));
+const StratsContainer = withBlank(lazy(() => import("./Strats")));
 
 export function App() {
   useAutoProgress();
@@ -72,6 +73,16 @@ export function App() {
                 }
               />
             ))}
+            {/* The league cheat sheet, live from GitHub Pages. */}
+            <Route
+              path="/strats"
+              element={
+                <Page
+                  title="Lioneye - Strats"
+                  component={<StratsContainer />}
+                />
+              }
+            />
             <Route
               path="/edit-route"
               element={

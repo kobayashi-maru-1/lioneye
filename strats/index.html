@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Covens of Umbra Cheat Sheet</title>
+<meta name="description" content="Path of Exile 3.30 trade league cheat sheet: leveling, voidstones, mapping, swap gems, farms and crafts.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<!--
+  Lioneye's Strats page shows this file in a frame (web/src/containers/Strats).
+  Each <section> with an id and data-jump becomes a jump button in the app's bar.
+  Edit the content freely; keep those two attributes on the sections.
+-->
+<style>
+  /* Layout: a dark grimoire board of small framed panels; every line is a glanceable fragment. */
+  :root {
+    color-scheme: dark;
+    --night: #08090c; --shroud: #11141b; --shroud-2: #181c26; --bark: #3b2c1b;
+    --bone: #dad9d9; --ash: #a4a9be; --gilt: #c9a24a; --blackfire: #d4474f;
+    --spectral: #7cb8f2; --verdant: #84b98f; --eater: #c58fd6; --exarch: #e9a25a;
+    --font-display: "Cinzel", "Trajan Pro", Georgia, serif;
+    --font-body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+    --r: 6px;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--night); scroll-padding-top: 12px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1100px 520px at 70% -120px, rgba(124,184,242,0.13), transparent 70%),
+      radial-gradient(900px 600px at -10% 30%, rgba(125,21,28,0.16), transparent 70%),
+      var(--night);
+    background-attachment: fixed;
+    color: var(--bone); font-family: var(--font-body); font-size: 16px; line-height: 1.4;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 24px 56px;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; }
+  .page { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  a { color: var(--spectral); }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--spectral); outline-offset: 2px; }
+  b { color: #fff; }
+
+  header .eyebrow { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gilt); }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 5vw, 44px); line-height: 1.05; margin: 4px 0 0; letter-spacing: 0.02em; text-wrap: balance;
+       background: linear-gradient(180deg, #f2efe8 10%, #b9c4d6 90%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  .panel { position: relative; background: linear-gradient(180deg, var(--shroud), #0d1016); border: 1px solid var(--bark); border-radius: var(--r);
+           box-shadow: inset 0 0 0 4px rgba(59,44,27,0.35), 0 10px 30px rgba(0,0,0,0.45); padding: 18px 18px 20px; min-width: 0; }
+  .panel::before, .panel::after { content: ""; position: absolute; width: 9px; height: 9px; background: var(--gilt); transform: rotate(45deg); top: -5px; }
+  .panel::before { left: 18px; } .panel::after { right: 18px; }
+  .ph { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--bark); }
+  h2 { font-family: var(--font-display); font-weight: 700; font-size: 21px; letter-spacing: 0.06em; margin: 0; color: #efe9dc; }
+  .ph .sub { color: var(--ash); font-size: 14px; }
+  .stale { display: inline-block; margin-left: 6px; padding: 1px 8px; border: 1px solid var(--exarch); border-radius: 999px; color: var(--exarch); font-size: 13px; font-weight: 700; white-space: nowrap; }
+  h3 { font-family: var(--font-display); font-weight: 500; font-size: 13.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gilt); margin: 0 0 8px; }
+  .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+
+  /* habit pills */
+  .habits { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+  .habit { background: var(--shroud-2); border: 1px solid rgba(93,70,48,0.55); border-radius: var(--r); padding: 9px 12px; display: grid; grid-template-columns: 16px 1fr; gap: 0 10px; align-items: start; }
+  .habit i { width: 11px; height: 11px; margin-top: 6px; }
+  .habit .t { font-weight: 700; color: #f3efe6; font-size: 15.5px; }
+  .habit .d { grid-column: 2; color: var(--ash); font-size: 14px; }
+  i.gem { background: var(--spectral); transform: rotate(45deg); border-radius: 2px; }
+  i.orb { background: var(--gilt); border-radius: 50%; }
+  i.fate { background: var(--blackfire); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
+
+  /* voidstones */
+  .stones { display: flex; flex-direction: column; gap: 6px; }
+  .stone { display: grid; grid-template-columns: 28px minmax(0, 150px) 1fr; gap: 2px 10px; align-items: baseline; background: var(--shroud-2); border: 1px solid rgba(93,70,48,0.55); border-radius: var(--r); padding: 8px 12px; }
+  .stone .n { font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--gilt); }
+  .stone .nm { font-weight: 700; color: #f3efe6; }
+  .stone .nm small { display: block; font-weight: 400; color: var(--ash); font-size: 13.5px; }
+  .stone .how { color: var(--bone); font-size: 14.5px; }
+  @media (max-width: 520px) { .stone { grid-template-columns: 28px 1fr; } .stone .how { grid-column: 2; } }
+  .bar { display: flex; height: 26px; border-radius: 4px; overflow: hidden; border: 1px solid var(--bark); margin-top: 12px; }
+  .bar span { display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; color: #0b0d12; white-space: nowrap; overflow: hidden; min-width: 0; border-right: 1px solid rgba(0,0,0,0.5); }
+  .note { color: var(--ash); font-size: 13.5px; margin: 8px 0 0; }
+
+  ul.do { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+  ul.do li { position: relative; padding-left: 16px; font-size: 15px; }
+  ul.do li::before { content: ""; position: absolute; left: 2px; top: 8px; width: 6px; height: 6px; background: var(--gilt); transform: rotate(45deg); }
+
+  .altars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  @media (max-width: 520px) { .altars { grid-template-columns: 1fr; } }
+  .altar { background: var(--shroud-2); border: 1px solid rgba(93,70,48,0.55); border-radius: var(--r); padding: 8px 12px; font-size: 14.5px; }
+  .altar .an { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; display: block; }
+  .altar.eater .an, .tag.eater { color: var(--eater); } .altar.exarch .an, .tag.exarch { color: var(--exarch); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .chip { font-size: 14px; padding: 3px 10px; border-radius: 999px; background: rgba(124,184,242,0.08); border: 1px solid rgba(124,184,242,0.35); color: #d9e9fb; }
+  .chip.hot { background: rgba(124,184,242,0.2); border-color: var(--spectral); color: #fff; font-weight: 700; }
+  .chip.util { background: rgba(201,162,74,0.08); border-color: rgba(201,162,74,0.45); color: #eadbb6; }
+  .chip.price { background: transparent; border-color: rgba(164,169,190,0.45); color: var(--bone); font-variant-numeric: tabular-nums; }
+  .chip small { color: var(--ash); font-size: 12px; font-weight: 400; }
+
+  /* farm cards */
+  .farms { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+  .farm { background: var(--shroud-2); border: 1px solid rgba(93,70,48,0.55); border-left: 4px solid var(--verdant); border-radius: var(--r); padding: 9px 12px; }
+  .farm.new { border-left-color: var(--spectral); } .farm.out { border-left-color: var(--blackfire); opacity: 0.8; }
+  .farm .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+  .farm .t { font-weight: 700; color: #f3efe6; font-size: 15.5px; }
+  .tag { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; color: var(--ash); }
+  .farm ul { margin: 0; padding-left: 16px; font-size: 14.5px; color: var(--bone); }
+  .farm li::marker { color: var(--gilt); }
+  .key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ash); margin-bottom: 10px; }
+  .key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+
+  details.sources { background: var(--shroud); border: 1px solid var(--bark); border-radius: var(--r); padding: 10px 16px; font-size: 14px; color: var(--ash); }
+  details.sources summary { cursor: pointer; font-family: var(--font-display); letter-spacing: 0.08em; color: var(--gilt); }
+  details.sources p { margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<main class="page">
+  <header>
+    <div class="eyebrow">Path of Exile 3.30 · Trade league</div>
+    <h1>Covens of Umbra Cheat Sheet</h1>
+  </header>
+
+  <section class="panel" id="leveling" data-jump="Leveling" aria-labelledby="h-level">
+    <div class="ph"><h2 id="h-level">Leveling</h2><span class="sub">Every character</span></div>
+    <div class="habits">
+      <div class="habit"><i class="gem"></i><span class="t">Fill the weapon swap</span><span class="d">Popular skill gems, from Act 1.</span></div>
+      <div class="habit"><i class="gem"></i><span class="t">Check every Lab font</span><span class="d">Free transfigures to level.</span></div>
+      <div class="habit"><i class="fate"></i><span class="t">Fates on fast kills</span><span class="d">Skip on scary bosses.</span></div>
+      <div class="habit"><i class="fate"></i><span class="t">Fill the Wickerman</span><span class="d">All 4 slots, early.</span></div>
+      <div class="habit"><i class="orb"></i><span class="t">Same-name rares</span><span class="d">2 = Chaos · 3 = Exalted.</span></div>
+      <div class="habit"><i class="orb"></i><span class="t">5 Vaal gems</span><span class="d">= Vaal Orb.</span></div>
+      <div class="habit"><i class="orb"></i><span class="t">No rarity on gear</span><span class="d">Doesn't add currency.</span></div>
+      <div class="habit"><i class="orb"></i><span class="t">Filter shows T4–5</span><span class="d">From Act 6.</span></div>
+    </div>
+  </section>
+
+  <section class="panel" id="voidstones" data-jump="Voidstones" aria-labelledby="h-void">
+    <div class="ph"><h2 id="h-void">Voidstones</h2><span class="sub">Suggested order</span></div>
+    <div class="stones">
+      <div class="stone"><span class="n">1</span><span class="nm">Decayed<small>Shaper + Elder</small></span><span class="how">Buy all 8 fragments.</span></div>
+      <div class="stone"><span class="n">2</span><span class="nm">Eldritch<small>Exarch + Eater</small></span><span class="how">Quest invitations only. Run influenced T14+ early.</span></div>
+      <div class="stone"><span class="n">3</span><span class="nm">Originator<small>Incarnation of Dread</small></span><span class="how">Echo of Reverence. Adds Exceptional Support drops.</span></div>
+      <div class="stone"><span class="n">4</span><span class="nm">Ceremonial<small>The Maven</small></span><span class="how">Writ from invitation splinters.</span></div>
+    </div>
+    <div class="bar" role="img" aria-label="22 Atlas points from bosses: Maven's six invitations 12, Uber Elder 4, Exarch 2, Eater 2, Maven 2">
+      <span style="flex:12;background:#7cb8f2">Maven invitations 12</span>
+      <span style="flex:4;background:#c9a24a">Uber Elder 4</span>
+      <span style="flex:2;background:#e9a25a">Exarch 2</span>
+      <span style="flex:2;background:#c58fd6">Eater 2</span>
+      <span style="flex:2;background:#84b98f">Maven 2</span>
+    </div>
+    <p class="note">22 Atlas points from bosses. Sustain nodes first: voidstones only lift a quadrant to T12.</p>
+  </section>
+
+  <section class="panel" id="mapping" data-jump="Mapping" aria-labelledby="h-maps">
+    <div class="ph"><h2 id="h-maps">Mapping</h2><span class="sub">Every map</span></div>
+    <div class="cols">
+      <div>
+        <h3>Maps</h3>
+        <ul class="do">
+          <li>Roll <b>Atlas Drops</b>. Run unidentified (+30%).</li>
+          <li>Vaal good maps: +2 mods, up to 9.</li>
+          <li>Rarity = currency: Procurement chisel, rarity altars, Divine Vessel.</li>
+          <li>Kirac T14s feed the Eldritch quest.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Threads</h3>
+        <ul class="do">
+          <li>Shaped regions first: free Threads, +1 per objective.</li>
+          <li>1–2 per map early. 4–5 per mechanic later.</li>
+          <li>Sell types you don't run.</li>
+        </ul>
+        <h3 style="margin-top:12px">Altars drop Threads</h3>
+        <div class="altars">
+          <div class="altar eater"><span class="an">Eater</span>Breach · Legion · Blight · Ritual · Incursion</div>
+          <div class="altar exarch"><span class="an">Exarch</span>Abyss · Expedition · Betrayal · Bestiary · Ultimatum</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="gems" data-jump="Gems" aria-labelledby="h-gems">
+    <div class="ph"><h2 id="h-gems">Swap gems</h2><span class="sub">Level to 20, sell uncorrupted, repeat <span class="stale">Prices: Mirage 3.28</span></span></div>
+    <h3>Top picks: on Tyty's list and sold well early in Mirage</h3>
+    <div class="chips">
+      <span class="chip hot">Kinetic Blast of Clustering <small>860c</small></span><span class="chip hot">Static Strike of Gathering Lightning <small>262c</small></span><span class="chip hot">Elemental Hit of the Spectrum <small>256c</small></span><span class="chip hot">Penance Brand of Dissipation <small>180c</small></span><span class="chip hot">Cyclone <small>120c</small></span><span class="chip hot">Flicker Strike <small>110c</small></span><span class="chip hot">Lightning Arrow <small>110c</small></span><span class="chip hot">Kinetic Blast <small>110c</small></span><span class="chip hot">Ice Nova of Frostbolts <small>110c</small></span><span class="chip hot">Elemental Hit <small>102c</small></span><span class="chip hot">Boneshatter of Complex Trauma <small>100c</small></span><span class="chip hot">Ball Lightning of Orbiting <small>94c</small></span><span class="chip hot">Kinetic Fusillade <small>80c</small></span>
+    </div>
+    <h3>Also on Tyty's list</h3>
+    <div class="chips">
+      <span class="chip">Absolution</span><span class="chip">Animate Weapon</span><span class="chip">Holy Relic</span><span class="chip">Earthshatter</span><span class="chip">Sunder</span><span class="chip">Righteous Fire</span><span class="chip">Reap</span><span class="chip">Exsanguinate</span><span class="chip">Wave of Conviction</span><span class="chip">Vortex / Cold Snap</span><span class="chip">Viper Strike</span><span class="chip">Poisonous Concoction <small>of Bouncing</small></span><span class="chip">Glacial Cascade <small>of the Fissure</small></span><span class="chip">Eye of Winter</span><span class="chip">Lightning Conduit</span><span class="chip">Storm Burst</span><span class="chip">Pyroclast Mine</span><span class="chip">Blade Flurry</span><span class="chip">Blight <small>of Contagion</small></span>
+    </div>
+    <h3>Lab transfigures that sold early in Mirage</h3>
+    <div class="chips">
+      <span class="chip price">Lacerate of Butchering <small>600c</small></span><span class="chip price">Shock Nova of Procession <small>578c</small></span><span class="chip price">Cyclone of Tumult <small>545c</small></span><span class="chip price">Animate Guardian of Smiting <small>506c</small></span><span class="chip price">Spark of the Nova <small>429c</small></span><span class="chip price">Molten Strike of the Zenith <small>398c</small></span><span class="chip price">Ground Slam of Earthshaking <small>300c</small></span><span class="chip price">Holy Relic of Conviction <small>300c</small></span><span class="chip price">Detonate Dead of Scavenging <small>266c</small></span><span class="chip price">Forbidden Rite of Soul Sacrifice <small>257c</small></span><span class="chip price">Frostblink of Wintry Blast <small>248c</small></span><span class="chip price">Smite of Divine Judgement <small>220c</small></span>
+    </div>
+    <h3>Steady sellers: auras and utility (60–100c)</h3>
+    <div class="chips" style="margin-bottom:0">
+      <span class="chip util">Elemental Penetration <small>196c</small></span><span class="chip util">Raise Spectre</span><span class="chip util">Animate Guardian</span><span class="chip util">Automation</span><span class="chip util">Assassin's Mark</span><span class="chip util">Sniper's Mark</span><span class="chip util">Flesh and Stone</span><span class="chip util">Shield Charge</span><span class="chip util">Immortal Call</span><span class="chip util">Steelskin</span><span class="chip util">Petrified Blood</span><span class="chip util">Purity of Elements</span><span class="chip util">Purity of Fire</span><span class="chip util">Despair</span><span class="chip util">Herald of Purity</span><span class="chip util">Haste</span><span class="chip util">Precision</span><span class="chip util">Arctic Armour</span>
+    </div>
+    <p class="note">Prices: median 20/20 uncorrupted, days 5–14 of Mirage (3.28), poe.ninja. Transfigured gems paid 3–8× a base gem. Skip Rolling Magma and Winter Orb (off Tyty's list).</p>
+  </section>
+
+  <section class="panel" id="farms" data-jump="Farms" aria-labelledby="h-farms">
+    <div class="ph"><h2 id="h-farms">Farms</h2><span class="sub">Our old strats, rebuilt for 3.30 (untested until trees are posted)</span></div>
+    <div class="key"><span><i style="background:#84b98f"></i>Rebuilt</span><span><i style="background:#7cb8f2"></i>New in 3.30</span><span><i style="background:#d4474f"></i>Out</span></div>
+    <div class="farms">
+      <div class="farm"><div class="top"><span class="t">Essence</span><span class="tag">No Threads</span></div><ul><li>Essence cluster + Atlas Drops maps</li><li>Corrupt only MEDS or 3× Shrieking (Vaal Orb)</li><li>Crystal Resonance: check if it survived</li></ul></div>
+      <div class="farm"><div class="top"><span class="t">Harvest</span><span class="tag">No Threads</span></div><ul><li>Harvest cluster: 5–6 Flora per map</li><li>Atlas Drops = more Lifeforce</li><li>Sell all 3 colors in bulk</li></ul></div>
+      <div class="farm"><div class="top"><span class="t">Div cards</span><span class="tag">Rarity</span></div><ul><li>Stack <b>rarity</b>, not quantity</li><li>Divination Card cluster + Fate Bespoken</li><li>Card Sharp, Rabbit's Foot disabled</li></ul></div>
+      <div class="farm"><div class="top"><span class="t">Beasts</span><span class="tag exarch">Exarch</span></div><ul><li>4–5 Bestiary Threads + Bestiary cluster</li><li>Red beasts only; yellows are gone</li><li>Mawr Blaidd: check the Talisman it gives</li></ul></div>
+      <div class="farm"><div class="top"><span class="t">Blight</span><span class="tag eater">Eater</span></div><ul><li>4–5 Blight Threads + Blight cluster</li><li>Atlas Drops = more chests per lane</li><li>Oils only from Blight now</li></ul></div>
+      <div class="farm"><div class="top"><span class="t">Abyss</span><span class="tag exarch">Exarch</span></div><ul><li>Abyss Threads in Nightmare maps</li><li>Copy a posted tree</li><li>Stygian Vises still drop here</li></ul></div>
+      <div class="farm"><div class="top"><span class="t">Juiced maps</span><span class="tag">Was 16-mod</span></div><ul><li>Vaal for 9 mods</li><li>Temple map rooms: second corruption</li><li>Run them as rarity maps</li></ul></div>
+      <div class="farm out"><div class="top"><span class="t">Allflame 5-way</span><span class="tag">Out</span></div><ul><li>Allflame isn't core yet</li></ul></div>
+      <div class="farm new"><div class="top"><span class="t">Pinnacle bosses</span><span class="tag">New</span></div><ul><li>Boss currency penalty removed</li><li>Farm the voidstone bosses</li><li>Grim Fates → Pinnacle Viscera</li></ul></div>
+      <div class="farm new"><div class="top"><span class="t">Temple</span><span class="tag eater">Eater</span></div><ul><li>Level 80+ Temples: Atziri drops Soul Cores</li><li>Cradle of Creation: Uber Atziri</li><li>Twice-corrupt gear and maps</li></ul></div>
+      <div class="farm new"><div class="top"><span class="t">Fate rewards</span><span class="tag">New</span></div><ul><li>Duplicate Fates triple the reward</li><li>Sell Viscera, Sacrament, Exceptional Supports early</li></ul></div>
+    </div>
+  </section>
+
+  <section class="panel" id="crafts" data-jump="Crafts" aria-labelledby="h-craft">
+    <div class="ph"><h2 id="h-craft">Crafts</h2><span class="sub">What changed in our recipes</span></div>
+    <div class="farms">
+      <div class="farm"><div class="top"><span class="t">Armour-stacker helmet</span><span class="tag">Dearer</span></div><ul><li>Suffix lock: 4 Divine + 4 Blessed</li><li>Veiled Chaos: Betrayal only now</li><li>Fractured bases rarer</li></ul></div>
+      <div class="farm"><div class="top"><span class="t">Stygian Vise life stack</span><span class="tag">Same</span></div><ul><li>Recipe unchanged</li><li>Vises also drop as T5 rares</li></ul></div>
+      <div class="farm"><div class="top"><span class="t">Twilight Regalia</span><span class="tag">Same</span></div><ul><li>Recipe unchanged</li><li>Strand bases: Originator maps only</li></ul></div>
+      <div class="farm"><div class="top"><span class="t">Fractured jewels</span><span class="tag">Dearer</span></div><ul><li>Fewer fractured sources</li><li>T5 magic drops can be fractured</li></ul></div>
+    </div>
+  </section>
+
+  <details class="sources">
+    <summary>Sources</summary>
+    <p><a href="https://www.pathofexile.com/forum/view-thread/4013680" target="_blank" rel="noopener">3.30 patch notes</a> · tytykiller's 3.30 starter list · <a href="https://poe.ninja/poe1/economy" target="_blank" rel="noopener">poe.ninja</a>. Gem prices: Mirage (3.28) days 5–14. Built Nov 11, 2026, before launch.</p>
+  </details>
+</main>
+<script>
+  // Lioneye's Strats page frames this file. It asks for the jump list ("strats-list")
+  // and asks to scroll to a section ("strats-jump"). When framed, links are handed to it
+  // ("strats-open") so they open in your own browser profile. Nothing else is sent.
+  (function () {
+    var framed = window.parent !== window;
+    var sections = Array.prototype.slice.call(document.querySelectorAll("section[id][data-jump]"));
+    var list = sections.map(function (s) { return { id: s.id, label: s.getAttribute("data-jump") }; });
+    var parentOrigin = null;
+    window.addEventListener("message", function (e) {
+      var d = e.data;
+      if (!framed || e.source !== window.parent || e.origin === "null") return;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "strats-list") {
+        parentOrigin = e.origin;
+        window.parent.postMessage({ type: "strats-sections", sections: list }, e.origin);
+      } else if (d.type === "strats-jump" && typeof d.id === "string") {
+        for (var i = 0; i < sections.length; i++) {
+          if (sections[i].id === d.id) { sections[i].scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+        }
+      }
+    });
+    // Only once the app has introduced itself (strats-list): otherwise links open as usual.
+    document.addEventListener("click", function (e) {
+      if (!parentOrigin || e.defaultPrevented || e.button !== 0) return;
+      var link = e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (!link || link.protocol !== "https:") return;
+      e.preventDefault();
+      window.parent.postMessage({ type: "strats-open", url: link.href }, parentOrigin);
+    });
+  })();
+</script>
+</body>
+</html>

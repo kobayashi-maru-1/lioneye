@@ -18,10 +18,11 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 /// The page titles set in web/src/containers/index.tsx; keep in sync. The app was called
 /// Exile Leveling before 0.4: a window from an older copy is still ours.
-const TITLES: [&str; 7] = [
+const TITLES: [&str; 8] = [
     "Lioneye",
     "Lioneye - Settings",
     "Lioneye - Edit Route",
+    "Lioneye - Strats",
     "Exile Leveling",
     "Exile Leveling - Settings",
     // Before the Build page became Settings.
@@ -293,6 +294,7 @@ mod tests {
     fn matches_app_windows_only() {
         assert!(is_guide_title("Lioneye"));
         assert!(is_guide_title("Lioneye - Settings"));
+        assert!(is_guide_title("Lioneye - Strats"));
         assert!(!is_guide_title("Lioneye - Personal - Microsoft\u{200b} Edge"));
         assert!(is_guide_title("Exile Leveling"));
         assert!(is_guide_title("Exile Leveling - Settings"));

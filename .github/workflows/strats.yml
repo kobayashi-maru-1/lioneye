@@ -1,0 +1,49 @@
+name: Strats page
+
+# Publishes strats/ to GitHub Pages: https://kobayashi-maru-1.github.io/lioneye/strats/
+# The app's Strats page shows it in a frame, so a push here updates the app without a release.
+# Only strats/ is published; upstream's website build stays out (DESKTOP.md, Strats page).
+# Actions are pinned to commit SHAs so a moved tag can't change what runs.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "strats/**"
+      - ".github/workflows/strats.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}strats/
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Stage the site
+        run: |
+          mkdir -p _site/strats
+          cp -r strats/. _site/strats/
+
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
