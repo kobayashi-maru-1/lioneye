@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Covens of Umbra Cheat Sheet</title>
-<meta name="description" content="Path of Exile 3.30 trade league cheat sheet: leveling, voidstones, swap gems, farms and crafts.">
+<meta name="description" content="Path of Exile 3.30 trade league cheat sheet: leveling, voidstones, atlas quadrants, swap gems, farms and crafts.">
 <!--
   Lioneye's Strats page shows this file in a frame (web/src/containers/Strats).
   Each <section> with an id and data-jump becomes a jump button in the app's bar.
@@ -127,6 +127,18 @@
   details.sources { background: var(--shroud); border: 1px solid var(--bark); border-radius: var(--r); padding: 10px 16px; font-size: 14px; color: var(--ash); }
   details.sources summary { cursor: pointer; font-family: var(--font-display); letter-spacing: 0.08em; color: var(--gilt); }
   details.sources p { margin: 8px 0 0; }
+  /* atlas quadrants */
+  .quads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  @media (max-width: 720px) { .quads { grid-template-columns: 1fr; } }
+  .quad { background: var(--shroud-2); border: 1px solid rgba(93,70,48,0.55); border-radius: var(--r); padding: 10px 12px; }
+  .quad .qn { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.08em; color: var(--gilt); font-size: 14px; margin-bottom: 6px; }
+  .quad .ql { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin: 8px 0 3px; }
+  .quad .ql b { color: var(--spectral); font-weight: 700; }
+  .quad dl { margin: 0; display: grid; grid-template-columns: minmax(0, 150px) 1fr; gap: 2px 10px; font-size: 14.5px; }
+  .quad dt { font-weight: 700; color: #f3efe6; }
+  .quad dd { margin: 0; color: var(--bone); }
+  .quad p { margin: 0; font-size: 14.5px; }
+  @media (max-width: 420px) { .quad dl { grid-template-columns: 1fr; } .quad dd { margin-bottom: 4px; } }
 </style>
 </head>
 <body>
@@ -166,6 +178,56 @@
       <span style="flex:2;background:#84b98f">Maven 2</span>
     </div>
     <p class="note">22 Atlas points from bosses. Sustain nodes first: voidstones only lift a quadrant to T12.</p>
+  </section>
+
+  <section class="panel" id="atlas" data-jump="Atlas" aria-labelledby="h-quad">
+    <div class="ph"><h2 id="h-quad">Atlas quadrants</h2><span class="sub">What each corner can spawn</span></div>
+    <div class="quads">
+      <div class="quad">
+        <div class="qn">Northwest</div>
+        <div class="ql">Anomalies · after maps</div>
+        <dl>
+          <dt>River's End</dt><dd>Nameless Seer: pick a unique</dd>
+          <dt>Syndicate Hideout</dt><dd>Safehouse with T3 rewards</dd>
+          <dt>Untainted Paradise</dt><dd>XP map + Einhar</dd>
+        </dl>
+        <div class="ql"><b>Machinist's Vault</b> · Incarnation kills</div>
+        <p>T3+ unique weapons / jewelry / jewels · 11–20 Stacked Decks · rare div cards</p>
+      </div>
+      <div class="quad">
+        <div class="qn">Northeast</div>
+        <div class="ql">Anomalies · after maps</div>
+        <dl>
+          <dt>Lake Islet</dt><dd>Reflecting Mist</dd>
+          <dt>Overgrown Grove</dt><dd>Big Harvest, Crystallised Rancour</dd>
+          <dt>Forgotten Shrine</dt><dd>Ipaatiki: double-corrupted unique</dd>
+        </dl>
+        <div class="ql"><b>Zealot's Vault</b> · Shaper, Uber Elder, Venarius</div>
+        <p>20/20 and 21/20 gems, Empower / Enhance / Enlighten · Facetor's Lens · T3+ unique armour · rare: Greater Multistrike, Invention</p>
+      </div>
+      <div class="quad">
+        <div class="qn">Southwest</div>
+        <div class="ql">Anomalies · after maps</div>
+        <dl>
+          <dt>The Manor Foyer</dt><dd>Cadiro: uniques for gold</dd>
+          <dt>Gambling District</dt><dd>Ventor's Strongbox: gold for currency</dd>
+          <dt>Planned Heist</dt><dd>One revealed Blueprint wing</dd>
+        </dl>
+        <div class="ql"><b>Scholar's Vault</b> · Exarch, Eater</div>
+        <p>1–5 valuable currency · 20 regular currency · Orbs of Intention / Remembrance / Unravelling · Reflecting Mist · Valdo's Puzzle Box</p>
+      </div>
+      <div class="quad">
+        <div class="qn">Southeast</div>
+        <div class="ql">Anomalies · after maps</div>
+        <dl>
+          <dt>The Court of Chaos</dt><dd>Sacrifice a unique for 1–6 troves</dd>
+          <dt>Uncharted Expedition</dt><dd>Random Logbook area</dd>
+        </dl>
+        <div class="ql"><b>Arkhon's Vault</b> · Maven, Sirus</div>
+        <p>Guardian / Conqueror / Synthesised / Nightmare maps · Uber Elder fragments · Valdo's Puzzle Box · rare: Greater Spell Cascade, Cooldown Recovery</p>
+      </div>
+    </div>
+    <p class="note">Anomalies need a voidstone in that quadrant and stay until you enter them. Vaults only spawn from boss kills in the boss's own arena, not Maven invitations or Valdo maps. Lists are from the PoE Wiki's 3.29 data; the Arkhon's Vault scarab reward is presumably Threads now.</p>
   </section>
 
   <section class="panel" id="gems" data-jump="Gems" aria-labelledby="h-gems">
@@ -219,7 +281,7 @@
 
   <details class="sources">
     <summary>Sources</summary>
-    <p><a href="https://www.pathofexile.com/forum/view-thread/4013680" target="_blank" rel="noopener">3.30 patch notes</a> · tytykiller's 3.30 starter list · <a href="https://poe.ninja/poe1/economy" target="_blank" rel="noopener">poe.ninja</a>. Gem prices: Mirage (3.28) days 5–14. Built Nov 11, 2026, before launch.</p>
+    <p><a href="https://www.pathofexile.com/forum/view-thread/4013680" target="_blank" rel="noopener">3.30 patch notes</a> · tytykiller's 3.30 starter list · <a href="https://www.poewiki.net/wiki/Atlas_anomaly" target="_blank" rel="noopener">PoE Wiki: Atlas anomaly</a> · <a href="https://www.poewiki.net/wiki/Templar_Vault" target="_blank" rel="noopener">Memory vaults</a> · <a href="https://poe.ninja/poe1/economy" target="_blank" rel="noopener">poe.ninja</a>. Gem prices: Mirage (3.28) days 5–14. Built Nov 11, 2026, before launch.</p>
   </details>
 </main>
 <script>
