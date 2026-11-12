@@ -308,14 +308,15 @@ settings; otherwise it leaves it alone and says so.
   <https://kobayashi-maru-1.github.io/lioneye/strats/>. It works in any browser too, so
   friends without Lioneye can use the same link. The top bar stays as it is (its panel
   buttons take you back to the guide, at that panel); under it, the page pins its own bar
-  with a button per section (Builds, Leveling, ..., Trade), which the page lists itself.
+  with a button per section (Builds, Trade, Leveling, ...), which the page lists itself.
 - Each section's header bar folds it; the page remembers which are folded (per browser).
   Jumping to a folded section opens it.
 - **Builds**: a card per build with a copy button for its PoB code (paste into PoB's
   Import or Lioneye's Settings). The codes are files in `strats/builds/`, made from the PoB
   files without their character-import details (account, character, realm) or item
   Unique IDs.
-- **Trade**: a card per search with a copy button for its link. Each link is built from
+- **Trade**: a card per search with a copy button for its link, grouped under a heading
+  per build (named like its Builds card). Each link is built from
   the card's `data-query` (official trade search JSON) and the section's `data-league`;
   at a new league, change `data-league` to the league's trade name and every link follows.
   The full links run past Discord's 2,000-character limit for big searches: share the
