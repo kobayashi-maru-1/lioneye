@@ -743,6 +743,160 @@ local function gear()
 	return gearCache
 end
 
+-- Tree extras ----------------------------------------------------------------------------
+-- What the guide's tree can't work out from the tree data alone, per tree (PoB's order):
+-- the socketed jewels with where they sit and the rings of their radius, the passives
+-- timeless jewels conquer (as PoB replaces them), and the cluster jewels' passives, which
+-- PoB generates with their positions. Built once per build, like the gear.
+
+local treeExtrasCache
+
+-- Who conquers what, for the tooltip ("Elegant Hubris").
+local CONQUEROR_JEWELS = {
+	vaal = "Glorious Vanity", karui = "Lethal Pride", maraketh = "Brutal Restraint",
+	templar = "Militant Faith", eternal = "Elegant Hubris", kalguur = "Heroic Tragedy",
+}
+
+local function plain(text)
+	return (tostring(text):gsub("%^x%x%x%x%x%x%x", ""):gsub("%^%d", ""))
+end
+
+local function nodeStats(node)
+	local out = setmetatable({}, ARRAY)
+	for _, line in ipairs(node.sd or {}) do
+		local text = plain(line)
+		if text:match("%S") then
+			out[#out + 1] = text
+		end
+	end
+	return out
+end
+
+local function tenth(value)
+	return math.floor(value * 10 + 0.5) / 10
+end
+
+local function treeExtras()
+	if treeExtrasCache then
+		return treeExtrasCache
+	end
+	local items = build.itemsTab.items
+	local out = setmetatable({}, ARRAY)
+	for index, spec in ipairs(build.treeTab.specList) do
+		-- PoB applied the jewels to every tree when it loaded the build (each spec's PostLoad).
+		local jewels = setmetatable({}, ARRAY)
+		for nodeId, itemId in pairs(spec.jewels or {}) do
+			local item = items[itemId]
+			local socket = spec.nodes[nodeId]
+			if item and socket and socket.x and spec.allocNodes[nodeId] then
+				local rings = setmetatable({}, ARRAY)
+				-- Abyss timeless jewels conquer along a path, not in a radius (PoB draws none).
+				local conqueror = item.jewelData and item.jewelData.conqueredBy
+					and item.jewelData.conqueredBy.conqueror
+				local abyss = conqueror and tostring(conqueror.type):find("^abyss") ~= nil
+				local radius = not abyss and item.jewelRadiusIndex and data.jewelRadius[item.jewelRadiusIndex]
+				if radius then
+					local function ring(x, y)
+						rings[#rings + 1] = {
+							x = tenth(x), y = tenth(y), outer = radius.outer,
+							inner = radius.inner > 0 and radius.inner or nil,
+						}
+					end
+					local escape = item.jewelData and item.jewelData.impossibleEscapeKeystones
+					if escape and next(escape) then
+						-- Impossible Escape: the radius is around the keystone it names.
+						for keyName in pairs(escape) do
+							local key = spec.tree.keystoneMap[keyName]
+							if key and key.x then
+								ring(key.x, key.y)
+							end
+						end
+					else
+						ring(socket.x, socket.y)
+					end
+				end
+				jewels[#jewels + 1] = {
+					node = nodeId, item = itemId, x = tenth(socket.x), y = tenth(socket.y), rings = rings,
+				}
+			end
+		end
+
+		-- The jewel each conquest comes from, by its conqueror (PoB shares that table, Abyss
+		-- jewels' per-node conquests too).
+		local conquestJewel = {}
+		for _, itemId in pairs(spec.jewels or {}) do
+			local item = items[itemId]
+			local by = item and item.jewelData and item.jewelData.conqueredBy
+			if by and by.conqueror then
+				conquestJewel[by.conqueror] = item.title or item.name
+			end
+		end
+		local conquered = {}
+		for id, node in pairs(spec.nodes) do
+			if node.conqueredBy and node.type ~= "Socket" and node.dn then
+				local conqueror = node.conqueredBy.conqueror
+				conquered[tostring(id)] = {
+					name = plain(node.dn),
+					stats = nodeStats(node),
+					by = conqueror and (conquestJewel[conqueror] or CONQUEROR_JEWELS[conqueror.type]) or nil,
+				}
+			end
+		end
+
+		-- Cluster jewel passives: PoB's generated nodes and links (an arc when two sit on
+		-- one orbit of one group, as on the tree).
+		local clusterNodes = setmetatable({}, ARRAY)
+		local links = setmetatable({}, ARRAY)
+		local linked = {}
+		-- Only clusters the tree reaches: PoB also builds them for jewels in sockets it hasn't taken.
+		local function reached(subGraph)
+			local socket = subGraph.parentSocket
+			return socket and spec.allocNodes[socket.id] ~= nil
+		end
+		for _, subGraph in pairs(spec.subGraphs or {}) do
+			for _, node in ipairs(reached(subGraph) and subGraph.nodes or {}) do
+				if node.id and node.x then
+					clusterNodes[#clusterNodes + 1] = {
+						id = node.id,
+						x = tenth(node.x),
+						y = tenth(node.y),
+						kind = node.type,
+						name = node.dn and plain(node.dn) or nil,
+						stats = nodeStats(node),
+						alloc = spec.allocNodes[node.id] and true or nil,
+					}
+					for _, other in ipairs(node.linked or {}) do
+						local a, b = node.id, other.id
+						local key = b and (a < b and (a .. ":" .. b) or (b .. ":" .. a))
+						if key and not linked[key] then
+							linked[key] = true
+							local link = { a = a, b = b }
+							if other.group == node.group and other.o == node.o and node.o and node.o > 0
+								and node.angle and other.angle then
+								link.r = spec.tree.orbitRadii[node.o + 1]
+								-- Clockwise on screen from a to b the short way round.
+								link.cw = (other.angle - node.angle) % (2 * math.pi) < math.pi or nil
+							end
+							links[#links + 1] = link
+						end
+					end
+				end
+			end
+		end
+
+		out[index] = {
+			-- The tree PoB used: a spec on an older tree is calculated on the latest, so its
+			-- places don't fit the older tree the guide draws.
+			version = spec.treeVersion,
+			jewels = jewels,
+			conquered = conquered,
+			cluster = { nodes = clusterNodes, links = links },
+		}
+	end
+	treeExtrasCache = out
+	return out
+end
+
 -- Compare --------------------------------------------------------------------------------
 
 -- The shown skill set's socket groups and their gems, for the guide's Compare.
@@ -1223,13 +1377,13 @@ local function gemMaxLevels()
 	return gemMaxLevelCache
 end
 
--- Runs an extra (Build health); an error there is logged and gives `fallback`.
-local function safely(fn, fallback)
+-- Runs an extra (Build health, the tree extras); an error there is logged and gives `fallback`.
+local function safely(fn, fallback, what)
 	local ok, result = pcall(fn)
 	if ok then
 		return result
 	end
-	host_log("Build health failed: " .. tostring(result))
+	host_log((what or "Build health") .. " failed: " .. tostring(result))
 	return fallback
 end
 
@@ -1241,6 +1395,7 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		loadedXml = nil
 		undo = {}
 		gearCache = nil
+		treeExtrasCache = nil
 		local bundled
 		bundled, treeNotes = onBundledTrees(xml)
 		takePromptError()
@@ -1274,6 +1429,7 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		lists = setLists(),
 		headline = headline(),
 		gear = gear(),
+		treeExtras = safely(treeExtras, setmetatable({}, ARRAY), "Tree extras"),
 		config = configRows(build.configTab.configSets[build.configTab.activeConfigSetId]),
 		skills = skillGroups(),
 		passives = passives(),

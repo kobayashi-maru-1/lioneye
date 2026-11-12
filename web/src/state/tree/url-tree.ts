@@ -41,6 +41,8 @@ export namespace UrlTree {
     ascendancy?: SkillTree.Ascendancy;
     nodes: string[];
     masteries: Record<string, string>;
+    /** Its place among the build's trees (PoB's order, from 0), for PoB's tree extras. */
+    spec?: number;
   }
 }
 
@@ -102,6 +104,7 @@ export async function buildUrlTree(
         : undefined,
     nodes: nodes,
     masteries: masteries,
+    spec: buildTree.spec,
   };
 }
 

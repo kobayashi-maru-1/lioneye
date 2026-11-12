@@ -51,7 +51,8 @@ export function usePopover<T>() {
 }
 
 interface PopoverProps {
-  anchor: HTMLElement;
+  /** An HTML element, or an SVG one (a node on the passive tree). */
+  anchor: Element;
   pinned: boolean;
   onClose: () => void;
   /** Shown under the content (Copy, Trade, Wiki...); usable once pinned. */

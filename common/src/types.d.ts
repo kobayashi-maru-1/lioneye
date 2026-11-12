@@ -102,6 +102,8 @@ export namespace RouteData {
     name: string;
     version: string;
     url: string;
+    /** Its place among the build's trees (PoB's order, from 0); missing in older imports. */
+    spec?: number;
   }
 
   export interface RequiredGem {

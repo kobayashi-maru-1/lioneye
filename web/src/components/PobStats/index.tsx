@@ -137,6 +137,61 @@ export interface Gear {
   treeJewels: { node: number; item: number }[][];
 }
 
+/** A ring of a jewel's radius on the tree (tree units); `inner` for Thread of Hope. */
+export interface JewelRing {
+  x: number;
+  y: number;
+  outer: number;
+  inner?: number;
+}
+
+/** A jewel in a taken socket of a tree, where it sits and its radius rings. */
+export interface TreeJewel {
+  node: number;
+  item: number;
+  x: number;
+  y: number;
+  rings: JewelRing[];
+}
+
+/** A passive as a timeless jewel left it (PoB's replacement), and which jewel. */
+export interface ConqueredNode {
+  name: string;
+  stats: string[];
+  by?: string;
+}
+
+/** A cluster jewel passive PoB generated (its id, place and text). */
+export interface ClusterNode {
+  id: number;
+  x: number;
+  y: number;
+  /** PoB's node type: Normal, Notable, Socket, Keystone or Mastery. */
+  kind: string;
+  name?: string;
+  stats: string[];
+  alloc?: boolean;
+}
+
+/** A link between cluster passives (or to their socket); r: an arc of that radius. */
+export interface ClusterLink {
+  a: number;
+  b: number;
+  r?: number;
+  /** Clockwise from a to b. */
+  cw?: boolean;
+}
+
+/** What a tree's drawing needs from PoB beyond the tree data. */
+export interface TreeExtras {
+  /** The tree version PoB used (the latest for a spec on an older tree). */
+  version?: string;
+  jewels: TreeJewel[];
+  /** By node id. */
+  conquered: Record<string, ConqueredNode>;
+  cluster: { nodes: ClusterNode[]; links: ClusterLink[] };
+}
+
 /** A gem in a socket group of the shown skill set. */
 export interface SkillGem {
   name: string;
@@ -183,6 +238,8 @@ export interface Stats {
   lists: SetLists | null;
   headline: Headline | null;
   gear: Gear | null;
+  /** Per tree (PoB's order): jewels, conquered passives and cluster passives. */
+  treeExtras: TreeExtras[];
   config: ConfigRow[];
   skills: SkillGroup[];
   passives: Passive[];
@@ -551,6 +608,7 @@ async function fetchStats(
       : null,
     headline: stats.headline ?? null,
     gear: stats.gear ? gearData(stats.gear) : null,
+    treeExtras: list(stats.treeExtras).map(treeExtrasData),
     config: list(stats.config),
     skills: list(stats.skills).map((group) => ({
       ...group,
@@ -592,6 +650,33 @@ function gearData(gear: Partial<Gear>): Gear {
     sets: list(gear.sets).map((set) => ({ ...set, slots: list(set.slots) })),
     items,
     treeJewels: list(gear.treeJewels).map((jewels) => list(jewels)),
+  };
+}
+
+function treeExtrasData(extras: Partial<TreeExtras>): TreeExtras {
+  const conquered: Record<string, ConqueredNode> = {};
+  const raw =
+    extras.conquered && !Array.isArray(extras.conquered)
+      ? extras.conquered
+      : {};
+  for (const [id, node] of Object.entries(raw))
+    conquered[id] = { ...node, stats: list(node.stats) };
+  const cluster: Partial<TreeExtras["cluster"]> =
+    extras.cluster && !Array.isArray(extras.cluster) ? extras.cluster : {};
+  return {
+    version: extras.version,
+    jewels: list(extras.jewels).map((jewel) => ({
+      ...jewel,
+      rings: list(jewel.rings),
+    })),
+    conquered,
+    cluster: {
+      nodes: list(cluster.nodes).map((node) => ({
+        ...node,
+        stats: list(node.stats),
+      })),
+      links: list(cluster.links),
+    },
   };
 }
 

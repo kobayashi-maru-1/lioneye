@@ -222,6 +222,13 @@ settings; otherwise it leaves it alone and says so.
   when the counts match; the last set once all are done). Pick another until your level,
   act or tree moves on; the loadout you pick is kept through Settings and restarts until
   then. A zone's suggested level (`12+`) turns red while you're below it.
+- The **Tree** panel draws what PoB knows about the set's jewels (with the exe): each
+  socketed jewel gets a ring in its rarity color, and jewels with a radius get their
+  radius (Thread of Hope's as a band, Impossible Escape's around its keystone). Cluster
+  jewel passives are drawn where PoB places them. Hovering a passive shows its tooltip
+  beside it: a timeless jewel's version of it (Slum Lord, with "Elegant Hubris … was
+  Arcanist's Dominion"), a cluster passive's stats, or the jewel's item card on a socket.
+  The exe's PoB sends these per tree (`treeExtras` in `log-api/src/pob-host.lua`).
 - When you have every main-tree point of the shown tree set, the **Tree** panel (and the
   in-game Tree tooltip) shows the next set you haven't finished, with "… done" in its
   hint. Stats, gear and gems stay on the loadout's set. Picking a set in the panel turns

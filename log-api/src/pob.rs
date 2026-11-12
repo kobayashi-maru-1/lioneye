@@ -356,6 +356,19 @@ fn fetch(dir: &Path, path: &str) -> bool {
 mod tests {
     use super::is_jewel_file;
 
+    /// For working on pob-host.lua: runs the bundled PoB on a build and writes the guide's
+    /// JSON. `POB_DUMP_XML=build.xml POB_DUMP_OUT=out.json cargo test dump_stats -- --ignored`
+    /// (POB_DUMP_LOADOUT picks a loadout).
+    #[test]
+    #[ignore]
+    fn dump_stats() {
+        let xml = std::fs::read_to_string(std::env::var("POB_DUMP_XML").expect("POB_DUMP_XML")).unwrap();
+        let loadout = std::env::var("POB_DUMP_LOADOUT").ok();
+        let pob = super::Pob::load().unwrap();
+        let json = pob.stats(&xml, loadout.as_deref(), None).unwrap();
+        std::fs::write(std::env::var("POB_DUMP_OUT").expect("POB_DUMP_OUT"), json).unwrap();
+    }
+
     #[test]
     fn only_timeless_jewel_files_download() {
         assert!(is_jewel_file("Data/TimelessJewelData/LethalPride.zip"));

@@ -570,6 +570,30 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   const [compare, setCompare] = useAtom(treeCompareAtom);
   const against = compare === "character" && character ? character.nodes : null;
   useTreeTip(urlTrees, index, character?.nodes ?? null);
+  // PoB's jewels, timeless jewel changes and cluster passives for each tree shown. Each
+  // answer from PoB (another main skill or config) repeats them; the same ones keep the
+  // tree as it is (redrawing it would reset its zoom). The plan's, also while Live shows
+  // your character's numbers: these trees are the plan's.
+  const stats = usePobStats()?.planStats ?? null;
+  const treeExtras = useSameValue(stats?.treeExtras ?? null);
+  const pobTitles = useSameValue(stats?.lists?.trees ?? null);
+  const items = useSameValue(stats?.gear?.items);
+  const extras = useMemo(() => {
+    if (!treeExtras) return urlTrees.map(() => null);
+    const pobNames = (pobTitles ?? []).map((title) => stripPob(title));
+    return urlTrees.map((tree, i) => {
+      // Older imports have no place: the same title's nth tree, counting from this one's.
+      const nth = urlTrees
+        .slice(0, i)
+        .filter((t) => t.name === tree.name).length;
+      const spec = tree.spec ?? nthIndex(pobNames, tree.name, nth);
+      const found = spec >= 0 ? (treeExtras[spec] ?? null) : null;
+      // A tree PoB calculated on a newer tree (no older one bundled): its places don't fit.
+      return found && found.version && found.version !== tree.version
+        ? null
+        : found;
+    });
+  }, [urlTrees, treeExtras, pobTitles]);
   return (
     <PageSection
       id="tree"
@@ -613,10 +637,28 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
           urlTrees={urlTrees}
           selectedIndex={index}
           against={against}
+          extras={extras}
+          items={items}
         />
       </div>
     </PageSection>
   );
+}
+
+/** Where `value` is in `list` for the nth time (from 0), or -1. */
+function nthIndex(list: string[], value: string, nth: number) {
+  let seen = 0;
+  for (let i = 0; i < list.length; i++)
+    if (list[i] === value && seen++ === nth) return i;
+  return -1;
+}
+
+/** The value from the last render while it's the same (as JSON), so memos and effects keep. */
+function useSameValue<T>(value: T): T {
+  const kept = useRef<{ json: string; value: T } | null>(null);
+  const json = JSON.stringify(value ?? null);
+  if (kept.current?.json !== json) kept.current = { json, value };
+  return kept.current.value;
 }
 
 /**

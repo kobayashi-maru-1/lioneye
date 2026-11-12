@@ -1,9 +1,13 @@
 import { TREE_DATA_LOOKUP } from "../../state/tree";
 import type { UrlTree } from "../../state/tree/url-tree";
 import { randomId } from "../../utility";
+import { ItemTooltip, RARITY_COLOURS } from "../Gear";
+import type { GearItem, TreeExtras, TreeJewel } from "../PobStats";
+import { PoeTooltip, TooltipProperty, tooltipStyles } from "../PoeTooltip";
+import { Popover } from "../Popover";
 import { SetPager, useFollowAct } from "../SetPager";
-import { SidebarTooltip } from "../SidebarTooltip";
 import { Viewport, type ViewportProps } from "../Viewport";
+import { drawExtras, extrasStyle } from "./extras";
 import styles from "./styles.module.css";
 import {
   type UrlTreeDelta,
@@ -12,8 +16,7 @@ import {
 } from "./url-tree-delta";
 import classNames from "classnames";
 import type { SkillTree } from "common";
-import React, { type JSX } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface SkillTreeViewerProps {
   urlTrees: UrlTree.Data[];
@@ -24,6 +27,10 @@ interface SkillTreeViewerProps {
    * show as active, the loadout's others as added (to take), yours it lacks as removed.
    */
   against?: string[] | null;
+  /** PoB's extras for each of `urlTrees` (jewels, timeless jewels, clusters), if known. */
+  extras?: (TreeExtras | null)[];
+  /** The build's items by id, for the jewels' tooltips. */
+  items?: Record<string, GearItem>;
 }
 
 interface RenderData {
@@ -33,12 +40,25 @@ interface RenderData {
   nodes: SkillTree.NodeLookup;
   intialFocus: ViewportProps["intialFocus"];
   masteries: UrlTreeDelta["masteries"];
+  extras: TreeExtras | null;
+  /** The set before's, for the tooltips of its cluster passives drawn as removed. */
+  previousExtras: TreeExtras | null;
 }
+
+/** The hovered node (or jewel socket) and its element, for the tooltip beside it. */
+interface Hovered {
+  id: string;
+  anchor: Element;
+}
+
+const NO_ITEMS: Record<string, GearItem> = {};
 
 export function SkillTreeViewer({
   urlTrees,
   selectedIndex: chosenIndex,
   against,
+  extras,
+  items = NO_ITEMS,
 }: SkillTreeViewerProps) {
   const svgDivRef = useRef<HTMLDivElement>(null);
   const titles = useMemo(() => urlTrees.map((x) => x.name), [urlTrees]);
@@ -50,7 +70,10 @@ export function SkillTreeViewer({
   const curIndex = selectedIndex >= 0 ? selectedIndex : followIndex;
   const [renderData, setRenderData] = useState<RenderData>();
   const [styleId] = useState(() => randomId(6));
-  const [tooltipNodeId, setTooltipNodeId] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<Hovered | null>(null);
+
+  const currentExtras = extras?.[curIndex] ?? null;
+  const previousExtras = against ? null : (extras?.[curIndex - 1] ?? null);
 
   useEffect(() => {
     async function fn() {
@@ -121,6 +144,21 @@ export function SkillTreeViewer({
             viewBox,
           );
 
+      // PoB's extras: jewel rings under the tree, cluster passives and jewel markers over it.
+      const drawing = drawExtras(
+        currentExtras,
+        previousExtras,
+        new Set(currentTree.nodes),
+        new Set(previousTree.nodes),
+        nodes,
+        items,
+        (rarity) => RARITY_COLOURS[rarity ?? "NORMAL"] ?? RARITY_COLOURS.NORMAL,
+        !!against,
+      );
+      const drawn = svg
+        .replace(/^(<svg[^>]*>\n)/, (open) => open + drawing.under)
+        .replace(/<\/svg>\n?$/, () => drawing.over + "</svg>\n");
+
       const style = compiledStyle({
         styleId: styleId,
         backgroundColor: "#00000000",
@@ -136,27 +174,38 @@ export function SkillTreeViewer({
         connectionAddedColor: "hsl(120, 90%, 40%)",
         connectionRemovedColor: "hsl(0, 90%, 40%)",
 
-        nodesActive: urlTreeDelta.nodesActive,
-        nodesAdded: urlTreeDelta.nodesAdded,
-        nodesRemoved: urlTreeDelta.nodesRemoved,
+        nodesActive: [...urlTreeDelta.nodesActive, ...drawing.nodesActive],
+        nodesAdded: [...urlTreeDelta.nodesAdded, ...drawing.nodesAdded],
+        nodesRemoved: [...urlTreeDelta.nodesRemoved, ...drawing.nodesRemoved],
 
-        connectionsActive: urlTreeDelta.connectionsActive,
-        connectionsAdded: urlTreeDelta.connectionsAdded,
-        connectionsRemoved: urlTreeDelta.connectionsRemoved,
+        connectionsActive: [
+          ...urlTreeDelta.connectionsActive,
+          ...drawing.connectionsActive,
+        ],
+        connectionsAdded: [
+          ...urlTreeDelta.connectionsAdded,
+          ...drawing.connectionsAdded,
+        ],
+        connectionsRemoved: [
+          ...urlTreeDelta.connectionsRemoved,
+          ...drawing.connectionsRemoved,
+        ],
       });
 
       setRenderData({
-        svg,
-        style,
+        svg: drawn,
+        style: style + extrasStyle(styleId),
         skillTree,
         nodes,
         intialFocus: bounds,
         masteries: urlTreeDelta.masteries,
+        extras: currentExtras,
+        previousExtras,
       });
     }
 
     fn();
-  }, [urlTrees, curIndex, against]);
+  }, [urlTrees, curIndex, against, currentExtras, previousExtras, items]);
 
   useEffect(() => {
     if (svgDivRef.current === null) return;
@@ -165,11 +214,11 @@ export function SkillTreeViewer({
     const handleEnter = (ev: PointerEvent) => {
       const target = ev.target as SVGElement | null;
       if (target !== null && target.id.startsWith("n")) {
-        setTooltipNodeId(target.id.slice(1));
+        setHovered({ id: target.id.slice(1), anchor: target });
       }
     };
     const handleLeave = (_ev: PointerEvent) => {
-      setTooltipNodeId(null);
+      setHovered(null);
     };
 
     svgDivRef.current.addEventListener("pointerover", handleEnter);
@@ -183,17 +232,46 @@ export function SkillTreeViewer({
     };
   }, [svgDivRef, renderData]);
 
+  const jewels = useMemo(() => {
+    const byNode = new Map<string, TreeJewel>();
+    for (const jewel of renderData?.extras?.jewels ?? [])
+      byNode.set(String(jewel.node), jewel);
+    return byNode;
+  }, [renderData]);
+  const close = useCallback(() => setHovered(null), []);
+  // The same objects while the tree is the same: React re-applies inner HTML given a new
+  // one, which would swap the tree's elements under the tooltip (closing it) on each hover.
+  const svgHtml = useMemo(
+    () => ({ __html: renderData?.svg ?? "" }),
+    [renderData?.svg],
+  );
+  const styleHtml = useMemo(
+    () => ({ __html: renderData?.style ?? "" }),
+    [renderData?.style],
+  );
+
+  const jewel = hovered && jewels.get(hovered.id);
+  const jewelItem = jewel ? items[String(jewel.item)] : undefined;
+
   return (
     <>
       {renderData && (
         <div className={classNames(styles.viewer)}>
-          {tooltipNodeId && (
-            <NodeTooltip
-              skillTree={renderData.skillTree}
-              nodes={renderData.nodes}
-              masteries={renderData.masteries}
-              nodeId={tooltipNodeId}
-            />
+          {hovered && (
+            <Popover anchor={hovered.anchor} pinned={false} onClose={close}>
+              {jewelItem ? (
+                <ItemTooltip item={jewelItem} />
+              ) : (
+                <NodeTooltip
+                  skillTree={renderData.skillTree}
+                  nodes={renderData.nodes}
+                  masteries={renderData.masteries}
+                  extras={renderData.extras}
+                  previousExtras={renderData.previousExtras}
+                  nodeId={hovered.id}
+                />
+              )}
+            </Popover>
           )}
           {selectedIndex < 0 && (
             <SetPager titles={titles} index={curIndex} onIndex={setCurIndex} />
@@ -203,11 +281,11 @@ export function SkillTreeViewer({
               intialFocus={renderData.intialFocus}
               resizeHandling="contain"
             >
-              <style dangerouslySetInnerHTML={{ __html: renderData.style }} />
+              <style dangerouslySetInnerHTML={styleHtml} />
               <div
                 id={styleId}
                 ref={svgDivRef}
-                dangerouslySetInnerHTML={{ __html: renderData.svg }}
+                dangerouslySetInnerHTML={svgHtml}
               />
             </Viewport>
           </div>
@@ -222,42 +300,60 @@ interface NodeTooltipProps {
   nodes: SkillTree.NodeLookup;
   nodeId: keyof SkillTree.NodeLookup;
   masteries: Record<string, string>;
+  extras: TreeExtras | null;
+  previousExtras: TreeExtras | null;
 }
 
+/**
+ * A passive as the build has it: a timeless jewel's version of it (and what it was), a
+ * cluster jewel passive from PoB, else the tree's own (with the picked mastery effect).
+ */
 function NodeTooltip({
   skillTree,
   nodes,
   masteries,
+  extras,
+  previousExtras,
   nodeId,
 }: NodeTooltipProps) {
-  const node = nodes[nodeId];
+  const node = nodes[nodeId] as SkillTree.Node | undefined;
+  const conquered = extras?.conquered[nodeId];
+  const find = (from: TreeExtras | null) =>
+    from?.cluster.nodes.find((n) => String(n.id) === nodeId);
+  const cluster = find(extras) ?? find(previousExtras);
 
-  let parts = [];
-
-  if (node.stats && node.stats.length > 0) {
-    for (const stat of node.stats.flatMap((x) => x.split("\n"))) {
-      parts.push(<span>{stat}</span>);
-    }
-  }
-
-  const masteryEffectId = masteries[nodeId];
-  if (masteryEffectId) {
-    const mastery = skillTree.masteryEffects[masteryEffectId];
-    if (mastery.stats.length > 0) {
-      for (const stat of mastery.stats.flatMap((x) => x.split("\n"))) {
-        parts.push(<span>{stat}</span>);
-      }
-    }
+  const name = conquered?.name ?? cluster?.name ?? node?.text ?? "";
+  const lines = (stats: string[]) => stats.flatMap((x) => x.split("\n"));
+  let stats: string[];
+  if (conquered) stats = lines(conquered.stats);
+  else if (cluster) stats = lines(cluster.stats);
+  else {
+    stats = lines(node?.stats ?? []);
+    const masteryEffectId = masteries[nodeId];
+    const mastery =
+      masteryEffectId !== undefined
+        ? skillTree.masteryEffects[masteryEffectId]
+        : undefined;
+    if (mastery) stats = [...stats, ...lines(mastery.stats)];
   }
 
   return (
-    <SidebarTooltip title={node.text}>
-      {parts.flatMap<JSX.Element>((x, i) => (
-        <React.Fragment key={i}>
-          {i !== 0 && <hr />}
-          {x}
-        </React.Fragment>
-      ))}
-    </SidebarTooltip>
+    <PoeTooltip kind="normal" name={name}>
+      {stats.length > 0 && (
+        <>
+          {stats.map((stat, i) => (
+            <div key={i} className={classNames(tooltipStyles.mod)}>
+              {stat}
+            </div>
+          ))}
+        </>
+      )}
+      {conquered && node && (
+        <TooltipProperty
+          label={conquered.by ?? "Timeless jewel"}
+          value={`was ${node.text}`}
+        />
+      )}
+    </PoeTooltip>
   );
 }

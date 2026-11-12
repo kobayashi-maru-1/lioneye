@@ -239,8 +239,9 @@ export function processPob(pobCode: string): PobData | null {
 
   const buildTrees: RouteData.BuildTree[] = [];
   const specElements = Array.from(doc.getElementsByTagName("Spec"));
-  for (const specElement of specElements) {
+  for (const [spec, specElement] of specElements.entries()) {
     buildTrees.push({
+      spec,
       name: cleanPobText(specElement.getAttribute("title") || "Default"),
       version: specElement.getAttribute("treeVersion")!,
       url: specElement.getElementsByTagName("URL")[0].textContent?.trim()!,
