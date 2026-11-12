@@ -6,11 +6,11 @@
   width: 100%;
 }
 
-/* Link groups flow into as many columns as the panel is wide. */
+/* Link groups flow into as many columns as the panel is wide; the cards in a row share
+   the tallest one's height, so the rows line up (as in PoE Overlay). */
 .gemLinkSection {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-  align-items: start;
   gap: var(--size-3);
 }
 
@@ -76,17 +76,26 @@
   margin-left: var(--size-4);
 }
 
-/* A gem row: a button (hover for its tooltip, click to pin it), level/quality on the right. */
+/* A gem row: a button (hover for its tooltip, click to pin it), level/quality on the right.
+   Stretched, not width 100%: a support's indent would push it past the card's edge.
+   Baseline: on a name that wraps, the level sits on its first line. */
 .gemLink {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--size-3);
-  width: 100%;
+  align-self: stretch;
   padding: 0 var(--size-1);
   text-align: left;
   border-radius: var(--border-radius);
   cursor: pointer;
+}
+
+/* A long name wraps under the name, not under the color dot (1em + its margin). */
+.gemName {
+  min-width: 0;
+  padding-left: calc(1em + var(--size-1));
+  text-indent: calc(-1em - var(--size-1));
 }
 
 .gemLink:hover,

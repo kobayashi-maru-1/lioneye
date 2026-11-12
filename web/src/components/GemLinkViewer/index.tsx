@@ -150,7 +150,7 @@ function GemLink({ gemLink, isPrimary, open, handlers }: GemLinkProps) {
       aria-label={gemLink.off ? `${gem.name}, off in PoB` : gem.name}
       {...handlers}
     >
-      <span>
+      <span className={classNames(styles.gemName)}>
         <MdCircle
           color={Data.GemColours[gem.primary_attribute]}
           className={classNames("inlineIcon")}
