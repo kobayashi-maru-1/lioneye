@@ -316,7 +316,13 @@ settings; otherwise it leaves it alone and says so.
   build stays out.
 - Pages was turned on once for the repo with the source **GitHub Actions** (Settings >
   Pages, or `gh api -X POST repos/kobayashi-maru-1/lioneye/pages -f build_type=workflow`).
-- The page runs in a sandboxed frame that can't navigate the app window.
+- The page runs in a sandboxed frame that can't navigate the app window. The app opens a
+  link from it only right after a real click with the sheet focused, one link per click
+  (5 s), so a changed page can't open links on load or a pile of tabs. Left and middle
+  clicks both go to your Edge profile.
+- Its fonts (Cinzel, Alegreya Sans, SIL OFL) are in `strats/fonts/`, so the page loads
+  nothing from Google. When copying a new version of the sheet in, keep the `@font-face`
+  rules instead of a Google Fonts link.
 
 ## Overlay
 

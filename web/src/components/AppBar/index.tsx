@@ -75,6 +75,9 @@ export function AppBar() {
         className={classNames(styles.button, styles.icon, {
           [styles.active]: pathname === "/settings" || pathname === "/build",
         })}
+        aria-current={
+          pathname === "/settings" || pathname === "/build" ? "page" : undefined
+        }
         aria-label="Settings"
         title="Settings"
         onClick={() => navigate("/settings")}

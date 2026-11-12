@@ -5,15 +5,27 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Covens of Umbra Cheat Sheet</title>
 <meta name="description" content="Path of Exile 3.30 trade league cheat sheet: leveling, voidstones, swap gems, farms and crafts.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya+Sans:wght@400;500;700&display=swap">
 <!--
   Lioneye's Strats page shows this file in a frame (web/src/containers/Strats).
   Each <section> with an id and data-jump becomes a jump button in the app's bar.
   Edit the content freely; keep those two attributes on the sections.
+  Fonts are served from fonts/ (SIL OFL, licenses there), not Google Fonts.
 -->
 <style>
+  /* Latin subset from Google Fonts; other characters fall back to the system font. */
+  @font-face { font-family: "Cinzel"; font-style: normal; font-weight: 500 700; font-display: swap;
+    src: url("fonts/cinzel.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 400; font-display: swap;
+    src: url("fonts/alegreya-sans-400.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 500; font-display: swap;
+    src: url("fonts/alegreya-sans-500.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 700; font-display: swap;
+    src: url("fonts/alegreya-sans-700.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
   /* Layout: a dark grimoire board of small framed panels; every line is a glanceable fragment. */
   :root {
     color-scheme: dark;
@@ -233,13 +245,17 @@
       }
     });
     // Only once the app has introduced itself (strats-list): otherwise links open as usual.
-    document.addEventListener("click", function (e) {
-      if (!parentOrigin || e.defaultPrevented || e.button !== 0) return;
+    // Left click, and middle click (auxclick), which would otherwise open a tab in the
+    // guide window's own profile instead of yours.
+    function handOver(e) {
+      if (!parentOrigin || e.defaultPrevented || (e.button !== 0 && e.button !== 1)) return;
       var link = e.target instanceof Element ? e.target.closest("a[href]") : null;
       if (!link || link.protocol !== "https:") return;
       e.preventDefault();
       window.parent.postMessage({ type: "strats-open", url: link.href }, parentOrigin);
-    });
+    }
+    document.addEventListener("click", handOver);
+    document.addEventListener("auxclick", handOver);
   })();
 </script>
 </body>

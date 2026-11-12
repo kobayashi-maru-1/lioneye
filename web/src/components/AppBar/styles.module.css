@@ -32,9 +32,15 @@
   white-space: nowrap;
 }
 
-.button:hover,
-.active {
+.button:hover {
   color: #c99550;
+}
+
+/* The page you're on: lighter text, a faint fill and a gold underline (hover too). */
+.button.active {
+  color: #e6c48c;
+  background-color: rgba(175, 128, 64, 0.14);
+  box-shadow: inset 0 -2px 0 var(--gold);
 }
 
 .icon {

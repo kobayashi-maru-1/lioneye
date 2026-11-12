@@ -81,7 +81,7 @@ export default function StratsContainer() {
         setSections(readSections(data.sections));
         setListed(true);
       } else if (data?.type === "strats-open" && typeof data.url === "string") {
-        openLink(data.url);
+        openLink(data.url, frame.current);
       }
     };
     window.addEventListener("message", onMessage);
@@ -135,11 +135,27 @@ export default function StratsContainer() {
 }
 
 /**
+ * How long a click counts as a click: Chromium's user activation lasts 5 s. One link per
+ * gap means one link per click, since the exe's handler doesn't use up the activation.
+ */
+const OPEN_GAP_MS = 5000;
+let lastOpen = Number.NEGATIVE_INFINITY;
+
+/**
  * Opens a link from the sheet the way the guide's own links open: a click on a link here
  * is picked up by AutoProgress, which hands it to the exe (your signed-in Edge profile).
  * Outside the exe's window it opens in a new tab.
+ *
+ * Only right after a real click, with the frame focused: a click inside the frame
+ * activates this page too and focuses the frame. So a changed sheet can't open links on
+ * load or open a pile of tabs: at most one link per click. (It could still focus itself
+ * right after a click on a bar button and open one link then; accepted, Nov 2026.)
  */
-function openLink(href: string) {
+function openLink(href: string, frame: HTMLIFrameElement | null) {
+  if (!navigator.userActivation?.isActive) return;
+  if (frame === null || document.activeElement !== frame) return;
+  const now = performance.now();
+  if (now - lastOpen < OPEN_GAP_MS) return;
   let url: URL;
   try {
     url = new URL(href);
@@ -147,6 +163,7 @@ function openLink(href: string) {
     return;
   }
   if (url.protocol !== "https:") return;
+  lastOpen = now;
   const link = document.createElement("a");
   link.href = url.href;
   link.target = "_blank";
