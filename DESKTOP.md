@@ -459,7 +459,7 @@ first" when it had to load).
 Build health is a port of PoB Redux's `sanity_check`, with its two ascendancy checks
 replaced by Lioneye's Labyrinth check and an item level check added (both marked
 "Lioneye" in `healthFindings`; keep them when porting). `log-api\redux-watch.ps1` says
-whether Redux changed it since the port (the Watch workflow runs it daily and fails
+whether Redux changed it since the port (the Watch workflow runs it daily and warns
 on a change); after porting, `.\log-api\redux-watch.ps1 -Update` records the new version.
 
 ```powershell
@@ -542,8 +542,9 @@ workflow (`.github/workflows/build-and-deploy.yml`), the PWA plugin (`vite-plugi
 the phone icons in `web/public`, keep them out, and keep this repo's `web/vite.config.ts`.
 
 `upstream-watch.ps1` (without `-Update`) says whether either upstream has changes not merged
-yet. The **Watch** workflow runs it and `log-api\redux-watch.ps1` daily and fails (GitHub
-emails you) when there's something to merge or port.
+yet. The **Watch** workflow runs it and `log-api\redux-watch.ps1` daily. When there's
+something to merge or port, the run passes with a yellow warning and lists it in the run
+summary. There's no email, so check Actions.
 
 After cloning, add the remotes once:
 

@@ -1,4 +1,4 @@
-# Daily: fails (GitHub emails you) when
+# Daily: passes with a warning and a run summary (no email) when
 # - HeartofPhos's exile-leveling or exile-log-api has changes not merged here yet
 #   (upstream-watch.ps1), or
 # - PoB Redux changed the build checks Build health is ported from (log-api/redux-watch.ps1).
@@ -58,5 +58,4 @@ jobs:
               echo "Port what applies to \`healthFindings\` in \`log-api/src/pob-host.lua\`, then run \`./log-api/redux-watch.ps1 -Update\`."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "::error::Upstream changes to look at; see the run summary."
-          exit 1
+          echo "::warning::Upstream changes to look at; see the run summary."
