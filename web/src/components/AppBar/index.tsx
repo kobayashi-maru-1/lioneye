@@ -17,7 +17,7 @@ export const jumpTargetsAtom = atom<JumpTarget[]>([]);
 /**
  * The app's one bar, pinned at the top, the same on every page: a button per guide panel
  * (opens it if folded and scrolls to it; from another page, back to the guide first),
- * then League and Settings, and the auto-progress pill at the right. Before the guide
+ * then League, Atlas and Settings, and the auto-progress pill at the right. Before the guide
  * has listed its panels (the app opened on another page), a Guide button instead.
  */
 export function AppBar() {
@@ -26,6 +26,7 @@ export function AppBar() {
   const targets = useAtomValue(jumpTargetsAtom);
   const jump = useJumpToPanel();
   const onStrats = pathname === "/strats";
+  const onAtlas = pathname === "/atlas";
   const onSettings = pathname === "/settings" || pathname === "/build";
 
   return (
@@ -55,6 +56,13 @@ export function AppBar() {
         onClick={() => navigate("/strats")}
       >
         League
+      </button>
+      <button
+        className={classNames(styles.button, { [styles.active]: onAtlas })}
+        aria-current={onAtlas ? "page" : undefined}
+        onClick={() => navigate("/atlas")}
+      >
+        Atlas
       </button>
       <button
         className={classNames(styles.button, styles.icon, {

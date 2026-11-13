@@ -25,6 +25,7 @@ const RoutesContainer = pipe(
 const BuildContainer = withBlank(lazy(() => import("./Build")));
 const EditRouteContainer = withBlank(lazy(() => import("./EditRoute")));
 const StratsContainer = withBlank(lazy(() => import("./Strats")));
+const AtlasContainer = withBlank(lazy(() => import("./Atlas")));
 
 export function App() {
   useAutoProgress();
@@ -81,6 +82,13 @@ export function App() {
                   title="Lioneye - League"
                   component={<StratsContainer />}
                 />
+              }
+            />
+            {/* The atlas tree planner (poeatlasplanner.com), live in a frame. */}
+            <Route
+              path="/atlas"
+              element={
+                <Page title="Lioneye - Atlas" component={<AtlasContainer />} />
               }
             />
             <Route

@@ -5,14 +5,13 @@ import {
   STRATS_URL,
   type StratsSection,
 } from "../../state/strats";
+import { useReachable, type Reachable } from "../../utility/use-reachable";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useEffect, useRef, useState } from "react";
 
-type Status = "checking" | "online" | "offline" | "missing";
+type Status = Reachable | "missing";
 
-/** How long the reachability check may take before it counts as offline. */
-const CHECK_WAIT_MS = 10000;
 /** How long the framed page gets to load and list its sections before it counts as missing. */
 const LIST_WAIT_MS = 15000;
 
@@ -26,33 +25,16 @@ const LIST_WAIT_MS = 15000;
 export default function StratsContainer() {
   const frame = useRef<HTMLIFrameElement>(null);
   const [sections, setSections] = useState<StratsSection[]>([]);
-  const [status, setStatus] = useState<Status>("checking");
   const [listed, setListed] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const reachable = useReachable(STRATS_URL, attempt);
+  const status: Status = missing ? "missing" : reachable;
 
-  // A frame can't report a failed load across origins, so check the page is reachable first.
   useEffect(() => {
-    const abort = new AbortController();
-    let current = true;
-    // A hung connection (captive portal) counts as offline.
-    const timer = setTimeout(() => abort.abort(), CHECK_WAIT_MS);
-    setStatus("checking");
+    setMissing(false);
     setListed(false);
     setSections([]);
-    fetch(STRATS_URL, {
-      method: "HEAD",
-      mode: "no-cors",
-      cache: "no-store",
-      signal: abort.signal,
-    }).then(
-      () => current && setStatus("online"),
-      () => current && setStatus("offline"),
-    );
-    return () => {
-      current = false;
-      clearTimeout(timer);
-      abort.abort();
-    };
   }, [attempt]);
 
   // Reachable but silent (GitHub's 404 page, a broken publish): say so instead.
@@ -64,7 +46,7 @@ export default function StratsContainer() {
   };
   useEffect(() => {
     if (status !== "online" || listed) return;
-    const timer = setTimeout(() => setStatus("missing"), LIST_WAIT_MS);
+    const timer = setTimeout(() => setMissing(true), LIST_WAIT_MS);
     return () => clearTimeout(timer);
   }, [status, listed]);
 

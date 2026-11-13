@@ -349,6 +349,22 @@ settings; otherwise it leaves it alone and says so.
   `@font-face` rules instead of a Google Fonts link, and keep the Builds and Trade sections,
   `builds/` and the script: they aren't part of the cheat sheet artifact.
 
+## Atlas
+
+- **Atlas** in the top bar loads <https://poeatlasplanner.com/> (Atlas Route, an
+  independent atlas tree planner; not open source) live in a frame. Lioneye doesn't copy
+  or change it: when the site changes, the tab does too.
+- The planner keeps its draft and **Saved trees** in its own browser storage. In the
+  frame that storage belongs to Lioneye: kept across restarts, separate from the same site
+  in a normal Edge tab, and gone if Edge's site data is cleared. **Share tree** links hold
+  the whole tree (nodes, effects, point budget), so keep one for any tree that matters.
+- If Edge blocks third-party cookies, it also blocks the framed site's storage: the
+  planner still works but forgets trees.
+- The site runs its own analytics (Plausible, Google Analytics) in the frame.
+- Offline it shows **Not loaded** with **Retry**. The frame can't navigate the app window
+  (its **About** link opens inside the frame). If the site ever refuses to be framed, the
+  tab shows a blank frame instead of **Not loaded**.
+
 ## Overlay
 
 - While Path of Exile is the window in front and you're playing a character, the exe shows a
