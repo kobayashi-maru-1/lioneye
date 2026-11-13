@@ -124,6 +124,11 @@
   .tag { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; color: var(--ash); }
   .farm ul { margin: 0; padding-left: 16px; font-size: 14.5px; color: var(--bone); }
   .farm li::marker { color: var(--gilt); }
+  /* Temple rooms: the full row, ranked; the upgrade path after the room's name. */
+  .farm.wide { grid-column: 1 / -1; }
+  .farm ol { margin: 0; padding-left: 22px; font-size: 14.5px; color: var(--bone); }
+  .farm ol li::marker { color: var(--gilt); font-weight: 700; }
+  .farm .path { color: var(--ash); }
   .key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ash); margin-bottom: 10px; }
   .key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
 
@@ -316,6 +321,7 @@
     <div class="ph"><h2 id="h-farms">Farms</h2><span class="sub">Our old strats, rebuilt for 3.30 (untested)</span></div>
     <div class="key"><span><i style="background:#84b98f"></i>Rebuilt</span><span><i style="background:#7cb8f2"></i>New in 3.30</span><span><i style="background:#d4474f"></i>Out</span></div>
     <div class="farms">
+      <div class="farm new wide"><div class="top"><span class="t">Temple rooms</span><span class="tag">Tier 3</span></div><ol><li><b>Locus of Corruption</b> <span class="path">Corruption Chamber → Catalyst of Corruption</span></li><li><b>Doryani’s Institute</b> <span class="path">Gemcutter’s Workshop → Department of Thaumaturgy</span></li><li><b>Cradle of Creation</b> <span class="path">Royal Meeting Room → Hall of Lords</span></li><li><b>Atlas of Worlds</b> <span class="path">Surveyor’s Study → Office of Cartography</span></li><li><b>Apex of Ascension</b> <span class="path">Sacrificial Chamber → Hall of Offerings</span></li></ol></div>
       <div class="farm"><div class="top"><span class="t">Essence</span><span class="tag">No Threads</span></div><ul><li>Prolific Essence, Crystal Lattice, Amplified Energies</li><li>Corrupt only MEDS or 3× Shrieking; Recrystallisation allows a second corrupt</li><li>Crystal Resonance survived (T16 bosses)</li></ul></div>
       <div class="farm"><div class="top"><span class="t">Harvest</span><span class="tag">No Threads</span></div><ul><li>Call of the Grove, Doubling Season, Heart of the Grove</li><li>Atlas Drops = more Lifeforce</li><li>Sell all 3 colors in bulk</li></ul></div>
       <div class="farm"><div class="top"><span class="t">Div cards</span><span class="tag">Rarity</span></div><ul><li>Stack <b>rarity</b>, not quantity</li><li>Divination Card cluster + Fate Bespoken</li><li>Card Sharp, Rabbit's Foot disabled</li></ul></div>
@@ -437,6 +443,42 @@
     }
     openFromHash();
     window.addEventListener("hashchange", openFromHash);
+    // Where you were on the page, kept per browser (in the app: across restarts) and put
+    // back on load, unless a link points at a section. Again once fonts and images are in,
+    // if you haven't scrolled since.
+    var SCROLL_KEY = "lioneye-league-scroll";
+    var restoredAt = null;
+    function restoreScroll() {
+      if (location.hash) return;
+      if (restoredAt !== null && Math.abs(window.scrollY - restoredAt) > 2) return;
+      var y = 0;
+      try { y = Number(localStorage.getItem(SCROLL_KEY)); } catch (err) { return; }
+      if (!(y > 0) || !isFinite(y)) return;
+      window.scrollTo(0, y);
+      restoredAt = window.scrollY;
+    }
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    restoreScroll();
+    // Saved only once the page is in (or you scroll yourself): a restore clamped by a page
+    // still short would otherwise save the clamped spot over the real one.
+    var canSave = restoredAt === null;
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(restoreScroll);
+    window.addEventListener("load", function () { restoreScroll(); canSave = true; });
+    ["wheel", "keydown", "pointerdown", "touchstart"].forEach(function (type) {
+      window.addEventListener(type, function () { canSave = true; }, { passive: true });
+    });
+    function saveScroll() {
+      if (!canSave) return;
+      try { localStorage.setItem(SCROLL_KEY, String(Math.round(window.scrollY))); } catch (err) { /* not kept */ }
+    }
+    var scrollTimer = 0;
+    window.addEventListener("scroll", function () {
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(saveScroll, 250);
+    }, { passive: true });
+    // Leaving (the app's League tab closes this frame): the last stretch too.
+    window.addEventListener("pagehide", saveScroll);
+    document.addEventListener("visibilitychange", function () { if (document.hidden) saveScroll(); });
     var sources = document.getElementById("sources");
     if (sources) {
       if (typeof folded.sources === "boolean") sources.open = !folded.sources;

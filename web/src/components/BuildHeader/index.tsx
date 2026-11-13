@@ -11,6 +11,7 @@ import {
 } from "../../state/live-character";
 import { pobAtom } from "../../state/pob";
 import { BuildCompare } from "../BuildCompare";
+import { LoadCode } from "../BuildCodeForm";
 import { BuildPicker } from "../BuildPicker";
 import { DesktopPob, SaveToPob } from "../DesktopPob";
 import { type Headline, usePobStats } from "../PobStats";
@@ -19,7 +20,13 @@ import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRef } from "react";
-import { FaDesktop, FaRegClipboard, FaSave, FaSyncAlt } from "react-icons/fa";
+import {
+  FaDesktop,
+  FaFileImport,
+  FaRegClipboard,
+  FaSave,
+  FaSyncAlt,
+} from "react-icons/fa";
 import { toast } from "react-toastify";
 
 /** The imported build's PoB code to the clipboard, as pob.codes' Copy does. */
@@ -37,8 +44,8 @@ async function copyCode(code: string) {
  * PoB's builds folder) with Save beside it (a pasted build to PoB's builds folder;
  * greyed out when it can't), then a Plan row (the shown loadout's PoB numbers) and a
  * Live row (your character: its level from the game log, its numbers from poe.ninja,
- * with Refresh). Compare, Edit PoB (opens it in the chosen PoB) and Copy at the right
- * of the title. The Loadout dropdown is at the top of the left column (StatsViewer).
+ * with Refresh). Load (a popup to paste a code) sits beside Save. Compare, Edit PoB
+ * (opens it in the chosen PoB) and Copy at the right of the title. The Loadout dropdown is at the top of the left column (StatsViewer).
  */
 export function BuildHeader() {
   const pob = usePobStats();
@@ -64,6 +71,9 @@ export function BuildHeader() {
           <SaveToPob className={classNames(styles.tool, styles.icon)}>
             <FaSave aria-hidden />
           </SaveToPob>
+          <LoadCode className={classNames(styles.tool, styles.icon)}>
+            <FaFileImport aria-hidden />
+          </LoadCode>
         </div>
         <div className={classNames(styles.tools)}>
           <BuildCompare buttonClassName={classNames(styles.tool)} />

@@ -207,7 +207,9 @@ settings; otherwise it leaves it alone and says so.
   file. It's greyed out, with why as its tooltip, when it can't save: **PoB not found**
   (no answer from the exe yet), **PoB Community not installed** (or **PoB Redux**, the
   chosen editor), **No build**, **Already in PoB** (an opened file) or **Saving**. An
-  open **Save to PoB?** closes by itself if the build changes or gets saved meanwhile. **Plan**: the shown loadout as PoB calculates it, with PoB's level. **Live**: your
+  open **Save to PoB?** closes by itself if the build changes or gets saved meanwhile. The
+  import icon after it (**Load code**) opens **Load build**: paste a PoB code or build link
+  and **Import**, as Settings' **Import code** does, without leaving the guide. **Plan**: the shown loadout as PoB calculates it, with PoB's level. **Live**: your
   character, with your level from the game log (it's never behind poe.ninja's) and the
   numbers from poe.ninja's copy; without a live character, just the log's level. Live's
   ⟳ (once a live character is set) does what **Refresh** in Settings does, and opens the
@@ -319,7 +321,8 @@ settings; otherwise it leaves it alone and says so.
   buttons take you back to the guide, at that panel); under it, the page pins its own bar
   with a button per section (Builds, Trade, Leveling, ...), which the page lists itself.
 - Each section's header bar folds it; the page remembers which are folded (per browser).
-  Jumping to a folded section opens it.
+  Jumping to a folded section opens it. It also remembers where you'd scrolled to and opens
+  there again (not when a link points at a section, `#trade`).
 - **Builds**: a card per build with a copy button for its PoB code (paste into PoB's
   Import or Lioneye's Settings). The codes are files in `strats/builds/`, made from the PoB
   files without their character-import details (account, character, realm) or item

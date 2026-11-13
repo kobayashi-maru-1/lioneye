@@ -28,6 +28,140 @@ function readable(code: string) {
 }
 
 /**
+ * Imports a pasted PoB code or build link, the way Settings' Import code does: fetches a
+ * link, checks the code reads as a build, loads it (your progress stays). `importCode`
+ * resolves true when the text is now the loaded build (imported, or already loaded).
+ */
+export function useImportCode() {
+  const code = useAtomValue(pobAtom);
+  const loadBuild = useSetAtom(loadBuildAtom);
+  const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  const importCode = async (text: string) => {
+    const input = text.trim();
+    const isLink = getRewriteUrl(input, URL_REWRITERS) !== null;
+    setImporting(true);
+    setError(null);
+    try {
+      const value = (await fetchStringOrUrl(input, URL_REWRITERS)).trim();
+      if (!readable(value)) {
+        setError("Code not read. Paste a PoB code or link.");
+      } else if (value === (code ?? "").trim()) {
+        toast.info("Already loaded");
+        return true;
+      } else if (loadBuild(value, null)) {
+        toast.success("Build imported");
+        return true;
+      } else {
+        setError("Code not read. Paste a PoB code or link.");
+      }
+    } catch {
+      setError(
+        isLink
+          ? "Link not loaded. Check it and retry."
+          : "Code not read. Paste a PoB code or link.",
+      );
+    } finally {
+      setImporting(false);
+    }
+    return false;
+  };
+
+  return { importCode, importing, error, setError };
+}
+
+/**
+ * The guide's Load button (beside Save at the top): a popup to paste a PoB code or build
+ * link and import it, without leaving the guide.
+ */
+export function LoadCode({
+  className,
+  children,
+}: React.PropsWithChildren<{ className: string }>) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const { importCode, importing, error, setError } = useImportCode();
+  const id = useId();
+  const close = () => {
+    setOpen(false);
+    setText("");
+    setError(null);
+  };
+
+  return (
+    <>
+      <button
+        className={className}
+        title="Load code"
+        aria-label="Load code"
+        onClick={() => setOpen(true)}
+      >
+        {children}
+      </button>
+      <Modal
+        size="small"
+        isOpen={open}
+        onRequestClose={close}
+        contentLabel="Load build"
+      >
+        <form
+          className={classNames(formStyles.form)}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (text.trim() === "" || importing) return;
+            if (await importCode(text)) close();
+          }}
+        >
+          <div className={classNames(formStyles.formRow)}>
+            <label htmlFor={id}>Load build</label>
+          </div>
+          <textarea
+            id={id}
+            className={classNames(formStyles.formInput, styles.code)}
+            spellCheck={false}
+            autoFocus
+            placeholder="PoB code or link"
+            value={text}
+            aria-invalid={error !== null}
+            aria-describedby={error ? `${id}-error` : undefined}
+            onChange={(event) => {
+              setText(event.target.value);
+              setError(null);
+            }}
+          />
+          {error && (
+            <div
+              id={`${id}-error`}
+              role="alert"
+              className={classNames(styles.error)}
+            >
+              {error}
+            </div>
+          )}
+          <div className={classNames(formStyles.groupRight)}>
+            <button
+              type="button"
+              className={classNames(formStyles.formButton)}
+              onClick={close}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className={classNames(formStyles.formButton)}
+              disabled={text.trim() === "" || importing}
+            >
+              {importing ? "Importing…" : "Import"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </>
+  );
+}
+
+/**
  * The build. Load: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link and
  * Import code, or Open file for a build file PoB saved (then each save in PoB updates the
  * guide). Loaded: Edit PoB opens the build in the PoB chosen under Editor, when it's
@@ -42,9 +176,13 @@ export function BuildCodeForm() {
   const unload = useSetAtom(unloadBuildAtom);
   // Empty, with the loaded code as its placeholder: paste a new one without clearing it.
   const [text, setText] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const {
+    importCode: importText,
+    importing,
+    error,
+    setError,
+  } = useImportCode();
   const [busy, setBusy] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const home = usePobHome();
   // Unique, should the form ever show twice.
@@ -57,36 +195,15 @@ export function BuildCodeForm() {
     setError(null);
   }, [code]);
 
-  const loaded = (code ?? "").trim();
   // Anything pasted: Import says "Already loaded" for the loaded build itself.
   const changed = text.trim() !== "";
 
   const importCode = async () => {
-    const input = text.trim();
-    const isLink = getRewriteUrl(input, URL_REWRITERS) !== null;
     setBusy(true);
-    setImporting(true);
-    setError(null);
     try {
-      const value = (await fetchStringOrUrl(input, URL_REWRITERS)).trim();
-      if (!readable(value)) {
-        setError("Code not read. Paste a PoB code or link.");
-      } else if (value === loaded) {
-        setText("");
-        toast.info("Already loaded");
-      } else if (loadBuild(value, null)) {
-        setText("");
-        toast.success("Build imported");
-      }
-    } catch {
-      setError(
-        isLink
-          ? "Link not loaded. Check it and retry."
-          : "Code not read. Paste a PoB code or link.",
-      );
+      if (await importText(text)) setText("");
     } finally {
       setBusy(false);
-      setImporting(false);
     }
   };
 
