@@ -98,6 +98,20 @@ export function treeTip(
   if (next.size === 0) for (const id of toTake) next.add(id);
   const later = [...toTake].filter((id) => !next.has(id));
 
+  // The set's masteries you don't have: next once one of their notables is yours or next,
+  // else later. They don't count towards the area or the set being done.
+  const nextMasteries: string[] = [];
+  const laterMasteries: string[] = [];
+  for (const id of tree.nodes) {
+    const mastery = main.nodes[id];
+    if (mastery === undefined || mastery.k !== "Mastery" || haveSet.has(id))
+      continue;
+    const open = (mastery.m ?? []).some(
+      (notable) => haveSet.has(notable) || next.has(notable),
+    );
+    (open ? nextMasteries : laterMasteries).push(id);
+  }
+
   // The ascendancy's points to take, at the next labs. They're far from the main tree, so
   // they don't count towards the area shown, nor towards the set being done.
   const ascendGraph = tree.ascendancy
@@ -136,8 +150,8 @@ export function treeTip(
     set: tree.name,
     ascendancy: tree.ascendancy?.id,
     have,
-    next: [...next],
-    later,
+    next: [...next, ...nextMasteries],
+    later: [...later, ...laterMasteries],
     ascend,
     remove,
     view: bounds(shown, main.nodes),

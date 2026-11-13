@@ -6,6 +6,7 @@ const ASCENDANCY_BORDER_RADIUS = 650;
 const ASCENDANCY_ASCENDANT_BORDER_RADIUS = 750;
 
 const NODE_STROKE_WIDTH = 0;
+const MASTERY_RING_WIDTH = 14;
 const CONNECTION_STROKE_WIDTH = 20;
 const CONNECTION_ACTIVE_STROKE_WIDTH = 35;
 
@@ -121,9 +122,12 @@ export function buildTemplate(
   stroke-width: ${NODE_STROKE_WIDTH};
 }
 
+/* A mastery (in the middle of its notables, no lines to it): a ring, filled once it's
+   yours or the guide's (the colors below). */
 #{{ styleId }} .${GROUP_NODE_CLASS} .${NODE_MASTERY_CLASS} {
   fill: transparent;
-  stroke: transparent;
+  stroke: {{ nodeColor }};
+  stroke-width: ${MASTERY_RING_WIDTH};
 }
 
 #{{ styleId }} .${GROUP_CONNECTION_CLASS} {

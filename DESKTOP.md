@@ -239,6 +239,11 @@ settings; otherwise it leaves it alone and says so.
   this off until the loadout, act or level set changes. Masteries and ascendancy points
   don't count toward finishing a set. Refunds aren't in the log, so a point you refunded
   still counts as taken.
+- Masteries show in both trees as rings in the middle of their notables, filled in the
+  same colors as other points once they're yours or the set's. In the Tree tooltip a mastery
+  the set takes is next (green) once one of its own notables is yours or next, else later
+  (dim green). The tree data lists each mastery's notables (`m`, from GGG's groups, made by
+  `seeding/src/build-tree/tree.ts`).
 - The card's clipboard button copies the build's PoB code. **Compare** works like pob.codes'
   "Compare my PoB": paste any build's PoB code (your character imported in PoB, a
   streamer's, a poe.ninja player's) or a pobb.in, poe.ninja, pastebin or maxroll link. The

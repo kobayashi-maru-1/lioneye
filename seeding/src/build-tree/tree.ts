@@ -152,6 +152,11 @@ export function buildSkillTree(rawTree: RawTree.Data) {
         console.log(`skipping node: ${nodeId}`);
         continue;
       }
+      // A mastery opens with any notable of its group: the Tree tooltip needs which.
+      if (node.isMastery)
+        treeNode.m = group.nodes
+          .map((id) => id.toString())
+          .filter((id) => rawTree.nodes[id]?.isNotable);
       graph.nodes[nodeId] = treeNode;
 
       if (node.out) {

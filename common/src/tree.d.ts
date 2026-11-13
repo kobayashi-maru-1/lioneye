@@ -42,6 +42,8 @@ export namespace SkillTree {
       | "Ascendancy_Start";
     text: string;
     stats?: string[];
+    /** A mastery's notables (its group's): taking one of them opens it. */
+    m?: string[];
   }
 
   export interface Coord {
