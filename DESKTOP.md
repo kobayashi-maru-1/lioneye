@@ -328,6 +328,10 @@ settings; otherwise it leaves it alone and says so.
   at a new league, change `data-league` to the league's trade name and every link follows.
   The full links run past Discord's 2,000-character limit for big searches: share the
   page instead.
+- **Atlas trees**: a card per atlas tree, linking to its **Share tree** link from Atlas
+  Route (poeatlasplanner.com, the app's **Atlas** tab), with a copy button. The link holds
+  the whole tree, so opening it shows the tree in the planner. In the app (from v0.4.53) a
+  click on the tree's name opens it in the **Atlas** tab; in a browser it opens the planner.
 - The copy buttons need the frame's `clipboard-write` permission, which the app grants
   from v0.4.48; older versions fall back to the browser's copy command.
 - It needs a connection: offline, or when the page doesn't answer, it shows **Not loaded**
@@ -346,8 +350,8 @@ settings; otherwise it leaves it alone and says so.
   clicks both go to your Edge profile.
 - Its fonts (Cinzel, Alegreya Sans, SIL OFL) are in `strats/fonts/`, so the page loads
   nothing from Google. When copying a new version of the cheat sheet in, keep the
-  `@font-face` rules instead of a Google Fonts link, and keep the Builds and Trade sections,
-  `builds/` and the script: they aren't part of the cheat sheet artifact.
+  `@font-face` rules instead of a Google Fonts link, and keep the Builds, Trade and Atlas trees
+  sections, `builds/` and the script: they aren't part of the cheat sheet artifact.
 
 ## Atlas
 
@@ -358,6 +362,11 @@ settings; otherwise it leaves it alone and says so.
   frame that storage belongs to Lioneye: kept across restarts, separate from the same site
   in a normal Edge tab, and gone if Edge's site data is cleared. **Share tree** links hold
   the whole tree (nodes, effects, point budget), so keep one for any tree that matters.
+- A tree clicked on the League page (**Atlas trees**) opens here: the League page hands the
+  link to the app, which switches to this tab with the planner on that link. The planner
+  shows it as **Viewing a shared tree**, with **My draft** to go back and **Save as draft**
+  to keep it. **Atlas** in the top bar opens the planner on your draft again. Any other
+  League page link still opens in Edge, and the same click rules apply (one per click).
 - If Edge blocks third-party cookies, it also blocks the framed site's storage: the
   planner still works but forgets trees.
 - The site runs its own analytics (Plausible, Google Analytics) in the frame.

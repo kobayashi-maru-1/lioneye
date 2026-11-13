@@ -1,4 +1,5 @@
 import { Loading } from "../../components/Loading";
+import { atlasTreeUrl, type AtlasTreeState } from "../../state/atlas";
 import {
   readSections,
   STRATS_ORIGIN,
@@ -9,6 +10,7 @@ import { useReachable, type Reachable } from "../../utility/use-reachable";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 type Status = Reachable | "missing";
 
@@ -19,8 +21,9 @@ const LIST_WAIT_MS = 15000;
  * The League page (the route and code keep its old name, Strats): the page from GitHub
  * Pages with the cheat sheet, builds and trade searches, live in a frame, under its own bar of section
  * buttons. The page lists its sections for that bar, scrolls when one is picked, and hands
- * its links over to open in your Edge profile (all by postMessage). Its copy buttons
- * write to the clipboard themselves (clipboard-write).
+ * its links over to open in your Edge profile (all by postMessage); atlas tree links open
+ * in the Atlas tab instead. Its copy buttons write to the clipboard themselves
+ * (clipboard-write).
  */
 export default function StratsContainer() {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -30,6 +33,9 @@ export default function StratsContainer() {
   const [attempt, setAttempt] = useState(0);
   const reachable = useReachable(STRATS_URL, attempt);
   const status: Status = missing ? "missing" : reachable;
+  const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
 
   useEffect(() => {
     setMissing(false);
@@ -63,7 +69,14 @@ export default function StratsContainer() {
         setSections(readSections(data.sections));
         setListed(true);
       } else if (data?.type === "strats-open" && typeof data.url === "string") {
-        openLink(data.url, frame.current);
+        const url = clickedLink(data.url, frame.current);
+        if (url === null) return;
+        // An atlas tree (Atlas trees section): open it in the Atlas tab.
+        const tree = atlasTreeUrl(url.href);
+        if (tree !== null) {
+          const state: AtlasTreeState = { tree };
+          navigateRef.current("/atlas", { state });
+        } else openInEdge(url);
       }
     };
     window.addEventListener("message", onMessage);
@@ -133,28 +146,34 @@ const OPEN_GAP_MS = 5000;
 let lastOpen = Number.NEGATIVE_INFINITY;
 
 /**
- * Opens a link from the sheet the way the guide's own links open: a click on a link here
- * is picked up by AutoProgress, which hands it to the exe (your signed-in Edge profile).
- * Outside the exe's window it opens in a new tab.
- *
- * Only right after a real click, with the frame focused: a click inside the frame
- * activates this page too and focuses the frame. So a changed sheet can't open links on
- * load or open a pile of tabs: at most one link per click. (It could still focus itself
- * right after a click on a bar button and open one link then; accepted, Nov 2026.)
+ * A link the sheet handed over, if it may open: only right after a real click, with the
+ * frame focused (a click inside the frame activates this page too and focuses the frame),
+ * and https only. So a changed sheet can't open links or switch tabs on load, or open a
+ * pile of tabs: at most one link per click. (It could still focus itself right after a
+ * click on a bar button and open one link then; accepted, Nov 2026.)
  */
-function openLink(href: string, frame: HTMLIFrameElement | null) {
-  if (!navigator.userActivation?.isActive) return;
-  if (frame === null || document.activeElement !== frame) return;
+function clickedLink(href: string, frame: HTMLIFrameElement | null) {
+  if (!navigator.userActivation?.isActive) return null;
+  if (frame === null || document.activeElement !== frame) return null;
   const now = performance.now();
-  if (now - lastOpen < OPEN_GAP_MS) return;
+  if (now - lastOpen < OPEN_GAP_MS) return null;
   let url: URL;
   try {
     url = new URL(href);
   } catch {
-    return;
+    return null;
   }
-  if (url.protocol !== "https:") return;
+  if (url.protocol !== "https:") return null;
   lastOpen = now;
+  return url;
+}
+
+/**
+ * Opens a link from the sheet the way the guide's own links open: a click on a link here
+ * is picked up by AutoProgress, which hands it to the exe (your signed-in Edge profile).
+ * Outside the exe's window it opens in a new tab.
+ */
+function openInEdge(url: URL) {
   const link = document.createElement("a");
   link.href = url.href;
   link.target = "_blank";
