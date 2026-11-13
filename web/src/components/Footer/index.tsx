@@ -3,7 +3,7 @@ import upstream from "../../upstream.json";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useCallback, useEffect, useState } from "react";
-import { FiDownload } from "react-icons/fi";
+import { FiDownload, FiRefreshCw } from "react-icons/fi";
 
 const REPO = "kobayashi-maru-1/lioneye";
 
@@ -24,7 +24,13 @@ interface UpdateView {
   latest: { tag: string; url: string } | null;
   state: "idle" | "installing" | "failed";
   error?: string;
+  /** The last check didn't reach GitHub (exe 0.4.54 and later). */
+  checkFailed?: boolean;
 }
+
+/** The check button's result, shown beside it for `CHECK_SHOWN` ms. */
+type CheckResult = "checking" | "current" | "failed" | null;
+const CHECK_SHOWN = 4000;
 
 /** The exe's answer; it asks GitHub when its last answer is older than `maxAge` ms. */
 function fetchUpdate(maxAge?: number): Promise<UpdateView | null> {
@@ -38,7 +44,8 @@ function fetchUpdate(maxAge?: number): Promise<UpdateView | null> {
 /**
  * PoB Redux-style status line at the bottom of the window: the app's version, the bundled
  * Path of Building's, the date of the merged exile-leveling route data, a newer release
- * when there is one (its page, and an icon that installs it), and links.
+ * when there is one (its page, and an icon that installs it), and links. Beside the
+ * version, a button checks GitHub now and says how it went for a few seconds.
  */
 export function Footer() {
   const { info } = useAppInfo();
@@ -94,6 +101,36 @@ export function Footer() {
       window.clearTimeout(timer);
     };
   }, [installing]);
+  // The check button: ask GitHub now (the exe allows one check a minute).
+  const [checkResult, setCheckResult] = useState<CheckResult>(null);
+  useEffect(() => {
+    if (checkResult !== "current" && checkResult !== "failed") return;
+    const timer = window.setTimeout(() => setCheckResult(null), CHECK_SHOWN);
+    return () => window.clearTimeout(timer);
+  }, [checkResult]);
+  const checkNow = useCallback(() => {
+    setCheckResult("checking");
+    fetchUpdate(0).then((found) => {
+      // Only what the check found: an install started meanwhile keeps its state.
+      if (found)
+        setUpdate((current) =>
+          current
+            ? {
+                ...current,
+                latest: found.latest,
+                checkFailed: found.checkFailed,
+              }
+            : found,
+        );
+      setCheckResult(
+        found === null || found.checkFailed
+          ? "failed"
+          : found.latest
+            ? null
+            : "current",
+      );
+    });
+  }, []);
   const install = useCallback(() => {
     const failed = (error: string) =>
       setUpdate((current) => current && { ...current, state: "failed", error });
@@ -126,9 +163,25 @@ export function Footer() {
         : "Not updated. Click to retry.";
   return (
     <footer className={classNames(styles.footer)}>
-      <span title={info.commit ? `Build ${info.commit}` : undefined}>
-        Lioneye {info.version}
-        {info.commit && ` (${info.commit})`}
+      <span className={classNames(styles.version)}>
+        <span title={info.commit ? `Build ${info.commit}` : undefined}>
+          Lioneye {info.version}
+          {info.commit && ` (${info.commit})`}
+        </span>
+        <button
+          className={classNames(styles.check, {
+            [styles.checking]: checkResult === "checking",
+          })}
+          onClick={checkNow}
+          disabled={checkResult === "checking" || installing}
+          title="Check updates"
+          aria-label="Check updates"
+        >
+          <FiRefreshCw />
+        </button>
+        {checkResult === "checking" && <span>Checking…</span>}
+        {checkResult === "current" && <span>Up to date</span>}
+        {checkResult === "failed" && <span>Not checked. Retry.</span>}
       </span>
       <span title="Path of Building Community, bundled">
         PoB {info.pob.replace(/^v/, "")}

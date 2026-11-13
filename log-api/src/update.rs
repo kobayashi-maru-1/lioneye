@@ -40,6 +40,11 @@ const EXE_IN_ZIP: &str = "lioneye.exe";
 pub const RECHECK: Duration = Duration::from_secs(6 * 60 * 60);
 /// The first check, once the app is up.
 const FIRST_CHECK: Duration = Duration::from_secs(5);
+/// After a failed check, a check asked for by hand (the footer's button, a minute's floor)
+/// may try again this soon: back online, Retry shouldn't repeat the old failure.
+const RETRY_FAILED: Duration = Duration::from_secs(5);
+/// What counts as a check asked for by hand (the server's floor for maxAge).
+const BY_HAND: Duration = Duration::from_secs(60);
 /// Larger than any real release; a bad answer can't fill memory.
 const MAX_DOWNLOAD: usize = 200 * 1024 * 1024;
 /// A download still running after this is given up (a trickle never times out on its own).
@@ -101,6 +106,9 @@ pub struct View {
     /// Why the last install failed, a short phrase ("GitHub not reached").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// The last check didn't reach GitHub (the footer's check button says so).
+    #[serde(rename = "checkFailed", skip_serializing_if = "std::ops::Not::not")]
+    pub check_failed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -113,6 +121,8 @@ struct Inner {
     /// The newest release seen, newer than this exe or not.
     latest: Option<Release>,
     checked: Option<Instant>,
+    /// The last check failed (offline, GitHub down).
+    check_failed: bool,
     checking: bool,
     phase: Phase,
     error: Option<String>,
@@ -147,6 +157,7 @@ impl Updater {
             inner: Mutex::new(Inner {
                 latest: None,
                 checked: None,
+                check_failed: false,
                 checking: false,
                 phase: Phase::Idle,
                 error: None,
@@ -183,6 +194,7 @@ impl Updater {
                 }),
             state: inner.phase.clone(),
             error: inner.error.clone(),
+            check_failed: inner.check_failed,
         }
     }
 
@@ -197,7 +209,12 @@ impl Updater {
         let waited = Instant::now();
         loop {
             let mut inner = self.inner.lock().unwrap();
-            let fresh = inner.checked.is_some_and(|t| t.elapsed() < max_age);
+            let window = if inner.check_failed && max_age <= BY_HAND {
+                RETRY_FAILED
+            } else {
+                max_age
+            };
+            let fresh = inner.checked.is_some_and(|t| t.elapsed() < window);
             if inner.checking && !fresh && waited.elapsed() < Duration::from_secs(60) {
                 drop(inner);
                 std::thread::sleep(Duration::from_millis(100));
@@ -215,6 +232,7 @@ impl Updater {
             let mut inner = self.inner.lock().unwrap();
             inner.checking = false;
             inner.checked = Some(Instant::now());
+            inner.check_failed = found.is_err();
             match found {
                 Ok(release) => {
                     if inner.latest.as_ref() != Some(&release) {

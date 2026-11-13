@@ -33,7 +33,9 @@ since, so switching never brings back old progress.
 
 The thin line at the bottom shows the app's version, the bundled Path of Building's, and
 the date of the exile-leveling route data merged in, with **Update** when GitHub has a
-newer release (checked on start, every 6 hours, and when you come back to the window).
+newer release (checked on start, every 6 hours, and when you come back to the window, at
+most once an hour). The ↻ beside the version checks now (at most once a minute; 5 s after a failed check) and shows
+**Up to date**, or **Not checked. Retry.** when GitHub can't be reached, for a few seconds.
 **Update** opens the release's page; the download icon beside it, or **Update** in the tray
 menu, installs it: the exe downloads `lioneye.zip`, checks it against GitHub's SHA-256 and
 the release key's signature (below), renames itself to `lioneye.exe.old`, puts the new exe
