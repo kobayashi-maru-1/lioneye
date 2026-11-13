@@ -37,7 +37,7 @@ async function copyCode(code: string) {
  * PoB's builds folder) with Save beside it (a pasted build to PoB's builds folder;
  * greyed out when it can't), then a Plan row (the shown loadout's PoB numbers) and a
  * Live row (your character: its level from the game log, its numbers from poe.ninja,
- * with Refresh). Compare, Desktop PoB (opens it in the chosen PoB) and Copy at the right
+ * with Refresh). Compare, Edit PoB (opens it in the chosen PoB) and Copy at the right
  * of the title. The Loadout dropdown is at the top of the left column (StatsViewer).
  */
 export function BuildHeader() {
@@ -69,7 +69,7 @@ export function BuildHeader() {
           <BuildCompare buttonClassName={classNames(styles.tool)} />
           <DesktopPob className={classNames(styles.tool)}>
             <FaDesktop aria-hidden />
-            Desktop PoB
+            Edit PoB
           </DesktopPob>
           {code !== null && (
             <button

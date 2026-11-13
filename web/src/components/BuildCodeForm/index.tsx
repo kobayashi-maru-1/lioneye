@@ -30,7 +30,7 @@ function readable(code: string) {
 /**
  * The build. Load: paste a PoB code or a pobb.in, poe.ninja, pastebin or maxroll link and
  * Import code, or Open file for a build file PoB saved (then each save in PoB updates the
- * guide). Loaded: Edit in PoB opens the build in the PoB chosen under Editor, when it's
+ * guide). Loaded: Edit PoB opens the build in the PoB chosen under Editor, when it's
  * installed (components/DesktopPob); Copy code; Clear build (asks first).
  * Loading a build keeps your progress; Clear build removes the build, not the progress.
  * The PoB code row of Settings' Build card.
@@ -194,7 +194,7 @@ export function BuildCodeForm() {
                 disabled={busy}
                 onBusy={setBusy}
               >
-                Edit in PoB
+                Edit PoB
               </DesktopPob>
               <button
                 className={classNames(formStyles.formButton)}

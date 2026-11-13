@@ -55,7 +55,7 @@
   font-size: 0.7rem;
 }
 
-/* Compare, Desktop PoB and Copy, at the right of the title. */
+/* Compare, Edit PoB and Copy, at the right of the title. */
 .tools {
   display: flex;
   align-items: center;

@@ -10,7 +10,7 @@ export type SettingsTab = "app" | "build" | "route";
  */
 export const settingsTabAtom = atom<SettingsTab | null>(null);
 
-/** Which PoB Edit and Desktop PoB open (Settings' Editor, in Build). */
+/** Which PoB the Edit PoB buttons open (Settings' Editor, in Build). */
 export const pobEditorAtom = persistentAtom<PobEditor>(
   "pob-editor",
   "community",

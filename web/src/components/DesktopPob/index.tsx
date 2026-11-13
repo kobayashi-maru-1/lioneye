@@ -21,7 +21,7 @@ import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
 /**
- * A pasted build being saved to PoB (Desktop PoB's or Save's): the other holds off, so the
+ * A pasted build being saved to PoB (Edit PoB's or Save's): the other holds off, so the
  * build isn't saved twice.
  */
 const savingAtom = atom(false);
@@ -100,7 +100,7 @@ export function usePobEditor() {
 }
 
 /**
- * Settings' Editor (a row of the Build card): which PoB Edit and Desktop PoB open. Shows with the exe; "Not
+ * Settings' Editor (a row of the Build card): which PoB the Edit PoB buttons open. Shows with the exe; "Not
  * installed" under it when the chosen one isn't on this PC (then neither button shows).
  */
 export function PobEditorSelect() {

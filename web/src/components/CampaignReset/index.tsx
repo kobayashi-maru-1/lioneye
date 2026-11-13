@@ -1,4 +1,4 @@
-import { resetCampaignAtom } from "../../state/pob";
+import { resetCampaignAtom, resetGemsAtom } from "../../state/pob";
 import { formStyles } from "../../styles";
 import { Modal } from "../Modal";
 import styles from "./styles.module.css";
@@ -9,11 +9,12 @@ import { FaUndoAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 /**
- * The Campaign panel's reset: asks first, then clears what Settings' Reset campaign does
- * (campaign ticks, your place and level). Gem ticks stay.
+ * The Campaign panel's reset: asks first, then clears what Settings' Reset campaign and
+ * Reset gems do (campaign ticks, your place and level, gem ticks): a fresh start.
  */
 export function CampaignReset() {
-  const reset = useSetAtom(resetCampaignAtom);
+  const resetCampaign = useSetAtom(resetCampaignAtom);
+  const resetGems = useSetAtom(resetGemsAtom);
   const [asking, setAsking] = useState(false);
   return (
     <>
@@ -35,7 +36,7 @@ export function CampaignReset() {
           <div className={classNames(formStyles.formRow)}>
             <label>Reset campaign?</label>
           </div>
-          <p>Clears campaign ticks, your place and level.</p>
+          <p>Clears campaign and gem ticks, place and level.</p>
           <div className={classNames(formStyles.groupRight)}>
             <button
               className={classNames(formStyles.formButton)}
@@ -47,7 +48,8 @@ export function CampaignReset() {
             <button
               className={classNames(formStyles.formButton)}
               onClick={() => {
-                reset();
+                resetCampaign();
+                resetGems();
                 setAsking(false);
                 toast.success("Campaign reset");
               }}

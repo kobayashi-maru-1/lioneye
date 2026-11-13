@@ -33,7 +33,7 @@ again and replace `lioneye.exe`.
   **Trade List** with pob.codes' search options, **Build health**, **Config** (with Custom
   Modifiers), the passive **Tree** and the build's **Notes**.
 - **Open file**: a build file from Path of Building, and the guide follows it: each save in
-  PoB updates the guide. **Desktop PoB** (or **Edit in PoB** in Settings) opens the build in PoB
+  PoB updates the guide. **Edit PoB** (at the top of the guide or in Settings) opens the build in PoB
   Community or PoB Redux (Settings → Build → **Editor**).
 - **Compare** any PoB code or build link with the guide's loadout: Stats, Passives,
   Skills and Items.

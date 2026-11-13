@@ -80,12 +80,12 @@ acts on the one you have:
   within a couple of seconds, with a **Build updated** note. The loadout you're on stays (by
   its name) while the new numbers calculate. Saves made while the guide was closed are
   picked up when it opens.
-- **Editor**: which Path of Building **Edit in PoB** and **Desktop PoB** open, **PoB
+- **Editor**: which Path of Building the **Edit PoB** buttons open, **PoB
   Community** (the default) or **PoB Redux**. **Not installed** under it means the chosen
   one isn't on this PC, and neither button shows.
-- **Edit in PoB** (Loaded; when the chosen editor is installed; also **Desktop PoB** next
-  to **Compare** at the top of the guide): opens PoB on the build. For an opened file, PoB
-  opens straight into it. PoB Community: Lioneye sets the file as PoB's last open build (the `<Mode>` entry in
+- **Edit PoB** (Loaded, when the chosen editor is installed; also next to **Compare** at
+  the top of the guide; called Edit in PoB and Desktop PoB before v0.4.52): opens PoB on
+  the build. For an opened file, PoB opens straight into it. PoB Community: Lioneye sets the file as PoB's last open build (the `<Mode>` entry in
   PoB's `Settings.xml`), then starts PoB. PoB Redux: Lioneye starts Redux with the file.
   With PoB already open, a second PoB window opens. A save updates the guide when the editor
   writes it back to the same file.
@@ -102,8 +102,8 @@ Loading a different build (Import code or Open file) brings its gem list, class 
 **Route**) and keeps your progress. A save of the same file in PoB updates only what comes
 from PoB (stats, tree, gear, links); the gem list, class and bandit stay as you set them, so
 Open the file again to take PoB's. To start over, **Settings → Route → Reset** has
-**Reset campaign** (campaign ticks, your place and level; also ↺ on the Campaign panel)
-and **Reset gems** (gem ticks).
+**Reset campaign** (campaign ticks, your place and level) and **Reset gems** (gem ticks).
+The ↺ on the Campaign panel does both.
 
 Campaign ticks are kept by what each step says (with the step before it), not by its place,
 so a different gem list, bandit or route option never moves a tick onto another step. Ticks
@@ -150,9 +150,9 @@ change on poe.ninja's side can break it until Lioneye is updated. The bundled Po
 build at a time, so after the live character is calculated, the guide's next loadout
 change takes a few seconds longer (as after a Compare).
 
-Open file, Edit in PoB, the builds list and the file watch work only from the guide on this PC: never from another
+Open file, Edit PoB, the builds list and the file watch work only from the guide on this PC: never from another
 device (`--address 0.0.0.0`) or another website, and only for local `.xml` files (not
-network paths). Edit in PoB changes PoB's `Settings.xml` only when it reads cleanly as PoB's own
+network paths). Edit PoB changes PoB's `Settings.xml` only when it reads cleanly as PoB's own
 settings; otherwise it leaves it alone and says so.
 
 ## Using the guide
@@ -184,7 +184,7 @@ settings; otherwise it leaves it alone and says so.
   - **App** (Settings opens here): **Overlay** (**Show in game**, **Auto tree**, **Buttons**)
     and **Game** (**Game log**, **Browser**; with the exe).
   - **Build**: **Build** (the code box; Load: **Import code**, **Open file**; Loaded:
-    **Edit in PoB**, **Copy code**, **Clear build**; **Editor**; see [Your build](#your-build)),
+    **Edit PoB**, **Copy code**, **Clear build**; **Editor**; see [Your build](#your-build)),
     **Character** (**PoE account**, **Live character**, **poe.ninja**) and **Search**
     (your search strings, with a link to poe.re).
   - **Route**: **Route** (class, bandits, **League start**, **Library**, **Gems only**,
@@ -192,8 +192,8 @@ settings; otherwise it leaves it alone and says so.
     card) and **Reset** (**Reset campaign**, **Reset gems**).
 
   The
-  Campaign header's dropdown jumps to an act, and its ↺ is **Reset campaign** (it asks
-  first; gem ticks stay). Auto-progress only scrolls to your zone while
+  Campaign header's dropdown jumps to an act, and its ↺ resets the campaign and gem ticks
+  (it asks first). Auto-progress only scrolls to your zone while
   Campaign is on screen.
 - The card at the top shows the build (skill, ascendancy) and two rows of headline numbers.
   With the chosen editor installed, the title is a dropdown of the builds in its builds
@@ -201,7 +201,7 @@ settings; otherwise it leaves it alone and says so.
   a search box). Picking one opens it as **Open file** does, and the guide follows the file; the
   one loaded is gold. With no build loaded, the same list is under **Builds** beside
   **Import**. The 💾 icon beside the title saves a pasted code to the builds folder
-  (**Save to PoB?**, the same as Edit in PoB's) without opening PoB; from then on it's an opened
+  (**Save to PoB?**, the same as Edit PoB's) without opening PoB; from then on it's an opened
   file. It's greyed out, with why as its tooltip, when it can't save: **PoB not found**
   (no answer from the exe yet), **PoB Community not installed** (or **PoB Redux**, the
   chosen editor), **No build**, **Already in PoB** (an opened file) or **Saving**. An
