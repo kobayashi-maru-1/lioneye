@@ -7,7 +7,7 @@ import ReactModal from "react-modal";
 ReactModal.setAppElement("#root");
 
 interface ModalSizeProps {
-  size: "small" | "large";
+  size: "small" | "medium" | "large";
 }
 
 export function Modal(props: ReactModal.Props & ModalSizeProps) {

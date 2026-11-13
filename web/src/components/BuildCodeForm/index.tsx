@@ -100,13 +100,13 @@ export function LoadCode({
         {children}
       </button>
       <Modal
-        size="small"
+        size="medium"
         isOpen={open}
         onRequestClose={close}
         contentLabel="Load build"
       >
         <form
-          className={classNames(formStyles.form)}
+          className={classNames(formStyles.form, styles.loadForm)}
           onSubmit={async (event) => {
             event.preventDefault();
             if (text.trim() === "" || importing) return;
@@ -118,7 +118,7 @@ export function LoadCode({
           </div>
           <textarea
             id={id}
-            className={classNames(formStyles.formInput, styles.code)}
+            className={classNames(formStyles.formInput, styles.loadCode)}
             spellCheck={false}
             autoFocus
             placeholder="PoB code or link"

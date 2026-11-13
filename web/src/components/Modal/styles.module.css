@@ -16,6 +16,12 @@
   max-width: 20rem;
 }
 
+/* Wide and short: a box to paste into (Load build). */
+.medium {
+  max-height: 17rem;
+  max-width: 32rem;
+}
+
 .large {
   max-height: 40rem;
   max-width: 40rem;
