@@ -37,9 +37,11 @@ const NO_PICK = atom<SetPick | null>(null);
  * neither ("Early", "27 points") follow your tree: the first
  * set whose tree you haven't finished (from the log). Picking another overrides it until
  * the set your level, act or tree points to changes (a level-up that doesn't change it
- * keeps your pick). A new list of titles (PoB saved the build again) keeps the set you
- * were on, by its title, while your level, act or tree still points to the same set. A
- * different build starts over.
+ * keeps your pick); a pick further down the list than that set stays while it moves
+ * forward, until it catches up (a skill swap taken early isn't undone by the next act;
+ * a new character starts over). A new list of titles (PoB saved the build again) keeps
+ * the set you were on, by its title, while your level, act or tree still points to the
+ * same set. A different build starts over.
  */
 export function useFollowAct(
   titles: string[],
@@ -66,17 +68,25 @@ export function useFollowAct(
     index === null ? null : (titles[index] ?? null);
   // Your remembered pick, while the build and the set your level, act or tree points to
   // are the ones it was made on; also while that set isn't known yet (the route or your
-  // tree still being read after a restart), so the page doesn't show another first.
+  // tree still being read after a restart), so the page doesn't show another first; and
+  // while the pick is further down the list than that set (you moved on early, as with a
+  // skill swap before its maps), until your level, act or tree reaches or passes it.
   const remembered = (followedTitle: string | null) => {
-    if (
-      remember === undefined ||
-      memory === null ||
-      memory.buildId !== buildId ||
-      (followedTitle !== null && memory.followed !== followedTitle)
-    )
+    if (remember === undefined || memory === null || memory.buildId !== buildId)
       return -1;
-    return titles.indexOf(memory.title);
+    const at = titles.indexOf(memory.title);
+    if (followedTitle === null || memory.followed === followedTitle) return at;
+    return aheadOf(followedTitle) ? at : -1;
   };
+  // The pick is further down the list than the set followed now, which has moved forward
+  // since the pick (not back: a new character or campaign starts over).
+  function aheadOf(followedTitle: string) {
+    if (memory === null) return false;
+    const now = titles.indexOf(followedTitle);
+    const then =
+      memory.followed === null ? -1 : titles.indexOf(memory.followed);
+    return titles.indexOf(memory.title) > now && now >= then;
+  }
   const [state, setState] = useState(() => {
     const followed = levelIndex ?? actIndex ?? fresh;
     const pick = remembered(titleAt(followed));
@@ -145,13 +155,16 @@ export function useFollowAct(
 
   // A pick made on another build, or before the set followed changed, is forgotten. Not
   // while the titles are still coming (empty until PoB answers), nor while the set to
-  // follow isn't known yet (the route or your tree is still being read after a restart).
+  // follow isn't known yet (the route or your tree is still being read after a restart),
+  // nor while the pick is still further down the list than the set followed now.
   const stale =
     remember !== undefined &&
     memory !== null &&
     titles.length > 0 &&
     (memory.buildId !== buildId ||
-      (current.followed !== null && memory.followed !== current.followed));
+      (current.followed !== null &&
+        memory.followed !== current.followed &&
+        !aheadOf(current.followed)));
   useEffect(() => {
     if (stale) setMemory(null);
   }, [stale]);

@@ -33,7 +33,8 @@ import {
   storageSnapshot,
   takeReset,
 } from "../../state/saved-state";
-import { useJumpToPanel } from "../PageSection";
+import { onGuide, useJumpToPanel } from "../PageSection";
+import { useNavigate } from "react-router-dom";
 import { autoProgressAtom } from "../../state/auto-progress";
 import {
   characterLogAtom,
@@ -115,6 +116,7 @@ export function useAutoProgress() {
   const setGemsStep = useSetAtom(gemsStepAtom);
   const setGearStep = useSetAtom(gearStepAtom);
   const setLoadoutPick = useSetAtom(loadoutPickAtom);
+  const navigate = useNavigate();
   // What the bar's Loadout tooltip shows, to tie a pick there to its loadout by title.
   const shownLoadout = useAtomValue(overlayLoadoutAtom);
   const shownLoadoutRef = useRef(shownLoadout);
@@ -188,6 +190,11 @@ export function useAutoProgress() {
           buildId: shown.buildId!,
           auto,
         }));
+        // Only the guide itself shows a loadout: from League, Atlas or Settings, go back to
+        // it (as the bar's panel buttons do), where the pick is shown once PoB answers. Not
+        // from Edit Route, whose unsaved edits leaving would lose.
+        if (!onGuide() && !location.hash.startsWith("#/edit-route"))
+          navigate("/");
         return;
       }
       // A new exe (an update) serves a new guide: reload to get it.

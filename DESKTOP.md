@@ -225,7 +225,10 @@ settings; otherwise it leaves it alone and says so.
   main-tree points you all have (from the game's log; matched by name, else by position
   when the counts match; the last set once all are done). Pick another until your level,
   act or tree moves on; the loadout you pick is kept through Settings and restarts until
-  then. A zone's suggested level (`12+`) turns red while you're below it.
+  then. From v0.4.58 a pick further down the list than the set followed stays while that
+  set moves forward, until it reaches or passes the pick: `HRoC Swap` picked in Act 7 is
+  kept once the guide follows `SRS Early Maps` past level 73. A new character (the
+  followed set moving back) starts over; **Auto** follows again. A zone's suggested level (`12+`) turns red while you're below it.
 - The **Tree** panel draws what PoB knows about the set's jewels (with the exe): each
   socketed jewel gets a ring in its rarity color, and jewels with a radius get their
   radius (Thread of Hope's as a band, Impossible Escape's around its keystone). Cluster
@@ -426,8 +429,9 @@ settings; otherwise it leaves it alone and says so.
   **Loadout** for the guide's loadouts (its button shows when the build has two or more;
   the one shown is gold, the one your level, act or tree points to is tagged **Auto**;
   click another to show it in the guide, as its **Loadout** dropdown does, back on the
-  plan if the page showed your live character, until your level, act or tree moves on;
-  click the **Auto** one to follow again),
+  plan if the page showed your live character, until your level, act or tree moves on
+  (a pick further down the list stays, as there); from League, Atlas or Settings it goes
+  back to the guide first, from v0.4.58; click the **Auto** one to follow again),
   **Health** for Build health's findings as the panel lists
   them, each with its severity dot and fix (**Live** or **Plan** by the title when a live
   character is set, as the panel's dropdown picks; dimmed while PoB recalculates),

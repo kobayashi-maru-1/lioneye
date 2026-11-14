@@ -162,7 +162,8 @@ export function useJumpToSection() {
 /** The jump still waiting for the guide to open, if any: a newer jump replaces it. */
 let pendingJump: ReturnType<typeof setTimeout> | undefined;
 
-const onGuide = () => location.hash === "" || location.hash === "#/";
+/** The window shows the guide itself (not League, Atlas or Settings). */
+export const onGuide = () => location.hash === "" || location.hash === "#/";
 
 /**
  * Jumps to a guide panel from any page: from another page (League, Settings), back to the
