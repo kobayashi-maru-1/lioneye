@@ -332,10 +332,14 @@ settings; otherwise it leaves it alone and says so.
   Import or Lioneye's Settings). The codes are files in `strats/builds/`, made from the PoB
   files without their character-import details (account, character, realm) or item
   Unique IDs.
-- **Trade**: a card per search with a copy button for its link, grouped under a heading
+- **Trade**: a card per search (or list of searches), grouped under a heading
   per build (named like its Builds card). Each link is built from
-  the card's `data-query` (official trade search JSON) and the section's `data-league`;
+  its own `data-query` (official trade search JSON) and the section's `data-league`;
   at a new league, change `data-league` to the league's trade name and every link follows.
+  Every search is buyout only: the script sets the status to Instant Buyout (`securable`)
+  and drops any sale type filter (the default is Buyout or Fixed Price). A card can hold
+  several links in its list (the Animate Guardian gear card); only single-link cards get
+  a copy button.
   The full links run past Discord's 2,000-character limit for big searches: share the
   page instead.
 - **Atlas trees**: a card per atlas tree, linking to its **Share tree** link from Atlas
