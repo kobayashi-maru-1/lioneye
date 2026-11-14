@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc --build && vite build",
     "preview": "vite preview",
-    "build:desktop": "tsc --build && vite build --mode desktop"
+    "build:desktop": "tsc --build && vite build --mode desktop",
+    "build:atlas": "tsc --build && vite build --config vite.atlas.config.ts",
+    "test:atlas": "tsx --test atlas-tests/atlas.test.ts"
   },
   "dependencies": {
     "@react-hook/resize-observer": "^2.0.2",

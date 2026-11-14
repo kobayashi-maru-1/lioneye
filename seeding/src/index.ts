@@ -1,3 +1,4 @@
+import { buildAtlases } from "./build-atlas/index.js";
 import { buildTemplates } from "./build-tree/index.js";
 import { getAreas } from "./seeding/areas.js";
 import { getCharacters } from "./seeding/characters.js";
@@ -37,6 +38,13 @@ const COMMAND_PROCESSORS: Record<string, () => Promise<any>> = {
     for (const { version, skillTree } of templates) {
       saveTreeJSON(version, skillTree);
     }
+  },
+  // The Atlas passive tree, for the standalone Atlas planner (web/atlas.html).
+  ["atlas"]: async () => {
+    const folder = `${dataPath}/atlas`;
+    fs.mkdirSync(folder, { recursive: true });
+    for (const { name, atlas } of await buildAtlases())
+      fs.writeFileSync(`${folder}/${name}.json`, JSON.stringify(atlas));
   },
 };
 

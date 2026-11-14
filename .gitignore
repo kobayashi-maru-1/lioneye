@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-atlas
 *.local
 
 # Editor directories and files
@@ -25,6 +26,7 @@ dist-ssr
 
 .env
 /common/data/tree/*.json
+/common/data/atlas/*.json
 # Desktop build output
 /exile-leveling.exe
 /tools/sign-release/target/

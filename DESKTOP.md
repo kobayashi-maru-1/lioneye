@@ -397,6 +397,35 @@ settings; otherwise it leaves it alone and says so.
   (its **About** link opens inside the frame). If the site ever refuses to be framed, the
   tab shows a blank frame instead of **Not loaded**.
 
+### Our Atlas planner (testing)
+
+A planner of our own, meant to replace poeatlasplanner.com in this tab once it's tested
+(plans/atlas-planner.md). For now it's a standalone page, not linked from the app or the
+League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
+
+- **Data:** `npm -w seeding run seed atlas` reads GGG's official atlas tree export (pinned
+  by commit in `seeding/src/build-atlas/index.ts`) and writes
+  `common/data/atlas/3_30.json` (gitignored, rebuilt in CI). It keeps positions, edges,
+  mechanics, stats and choice options; GGG's link markup in stat text becomes plain text.
+  No game art: nodes are coloured circles, clusters a letter disc.
+- **Page:** `web/atlas.html` with `web/src/atlas/` (React, Lioneye's look), built by
+  `npm -w web run build:atlas` (`web/vite.atlas.config.ts`: relative paths, no proxy, so
+  it never talks to lioneye.exe) into `web/dist-atlas/`.
+- **Tests:** `npm -w web run test:atlas` (Node's test runner via tsx, after the seed):
+  counts, positions, routes and costs, refunds, gateways, budget, links and bonuses.
+- **Publishing:** the **Strats page** workflow seeds, tests and builds it, then publishes
+  it at `/lioneye/atlas/` next to `strats/` on every run (a Pages deploy replaces the whole
+  site, so both always go together).
+- **Plans** live in the browser's local storage (keys `lioneye-atlas-…`): the draft,
+  named **Saved** plans, and **Export** / **Import** as a JSON file. **Share** makes a
+  link with the plan in the address (`#t=`); **Open** takes our links, poeatlasplanner.com
+  links (`#p=`, so the League page's trees open) and official pathofexile.com atlas
+  links.
+- **Routes** are the shortest path from what's allocated (ties go to the lower node id, so
+  they're stable); refunding a node drops everything only it joined to the start.
+- Testing it in a browser: serve `web/dist-atlas` as plain files (`atlas.html` renamed
+  `index.html`). Never through `vite preview` on 4173, which proxies to the exe.
+
 ## Overlay
 
 - While Path of Exile is the window in front and you're playing a character, the exe shows a

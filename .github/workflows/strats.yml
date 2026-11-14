@@ -1,15 +1,34 @@
 name: Strats page
 
-# Publishes strats/ to GitHub Pages: https://kobayashi-maru-1.github.io/lioneye/strats/
-# The app's Strats page shows it in a frame, so a push here updates the app without a release.
-# Only strats/ is published; upstream's website build stays out (DESKTOP.md, Strats page).
-# Actions are pinned to commit SHAs so a moved tag can't change what runs.
+# Publishes the GitHub Pages site (https://kobayashi-maru-1.github.io/lioneye/):
+# - strats/: the League page. The app's League tab shows it in a frame, so a push here
+#   updates the app without a release.
+# - atlas/: the standalone Atlas planner (plans/atlas-planner.md), built from web/atlas.html
+#   with the atlas data seeded from GGG's export. Its tests run first; a failure stops the
+#   deploy.
+# A deploy replaces the whole site, so every run publishes both. Upstream's website build
+# stays out (DESKTOP.md, Strats page). Actions are pinned to commit SHAs so a moved tag
+# can't change what runs.
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - "strats/**"
+      - "web/atlas.html"
+      - "web/vite.atlas.config.ts"
+      - "web/src/atlas/**"
+      - "web/atlas-tests/**"
+      # What the Atlas planner borrows from the guide and the seeding.
+      - "web/src/components/Modal/**"
+      - "web/src/styles/**"
+      - "web/src/index.css"
+      - "web/public/**"
+      - "web/package.json"
+      - "package-lock.json"
+      - "seeding/src/build-atlas/**"
+      - "seeding/src/build-tree/tree.ts"
+      - "seeding/src/index.ts"
       - ".github/workflows/strats.yml"
 
 permissions:
@@ -34,10 +53,29 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install packages
+        run: npm ci
+
+      - name: Download atlas tree data
+        run: npm -w seeding run seed atlas
+
+      - name: Test the Atlas planner
+        run: npm -w web run test:atlas
+
+      - name: Build the Atlas planner
+        run: npm -w web run build:atlas
+
       - name: Stage the site
         run: |
-          mkdir -p _site/strats
+          mkdir -p _site/strats _site/atlas
           cp -r strats/. _site/strats/
+          cp -r web/dist-atlas/. _site/atlas/
+          mv _site/atlas/atlas.html _site/atlas/index.html
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
