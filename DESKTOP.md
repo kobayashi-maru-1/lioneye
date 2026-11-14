@@ -346,6 +346,12 @@ settings; otherwise it leaves it alone and says so.
   Route (poeatlasplanner.com, the app's **Atlas** tab), with a copy button. The link holds
   the whole tree, so opening it shows the tree in the planner. In the app (from v0.4.53) a
   click on the tree's name opens it in the **Atlas** tab; in a browser it opens the planner.
+- **Cheat sheets**: league mechanics with their own strats, as wide cards. **Betrayal** is a
+  member × division table rebuilt as text from Ayeleth's 3.30 Syndicate sheet (credited in
+  Sources): the best picks (`td.best`, with a hidden "Best:" for screen readers) are
+  bright and the rest in the page's secondary color; Intervention is one
+  line, as it's the same for every member. **Temple rooms** (moved here from Farms) ranks
+  the rooms worth upgrading, with each one's upgrade path.
 - The copy buttons need the frame's `clipboard-write` permission, which the app grants
   from v0.4.48; older versions fall back to the browser's copy command.
 - It needs a connection: offline, or when the page doesn't answer, it shows **Not loaded**
@@ -364,8 +370,8 @@ settings; otherwise it leaves it alone and says so.
   clicks both go to your Edge profile.
 - Its fonts (Cinzel, Alegreya Sans, SIL OFL) are in `strats/fonts/`, so the page loads
   nothing from Google. When copying a new version of the cheat sheet in, keep the
-  `@font-face` rules instead of a Google Fonts link, and keep the Builds, Trade and Atlas trees
-  sections, `builds/` and the script: they aren't part of the cheat sheet artifact.
+  `@font-face` rules instead of a Google Fonts link, and keep the Builds, Trade, Atlas trees
+  and Cheat sheets sections, their CSS (the "(Lioneye)" blocks at the end of the style), `builds/` and the script: they aren't part of the cheat sheet artifact.
 
 ## Atlas
 

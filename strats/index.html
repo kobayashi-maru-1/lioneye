@@ -10,8 +10,9 @@
   Each <section> with an id and data-jump becomes a jump button in the app's bar, and its
   .ph header bar folds it (state kept per section id). Edit the content freely; keep those
   two attributes and the .ph > h2 header on the sections.
-  Builds and Trade are Lioneye's own sections, not part of the cheat sheet artifact: keep
-  them, builds/ and the script when copying a new version of the sheet in.
+  Builds, Trade, Atlas trees and Cheat sheets are Lioneye's own sections, not part of the
+  cheat sheet artifact: keep them, their CSS (the "(Lioneye)" blocks at the end of the
+  style), builds/ and the script when copying a new version of the sheet in.
   Fonts are served from fonts/ (SIL OFL, licenses there), not Google Fonts.
 -->
 <style>
@@ -124,11 +125,6 @@
   .tag { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; color: var(--ash); }
   .farm ul { margin: 0; padding-left: 16px; font-size: 14.5px; color: var(--bone); }
   .farm li::marker { color: var(--gilt); }
-  /* Temple rooms: the full row, ranked; the upgrade path after the room's name. */
-  .farm.wide { grid-column: 1 / -1; }
-  .farm ol { margin: 0; padding-left: 22px; font-size: 14.5px; color: var(--bone); }
-  .farm ol li::marker { color: var(--gilt); font-weight: 700; }
-  .farm .path { color: var(--ash); }
   .key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ash); margin-bottom: 10px; }
   .key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
 
@@ -170,6 +166,35 @@
   .copy.failed { color: var(--blackfire); border-color: var(--blackfire); }
   .copy .state:empty { display: none; }
   html:not(.js) .copy { display: none; } /* the script makes them work */
+
+  /* Cheat sheets (Lioneye): wide reference cards. Temple rooms: ranked, the upgrade path
+     after the room's name. Betrayal: a member × division table, the best picks bright and
+     the rest in the page's secondary text color. */
+  .farm.wide { grid-column: 1 / -1; }
+  .farm.ref { border-left-color: var(--gilt); }
+  .farm ol { margin: 0; padding-left: 22px; font-size: 14.5px; color: var(--bone); }
+  .farm ol li::marker { color: var(--gilt); font-weight: 700; }
+  .farm .path { color: var(--ash); }
+  .sheet { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
+  .sheet col.who { width: 16%; }
+  .sheet th, .sheet td { text-align: left; vertical-align: top; padding: 4px 8px; border-bottom: 1px solid rgba(93,70,48,0.4); }
+  .sheet thead th { font-family: var(--font-display); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gilt); }
+  .sheet tbody th { font-weight: 700; color: var(--ash); white-space: nowrap; }
+  .sheet tbody tr:has(td.best) th { color: #f3efe6; }
+  .sheet td { color: var(--ash); }
+  .sheet td.best, .key i.best { color: #fff; font-weight: 700; background: rgba(201,162,74,0.16); box-shadow: inset 3px 0 0 var(--gilt); }
+  .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  @media (max-width: 640px) {
+    .sheet { font-size: 13px; }
+    .sheet th, .sheet td { padding: 4px 5px; overflow-wrap: anywhere; }
+    .sheet col.who { width: 21%; }
+    .sheet thead th { font-size: 11px; letter-spacing: 0; }
+    .sheet tbody th { white-space: normal; }
+  }
+  @media (max-width: 480px) {
+    .sheet col.who { width: 25%; }
+    .sheet thead th { font-family: var(--font-body); font-weight: 700; font-size: 10px; text-transform: none; overflow-wrap: normal; padding: 4px 2px; }
+  }
 </style>
 </head>
 <body>
@@ -227,6 +252,47 @@
       <div class="farm card"><div class="top"><a class="t" href="https://poeatlasplanner.com/#p=WzEsIjMuMzAuMCIsIjMuMzAuMC1yMSIsMTUwLFsiMTQyMDYiLCIxNTk4NyIsIjE3MzIxIiwiMTg0MzIiLCIxODk1OCIsIjE5MjgiLCIxOTQ4OSIsIjIwNTAzIiwiMjMxNjUiLCIyMzc2OSIsIjIzOTkxIiwiMjQ1NTUiLCIyNDYwOSIsIjI0NjYiLCIyNDY3OSIsIjI0Njk5IiwiMjU4NSIsIjI2MjkzIiwiMjc4NjAiLCIyNzkyIiwiMjgwMjkiLCIyODkzOSIsIjI5MjMxIiwiMzAwNDQiLCIzMTA2NiIsIjMxNDk4IiwiMzE1ODEiLCIzMjAyOSIsIjMyMTU3IiwiMzM3NTciLCIzNDI0NCIsIjM0OTQ2IiwiMzU2MDgiLCIzNjEzNyIsIjM3MjQ1IiwiMzgxMCIsIjQzOTAzIiwiNDU0NDIiLCI0NjQ2MSIsIjQ3NjkyIiwiNTA5MDUiLCI1MTEzMyIsIjUxODc0IiwiNTQ0MDciLCI1NTQ1NCIsIjU1NDc3IiwiNTcxODIiLCI1NzczOSIsIjU4NTcyIiwiNTkxNzYiLCI1OTk4OSIsIjYxMTIxIiwiNjEzNTgiLCI2MTcwMSIsIjYyMTc1IiwiNjMzMTEiLCI2Mzc0NCIsIjY0MTc4IiwiNjUyNDYiLCI2OTkwIiwiODAzMyIsIjgwMzgiLCI4MjQ3IiwiODY0NSJdLFtbIjI4MDI5Iiw0MDg4M11dXQ" target="_blank" rel="noopener">Sirgog League Start</a><button class="copy" type="button" data-copy-link aria-label="Copy link" title="Copy link"></button></div><ul><li>3.30 tree · 64 points</li></ul></div>
       <div class="farm card"><div class="top"><a class="t" href="https://poeatlasplanner.com/#p=WzEsIjMuMzAuMCIsIjMuMzAuMC1yMSIsMTUwLFsiMTA0NDgiLCIxMTIyMyIsIjExMjU2IiwiMTE2NjciLCIxMTkxNSIsIjExOTYzIiwiMTMwNDciLCIxMzI4NCIsIjEzNTM0IiwiMTQyMDMiLCIxNDIwNiIsIjE0NDE3IiwiMTQ3MDgiLCIxNTkzMCIsIjE1OTg3IiwiMTY3MCIsIjE3MzIxIiwiMTc5ODIiLCIxODQzMiIsIjE4NjQyIiwiMTg5NTgiLCIxOTI4IiwiMTk0ODkiLCIxOTk2NCIsIjIwNTAzIiwiMjA2IiwiMjA3NSIsIjIwODY2IiwiMjA5MjkiLCIyMTExIiwiMjExNTQiLCIyMjU5NyIsIjIzMTY1IiwiMjM1MzkiLCIyMzc2OSIsIjIzNzgiLCIyMzk5MSIsIjI0MTA2IiwiMjQ1NTUiLCIyNDYwOSIsIjI0NjYiLCIyNDY3OSIsIjI0Njk5IiwiMjU1MjUiLCIyNTg1IiwiMjYyOTMiLCIyNjMxMCIsIjI2OTE0IiwiMjcwOTMiLCIyNzQyMSIsIjI3ODYwIiwiMjc5MiIsIjI4MDI5IiwiMjgxNTciLCIyODg3MyIsIjI4OTM5IiwiMjkyMzEiLCIzMDA0NCIsIjMwMTk4IiwiMzEiLCIzMTA2NiIsIjMxNDk4IiwiMzE1ODEiLCIzMjAyOSIsIjMyMDUyIiwiMzIxNTciLCIzMjk2IiwiMzM3NTciLCIzNDI0NCIsIjM0ODQxIiwiMzQ5NDYiLCIzNTYwOCIsIjM2MTM3IiwiMzY5OTgiLCIzNzI0NSIsIjM3MzU3IiwiMzc5NSIsIjM4MTAiLCIzODIxMiIsIjM5NjM4IiwiNDAwMjciLCI0MDM2OSIsIjQwODgxIiwiNDEwNTMiLCI0MTM1MCIsIjQxNTM4IiwiNDM5MDMiLCI0NDA0OCIsIjQ0Nzc1IiwiNDQ5MzciLCI0NTQ0MiIsIjQ1NTYzIiwiNDY0NjEiLCI0NjU4OSIsIjQ3MjIyIiwiNDc2OTIiLCI0Nzg0NSIsIjQ3OTE0IiwiNDgyOTYiLCI0OTUyOCIsIjQ5NTc0IiwiNTA3MzkiLCI1MDkwNSIsIjUxMTMzIiwiNTE4NzQiLCI1MTk2NSIsIjUyODgxIiwiNTM1NDAiLCI1MzU4MSIsIjUzODc2IiwiNTQ0MDciLCI1NDQ1NyIsIjU1NDU0IiwiNTU0NzciLCI1NTY5NiIsIjU3MTgyIiwiNTczMzYiLCI1NzczOSIsIjU3OTU3IiwiNTc5ODMiLCI1ODIyNCIsIjU4MjgiLCI1ODU3MiIsIjU4NzY3IiwiNTkwOCIsIjU5MTc2IiwiNTk5ODkiLCI2MDkxIiwiNjExMjEiLCI2MTIyMCIsIjYxMzU4IiwiNjE3MDEiLCI2MjE3NSIsIjYyMTg0IiwiNjMzMTEiLCI2Mzc0NCIsIjY0MTc4IiwiNjQyMTgiLCI2NDQ2MiIsIjY1MDA4IiwiNjUyNDYiLCI2OTkwIiwiNzQwMiIsIjgwMzMiLCI4MDM4IiwiODEzMiIsIjgyNDciLCI4NjQ1IiwiOTI5IiwiOTQxOSJdLFtbIjI4MDI5Iiw0MDg4M11dXQ" target="_blank" rel="noopener">Andy League Start</a><button class="copy" type="button" data-copy-link aria-label="Copy link" title="Copy link"></button></div><ul><li>3.30 tree · 150 points</li></ul></div>
       <div class="farm card"><div class="top"><a class="t" href="https://poeatlasplanner.com/#p=WzEsIjMuMzAuMCIsIjMuMzAuMC1yMSIsMTUwLFsiMTA3NTMiLCIxMTkxNSIsIjEyMzQxIiwiMTI4ODciLCIxNDIwNiIsIjE1ODUxIiwiMTU5ODciLCIxNjI2IiwiMTcyNiIsIjE3MzIxIiwiMTg0MzIiLCIxODU4NSIsIjE4OTU4IiwiMTkyOCIsIjE5NDg5IiwiMTk2OTIiLCIyMDUwMyIsIjIwNjgiLCIyMDg2NiIsIjIxNDIxIiwiMjI0MTEiLCIyMzE2NSIsIjIzMjQ2IiwiMjM1MzgiLCIyMzc2OSIsIjIzOTkxIiwiMjQ1NTUiLCIyNDYwOSIsIjI0Njc5IiwiMjQ2OTkiLCIyNTg1IiwiMjYyOTMiLCIyNzA5MyIsIjI3ODYwIiwiMjc5MiIsIjI4MDI5IiwiMjg5MzkiLCIyOTE5MSIsIjI5MjMxIiwiMjk4NzEiLCIzMDA0NCIsIjMwMzc5IiwiMzEwNjYiLCIzMTg2MCIsIjMyMDE5IiwiMzIwMjkiLCIzMjE1NyIsIjMzNzU3IiwiMzM4NjgiLCIzNDI0NCIsIjM0NDY3IiwiMzQ4NTAiLCIzNDk0NiIsIjM1NDM5IiwiMzU0OCIsIjM1NjA4IiwiMzYzMzkiLCIzNjU5NCIsIjM3MjQ1IiwiMzczNzciLCIzNzQyMCIsIjM3NDU0IiwiMzc5NSIsIjM4MTAiLCI0MTY5NCIsIjQyODgyIiwiNDMyMSIsIjQzOTAzIiwiNDQ4NjkiLCI0NjQ2MSIsIjQ3NjkyIiwiNDg4NyIsIjUwODk2IiwiNTA5MDciLCI1MjMxMyIsIjUyOTMxIiwiNTQzMjUiLCI1NDQwNyIsIjU1NDU0IiwiNTU0NzciLCI1NTkwOCIsIjU1OTk3IiwiNTc3MzkiLCI1ODIyNCIsIjU4MjMyIiwiNTg1NzIiLCI1OTE3NiIsIjU5NjkiLCI1OTY5NCIsIjU5OTg5IiwiNjEwMjIiLCI2MTEyMSIsIjYxMzU4IiwiNjE3MDEiLCI2MTkwIiwiNjIwOTkiLCI2MzMxMSIsIjYzNzQ0IiwiNjM4NDciLCI2NDE3OCIsIjY0MjU1IiwiNjUyNDYiLCI2NTczIiwiNjk5MCIsIjgwMzMiLCI4MDM4IiwiODUzMSIsIjg2NDUiLCI5NjU0Il0sW1siMTI4ODciLDIwODE4XSxbIjIzNTM4Iiw0OTcwOF0sWyIyODAyOSIsMzYzNzldLFsiMzc0NTQiLDMyNTQyXV1d" target="_blank" rel="noopener">Incursion League Start</a><button class="copy" type="button" data-copy-link aria-label="Copy link" title="Copy link"></button></div><ul><li>3.30 tree · 109 points</li></ul></div>
+    </div>
+  </section>
+
+  <!-- Cheat sheets (Lioneye, not part of the cheat sheet artifact): league mechanics with
+       their own strats. Betrayal: rebuilt as text from Ayeleth's 3.30 Syndicate sheet
+       (elrincondelexiliado.com/syndicate, "3.30 Updated (Temporary)"); the best picks
+       (td class "best", with a hidden "Best:" for screen readers) are the 7 cells marked on the group's copy, the rest are dimmed.
+       Intervention is the same for every member, so it's one line under the table. -->
+  <section class="panel" id="cheat-sheets" data-jump="Cheat sheets" aria-labelledby="h-cheat-sheets">
+    <div class="ph"><h2 id="h-cheat-sheets">Cheat sheets</h2><span class="sub">League mechanics</span></div>
+    <div class="farms">
+      <div class="farm ref wide"><div class="top"><span class="t" id="t-betrayal">Betrayal</span><span class="tag">Ayeleth · early 3.30</span></div>
+        <div class="key" aria-hidden="true"><span><i class="best"></i>Best</span></div>
+        <div>
+          <table class="sheet" aria-labelledby="t-betrayal">
+            <colgroup><col class="who"><col><col><col></colgroup>
+            <thead><tr><th scope="col">Member</th><th scope="col">Transportation</th><th scope="col">Fortification</th><th scope="col">Research</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Aisling</th><td>Double-Veiled items</td><td>Veiled Exalteds on an item</td><td>Veiled Chaos on an item</td></tr>
+              <tr><th scope="row">Cameria</th><td>Allflame Ember</td><td>Jewels (chest)</td><td>Currency on a jewel</td></tr>
+              <tr><th scope="row">Elreon</th><td>Allflame Ember</td><td>Corrupted items (chest)</td><td>Tainted currency on a corrupted item</td></tr>
+              <tr><th scope="row">Gravicius</th><td class="best"><span class="vh">Best: </span>Full stack of div cards</td><td>Div cards (chest)</td><td>Swap a div card</td></tr>
+              <tr><th scope="row">Guff</th><td>Random currency</td><td>Rare items (chest)</td><td class="best"><span class="vh">Best: </span>Reflecting Mist on jewelry</td></tr>
+              <tr><th scope="row">Haku</th><td>Unique Strongboxes</td><td>Allflame Ember</td><td>Hinekora's Locks and influenced Exalteds on an item</td></tr>
+              <tr><th scope="row">Hillock</th><td>Influenced item (chest)</td><td>Influenced Exalteds on an item</td><td>Eldritch currency on an item</td></tr>
+              <tr><th scope="row">It That Fled</th><td>Foulborn uniques (chest)</td><td>Foulborn currency on a Breach ring</td><td>Tainted socket currency on a corrupted item</td></tr>
+              <tr><th scope="row">Janus</th><td>Gold piles</td><td>Allflame Ember</td><td class="best"><span class="vh">Best: </span>Uniques for gold (Cadiro)</td></tr>
+              <tr><th scope="row">Jorgin</th><td>Allflame Ember</td><td>Delve items (chest)</td><td>Currency on a talisman</td></tr>
+              <tr><th scope="row">Korell</th><td>Allflame Ember</td><td>Essence items (chest)</td><td>Essences on an item</td></tr>
+              <tr><th scope="row">Leo</th><td>Allflame Ember</td><td class="best"><span class="vh">Best: </span>Corrupted uniques (chest)</td><td>Special corruption on a unique</td></tr>
+              <tr><th scope="row">Riker</th><td class="best"><span class="vh">Best: </span>Unique items</td><td>Ancient Orbs</td><td>Ancient Orbs on a unique</td></tr>
+              <tr><th scope="row">Rin Yushu</th><td>Originator influenced maps</td><td>Threads</td><td>Threads (chest)</td></tr>
+              <tr><th scope="row">Tora</th><td>Quality gems and Facetor's Lenses</td><td>All gem types (chest)</td><td>Gem currency on a gem</td></tr>
+              <tr><th scope="row">Vagan</th><td>Allflame Ember</td><td>Enshrouded items (chest)</td><td class="best"><span class="vh">Best: </span>Fracturing Orb on an item</td></tr>
+              <tr><th scope="row">Vorici</th><td>Full stacks of currency</td><td>Reforge sockets, colors or links on your item</td><td class="best"><span class="vh">Best: </span>Gems with a Soul Core applied (chest)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">Intervention, every member: unique items of one class (chest).</p>
+      </div>
+      <div class="farm ref wide"><div class="top"><span class="t">Temple rooms</span><span class="tag">Tier 3</span></div><ol><li><b>Locus of Corruption</b> <span class="path">Corruption Chamber → Catalyst of Corruption</span></li><li><b>Doryani’s Institute</b> <span class="path">Gemcutter’s Workshop → Department of Thaumaturgy</span></li><li><b>Cradle of Creation</b> <span class="path">Royal Meeting Room → Hall of Lords</span></li><li><b>Atlas of Worlds</b> <span class="path">Surveyor’s Study → Office of Cartography</span></li><li><b>Apex of Ascension</b> <span class="path">Sacrificial Chamber → Hall of Offerings</span></li></ol></div>
     </div>
   </section>
 
@@ -337,7 +403,6 @@
     <div class="ph"><h2 id="h-farms">Farms</h2><span class="sub">Our old strats, rebuilt for 3.30 (untested)</span></div>
     <div class="key"><span><i style="background:#84b98f"></i>Rebuilt</span><span><i style="background:#7cb8f2"></i>New in 3.30</span><span><i style="background:#d4474f"></i>Out</span></div>
     <div class="farms">
-      <div class="farm new wide"><div class="top"><span class="t">Temple rooms</span><span class="tag">Tier 3</span></div><ol><li><b>Locus of Corruption</b> <span class="path">Corruption Chamber → Catalyst of Corruption</span></li><li><b>Doryani’s Institute</b> <span class="path">Gemcutter’s Workshop → Department of Thaumaturgy</span></li><li><b>Cradle of Creation</b> <span class="path">Royal Meeting Room → Hall of Lords</span></li><li><b>Atlas of Worlds</b> <span class="path">Surveyor’s Study → Office of Cartography</span></li><li><b>Apex of Ascension</b> <span class="path">Sacrificial Chamber → Hall of Offerings</span></li></ol></div>
       <div class="farm"><div class="top"><span class="t">Essence</span><span class="tag">No Threads</span></div><ul><li>Prolific Essence, Crystal Lattice, Amplified Energies</li><li>Corrupt only MEDS or 3× Shrieking; Recrystallisation allows a second corrupt</li><li>Crystal Resonance survived (T16 bosses)</li></ul></div>
       <div class="farm"><div class="top"><span class="t">Harvest</span><span class="tag">No Threads</span></div><ul><li>Call of the Grove, Doubling Season, Heart of the Grove</li><li>Atlas Drops = more Lifeforce</li><li>Sell all 3 colors in bulk</li></ul></div>
       <div class="farm"><div class="top"><span class="t">Div cards</span><span class="tag">Rarity</span></div><ul><li>Stack <b>rarity</b>, not quantity</li><li>Divination Card cluster + Fate Bespoken</li><li>Card Sharp, Rabbit's Foot disabled</li></ul></div>
@@ -402,7 +467,7 @@
 
   <details class="sources" id="sources">
     <summary>Sources</summary>
-    <p><a href="https://www.pathofexile.com/forum/view-thread/4013680" target="_blank" rel="noopener">3.30 patch notes</a> · tytykiller's 3.30 starter list · WizChamp's League Start Wealth Plan · <a href="https://poedb.tw/us/atlas-skill-tree/" target="_blank" rel="noopener">poedb 3.30 Atlas tree</a> · <a href="https://www.poewiki.net/wiki/Atlas_anomaly" target="_blank" rel="noopener">PoE Wiki: Atlas anomaly</a> · <a href="https://www.poewiki.net/wiki/Templar_Vault" target="_blank" rel="noopener">Memory vaults</a> · <a href="https://poe.ninja/poe1/economy" target="_blank" rel="noopener">poe.ninja</a>. Gem prices: Mirage (3.28) days 5–14. Built Nov 11, 2026, before launch.</p>
+    <p><a href="https://www.pathofexile.com/forum/view-thread/4013680" target="_blank" rel="noopener">3.30 patch notes</a> · tytykiller's 3.30 starter list · WizChamp's League Start Wealth Plan · <a href="https://poedb.tw/us/atlas-skill-tree/" target="_blank" rel="noopener">poedb 3.30 Atlas tree</a> · <a href="https://www.poewiki.net/wiki/Atlas_anomaly" target="_blank" rel="noopener">PoE Wiki: Atlas anomaly</a> · <a href="https://www.poewiki.net/wiki/Templar_Vault" target="_blank" rel="noopener">Memory vaults</a> · <a href="https://poe.ninja/poe1/economy" target="_blank" rel="noopener">poe.ninja</a> · <a href="https://pathofexile.elrincondelexiliado.com/syndicate" target="_blank" rel="noopener">Ayeleth's Syndicate sheet</a> (Betrayal). Gem prices: Mirage (3.28) days 5–14. Built Nov 11, 2026, before launch.</p>
   </details>
 </main>
 <script>
