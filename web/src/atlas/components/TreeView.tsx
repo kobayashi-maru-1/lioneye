@@ -4,6 +4,8 @@ import styles from "../atlas.module.css";
 import classNames from "classnames";
 import {
   type CSSProperties,
+  type FocusEvent as ReactFocusEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   forwardRef,
   memo,
@@ -25,8 +27,12 @@ export interface TreeMarks {
   lit: ReadonlySet<string>;
   /** A mechanic brought out (its clusters full, the rest dim); null for none. */
   mechanic: number | null;
+  /** The mechanic pinned by a click (mechanic is the hovered one, else this). */
+  pinned: number | null;
   /** The gateway pair under the pointer, ringed. */
   gatewayPair: ReadonlySet<string>;
+  /** Allocated choice nodes with no option picked. */
+  unset: ReadonlySet<string>;
   overBudget: boolean;
 }
 
@@ -47,6 +53,8 @@ interface TreeViewProps {
   /** A node clicked or tapped; `touch` when there was no hover first. */
   onNode: (id: string, touch: boolean) => void;
   onLabel: (mechanic: number) => void;
+  /** A cluster label under a mouse pointer (null when it leaves one). */
+  onLabelHover: (mechanic: number | null) => void;
   onStart: () => void;
 }
 
@@ -58,6 +66,8 @@ interface Box {
 }
 
 const RADIUS = { start: 150, small: 79, notable: 113, keystone: 141 } as const;
+/** A cluster's letter badge: about a notable's size, so the passives around it read first. */
+const LABEL_RADIUS = 100;
 const PAD = 600;
 const DRAG = 5;
 
@@ -81,7 +91,17 @@ function boxAround(points: { x: number; y: number }[], pad: number): Box {
 }
 
 export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
-  { data, colours, letters, marks, onHover, onNode, onLabel, onStart },
+  {
+    data,
+    colours,
+    letters,
+    marks,
+    onHover,
+    onNode,
+    onLabel,
+    onLabelHover,
+    onStart,
+  },
   ref,
 ) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -235,10 +255,13 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
     const previous = pointers.current.get(e.pointerId);
     if (!previous) {
       if (e.pointerType === "mouse") {
-        const id = (e.target as Element)
-          .closest("[data-node]")
-          ?.getAttribute("data-node");
+        const target = e.target as Element;
+        const id = target.closest("[data-node]")?.getAttribute("data-node");
         onHover(id ?? null, e.clientX, e.clientY);
+        const label = target
+          .closest("[data-label]")
+          ?.getAttribute("data-label");
+        onLabelHover(label == null ? null : Number(label));
       }
       return;
     }
@@ -304,6 +327,53 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
     gesture.current.moved = true;
   };
 
+  // Keyboard: Tab moves through nodes and labels; Enter or Space acts as a click. A focused
+  // node off screen is brought into view, and shows its tooltip and preview.
+  const onKeyDown = (e: ReactKeyboardEvent<SVGSVGElement>) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const target = e.target as Element;
+    const node = target.getAttribute("data-node");
+    const label = target.getAttribute("data-label");
+    if (node !== null && node !== data.start) onNode(node, false);
+    else if (label !== null) onLabel(Number(label));
+    else return;
+    e.preventDefault();
+  };
+  // Keyboard focus only: a click or tap also focuses a node, and must not pan the view or
+  // turn into a hover (that would hide the touch card).
+  const focusFrame = useRef<number | undefined>(undefined);
+  const keyboardFocus = useRef<string | null>(null);
+  const onFocus = (e: ReactFocusEvent<SVGSVGElement>) => {
+    const target = e.target as Element;
+    const id = target.getAttribute("data-node");
+    if (id === null || !target.matches(":focus-visible")) return;
+    keyboardFocus.current = id;
+    const node = data.nodes[id];
+    const b = boxRef.current;
+    const margin = 300;
+    if (
+      node.x < b.x + margin ||
+      node.x > b.x + b.w - margin ||
+      node.y < b.y + margin ||
+      node.y > b.y + b.h - margin
+    )
+      setBox({ ...b, x: node.x - b.w / 2, y: node.y - b.h / 2 });
+    // After React commits the pan (a timeout, not a frame: frames can be paused).
+    window.clearTimeout(focusFrame.current);
+    focusFrame.current = window.setTimeout(() => {
+      const rect = target.getBoundingClientRect();
+      onHover(id, rect.right, rect.bottom);
+    }, 0);
+  };
+  const onBlur = (e: ReactFocusEvent<SVGSVGElement>) => {
+    const target = e.target as Element;
+    const id = target.getAttribute("data-node");
+    if (id === null || keyboardFocus.current !== id) return;
+    keyboardFocus.current = null;
+    window.clearTimeout(focusFrame.current);
+    onHover(null, 0, 0);
+  };
+
   const viewBox = `${box.x} ${box.y} ${box.w} ${box.h}`;
   return (
     <svg
@@ -315,30 +385,39 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      onPointerLeave={() => onHover(null, 0, 0)}
-      role="img"
+      onPointerLeave={() => {
+        onHover(null, 0, 0);
+        onLabelHover(null);
+      }}
+      onKeyDown={onKeyDown}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      role="group"
       aria-label="Atlas tree"
     >
-      <StaticLayers data={data} colours={colours} />
+      <StaticLayers data={data} colours={colours} mechanic={marks.mechanic} />
       <Edges data={data} marks={marks} />
       <Labels
         data={data}
         colours={colours}
         letters={letters}
         mechanic={marks.mechanic}
+        pinned={marks.pinned}
       />
       <Nodes data={data} colours={colours} marks={marks} flash={flash} />
     </svg>
   );
 });
 
-/** Cluster discs: drawn once per data set. */
+/** Cluster discs: only for the mechanic brought out (hovered or pinned), none otherwise. */
 const StaticLayers = memo(function StaticLayers({
   data,
   colours,
+  mechanic,
 }: {
   data: AtlasData;
   colours: string[];
+  mechanic: number | null;
 }) {
   const discs = useMemo(() => {
     const members = new Map<string, { x: number; y: number }[]>();
@@ -357,17 +436,20 @@ const StaticLayers = memo(function StaticLayers({
       return { ...label, r };
     });
   }, [data]);
+  if (mechanic === null) return null;
   return (
     <g className={styles.discs}>
-      {discs.map((d) => (
-        <circle
-          key={d.g}
-          cx={d.x}
-          cy={d.y}
-          r={d.r}
-          fill={colours[d.m] ?? TRAVEL_COLOUR}
-        />
-      ))}
+      {discs
+        .filter((d) => d.m === mechanic)
+        .map((d) => (
+          <circle
+            key={d.g}
+            cx={d.x}
+            cy={d.y}
+            r={d.r}
+            fill={colours[d.m] ?? TRAVEL_COLOUR}
+          />
+        ))}
     </g>
   );
 });
@@ -425,11 +507,13 @@ const Labels = memo(function Labels({
   colours,
   letters,
   mechanic,
+  pinned,
 }: {
   data: AtlasData;
   colours: string[];
   letters: string[];
   mechanic: number | null;
+  pinned: number | null;
 }) {
   return (
     <g className={styles.labels}>
@@ -437,12 +521,21 @@ const Labels = memo(function Labels({
         <g
           key={label.g}
           data-label={label.m}
+          role="button"
+          tabIndex={0}
+          aria-label={data.mechanics[label.m]}
+          aria-pressed={pinned === label.m}
           className={classNames(styles.label, {
             [styles.dim]: mechanic !== null && mechanic !== label.m,
           })}
         >
           <title>{data.mechanics[label.m]}</title>
-          <circle cx={label.x} cy={label.y} r={150} fill={colours[label.m]} />
+          <circle
+            cx={label.x}
+            cy={label.y}
+            r={LABEL_RADIUS}
+            fill={colours[label.m]}
+          />
           <text x={label.x} y={label.y} dy="0.36em" textAnchor="middle">
             {letters[label.m]}
           </text>
@@ -475,11 +568,20 @@ const Nodes = memo(function Nodes({
             : m >= 0
               ? colours[m]
               : TRAVEL_COLOUR;
-        const allocated = node.kind === "start" || marks.allocated.has(id);
+        const start = node.kind === "start";
+        const allocated = start || marks.allocated.has(id);
         return (
           <g
             key={id}
             data-node={id}
+            {...(start
+              ? {}
+              : {
+                  role: "button",
+                  tabIndex: 0,
+                  "aria-label": node.name,
+                  "aria-pressed": allocated,
+                })}
             style={{ "--c": colour } as CSSProperties}
             className={classNames(styles.node, {
               [styles.on]: allocated,
@@ -489,10 +591,15 @@ const Nodes = memo(function Nodes({
               [styles.match]: marks.matches.has(id) || flash === id,
               [styles.lit]: marks.lit.has(id),
               [styles.gate]: marks.gatewayPair.has(id),
+              [styles.unset]: marks.unset.has(id),
+              // A highlighted mechanic never dims the plan itself; a lit Bonuses line
+              // does (it picks out some allocated nodes from the rest).
               [styles.dim]:
-                (marks.mechanic !== null && m !== marks.mechanic) ||
+                (marks.mechanic !== null &&
+                  m !== marks.mechanic &&
+                  !allocated) ||
                 (marks.lit.size > 0 && !marks.lit.has(id)),
-              [styles.start]: node.kind === "start",
+              [styles.start]: start,
             })}
           >
             {(node.kind === "notable" || node.kind === "keystone") && (
@@ -501,6 +608,14 @@ const Nodes = memo(function Nodes({
                 cx={node.x}
                 cy={node.y}
                 r={r * 1.3}
+              />
+            )}
+            {marks.unset.has(id) && (
+              <circle
+                className={styles.unsetRing}
+                cx={node.x}
+                cy={node.y}
+                r={r * 1.75}
               />
             )}
             {node.kind === "small" &&

@@ -417,10 +417,17 @@ League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
   it at `/lioneye/atlas/` next to `strats/` on every run (a Pages deploy replaces the whole
   site, so both always go together).
 - **Plans** live in the browser's local storage (keys `lioneye-atlas-…`): the draft,
-  named **Saved** plans, and **Export** / **Import** as a JSON file. **Share** makes a
-  link with the plan in the address (`#t=`); **Open** takes our links, poeatlasplanner.com
-  links (`#p=`, so the League page's trees open) and official pathofexile.com atlas
-  links.
+  named **Saved** plans, and **Export** / **Import** as a JSON file. **Share** gives our
+  link (`#t=`: nodes, choices, budget) and the official pathofexile.com link (nodes only);
+  **Open** takes our links, poeatlasplanner.com links (`#p=`, so the League page's trees
+  open) and official links. An official link carries no choices, so its choice nodes open
+  **Unset** (a dashed ring, listed first in Bonuses) until one is picked.
+- **Bonuses** files a travel node's lines under the mechanic they name ("Maps found" →
+  Maps), else **Other**; a picked choice shows once, under its mechanic.
+- **Colours:** clusters within 3,000 units never share a colour (16-colour palette; 3.30
+  needs 14). Discs show only for the hovered or pinned mechanic.
+- **Keyboard:** Tab reaches the zoom buttons, then every cluster label and node; Enter or
+  Space acts as a click, and a focused node shows its tooltip.
 - **Routes** are the shortest path from what's allocated (ties go to the lower node id, so
   they're stable); refunding a node drops everything only it joined to the start.
 - Testing it in a browser: serve `web/dist-atlas` as plain files (`atlas.html` renamed

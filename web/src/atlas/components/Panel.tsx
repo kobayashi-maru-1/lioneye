@@ -1,6 +1,6 @@
 import { mechanicOf, type AtlasData, type Plan } from "../lib/types.ts";
 import { bonuses } from "../lib/bonuses.ts";
-import { HEADINGS, headingOf, TRAVEL_COLOUR } from "../lib/mechanics.ts";
+import { HEADINGS, headingOf } from "../lib/mechanics.ts";
 import type { SavedPlan } from "../store.ts";
 import { formStyles } from "../../styles";
 import styles from "../atlas.module.css";
@@ -167,17 +167,23 @@ export function Explore({
 export function Bonuses({
   data,
   plan,
+  budget,
   colours,
   letters,
   lit,
   onLight,
+  onChoose,
 }: {
   data: AtlasData;
   plan: Plan;
+  /** The budget shown: the one being typed, else the plan's. */
+  budget: number;
   colours: string[];
   letters: string[];
   lit: string | null;
   onLight: (key: string | null, nodes: string[]) => void;
+  /** An unset choice node: opens its picker. */
+  onChoose: (id: string) => void;
 }) {
   const result = useMemo(() => bonuses(data, plan), [data, plan]);
   const used = plan.allocated.length;
@@ -189,7 +195,7 @@ export function Bonuses({
         g.mechanic >= 0 && headingOf(data.mechanics[g.mechanic]) === h.name,
     ),
   }));
-  const travel = result.groups.find((g) => g.mechanic < 0);
+  const other = result.groups.find((g) => g.mechanic < 0);
   const line = (key: string, text: string, count: number, nodes: string[]) => (
     <button
       key={key}
@@ -204,25 +210,29 @@ export function Bonuses({
   return (
     <>
       <div className={styles.pointsLine}>
-        {used} / {plan.budget}
+        {used} / {budget}
       </div>
+      {result.unset.length > 0 && (
+        <section className={styles.section}>
+          <h3 className={classNames(styles.heading, styles.unsetHeading)}>
+            Unset
+          </h3>
+          {result.unset.map((u) => (
+            <button
+              key={u.id}
+              className={styles.bonus}
+              onClick={() => onChoose(u.id)}
+            >
+              {u.name}
+              <span className={styles.count}> Choose</span>
+            </button>
+          ))}
+        </section>
+      )}
       {result.keystones.length > 0 && (
         <section className={styles.section}>
           <h3 className={styles.heading}>Keystones</h3>
           {result.keystones.map((k) => line(`k${k.id}`, k.name, 1, [k.id]))}
-        </section>
-      )}
-      {result.choices.length > 0 && (
-        <section className={styles.section}>
-          <h3 className={styles.heading}>Choices</h3>
-          {result.choices.map((c) =>
-            line(
-              `c${c.id}`,
-              `${c.name}: ${c.stats.length ? c.stats.join(" ") : "None picked"}`,
-              1,
-              [c.id],
-            ),
-          )}
         </section>
       )}
       {byHeading.map(
@@ -248,17 +258,12 @@ export function Bonuses({
             </section>
           ),
       )}
-      {travel && (
+      {other && (
         <section className={styles.section}>
-          <h3 className={styles.heading}>Travel</h3>
+          <h3 className={styles.heading}>Other</h3>
           <div className={styles.bonusGroup}>
-            <div className={styles.bonusMechanic}>
-              <Swatch colour={TRAVEL_COLOUR} letter="" />
-              Travel
-              <span className={styles.count}>{travel.nodes}</span>
-            </div>
-            {travel.lines.map((l, i) =>
-              line(`t:${i}`, flat(l.text), l.count, l.nodes),
+            {other.lines.map((l, i) =>
+              line(`o:${i}`, flat(l.text), l.count, l.nodes),
             )}
           </div>
         </section>

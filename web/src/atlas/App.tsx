@@ -6,7 +6,7 @@ import {
 } from "./lib/types.ts";
 import { buildGraph, fits, normalise, refundSet, route } from "./lib/graph.ts";
 import { nodeStats } from "./lib/bonuses.ts";
-import { encodeShare, parseLink } from "./lib/links.ts";
+import { encodeOfficial, encodeShare, parseLink } from "./lib/links.ts";
 import { mechanicColours, mechanicLetters } from "./lib/mechanics.ts";
 import { KIND, byId, flat } from "./lib/text.ts";
 import {
@@ -183,6 +183,18 @@ export function App({ data }: { data: AtlasData }) {
 
   const allocated = useMemo(() => new Set(plan.allocated), [plan]);
   const used = plan.allocated.length;
+  // The budget being typed applies at once; it becomes an undo step on Enter or leaving.
+  const [typedBudget, setTypedBudget] = useState<number | null>(null);
+  const budget = typedBudget ?? plan.budget;
+  const unset = useMemo(
+    () =>
+      new Set(
+        plan.allocated.filter(
+          (id) => data.nodes[id]?.choices && plan.choices[id] === undefined,
+        ),
+      ),
+    [plan, data],
+  );
 
   // Pointer, previews and highlights.
   const [hover, setHover] = useState<{
@@ -205,7 +217,7 @@ export function App({ data }: { data: AtlasData }) {
       : { kind: "route" as const, nodes: new Set(path) };
   }, [focus, allocated, graph, data.start]);
   const cost = preview?.kind === "route" ? preview.nodes.size : 0;
-  const over = preview?.kind === "route" && !fits(used, cost, plan.budget);
+  const over = preview?.kind === "route" && !fits(used, cost, budget);
 
   const twins = useMemo(() => {
     const map = new Map<string, string>();
@@ -260,7 +272,9 @@ export function App({ data }: { data: AtlasData }) {
       matches: matchSet,
       lit: lit?.nodes ?? none,
       mechanic: previewMechanic ?? pinned,
+      pinned,
       gatewayPair,
+      unset,
       overBudget: over,
     }),
     [
@@ -271,6 +285,7 @@ export function App({ data }: { data: AtlasData }) {
       previewMechanic,
       pinned,
       gatewayPair,
+      unset,
       over,
       none,
     ],
@@ -282,13 +297,14 @@ export function App({ data }: { data: AtlasData }) {
     (id: string, effect?: number) => {
       const path = route(graph, allocated, id);
       if (path === null) return;
-      if (!fits(used, path.length, plan.budget)) {
-        say(`Over budget by ${used + path.length - plan.budget}`);
+      if (!fits(used, path.length, budget)) {
+        say(`Over budget by ${used + path.length - budget}`);
         return;
       }
       apply(
         fix({
           ...plan,
+          budget,
           allocated: [...plan.allocated, ...path],
           choices:
             effect === undefined
@@ -297,7 +313,7 @@ export function App({ data }: { data: AtlasData }) {
         }),
       );
     },
-    [graph, allocated, used, plan, apply, fix, say],
+    [graph, allocated, used, plan, budget, apply, fix, say],
   );
   const refund = useCallback(
     (id: string) => {
@@ -356,7 +372,10 @@ export function App({ data }: { data: AtlasData }) {
   };
 
   // Links and saved plans.
-  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareLinks, setShareLinks] = useState<{
+    ours: string;
+    official: string;
+  } | null>(null);
   const [openLink, setOpenLink] = useState(false);
   const [deleting, setDeleting] = useState<SavedPlan | null>(null);
   openPlan.current = (next: Plan) => {
@@ -477,12 +496,17 @@ export function App({ data }: { data: AtlasData }) {
             <Bonuses
               data={data}
               plan={plan}
+              budget={budget}
               colours={colours}
               letters={letters}
               lit={lit?.key ?? null}
               onLight={(key, nodes) =>
                 setLit(key === null ? null : { key, nodes: new Set(nodes) })
               }
+              onChoose={(id) => {
+                setPanelOpen(false);
+                setChoiceFor(id);
+              }}
             />
           )}
           {tab === "saved" && (
@@ -537,13 +561,17 @@ export function App({ data }: { data: AtlasData }) {
           </button>
           <span
             className={classNames(styles.points, {
-              [styles.costOver]: used > plan.budget,
+              [styles.costOver]: used > budget,
             })}
           >
             {used} /
             <BudgetInput
               value={plan.budget}
-              onCommit={(n) => apply(fix({ ...plan, budget: n }))}
+              onLive={setTypedBudget}
+              onCommit={(n) => {
+                setTypedBudget(null);
+                if (n !== plan.budget) apply(fix({ ...plan, budget: n }));
+              }}
             />
           </span>
           <button
@@ -568,15 +596,13 @@ export function App({ data }: { data: AtlasData }) {
             Clear
           </button>
           <span className={styles.spacer} />
-          <span className={styles.status} role="status">
-            {status ?? ""}
-          </span>
           <button
             className={formStyles.formButton}
             onClick={() =>
-              setShareLink(
-                `${location.origin}${location.pathname}#${encodeShare(plan, data.version)}`,
-              )
+              setShareLinks({
+                ours: `${location.origin}${location.pathname}#${encodeShare(plan, data.version)}`,
+                official: encodeOfficial(plan.allocated),
+              })
             }
             disabled={used === 0}
           >
@@ -591,17 +617,7 @@ export function App({ data }: { data: AtlasData }) {
         </div>
 
         <div className={styles.treeWrap}>
-          <TreeView
-            ref={tree}
-            data={data}
-            colours={colours}
-            letters={letters}
-            marks={marks}
-            onHover={onHover}
-            onNode={onNode}
-            onLabel={onLabel}
-            onStart={clear}
-          />
+          {/* Before the tree: Tab reaches zoom before the tree's many stops. */}
           <div className={styles.zoom}>
             <button
               className={formStyles.formButton}
@@ -632,6 +648,27 @@ export function App({ data }: { data: AtlasData }) {
             >
               Focus
             </button>
+          </div>
+          <TreeView
+            ref={tree}
+            data={data}
+            colours={colours}
+            letters={letters}
+            marks={marks}
+            onHover={onHover}
+            onNode={onNode}
+            onLabel={onLabel}
+            onLabelHover={setPreviewMechanic}
+            onStart={clear}
+          />
+          {/* Over the tree, so a message never changes the toolbar's height. */}
+          <div
+            className={classNames(styles.status, styles.toast, {
+              [styles.toastOn]: status !== null,
+            })}
+            role="status"
+          >
+            {status ?? ""}
           </div>
           {hover && shown && (
             <NodeTip
@@ -669,7 +706,7 @@ export function App({ data }: { data: AtlasData }) {
         picked={choiceFor ? (plan.choices[choiceFor] ?? null) : null}
         allocated={choiceFor !== null && allocated.has(choiceFor)}
         cost={choiceCost}
-        over={!fits(used, choiceCost, plan.budget)}
+        over={!fits(used, choiceCost, budget)}
         onPick={(effect) => {
           if (!choiceFor) return;
           if (allocated.has(choiceFor))
@@ -688,7 +725,7 @@ export function App({ data }: { data: AtlasData }) {
         }}
         onClose={() => setChoiceFor(null)}
       />
-      <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />
+      <ShareDialog links={shareLinks} onClose={() => setShareLinks(null)} />
       <OpenDialog
         isOpen={openLink}
         onOpen={openText}
@@ -707,24 +744,34 @@ export function App({ data }: { data: AtlasData }) {
   );
 }
 
-/** The point budget: typed freely, applied on Enter or leaving the box (one undo step). */
+/** A typed budget, clamped to 1–150; null while the box holds no number. */
+function budgetFrom(typed: string): number | null {
+  const n = Math.round(Number(typed));
+  return typed.trim() !== "" && Number.isFinite(n)
+    ? Math.min(MAX_BUDGET, Math.max(1, n))
+    : null;
+}
+
+/**
+ * The point budget: applies as it's typed (onLive), and becomes one undo step on Enter or
+ * leaving the box (onCommit). Escape puts the plan's budget back.
+ */
 function BudgetInput({
   value,
+  onLive,
   onCommit,
 }: {
   value: number;
+  onLive: (n: number | null) => void;
   onCommit: (n: number) => void;
 }) {
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);
   // Reads the box itself: a blur straight after typing can come before the re-render.
   const commit = (typed: string) => {
-    const n = Math.round(Number(typed));
-    if (typed.trim() !== "" && Number.isFinite(n) && n >= 1) {
-      const next = Math.min(MAX_BUDGET, n);
-      if (next !== value) onCommit(next);
-      setText(String(next));
-    } else setText(String(value));
+    const next = budgetFrom(typed) ?? value;
+    onCommit(next);
+    setText(String(next));
   };
   return (
     <input
@@ -734,11 +781,17 @@ function BudgetInput({
       className={classNames(formStyles.formInput, styles.budget)}
       aria-label="Budget"
       value={text}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(e) => {
+        setText(e.target.value);
+        onLive(budgetFrom(e.target.value));
+      }}
       onBlur={(e) => commit(e.currentTarget.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter") commit(e.currentTarget.value);
-        else if (e.key === "Escape") setText(String(value));
+        else if (e.key === "Escape") {
+          setText(String(value));
+          onLive(null);
+        }
       }}
     />
   );
@@ -780,9 +833,20 @@ function TipBody({ data, plan, id, allocated, change, over }: TipProps) {
         {node.gateway ? " · Gateway" : ""}
       </div>
       {node.choices && !stats.length && (
-        <div className={styles.tipNote}>
-          {allocated ? "None picked" : `Pick 1 of ${node.choices.length}`}
-        </div>
+        <>
+          <div className={styles.tipNote}>
+            {allocated ? "Unset · " : ""}Pick 1 of {node.choices.length}
+          </div>
+          {node.choices.map((option) => (
+            <div key={option.effect} className={styles.tipOption}>
+              {option.stats.map((line, i) => (
+                <div key={i} className={styles.tipStat}>
+                  {flat(line)}
+                </div>
+              ))}
+            </div>
+          ))}
+        </>
       )}
       {stats.map((line, i) => (
         <div key={i} className={styles.tipStat}>

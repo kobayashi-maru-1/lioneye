@@ -179,7 +179,10 @@ clears too).
    and the mechanic list under the four headings (swatch + letter, name, cluster count;
    hover highlights, click pins, **Clear**).
 2. **Bonuses:** `used / budget`; combined effects grouped by heading then mechanic, with
-   node counts; keystones and choice nodes by name; identical lines summed (eight "2%
+   node counts; keystones by name; a picked choice once, as `<node>: <effect>` under its
+   mechanic; allocated choice nodes with no pick first, under **Unset** (click to pick);
+   travel nodes' lines under the mechanic they name, else **Other**
+   (review round 1, 2026-11-15); identical lines summed (eight "2%
    increased Maps found in your Maps" → one "16% …"); a line with one percentage among
    other numbers sums that percentage; other lines with no or several numbers are listed
    once with a count; clicking a line highlights its nodes.

@@ -86,7 +86,7 @@ export function ChoiceDialog({
             disabled={choice === null || (allocated ? choice === picked : over)}
             onClick={() => choice !== null && onPick(choice)}
           >
-            {allocated ? "Change" : "Allocate"}
+            {!allocated ? "Allocate" : picked === null ? "Choose" : "Change"}
           </button>
         </div>
       </div>
@@ -94,17 +94,18 @@ export function ChoiceDialog({
   );
 }
 
-/** The plan's share link, to copy. */
-export function ShareDialog({
+/** One link to copy, with its own Copy button and result. */
+function CopyLink({
+  label,
   link,
-  onClose,
+  autoFocus,
 }: {
-  link: string | null;
-  onClose: () => void;
+  label: string;
+  link: string;
+  autoFocus?: boolean;
 }) {
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
   useEffect(() => setCopied("idle"), [link]);
-  if (link === null) return null;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(link);
@@ -114,6 +115,47 @@ export function ShareDialog({
     }
   };
   return (
+    <div className={styles.copyLink}>
+      <div className={styles.copyHead}>
+        <span className={styles.heading}>{label}</span>
+        {copied !== "idle" && (
+          <span className={styles.status} role="status">
+            {copied === "done" ? "Copied" : "Not copied. Select and copy."}
+          </span>
+        )}
+        <button
+          className={formStyles.formButton}
+          onClick={copy}
+          autoFocus={autoFocus}
+          aria-label={`Copy ${label.toLowerCase()}`}
+        >
+          Copy
+        </button>
+      </div>
+      <textarea
+        className={classNames(formStyles.formInput, styles.linkBox)}
+        readOnly
+        value={link}
+        aria-label={label}
+        onFocus={(e) => e.currentTarget.select()}
+      />
+    </div>
+  );
+}
+
+/**
+ * The plan's links: ours (nodes, choices and budget) and the official pathofexile.com
+ * one (nodes only), for the game's site and other tools.
+ */
+export function ShareDialog({
+  links,
+  onClose,
+}: {
+  links: { ours: string; official: string } | null;
+  onClose: () => void;
+}) {
+  if (links === null) return null;
+  return (
     <Modal
       size="medium"
       isOpen={true}
@@ -122,24 +164,12 @@ export function ShareDialog({
     >
       <div className={classNames(formStyles.form, styles.dialog)}>
         <div className={styles.dialogTitle}>Share</div>
-        <textarea
-          className={classNames(formStyles.formInput, styles.linkBox)}
-          readOnly
-          value={link}
-          aria-label="Link"
-          onFocus={(e) => e.currentTarget.select()}
-        />
+        <CopyLink label="Planner link" link={links.ours} autoFocus />
+        <CopyLink label="Official link" link={links.official} />
+        <div className={styles.tipNote}>Official link: nodes only.</div>
         <div className={formStyles.groupRight}>
-          {copied !== "idle" && (
-            <span className={styles.status} role="status">
-              {copied === "done" ? "Copied" : "Not copied. Select and copy."}
-            </span>
-          )}
           <button className={formStyles.formButton} onClick={onClose}>
             Close
-          </button>
-          <button className={formStyles.formButton} onClick={copy} autoFocus>
-            Copy
           </button>
         </div>
       </div>

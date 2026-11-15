@@ -67,50 +67,67 @@ export function headingOf(mechanic: string) {
 }
 
 /** Colours for clusters, readable on Lioneye's near-black page; neighbours never share one. */
-const PALETTE = [
-  "#e0a23a",
-  "#5aa9e6",
-  "#7fc97f",
-  "#e06c75",
-  "#c792ea",
-  "#4fd1c5",
-  "#f2d16b",
-  "#f78c6b",
-  "#9aa7ff",
-  "#a3d977",
-  "#ff8fc7",
-  "#6fc3df",
+export const PALETTE = [
+  "#e0a23a", // amber
+  "#5aa9e6", // blue
+  "#7fc97f", // green
+  "#e06c75", // red
+  "#c792ea", // purple
+  "#4fd1c5", // teal
+  "#f2d16b", // yellow
+  "#f78c6b", // orange
+  "#9aa7ff", // periwinkle
+  "#b8e04f", // lime
+  "#ff8fc7", // pink
+  "#c49a6c", // tan
+  "#3ccbf4", // cyan
+  "#b0709f", // mauve
+  "#a8a84a", // olive
+  "#d0d0d0", // silver
 ];
 
 export const TRAVEL_COLOUR = "#8a8a8a";
 
+/** Clusters whose centres are closer than this are neighbours: they never share a colour. */
+export const NEIGHBOUR_REACH = 3000;
+
 /**
- * A colour per mechanic: biggest mechanics first, each taking the first palette colour no
- * touching mechanic (an edge between their nodes, or labels within reach) already has.
+ * A colour per mechanic (DSatur): the mechanic with the most differently coloured
+ * neighbours goes next and takes the first colour none of them has. 3.30 needs 14 of the
+ * 16; if a later tree needs more, the extra mechanics reuse colours (the test catches it).
  */
 export function mechanicColours(data: AtlasData): string[] {
   const n = data.mechanics.length;
   const touching = Array.from({ length: n }, () => new Set<number>());
-  const join = (a: number, b: number) => {
-    if (a < 0 || b < 0 || a === b) return;
-    touching[a].add(b);
-    touching[b].add(a);
-  };
-  for (const { a, b } of data.edges) join(data.nodes[a].m, data.nodes[b].m);
-  const REACH = 2600;
   for (const p of data.labels)
     for (const q of data.labels)
-      if (Math.hypot(p.x - q.x, p.y - q.y) < REACH) join(p.m, q.m);
-  const size = new Array(n).fill(0);
-  for (const node of Object.values(data.nodes)) if (node.m >= 0) size[node.m]++;
-  const order = [...Array(n).keys()].sort((a, b) => size[b] - size[a] || a - b);
-  const colours: string[] = new Array(n);
-  for (const m of order) {
-    const taken = new Set([...touching[m]].map((t) => colours[t]));
-    colours[m] =
-      PALETTE.find((c) => !taken.has(c)) ?? PALETTE[m % PALETTE.length];
+      if (p.m !== q.m && Math.hypot(p.x - q.x, p.y - q.y) < NEIGHBOUR_REACH) {
+        touching[p.m].add(q.m);
+        touching[q.m].add(p.m);
+      }
+  const index = new Array<number>(n).fill(-1);
+  for (let k = 0; k < n; k++) {
+    let next = -1;
+    let bestSat = -1;
+    let bestDeg = -1;
+    for (let m = 0; m < n; m++) {
+      if (index[m] >= 0) continue;
+      const sat = new Set(
+        [...touching[m]].map((t) => index[t]).filter((c) => c >= 0),
+      ).size;
+      const deg = touching[m].size;
+      if (sat > bestSat || (sat === bestSat && deg > bestDeg)) {
+        next = m;
+        bestSat = sat;
+        bestDeg = deg;
+      }
+    }
+    const taken = new Set([...touching[next]].map((t) => index[t]));
+    let c = 0;
+    while (taken.has(c)) c++;
+    index[next] = c;
   }
-  return colours;
+  return index.map((c) => PALETTE[c % PALETTE.length]);
 }
 
 const MINOR = new Set(["the", "of", "and"]);

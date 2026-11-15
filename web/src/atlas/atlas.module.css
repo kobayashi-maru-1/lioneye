@@ -118,16 +118,20 @@
 }
 
 .section {
-  margin-top: var(--size-3);
+  margin-top: var(--size-2);
 }
 
 .heading {
   color: var(--gold);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: var(--font-heavy);
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  margin-bottom: var(--size-1);
+  margin-bottom: 0.15rem;
+}
+
+.unsetHeading {
+  color: #e06c75;
 }
 
 .search {
@@ -182,15 +186,28 @@
   color: var(--on-secondary);
 }
 
+/* The mechanic list: compact rows, so all 38 fit in less scrolling. */
 .mechanic {
   display: flex;
   align-items: center;
-  gap: var(--size-3);
+  gap: var(--size-2);
   width: 100%;
-  padding: 0.15rem var(--size-2);
+  padding: 0.05rem var(--size-1);
   border-radius: var(--border-radius);
   cursor: pointer;
   text-align: left;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.mechanic .swatch {
+  min-width: 1.15rem;
+  height: 1.15rem;
+  font-size: 0.55rem;
+}
+
+.mechanic .count {
+  font-size: 0.75rem;
 }
 
 .mechanic:hover,
@@ -392,6 +409,32 @@
   cursor: grabbing;
 }
 
+/* Status messages: over the top of the tree, so the toolbar never changes height. */
+.toast {
+  position: absolute;
+  top: var(--size-2);
+  left: 50%;
+  transform: translateX(-50%);
+  /* Above the narrow layout's open panel (4), so Saved messages show on phones. */
+  z-index: 6;
+  max-width: calc(100% - 2 * var(--size-3));
+  padding: var(--size-1) var(--size-3);
+  background-color: var(--navy-deep);
+  border: var(--border-width) solid var(--navy-border);
+  border-radius: var(--border-radius);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Hidden by opacity, not visibility: the live region stays in the accessibility tree,
+     so screen readers announce each message. */
+  opacity: 0;
+}
+
+.toastOn {
+  opacity: 1;
+}
+
 .zoom {
   position: absolute;
   right: var(--size-3);
@@ -402,7 +445,8 @@
 
 /* Tree layers. */
 .discs circle {
-  opacity: 0.06;
+  opacity: 0.12;
+  pointer-events: none;
 }
 
 .edge {
@@ -437,7 +481,7 @@
 }
 
 .label text {
-  font-size: 150px;
+  font-size: 95px;
   font-weight: 700;
   fill: #101010;
   pointer-events: none;
@@ -451,6 +495,27 @@
 
 .node {
   cursor: pointer;
+}
+
+/* Keyboard focus on a node or label: a bright ring (SVG has no outline of its own). */
+.node:focus,
+.label:focus {
+  outline: none;
+}
+
+.node:focus-visible .dot,
+.label:focus-visible circle {
+  stroke: #ffffff;
+  stroke-width: 4px;
+}
+
+/* An allocated choice node with no option picked: a dashed ring until one is. */
+.unsetRing {
+  fill: none;
+  stroke: #e06c75;
+  stroke-width: 2.5px;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
 }
 
 .dot {
@@ -591,6 +656,29 @@
 .tipNote {
   color: var(--accent-primary);
   font-style: italic;
+}
+
+.tipOption {
+  margin-top: var(--size-1);
+  padding-left: var(--size-2);
+  border-left: 2px solid var(--navy-border);
+}
+
+.copyLink {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-1);
+}
+
+.copyHead {
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+}
+
+.copyHead .heading {
+  flex: 1;
+  margin: 0;
 }
 
 .cost {

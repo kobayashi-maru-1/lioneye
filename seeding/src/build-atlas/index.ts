@@ -131,10 +131,19 @@ export function buildAtlas(data: RawData, version: string, source: string) {
   const startId = data.nodes.root?.out?.[0];
   if (!startId) throw new Error("atlas export: no root node");
 
-  // A group's mechanic is the name of its (one) mastery.
+  // A group's mechanic is the name of its (one) mastery. A group with only its mastery
+  // (3.30's group 7, "The Searing Exarch") has nothing to plan: no label, not counted.
+  const withPassives = new Set<string>();
+  for (const [id, node] of Object.entries(data.nodes))
+    if (id !== "root" && !node.isMastery && node.group !== undefined)
+      withPassives.add(String(node.group));
   const masteryOf = new Map<string, RawNode>();
   for (const node of Object.values(data.nodes))
-    if (node.isMastery && node.group !== undefined)
+    if (
+      node.isMastery &&
+      node.group !== undefined &&
+      withPassives.has(String(node.group))
+    )
       masteryOf.set(String(node.group), node);
   const mechanics = [
     ...new Set([...masteryOf.values()].map((m) => m.name ?? "")),

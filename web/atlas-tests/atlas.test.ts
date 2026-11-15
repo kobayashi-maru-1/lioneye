@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { bonuses, combine } from "../src/atlas/lib/bonuses.ts";
+import { bonuses, combine, mechanicInText } from "../src/atlas/lib/bonuses.ts";
 import {
   buildGraph,
   connected,
@@ -21,6 +21,8 @@ import {
 import {
   mechanicColours,
   mechanicLetters,
+  NEIGHBOUR_REACH,
+  PALETTE,
 } from "../src/atlas/lib/mechanics.ts";
 import type { AtlasData, Plan } from "../src/atlas/lib/types.ts";
 import {
@@ -46,7 +48,15 @@ test("data counts", () => {
   assert.equal(nodes.filter((n) => n.kind === "notable").length, 213);
   assert.equal(nodes.filter((n) => n.kind === "keystone").length, 18);
   assert.equal(nodes.filter((n) => n.choices).length, 31);
-  assert.equal(data.labels.length, 149);
+  // 149 masteries, less group 7: The Searing Exarch's mastery with no passives.
+  assert.equal(data.labels.length, 148);
+  assert.equal(
+    data.labels.filter((l) => data.mechanics[l.m] === "The Searing Exarch")
+      .length,
+    1,
+  );
+  const groups = new Set(Object.values(data.nodes).map((n) => n.g));
+  assert.ok(data.labels.every((l) => groups.has(l.g)));
   assert.equal(data.edges.length, 1050);
   assert.equal(data.edges.filter((e) => !e.hidden).length, 1048);
   assert.equal(data.mechanics.length, 38);
@@ -324,6 +334,31 @@ test("official link decodes and re-encodes", () => {
   assert.equal(encodeOfficial(ids), link);
 });
 
+test("an opened official link leaves its choice node unset until picked", () => {
+  const back = parseLink(
+    "https://www.pathofexile.com/fullscreen-atlas-skill-tree/AAAABgAAEQmdLrszg0GMW9lqJH0dkX2xXLH7xgzJqtdN4cHuzPJN-toAAA==",
+  );
+  assert.ok(back.ok);
+  const plan = normalise(graph, data, back.plan);
+  assert.equal(plan.allocated.length, 17);
+  const b = bonuses(data, plan);
+  assert.deepEqual(b.unset, [{ id: "45404", name: "Secrets Unveiled" }]);
+  const picked = bonuses(data, { ...plan, choices: { "45404": 5301 } });
+  assert.deepEqual(picked.unset, []);
+});
+
+test("Share's official link re-opens to the same nodes", () => {
+  const path = route(graph, none, "45404")!;
+  const more = route(graph, new Set(path), "64218") ?? [];
+  const ids = [...path, ...more];
+  const back = parseLink(encodeOfficial(ids));
+  assert.ok(back.ok && back.kind === "official");
+  assert.deepEqual(
+    normalise(graph, data, back.plan).allocated,
+    [...new Set(ids)].sort((a, b) => Number(a) - Number(b)),
+  );
+});
+
 test("League page poeatlasplanner links open with their point counts", () => {
   const html = readFileSync(
     new URL("../../strats/index.html", import.meta.url),
@@ -376,25 +411,105 @@ test("bonuses sum identical lines", () => {
       ["Tier 1-15 Maps found have 10% chance to become 1 tier higher", 1, 2],
     ],
   );
+});
+
+test("bonuses: a chosen effect shows once, under its mechanic", () => {
   const path = route(graph, none, "45404")!;
   const b = bonuses(data, {
     allocated: path,
     choices: { "45404": 5301 },
     budget: 150,
   });
-  assert.ok(
-    b.choices.some((c) => c.id === "45404" && c.stats[0].includes("Allflames")),
+  const all = b.groups.flatMap((g) =>
+    g.lines.map((l) => ({ m: g.mechanic, text: l.text })),
+  );
+  const chosen = all.filter((l) => l.text.startsWith("Secrets Unveiled: "));
+  assert.equal(chosen.length, 1);
+  assert.ok(chosen[0].text.includes("Allflames"));
+  assert.equal(data.mechanics[chosen[0].m], "Betrayal");
+});
+
+test("bonuses: travel lines go to the mechanic they name", () => {
+  const sixMaps = Object.entries(data.nodes)
+    .filter(
+      ([, n]) =>
+        n.m < 0 &&
+        n.a === undefined &&
+        n.stats.length === 1 &&
+        n.stats[0] === "2% increased Maps found in your Maps",
+    )
+    .map(([id]) => id)
+    .slice(0, 6);
+  assert.equal(sixMaps.length, 6);
+  const b = bonuses(data, { allocated: sixMaps, choices: {}, budget: 150 });
+  assert.equal(b.groups.length, 1);
+  assert.equal(data.mechanics[b.groups[0].mechanic], "Maps");
+  assert.deepEqual(
+    b.groups[0].lines.map((l) => l.text),
+    ["12% increased Maps found in your Maps"],
+  );
+  const names = data.mechanics;
+  const is = (line: string, name: string | null) =>
+    assert.equal(
+      mechanicInText(line, names),
+      name === null ? -1 : names.indexOf(name),
+      line,
+    );
+  is("3% increased Threads found in your Maps", "Threads");
+  is("3% increased number of Magic Monsters in your Maps", "Magic Monsters");
+  is("You can only apply one type of Thread to your Maps", "Threads");
+  is(
+    "75% chance for Threads found in your Maps to be converted to Gold",
+    "Threads",
+  );
+  is(
+    "Divination Cards found in your Maps are from two random other Maps",
+    "Divination Cards",
+  );
+  is(
+    "50% chance to spawn a Searing Exarch Altar when the Influence of The Searing Exarch first appears in your Maps",
+    "The Searing Exarch",
+  );
+  is("Breach Encounters in your Maps are always", "Breach");
+  is("Sacred Fauna in your Maps have 50% more Life", "Sacred Flora");
+  is(
+    "If there are fewer than 50 monsters remaining in your Maps, Final Map Bosses are Empowered by Wildwood Wisps",
+    "Viridian Wildwood",
+  );
+  is("Red Beasts in your Maps have 10% chance to be Rare", "Bestiary");
+  is("Tormented Spirits in your Maps have 25% more Life", "Torment");
+  is("certain Essences in your Maps are corrupted", "Essence");
+  is("1% increased Pack Size in your Maps", null);
+  is(
+    "Defeating a Map Boss while Witnessed by The Maven has 1% chance to count as also Witnessing an additional random Map Boss",
+    null,
   );
 });
 
-test("colours: touching mechanics differ; letters are unique", () => {
+test("colours: neighbouring clusters differ; letters are unique", () => {
   const colours = mechanicColours(data);
-  for (const { a, b } of data.edges) {
-    const ma = data.nodes[a].m;
-    const mb = data.nodes[b].m;
-    if (ma >= 0 && mb >= 0 && ma !== mb)
-      assert.notEqual(colours[ma], colours[mb]);
+  let pairs = 0;
+  for (const p of data.labels)
+    for (const q of data.labels)
+      if (p.m !== q.m && Math.hypot(p.x - q.x, p.y - q.y) < NEIGHBOUR_REACH) {
+        pairs++;
+        assert.notEqual(
+          colours[p.m],
+          colours[q.m],
+          `${data.mechanics[p.m]} / ${data.mechanics[q.m]}`,
+        );
+      }
+  assert.ok(pairs > 100);
+  // Every cluster's nearest other cluster is well inside the reach.
+  for (const p of data.labels) {
+    const nearest = Math.min(
+      ...data.labels
+        .filter((q) => q.m !== p.m)
+        .map((q) => Math.hypot(p.x - q.x, p.y - q.y)),
+    );
+    assert.ok(nearest < NEIGHBOUR_REACH / 2);
   }
+  assert.ok(new Set(colours).size <= PALETTE.length);
   const letters = mechanicLetters(data.mechanics);
   assert.equal(new Set(letters).size, letters.length, letters.join(" "));
 });
