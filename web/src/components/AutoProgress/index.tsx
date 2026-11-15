@@ -154,22 +154,22 @@ export function useAutoProgress() {
         tickStep(event.data.slice("tick:".length));
         return;
       }
-      // An arrow in the bar's Tree tooltip: the Tree panel steps its set.
-      if (event.data === "tree:prev" || event.data === "tree:next") {
-        const delta = event.data === "tree:next" ? 1 : -1;
-        setTreeStep((total) => total + delta);
-        return;
-      }
-      // An arrow in the bar's Gems tooltip: the Gems panel steps its set.
-      if (event.data === "gems:prev" || event.data === "gems:next") {
-        const delta = event.data === "gems:next" ? 1 : -1;
-        setGemsStep((total) => total + delta);
-        return;
-      }
-      // An arrow in the bar's Gear tooltip: the Gear panel steps its item set.
-      if (event.data === "gear:prev" || event.data === "gear:next") {
-        const delta = event.data === "gear:next" ? 1 : -1;
-        setGearStep((total) => total + delta);
+      // An arrow in the bar's Tree, Gems or Gear tooltip: that panel steps its set. Only
+      // the guide itself has the panels: from League, Atlas or Settings, back to it (as
+      // a loadout pick does), where the panel takes the press. Not from Edit Route, whose
+      // unsaved edits leaving would lose.
+      const arrow = /^(tree|gems|gear):(prev|next)$/.exec(event.data);
+      if (arrow) {
+        if (location.hash.startsWith("#/edit-route")) return;
+        const delta = arrow[2] === "next" ? 1 : -1;
+        const setStep =
+          arrow[1] === "tree"
+            ? setTreeStep
+            : arrow[1] === "gems"
+              ? setGemsStep
+              : setGearStep;
+        setStep(({ total }) => ({ total: total + delta, at: Date.now() }));
+        if (!onGuide()) navigate("/");
         return;
       }
       // A loadout picked in the bar's Loadout tooltip.

@@ -114,17 +114,24 @@ export const overlayGemsAtom = atom<OverlayGems | null | undefined>(undefined);
 export const overlayTreeAtom = atom<TreeTip | undefined>(undefined);
 
 /**
- * The bar's Tree tooltip arrows, added up (+1 each ›, -1 each ‹): the Tree panel steps its
- * set by however much this moved since it last looked, so presses that arrive together
- * all count.
+ * A bar tooltip's arrow presses not yet taken, added up (+1 each ›, -1 each ‹), and when
+ * the last came (Date.now()). The panel steps its set by `total` and takes that much off
+ * (useSetSteps), so presses that arrive together all count, and one made while the guide
+ * was on another page counts once the panel is back (unless it's been too long).
  */
-export const treeStepAtom = atom(0);
+export interface SetSteps {
+  total: number;
+  at: number;
+}
 
-/** The bar's Gems tooltip arrows, added up the same way, for the Gems panel's set. */
-export const gemsStepAtom = atom(0);
+/** The bar's Tree tooltip arrows, for the Tree panel's set. */
+export const treeStepAtom = atom<SetSteps>({ total: 0, at: 0 });
+
+/** The bar's Gems tooltip arrows, the same, for the Gems panel's set. */
+export const gemsStepAtom = atom<SetSteps>({ total: 0, at: 0 });
 
 /** The bar's Gear tooltip arrows, the same, for the Gear panel's item set. */
-export const gearStepAtom = atom(0);
+export const gearStepAtom = atom<SetSteps>({ total: 0, at: 0 });
 
 /** The bar's Loadout tooltip: the plan's loadouts, the one shown, and the one followed. */
 export interface OverlayLoadout {

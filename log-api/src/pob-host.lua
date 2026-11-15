@@ -604,6 +604,80 @@ local function setLists()
 	}
 end
 
+-- Which tree and skill, item and config set (their places, from 1, as setLists' `active`)
+-- each loadout uses, found as PoB's Loadouts dropdown finds them, so the guide's panels can
+-- show a loadout's sets before PoB has calculated it. In loadouts()' order; false where
+-- PoB couldn't tell.
+local function loadoutSets()
+	local function place(order, id)
+		for index, value in ipairs(order) do
+			if value == id then
+				return index
+			end
+		end
+		return nil
+	end
+	-- PoB's findSetId (item, skill and config sets): the first set titled `value`, else the
+	-- set linked by its {tag}.
+	local function setId(order, sets, value, links)
+		for _, id in ipairs(order) do
+			if value == (sets[id].title or "Default") then
+				return id
+			end
+			local link = value:match("%{(%w+)%}")
+			if link then
+				return links[link] and links[link].setId
+			end
+		end
+		return nil
+	end
+	-- PoB's findNamedSetId (trees): the tree listed as `value`, else the one its {tag} links.
+	local function specId(list, value, links)
+		for id, spec in ipairs(list) do
+			if value == spec then
+				return id
+			end
+			local link = value:match("%{(%w+)%}")
+			if link then
+				return links[link] and links[link].setId
+			end
+		end
+		return nil
+	end
+	local skills = build.skillsTab
+	local items = build.itemsTab
+	local config = build.configTab
+	local specs = build.treeTab:GetSpecList()
+	local out = setmetatable({}, ARRAY)
+	for _, name in ipairs(loadouts()) do
+		local ok, entry = pcall(function()
+			local tree = specId(specs, name, build.treeListSpecialLinks or {})
+			local skillId = #skills.skillSetOrderList == 1 and 1
+				or setId(skills.skillSetOrderList, skills.skillSets, name, build.skillListSpecialLinks or {})
+			local itemId = #items.itemSetOrderList == 1 and 1
+				or setId(items.itemSetOrderList, items.itemSets, name, build.itemListSpecialLinks or {})
+			local configId = #config.configSetOrderList == 1 and 1
+				or setId(config.configSetOrderList, config.configSets, name, build.configListSpecialLinks or {})
+			local skillPlace = skillId and place(skills.skillSetOrderList, skillId)
+			local itemPlace = itemId and place(items.itemSetOrderList, itemId)
+			local configPlace = configId and place(config.configSetOrderList, configId)
+			if not (tree and skillPlace and itemPlace and configPlace) then
+				return false
+			end
+			return {
+				tree = tree,
+				skills = skillPlace,
+				items = itemPlace,
+				config = configPlace,
+				-- As setTitles: an untitled skill set's gems are grouped by label instead.
+				skillsUntitled = skills.skillSets[skillId].title == nil or nil,
+			}
+		end)
+		out[#out + 1] = ok and entry or false
+	end
+	return out
+end
+
 -- The build's title and headline numbers, for the guide's header card.
 local function headline()
 	local output = build.calcsTab.mainOutput or {}
@@ -1423,6 +1497,7 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 	end
 	return json.encode({
 		loadouts = loadouts(),
+		loadoutSets = safely(loadoutSets, setmetatable({}, ARRAY), "Loadout sets"),
 		loadout = currentLoadout(),
 		skill = skillState(picked),
 		sets = setTitles(),

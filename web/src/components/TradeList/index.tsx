@@ -72,9 +72,10 @@ const RARITY_NAMES: Record<string, string> = {
  * gem of its skill set, with the league, search type and how close a match must be.
  */
 export function TradeListPanel() {
-  const stats = usePobStats()?.stats ?? null;
+  const pob = usePobStats();
+  const stats = pob?.stats ?? null;
   const gear = stats?.gear ?? null;
-  const lists = stats?.lists ?? null;
+  const active = pob?.active ?? null;
   const sets = useLoadoutSets();
   const gemLinks = useAtomValue(viewedGemLinksAtom);
   const { league, leagues, setLeague } = useTradeLeague();
@@ -88,8 +89,8 @@ export function TradeListPanel() {
     [trade],
   );
 
-  const slots = gear?.sets[lists ? lists.active.items - 1 : 0]?.slots ?? [];
-  const jewels = gear?.treeJewels[lists ? lists.active.tree - 1 : 0] ?? [];
+  const slots = gear?.sets[active ? active.items - 1 : 0]?.slots ?? [];
+  const jewels = gear?.treeJewels[active ? active.tree - 1 : 0] ?? [];
   const items = [
     ...slots.map((s) => ({ slot: s.slot, id: s.item })),
     ...jewels.map((j) => ({ slot: "Jewel", id: j.item })),

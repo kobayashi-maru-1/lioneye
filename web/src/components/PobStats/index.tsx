@@ -14,6 +14,7 @@ import {
   loadoutPickAtom,
   loadoutPickShownAtom,
   overlayLoadoutAtom,
+  type SetSteps,
 } from "../../state/overlay";
 import { type MainSkillPick, mainSkillPickAtom } from "../../state/main-skill";
 import { buildIdSelector, pobAtom } from "../../state/pob";
@@ -21,13 +22,19 @@ import { pobCodeToXml } from "../../state/pob/process";
 import { stripPob } from "../PobText";
 import { type SetPick, useFollowAct } from "../SetPager";
 import { persistentAtom } from "../../state";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import {
+  type PrimitiveAtom,
+  useAtom,
+  useAtomValue,
+  useSetAtom,
+} from "jotai";
 import React, {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -230,8 +237,20 @@ export interface HealthFinding {
   panel?: string;
 }
 
+/** Which tree and skill, item and config set a loadout uses (places from 1, as `active`). */
+export interface LoadoutPlaces {
+  tree: number;
+  skills: number;
+  items: number;
+  config: number;
+  /** Its skill set has no title (SetTitles' `skills` unset). */
+  skillsUntitled?: boolean;
+}
+
 export interface Stats {
   loadouts: string[];
+  /** Each loadout's sets (as `loadouts`); false where PoB couldn't tell. */
+  loadoutSets: (LoadoutPlaces | false)[];
   loadout: string | null;
   skill: SkillState | null;
   sets: SetTitles | null;
@@ -278,11 +297,42 @@ export interface PobStatsValue {
   /** The plan's own state: calculating (planStats may be the last loadout's), or failed. */
   planLoading: boolean;
   planError: string | null;
+  /**
+   * Which set of each kind the loadout you picked uses (from 1): PoB's answer once it's for
+   * that loadout, before that the build's loadout map, so panels switch without waiting
+   * for PoB. Null before PoB's first answer.
+   */
+  active: SetLists["active"] | null;
+  /**
+   * Titles (without colour codes) of the tree and skill set of the loadout you picked, the
+   * same way. Null without a loadout shown (the panels then follow the act themselves).
+   */
+  loadoutSets: { tree: string; skills?: string } | null;
+  /** `active` and `loadoutSets` are the loadout you picked (or there's none to wait for). */
+  setsReady: boolean;
+  /** A loadout picked in the bar is still to be shown (it may leave the live view). */
+  pickPending: boolean;
 }
 
 const PobStatsContext = createContext<PobStatsValue | null>(null);
 
 const NONE: string[] = [];
+
+/** PoB's answer, with the build, loadout and main skill it was asked for. */
+interface Answer {
+  xml: string;
+  buildId: number;
+  pickKey: string;
+  /** The loadout asked for (PoB's name); null: the one PoB has. */
+  requested: string | null;
+  stats: Stats;
+}
+
+/**
+ * The last answer, kept while the guide page is away (League, Atlas, Settings): back on it,
+ * the panels show it at once and PoB recalculates only when the request has changed.
+ */
+let lastAnswer: Answer | null = null;
 
 /** The loadout you picked, kept through Settings and restarts (see useFollowAct). */
 const loadoutMemoryAtom = persistentAtom<SetPick | null>(
@@ -312,13 +362,9 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
   // Kept with the build and pick it was asked with, so a new import never shows the old
   // build's loadouts and the "PoB pick" tag never describes an older pick. A save of the
   // same build in PoB keeps the last answer (shown as calculating) until the new one
-  // comes, so the loadout list and your pick stay put.
-  const [answer, setAnswer] = useState<{
-    xml: string;
-    buildId: number;
-    pickKey: string;
-    stats: Stats;
-  } | null>(null);
+  // comes, so the loadout list and your pick stay put. Kept while the guide page is away
+  // too (lastAnswer), so coming back shows it at once.
+  const [answer, setAnswer] = useState<Answer | null>(() => lastAnswer);
   const stats =
     answer !== null &&
     xml !== null &&
@@ -330,6 +376,14 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
   const titles = useMemo(() => loadouts.map(stripPob), [loadouts]);
   const [index, setIndex, followed] = useFollowAct(titles, loadoutMemoryAtom);
   const requested = loadouts[index] ?? null;
+  // The loadout you picked, while PoB still calculates it: its sets from the build's
+  // loadout map (in the answer before), so panels show them at once.
+  const ahead =
+    stats !== null && requested !== null && stats.loadout !== requested
+      ? placesIn(stats, index)
+      : null;
+  const planActive = ahead ?? stats?.lists?.active ?? null;
+  const planSets = useMemo(() => loadoutSetsOf(stats, ahead), [stats, ahead]);
 
   const [pick, setPick] = useAtom(mainSkillPickAtom);
   const pickKey = JSON.stringify(pick);
@@ -338,8 +392,21 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
+  // Back on the guide page with the answer for this very request: nothing to calculate.
+  const firstRequest = useRef(true);
   useEffect(() => {
     if (xml === null) return;
+    const first = firstRequest.current;
+    firstRequest.current = false;
+    if (
+      first &&
+      answer !== null &&
+      answer.xml === xml &&
+      answer.buildId === buildId &&
+      answer.requested === requested &&
+      answer.pickKey === pickKey
+    )
+      return;
     const controller = new AbortController();
     setLoading(true);
     setError(null);
@@ -347,7 +414,9 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
       .then((stats) => {
         // An older request (previous save or loadout) never replaces the current one.
         if (controller.signal.aborted) return;
-        setAnswer({ xml, buildId, pickKey, stats });
+        const next = { xml, buildId, pickKey, requested, stats };
+        lastAnswer = next;
+        setAnswer(next);
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -433,6 +502,19 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
     setLiveView(false);
     setIndex(target);
   }, [loadoutPick, titles.length]);
+  // The panels know the sets of the loadout you picked: PoB answered for it, or the
+  // loadout map has it, and no pick from the bar is still to be shown (that effect runs
+  // after the panels'). Or there's nothing to wait for: no build, or PoB failed.
+  const pickPending =
+    loadoutPick !== null && loadoutPick.n !== shownPick && titles.length > 0;
+  const setsReady =
+    !pickPending &&
+    (xml === null ||
+      error !== null ||
+      (stats !== null &&
+        (requested === null ||
+          stats.loadout === requested ||
+          ahead !== null)));
 
   const value = useMemo<PobStatsValue>(
     () =>
@@ -454,6 +536,18 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
             planStats: stats,
             planLoading: loading,
             planError: error,
+            active:
+              liveAnswer?.state === "ready"
+                ? (liveAnswer.stats.lists?.active ?? null)
+                : null,
+            loadoutSets:
+              liveAnswer?.state === "ready"
+                ? loadoutSetsOf(liveAnswer.stats, null)
+                : null,
+            setsReady:
+              !pickPending &&
+              (liveAnswer?.state === "ready" || liveAnswer?.state === "error"),
+            pickPending,
           }
         : {
             xml,
@@ -475,8 +569,16 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
             planStats: stats,
             planLoading: loading,
             planError: error,
+            active: planActive,
+            loadoutSets: planSets,
+            setsReady,
+            pickPending,
           },
     [
+      pickPending,
+      planActive,
+      planSets,
+      setsReady,
       code,
       xml,
       stats,
@@ -500,6 +602,45 @@ export function PobStatsProvider({ children }: React.PropsWithChildren) {
   );
 }
 
+/** Loadout `index`'s sets from the build's loadout map, if they fit the set lists. */
+function placesIn(stats: Stats, index: number): LoadoutPlaces | null {
+  const places = stats.loadoutSets[index];
+  const lists = stats.lists;
+  if (!places || typeof places !== "object" || !lists) return null;
+  const fits = (place: unknown, count: number) =>
+    Number.isInteger(place) && (place as number) >= 1 && (place as number) <= count;
+  return fits(places.tree, lists.trees.length) &&
+    fits(places.skills, Math.max(lists.skills.length, 1)) &&
+    fits(places.items, Math.max(lists.items.length, 1)) &&
+    fits(places.config, Math.max(lists.configs.length, 1))
+    ? places
+    : null;
+}
+
+/** The tree and skill set titles of the shown loadout, or of `ahead` (see `loadoutSets`). */
+function loadoutSetsOf(stats: Stats | null, ahead: LoadoutPlaces | null) {
+  if (!stats?.sets) return null;
+  // (Also when the answer before had no loadout: the build's saved sets match none.)
+  if (ahead && stats.lists) {
+    const tree = stats.lists.trees[ahead.tree - 1];
+    const skills = stats.lists.skills[ahead.skills - 1];
+    if (tree !== undefined)
+      return {
+        tree: stripPob(tree),
+        skills:
+          ahead.skillsUntitled || skills === undefined
+            ? undefined
+            : stripPob(skills),
+      };
+  }
+  if (stats.loadout === null) return null;
+  return {
+    tree: stripPob(stats.sets.tree),
+    skills:
+      stats.sets.skills === undefined ? undefined : stripPob(stats.sets.skills),
+  };
+}
+
 /** The page's PoB stats; null outside a PobStatsProvider. */
 export function usePobStats() {
   return useContext(PobStatsContext);
@@ -511,20 +652,7 @@ export function usePobStats() {
  * and for builds without PoB loadouts (the sections then follow the act themselves).
  */
 export function useLoadoutSets() {
-  const stats = usePobStats()?.stats;
-  return useMemo(
-    () =>
-      stats?.sets && stats.loadout !== null
-        ? {
-            tree: stripPob(stats.sets.tree),
-            skills:
-              stats.sets.skills === undefined
-                ? undefined
-                : stripPob(stats.sets.skills),
-          }
-        : null,
-    [stats],
-  );
+  return usePobStats()?.loadoutSets ?? null;
 }
 
 /**
@@ -566,7 +694,7 @@ export function usePanelSet(titles: string[], loadoutIndex: number | null) {
   // The loadout's set, while a loadout is shown (null without loadouts): a panel showing
   // another marks its dropdown.
   const loadoutAt =
-    pob?.stats?.loadout != null &&
+    pob?.loadoutSets != null &&
     loadoutIndex !== null &&
     loadoutIndex >= 0 &&
     loadoutIndex < titles.length
@@ -574,6 +702,43 @@ export function usePanelSet(titles: string[], loadoutIndex: number | null) {
       : null;
   // `picked`: you chose this set in the panel.
   return [index, choose, picked, loadoutAt] as const;
+}
+
+/** How long a bar arrow press waits for its panel (the guide coming back, PoB answering). */
+const STEP_WAIT_MS = 30_000;
+
+/**
+ * A bar tooltip's ‹ › arrows (`stepAtom`: presses not yet taken): the panel shows the set
+ * before or after, as if picked in its dropdown. Taken once the panel knows the loadout's
+ * sets (setsReady), so a press that brought the guide back from another page lands on
+ * them. Dropped while the page shows your live character (the tooltip's sets are the
+ * plan's), and when it waited too long (a build without this panel).
+ */
+export function useSetSteps(
+  stepAtom: PrimitiveAtom<SetSteps>,
+  index: number,
+  count: number,
+  choose: (index: number) => void,
+) {
+  const [steps, setStep] = useAtom(stepAtom);
+  const { total, at } = steps;
+  const viewingLive = useAtomValue(viewingLiveAtom);
+  const pob = usePobStats();
+  const ready = pob === null || pob.setsReady;
+  const waiting = pob?.pickPending ?? false;
+  // The presses already taken (the atom's value then), so running again on the same
+  // value (React's StrictMode does) doesn't take them twice.
+  const taken = useRef<SetSteps | null>(null);
+  useEffect(() => {
+    if (total === 0 || waiting || (!ready && !viewingLive)) return;
+    if (taken.current === steps) return;
+    taken.current = steps;
+    // Only what was seen here: a press that came since stays for the next run.
+    setStep((now) => ({ ...now, total: now.total - total }));
+    if (viewingLive || count === 0 || Date.now() - at > STEP_WAIT_MS) return;
+    const next = Math.min(Math.max(index + total, 0), count - 1);
+    if (next !== index) choose(next);
+  }, [steps, ready, waiting, viewingLive]);
 }
 
 /** PoB's stats for a build as saved (its own loadout and main skill), e.g. for Compare. */
@@ -600,6 +765,7 @@ async function fetchStats(
   const stats = (await response.json()) as Partial<Stats>;
   return {
     loadouts: list(stats.loadouts),
+    loadoutSets: list(stats.loadoutSets),
     loadout: stats.loadout ?? null,
     skill: stats.skill ? skillState(stats.skill) : null,
     sets: stats.sets ?? null,

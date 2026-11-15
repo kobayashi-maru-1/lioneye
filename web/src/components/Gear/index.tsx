@@ -5,6 +5,7 @@ import {
   type GearItem,
   usePanelSet,
   usePobStats,
+  useSetSteps,
 } from "../PobStats";
 import { Popover, PopoverAction, usePopover } from "../Popover";
 import {
@@ -34,7 +35,7 @@ import { viewingLiveAtom } from "../../state/live-view";
 import { stripPob } from "../PobText";
 import classNames from "classnames";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaBalanceScale, FaRegClipboard } from "react-icons/fa";
 import { toast } from "react-toastify";
 
@@ -131,16 +132,17 @@ function overlayGear(gear: Gear, set: Gear["sets"][number]): OverlayGear {
  * for its tooltip; click to pin it and use Copy or Trade.
  */
 export function GearPanel() {
-  const stats = usePobStats()?.stats ?? null;
-  const gear = stats?.gear ?? null;
-  const lists = stats?.lists ?? null;
+  const pob = usePobStats();
+  const gear = pob?.stats?.gear ?? null;
+  // The loadout's sets, before PoB has calculated it too.
+  const active = pob?.active ?? null;
   const titles = useMemo(
     () => gear?.sets.map((set) => set.title) ?? [],
     [gear],
   );
   const [index, choose, , loadoutAt] = usePanelSet(
     titles,
-    lists ? lists.active.items - 1 : null,
+    active ? active.items - 1 : null,
   );
   const { league, leagues, setLeague } = useTradeLeague();
 
@@ -148,18 +150,8 @@ export function GearPanel() {
   // page shows your live character the tooltip keeps the plan's (it guides the plan).
   const setOverlayGear = useSetAtom(overlayGearAtom);
   const viewingLive = useAtomValue(viewingLiveAtom);
-  // The tooltip's ‹ › arrows: the set before or after the one shown, picked here as if
-  // from the dropdown (until the loadout, act or level set changes). Not while the page
-  // shows your live character: the tooltip's sets are the plan's, not these.
-  const gearStep = useAtomValue(gearStepAtom);
-  const handledStep = useRef(gearStep);
-  useEffect(() => {
-    const delta = gearStep - handledStep.current;
-    handledStep.current = gearStep;
-    if (viewingLive || delta === 0 || titles.length === 0) return;
-    const next = Math.min(Math.max(index + delta, 0), titles.length - 1);
-    if (next !== index) choose(next);
-  }, [gearStep]);
+  // The tooltip's ‹ › arrows (until the loadout, act or level set changes).
+  useSetSteps(gearStepAtom, index, titles.length, choose);
   // None while a different build calculates (a save of the same one keeps its gear).
   useEffect(() => {
     if (viewingLive) return;
@@ -203,7 +195,7 @@ export function GearPanel() {
         <GearView
           gear={gear}
           setIndex={index}
-          treeIndex={lists ? lists.active.tree - 1 : 0}
+          treeIndex={active ? active.tree - 1 : 0}
           league={league}
         />
       )}

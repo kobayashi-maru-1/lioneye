@@ -471,7 +471,8 @@ share the address.
   **Loadout** has no panel: clicking it opens its tooltip.
 - Hover **Skills** for the Skills panel's links (the set it shows for your loadout, named in
   the title; the small ‹ › after the name step the Skills panel to the set before or after,
-  as picking it in the panel does, until your loadout, act or level set changes; each
+  as picking it in the panel does, until your loadout, act or level set changes; from
+  League, Atlas or Settings they go back to the guide first, from v0.4.64; each
   group's header names the gear slot PoB socketed it in, as in the Skills panel; its copy
   icon puts a search for the set's gems still unticked on the gem list on the clipboard,
   or for all the set's gems once none are left to get,
@@ -489,7 +490,9 @@ share the address.
   click another to show it in the guide, as its **Loadout** dropdown does, back on the
   plan if the page showed your live character, until your level, act or tree moves on
   (a pick further down the list stays, as there); from League, Atlas or Settings it goes
-  back to the guide first, from v0.4.58; click the **Auto** one to follow again),
+  back to the guide first, from v0.4.58; click the **Auto** one to follow again; the
+  guide's panels and the bar's tooltips switch to the loadout's sets at once, and only
+  the stats wait for PoB, from v0.4.64),
   **Health** for Build health's findings as the panel lists
   them, each with its severity dot and fix (**Live** or **Plan** by the title when a live
   character is set, as the panel's dropdown picks; dimmed while PoB recalculates),
@@ -505,8 +508,8 @@ share the address.
   search is built; quest reward gems are left out, since they come from the reward
   window), or **Tree** for the tree zoomed to your next points
   (for the set the Tree panel shows, named beside the title; the small ‹ › after the name
-  step the Tree panel to the set before or after, as picking it in the panel does, until
-  your loadout, act or level set changes; a finished set is titled **Tree** and shows its
+  step the Tree panel to the set before or after, as Skills' do; a finished set is titled
+  **Tree** and shows its
   points, all yours):
   yours blue, the guide's points up to 3 away from yours
   along its paths bright green, its later ones dim green, and yours the set doesn't take

@@ -22,6 +22,7 @@ import {
   useLoadoutSets,
   usePanelSet,
   usePobStats,
+  useSetSteps,
 } from "../../components/PobStats";
 import { SearchStrings } from "../../components/SearchStrings";
 import { SectionHolder } from "../../components/SectionHolder";
@@ -403,18 +404,8 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
   );
   // While the page shows your live character, the bar's Gems tooltip keeps the plan's.
   const viewingLive = useAtomValue(viewingLiveAtom);
-  // The in-game Gems tooltip's ‹ › arrows: the set before or after the one shown, picked
-  // here as if from the dropdown (until the loadout, act or level set changes). Not while
-  // the page shows your live character: the tooltip's sets are the plan's, not these.
-  const gemsStep = useAtomValue(gemsStepAtom);
-  const handledGemsStep = useRef(gemsStep);
-  useEffect(() => {
-    const delta = gemsStep - handledGemsStep.current;
-    handledGemsStep.current = gemsStep;
-    if (viewingLive || delta === 0 || titles.length === 0) return;
-    const next = Math.min(Math.max(index + delta, 0), titles.length - 1);
-    if (next !== index) choose(next);
-  }, [gemsStep]);
+  // The in-game Gems tooltip's ‹ › arrows (until the loadout, act or level set changes).
+  useSetSteps(gemsStepAtom, index, titles.length, choose);
 
   // The set shown here, for the in-game bar's Gems tooltip, with a search for its gems
   // still on the gem list unticked (soonest first; gems you took off the list stay off).
@@ -507,14 +498,16 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
 }
 
 function ConfigPanel() {
-  const lists = usePobStats()?.stats?.lists ?? null;
+  const pob = usePobStats();
+  const lists = pob?.stats?.lists ?? null;
+  const active = pob?.active ?? null;
   const titles = useMemo(
     () => lists?.configs.map((set) => set.title) ?? [],
     [lists],
   );
   const [index, choose, , loadoutAt] = usePanelSet(
     titles,
-    lists ? lists.active.config - 1 : null,
+    active ? active.config - 1 : null,
   );
   return (
     <PageSection
@@ -549,7 +542,7 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   const sets = useLoadoutSets();
   const titles = useMemo(() => urlTrees.map((tree) => tree.name), [urlTrees]);
   // The loadout's tree by its place in PoB (two trees can share a title), else by title.
-  const activeTree = usePobStats()?.stats?.lists?.active.tree ?? null;
+  const activeTree = usePobStats()?.active?.tree ?? null;
   const bySpec =
     sets !== null && activeTree !== null
       ? urlTrees.findIndex((tree) => tree.spec === activeTree - 1)
@@ -563,19 +556,8 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   const progress = useAtomValue(treeProgressAtom);
   const index = picked ? panelIndex : lookAhead(titles, panelIndex, progress);
   const ahead = index !== panelIndex;
-  // The in-game Tree tooltip's ‹ › arrows: the set before or after the one shown, picked
-  // here as if from the dropdown (until the loadout, act or level set changes). Not while
-  // the page shows your live character: the tooltip's sets are the plan's, not these.
-  const viewingLive = useAtomValue(viewingLiveAtom);
-  const treeStep = useAtomValue(treeStepAtom);
-  const handledStep = useRef(treeStep);
-  useEffect(() => {
-    const delta = treeStep - handledStep.current;
-    handledStep.current = treeStep;
-    if (viewingLive || delta === 0 || titles.length === 0) return;
-    const next = Math.min(Math.max(index + delta, 0), titles.length - 1);
-    if (next !== index) choose(next);
-  }, [treeStep]);
+  // The in-game Tree tooltip's ‹ › arrows (until the loadout, act or level set changes).
+  useSetSteps(treeStepAtom, index, titles.length, choose);
   // Your character's tree, once the exe has read it from the game's log.
   const character = useAtomValue(characterNodesNowAtom);
   const [compare, setCompare] = useAtom(treeCompareAtom);
