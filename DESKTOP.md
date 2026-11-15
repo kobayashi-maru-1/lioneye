@@ -449,8 +449,13 @@ League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
 A static mock of a reworked **Compare** in the guide's layout (foldable panels, jump bar):
 the live character against the shown loadout (HRoC Early Maps), on the guide's config, with
 per-stat sources, ranked gaps (each one PoB recalculating your build with one guide piece
-swapped in) and an in-game summary. The numbers are real PoB output from a one-off run,
-frozen into the page; it doesn't update. It's not
+swapped in) and an in-game summary. Nothing in it is specific to one build: the summary's
+stats are picked by rules over PoB's output (an ailment's chance only when that ailment is a
+tenth of the damage, life or ES by which is the pool, resistances only below cap), and the
+gaps come from diffing the two builds (each differing slot, all gear at once, the tree,
+links, higher gem levels, unlinked supports). A second example (a public Lightning Strike
+Juggernaut against its Mageblood version) shows the same page picking different stats. The
+numbers are real PoB output from a one-off run, frozen into the page; it doesn't update. It's not
 part of the app: `compare-demo/index.html`, published by the **Strats page** workflow at
 <https://kobayashi-maru-1.github.io/lioneye/compare-demo/>. Not linked from anywhere;
 share the address.
