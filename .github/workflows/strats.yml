@@ -6,7 +6,8 @@ name: Strats page
 # - atlas/: the standalone Atlas planner (plans/atlas-planner.md), built from web/atlas.html
 #   with the atlas data seeded from GGG's export. Its tests run first; a failure stops the
 #   deploy.
-# A deploy replaces the whole site, so every run publishes both. Upstream's website build
+# - compare-demo/: a static concept mock of a reworked Compare, to share.
+# A deploy replaces the whole site, so every run publishes all of them. Upstream's website build
 # stays out (DESKTOP.md, Strats page). Actions are pinned to commit SHAs so a moved tag
 # can't change what runs.
 on:
@@ -15,6 +16,7 @@ on:
     branches: [main]
     paths:
       - "strats/**"
+      - "compare-demo/**"
       - "web/atlas.html"
       - "web/vite.atlas.config.ts"
       - "web/src/atlas/**"
@@ -72,8 +74,9 @@ jobs:
 
       - name: Stage the site
         run: |
-          mkdir -p _site/strats _site/atlas
+          mkdir -p _site/strats _site/atlas _site/compare-demo
           cp -r strats/. _site/strats/
+          cp -r compare-demo/. _site/compare-demo/
           cp -r web/dist-atlas/. _site/atlas/
           mv _site/atlas/atlas.html _site/atlas/index.html
 

@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Lioneye Compare Concept</title>
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<style>
+/* Layout: Lioneye's pob.codes look (near-black, gold small-caps bars, navy cards);
+   compare panel left, in-game overlay mock right, stacked on phones. Single dark theme on purpose. */
+:root {
+  color-scheme: dark;
+  --bg: #161616;
+  --panel: #111111;
+  --panel-2: #1b1b1b;
+  --border: #2a2a2a;
+  --navy: #171e2a;
+  --navy-border: #2f3b4d;
+  --fg: #c8c8c8;
+  --fg-strong: #e8e8e8;
+  --muted: #8b8b8b;
+  --gold: #af8040;
+  --gold-soft: rgba(175, 128, 64, 0.16);
+  --good: #79c27d;
+  --bad: #e0716b;
+  --warn: #dfab4a;
+  --note: #5ea7e0;
+  --note-soft: rgba(94, 167, 224, 0.16);
+  --k-gear: #8fb0dc;
+  --k-tree: #86c08a;
+  --k-skill: #d6ad66;
+  --k-jewel: #b394dc;
+  --k-gem: #d6ad66;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --radius: 6px;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+.page {
+  max-width: 1240px; margin: 0 auto;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 16px;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.top h1 { font-size: 20px; font-weight: 600; color: var(--fg-strong); letter-spacing: 0.01em; }
+.top h1 span { color: var(--gold); font-variant: small-caps; letter-spacing: 0.06em; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.chip.warn { color: var(--warn); border-color: rgba(223, 171, 74, 0.45); }
+.chip.good { color: var(--good); border-color: rgba(121, 194, 125, 0.4); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
+.legend .item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg); }
+.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding-left: 6px; }
+.switch input { accent-color: var(--note); }
+
+/* Note markers */
+.mk { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--note); color: #0d1620; font-size: 11px; font-weight: 700; flex: none; }
+.notes-off .mk:not(.keep) { display: none; }
+.notes-off .legend .item { display: none; }
+
+/* Layout */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+@media (max-width: 920px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; }
+.bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--gold); font-variant: small-caps; letter-spacing: 0.08em; font-size: 15px; font-weight: 600; }
+.panel-body { padding: 12px; display: grid; gap: 12px; }
+.panel-body, [role="tabpanel"] > div, #gaps-body, .gap-group, .why { grid-template-columns: minmax(0, 1fr); }
+.seg button:focus-visible { outline-offset: -2px; }
+
+/* Build cards */
+.builds { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 560px) { .builds { grid-template-columns: 1fr; } }
+.build { background: var(--navy); border: 1px solid var(--navy-border); border-radius: var(--radius); padding: 8px 10px; display: grid; gap: 4px; min-width: 0; }
+.build .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.build .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.build select { background: var(--panel); border: 1px solid var(--navy-border); border-radius: 4px; padding: 3px 6px; min-width: 0; flex: 1; }
+.build .name { color: var(--fg-strong); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.build .sub { font-size: 12px; color: var(--muted); }
+.icon-btn { border: 1px solid var(--navy-border); background: var(--panel); border-radius: 4px; width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
+.icon-btn:hover { border-color: var(--gold); }
+
+/* Footing bar */
+.footing { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 8px 10px; border: 1px dashed var(--border); border-radius: var(--radius); background: var(--panel-2); }
+.footing .f { display: inline-flex; align-items: center; gap: 8px; }
+.footing .k { font-size: 12px; color: var(--muted); }
+.footing .v { color: var(--fg-strong); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.seg button { background: transparent; border: 0; padding: 2px 10px; font-size: 13px; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--gold-soft); color: var(--gold); }
+
+/* Tabs */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border); }
+.tab { background: transparent; border: 1px solid transparent; border-bottom: 0; padding: 6px 12px; border-radius: 4px 4px 0 0; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; margin-bottom: -1px; }
+.tab:hover { color: var(--fg-strong); }
+.tab[aria-selected="true"] { color: var(--gold); border-color: var(--border); background: var(--panel); border-bottom: 1px solid var(--panel); }
+.new { font-size: 10px; color: var(--note); border: 1px solid var(--note); border-radius: 3px; padding: 0 4px; letter-spacing: 0.05em; }
+
+/* Toolbars */
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.search { flex: 1 1 200px; min-width: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 5px 9px; }
+.search::placeholder { color: var(--muted); }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.check input { accent-color: var(--gold); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { background: transparent; border: 1px solid var(--border); border-radius: 999px; padding: 2px 11px; font-size: 13px; color: var(--muted); }
+.chips button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+
+/* Tables */
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); vertical-align: middle; }
+td.r, th.r { text-align: right; white-space: nowrap; }
+tr.group td { color: var(--gold); font-variant: small-caps; letter-spacing: 0.06em; font-weight: 600; padding-top: 12px; border-bottom: 1px solid var(--border); }
+tr.same td { color: var(--muted); }
+tr.sel td { background: var(--gold-soft); }
+tbody tr.stat:hover td { background: rgba(255, 255, 255, 0.03); }
+tbody tr.sel:hover td { background: var(--gold-soft); }
+.tag { font-size: 10px; border: 1px solid var(--border); color: var(--muted); border-radius: 3px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; letter-spacing: 0.04em; }
+.tag.cfg { color: var(--warn); border-color: rgba(223, 171, 74, 0.45); }
+.pos { color: var(--good); }
+.neg { color: var(--bad); }
+.zero { color: var(--muted); }
+.why-btn { background: transparent; border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; font-size: 12px; color: var(--fg); }
+.why-btn:hover, .why-btn[aria-expanded="true"] { border-color: var(--gold); color: var(--gold); }
+.empty { color: var(--muted); padding: 14px 8px; }
+
+/* Why drawer */
+.why { border: 1px solid var(--navy-border); background: var(--navy); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 10px; }
+.why-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.why-head h3 { font-size: 15px; color: var(--fg-strong); font-weight: 600; }
+.formula { display: grid; gap: 4px; font-size: 13px; }
+.formula div { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; }
+.formula b { color: var(--muted); font-weight: 600; }
+.formula code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; color: var(--fg-strong); overflow-wrap: anywhere; }
+.why table td { border-bottom-color: rgba(255, 255, 255, 0.05); }
+.why tr.sec td { color: var(--gold); font-variant: small-caps; letter-spacing: 0.06em; font-weight: 600; padding-top: 10px; }
+.kind { display: inline-block; min-width: 42px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; border-radius: 3px; padding: 0 5px; margin-right: 8px; border: 1px solid currentColor; text-align: center; }
+.kind.Gear { color: var(--k-gear); } .kind.Tree { color: var(--k-tree); } .kind.Skill { color: var(--k-skill); }
+.kind.Jewel { color: var(--k-jewel); } .kind.Gem { color: var(--k-gem); } .kind.Base { color: var(--muted); }
+
+/* Gaps */
+.gap-group { display: grid; gap: 6px; }
+.gap-group h3 { display: flex; align-items: baseline; gap: 10px; font-size: 13px; color: var(--gold); font-variant: small-caps; letter-spacing: 0.08em; font-weight: 600; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.gap-group h3 .tot { margin-left: auto; font-variant: normal; letter-spacing: 0; color: var(--muted); font-weight: 400; font-size: 12px; }
+.gap { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 12px; align-items: center; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-2); }
+.gap .t { color: var(--fg-strong); font-weight: 600; }
+.gap .d { font-size: 12px; color: var(--muted); }
+.gap .imp { text-align: right; white-space: nowrap; }
+.gap .imp b { color: var(--bad); font-weight: 600; }
+.gap .imp small { display: block; font-size: 11px; color: var(--muted); }
+.act { background: transparent; border: 1px solid var(--border); border-radius: 4px; padding: 3px 10px; font-size: 13px; }
+.act:hover { border-color: var(--gold); color: var(--gold); }
+.bar-meter { height: 4px; border-radius: 2px; background: var(--border); grid-column: 1 / -1; overflow: hidden; }
+.bar-meter i { display: block; height: 100%; background: var(--bad); opacity: 0.7; }
+@media (max-width: 480px) { .gap { grid-template-columns: minmax(0, 1fr) auto; } .gap .act { grid-column: 2; } }
+
+/* Overlay mock */
+.game { border-radius: var(--radius); border: 1px solid var(--border); padding: 14px; min-height: 280px; display: grid; align-content: start; gap: 12px;
+  background:
+    radial-gradient(120% 80% at 70% 10%, rgba(120, 90, 50, 0.22), transparent 60%),
+    radial-gradient(90% 70% at 10% 100%, rgba(40, 70, 90, 0.25), transparent 60%),
+    #0b0c0d; }
+.game .zone { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
+.ov { background: rgba(14, 14, 14, 0.94); border: 1px solid var(--gold); border-radius: var(--radius); padding: 10px; display: grid; gap: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); }
+.ov h4 { display: flex; align-items: center; gap: 8px; color: var(--gold); font-variant: small-caps; letter-spacing: 0.08em; font-size: 14px; }
+.ov h4 .chip { margin-left: auto; }
+.ov-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; }
+.ov-row .s { color: var(--fg-strong); }
+.ov-row .v { text-align: right; font-variant-numeric: tabular-nums; }
+.ov-row .m { grid-column: 1 / -1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.ov-row .m i { display: block; height: 100%; background: var(--gold); }
+.ov .fix { font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 6px; }
+.ov .fix b { color: var(--fg-strong); font-weight: 600; }
+.aside-body { display: grid; gap: 12px; padding: 12px; }
+
+/* Toast */
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--panel-2); border: 1px solid var(--gold); color: var(--fg-strong); padding: 6px 14px; border-radius: 999px; font-size: 13px; z-index: 20; }
+.toast.off { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) { .toast { transition: opacity 0.2s; } }
+</style>
+</head>
+<body>
+
+<div class="page" id="page">
+  <header class="top">
+    <h1><span>Lioneye</span> Compare</h1>
+    <span class="chip warn">Concept · Example data</span>
+    <div class="legend" role="group" aria-label="Ideas">
+      <span class="item"><span class="mk">1</span>Same setup</span>
+      <span class="item"><span class="mk">2</span>Why view</span>
+      <span class="item"><span class="mk">3</span>All stats</span>
+      <span class="item"><span class="mk">4</span>Gaps</span>
+      <span class="item"><span class="mk">5</span>In game</span>
+      <label class="switch"><input type="checkbox" id="notes-toggle" checked> Notes</label>
+    </div>
+  </header>
+
+  <div class="layout">
+    <section class="panel" aria-label="Compare">
+      <div class="bar">Compare</div>
+      <div class="panel-body">
+        <div class="builds">
+          <div class="build">
+            <span class="lbl">Build 1</span>
+            <div class="row">
+              <select id="b1-source" aria-label="Build 1">
+                <option>Live character</option>
+                <option>Pasted build</option>
+              </select>
+              <button class="icon-btn" type="button" id="refresh-btn" title="Refresh" aria-label="Refresh">⟳</button>
+            </div>
+            <span class="sub">RelicWarden · Lvl 68 Necromancer</span>
+          </div>
+          <div class="build">
+            <span class="lbl">Build 2 · Guide</span>
+            <div class="row"><span class="name">Act 10 - Lvl 68</span></div>
+            <span class="sub">Holy Relic Necromancer</span>
+          </div>
+        </div>
+
+        <div class="footing" role="group" aria-label="Setup">
+          <span class="mk">1</span>
+          <span class="f"><span class="k">Skill</span><span class="v">Holy Relic's Nova</span><span class="chip good">Matched</span></span>
+          <span class="f"><span class="k">Config</span>
+            <span class="seg" role="group" aria-label="Config">
+              <button type="button" id="cfg-guide" aria-pressed="true">Guide</button>
+              <button type="button" id="cfg-own" aria-pressed="false">Own</button>
+            </span>
+            <span class="chip good" id="cfg-status">Same</span>
+          </span>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Compare views">
+          <button class="tab" role="tab" type="button" data-tab="gaps" id="tab-gaps" aria-controls="panel-gaps" aria-selected="false" tabindex="-1">Gaps <span class="new">NEW</span></button>
+          <button class="tab" role="tab" type="button" data-tab="stats" id="tab-stats" aria-controls="panel-stats" aria-selected="true" tabindex="0">Stats</button>
+          <button class="tab" role="tab" type="button" data-tab="config" id="tab-config" aria-controls="panel-config" aria-selected="false" tabindex="-1">Config <span class="new">NEW</span></button>
+          <button class="tab" role="tab" type="button" data-tab="passives" id="tab-passives" aria-controls="panel-passives" aria-selected="false" tabindex="-1">Passives</button>
+          <button class="tab" role="tab" type="button" data-tab="skills" id="tab-skills" aria-controls="panel-skills" aria-selected="false" tabindex="-1">Skills</button>
+          <button class="tab" role="tab" type="button" data-tab="items" id="tab-items" aria-controls="panel-items" aria-selected="false" tabindex="-1">Items</button>
+        </div>
+
+        <!-- Stats -->
+        <div role="tabpanel" id="panel-stats" aria-labelledby="tab-stats">
+          <div style="display:grid; gap:10px;">
+            <div class="tools">
+              <span class="mk">3</span>
+              <input class="search" id="stat-search" type="search" placeholder="Search" aria-label="Search stats">
+              <span class="seg" role="group" aria-label="Stat list">
+                <button type="button" id="scope-side" aria-pressed="false">Sidebar</button>
+                <button type="button" id="scope-all" aria-pressed="true">All</button>
+              </span>
+              <label class="check"><input type="checkbox" id="show-same"> Same</label>
+            </div>
+            <div class="scroll">
+              <table>
+                <thead><tr><th>Stat</th><th class="r">Yours</th><th class="r">Guide</th><th class="r">Diff</th><th class="r" aria-label="Why"></th></tr></thead>
+                <tbody id="stats-body"></tbody>
+              </table>
+            </div>
+            <div id="why-slot"></div>
+          </div>
+        </div>
+
+        <!-- Gaps -->
+        <div role="tabpanel" id="panel-gaps" aria-labelledby="tab-gaps" hidden>
+          <div style="display:grid; gap:12px;">
+            <div class="tools">
+              <span class="mk">4</span>
+              <div class="chips" role="group" aria-label="Metric" id="gap-chips"></div>
+            </div>
+            <div id="gaps-body" style="display:grid; gap:14px;"></div>
+          </div>
+        </div>
+
+        <!-- Config -->
+        <div role="tabpanel" id="panel-config" aria-labelledby="tab-config" hidden>
+          <div style="display:grid; gap:10px;">
+            <div class="tools"><span class="mk">1</span><span class="chip" id="cfg-using"></span></div>
+            <div class="scroll">
+              <table>
+                <thead><tr><th>Option</th><th class="r">Yours</th><th class="r">Guide</th></tr></thead>
+                <tbody id="config-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Existing tabs (today) -->
+        <div role="tabpanel" id="panel-passives" aria-labelledby="tab-passives" hidden>
+          <div class="scroll"><table>
+            <thead><tr><th>Passive</th><th class="r">Yours</th><th class="r">Guide</th></tr></thead>
+            <tbody>
+              <tr class="group"><td colspan="3">Notables</td></tr>
+              <tr><td>Sanctity</td><td class="r">0</td><td class="r">1</td></tr>
+              <tr class="group"><td colspan="3">Sockets</td></tr>
+              <tr><td>Jewel Socket</td><td class="r">1</td><td class="r">2</td></tr>
+              <tr class="group"><td colspan="3">Normal</td></tr>
+              <tr><td>Armour and Energy Shield</td><td class="r">0</td><td class="r">2</td></tr>
+              <tr><td>Life Mastery</td><td class="r">0</td><td class="r">1</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+        <div role="tabpanel" id="panel-skills" aria-labelledby="tab-skills" hidden>
+          <div class="scroll"><table>
+            <thead><tr><th>Group</th><th>Missing</th><th>Extra</th></tr></thead>
+            <tbody>
+              <tr><td>Determination</td><td>Determination</td><td class="zero">—</td></tr>
+              <tr><td>Summon Holy Relic</td><td>Withering Touch</td><td>Minion Damage</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+        <div role="tabpanel" id="panel-items" aria-labelledby="tab-items" hidden>
+          <div class="scroll"><table>
+            <thead><tr><th>Slot</th><th>Yours</th><th>Guide</th></tr></thead>
+            <tbody>
+              <tr><td>Helmet</td><td>Gloom Visage<br><span class="zero">Leather Hood</span></td><td>Dread Crown<br><span class="zero">Eternal Burgonet</span></td></tr>
+              <tr><td>Body Armour</td><td>Eagle Shell<br><span class="zero">Chain Hauberk</span></td><td>Kraken Carapace<br><span class="zero">Sacrificial Garb</span></td></tr>
+              <tr><td>Belt</td><td>Stygian Vise<br><span class="zero">Empty abyss socket</span></td><td>Stygian Vise<br><span class="zero">Ghastly Eye Jewel</span></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel" aria-label="In game">
+      <div class="bar"><span class="mk">5</span>In game</div>
+      <div class="aside-body">
+        <div class="game">
+          <span class="zone">THE FEEDING TROUGH · ACT 10</span>
+          <div class="ov">
+            <h4>Gaps <span class="chip">Lvl 68</span></h4>
+            <div id="ov-rows" style="display:grid; gap:8px;"></div>
+            <div class="fix">Top fix: <b>Determination</b> · ≈ +3,949 Armour</div>
+            <button class="act" type="button" id="ov-open">Compare</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+<div class="toast off" id="toast" role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Example data. Armour and Life tie out: base × increased × more.
+  var STATS = [
+    { g: "Player", label: "Life", y: 3333, gd: 3937, side: true, why: "life" },
+    { g: "Player", label: "Energy Shield", y: 410, gd: 520, side: true },
+    { g: "Player", label: "Armour", y: 1452, gd: 7686, side: true, why: "armour" },
+    { g: "Player", label: "Evasion", y: 820, gd: 310, side: true },
+    { g: "Player", label: "Phys Max Hit", y: 5240, own: 4180, gd: 9860, side: true },
+    { g: "Player", label: "Fire Resistance", y: 75, gd: 75, side: true, u: "%" },
+    { g: "Player", label: "Cold Resistance", y: 68, gd: 75, side: true, u: "%" },
+    { g: "Player", label: "Lightning Resistance", y: 75, gd: 75, side: true, u: "%" },
+    { g: "Player", label: "Chaos Resistance", y: -12, gd: 18, side: true, u: "%" },
+    { g: "Player", label: "Movement Speed", y: 115, gd: 130, side: true, u: "%" },
+    { g: "Player", label: "Phys Damage Reduction", y: 9, gd: 34, side: false, u: "%" },
+    { g: "Minion: Holy Relic", label: "Total DPS", y: 21300, own: 24600, gd: 28950, side: true },
+    { g: "Minion: Holy Relic", label: "Poison DPS", y: 9610, own: 11200, gd: 18420, side: true },
+    { g: "Minion: Holy Relic", label: "Poison Chance", y: 40, gd: 70, side: false, u: "%", why: "poison" },
+    { g: "Minion: Holy Relic", label: "Poison Duration", y: 2.4, gd: 2.4, side: false, u: "s", dp: 2 },
+    { g: "Minion: Holy Relic", label: "Life", y: 6800, gd: 8120, side: true },
+    { g: "Minion: Holy Relic", label: "Crit Chance", y: 5, gd: 5, side: true, u: "%", dp: 1 },
+    { g: "Minion: Holy Relic", label: "Cast Rate", y: 1.6, gd: 1.6, side: true, dp: 2 }
+  ];
+
+  var WHY = {
+    armour: {
+      title: "Armour",
+      formula: [["Yours", "1,092 base × 133% × 100% = 1,452"], ["Guide", "3,002 base × 173% × 148% = 7,686"]],
+      sections: [
+        { name: "Base", u: "", rows: [
+          ["Body Armour", "Gear", 612, 1180], ["Helmet", "Gear", 0, 310], ["Shield", "Gear", 220, 410],
+          ["Gloves", "Gear", 120, 120], ["Boots", "Gear", 140, 140], ["Determination", "Skill", 0, 842]
+        ] },
+        { name: "Increased", u: "%", rows: [
+          ["Sanctity", "Tree", 0, 20], ["Faith and Steel", "Tree", 15, 15], ["Sanctum of Thought", "Tree", 18, 18],
+          ["Armour and Energy Shield ×2", "Tree", 0, 20]
+        ] },
+        { name: "More", u: "%", rows: [["Determination", "Skill", 0, 48]] }
+      ]
+    },
+    poison: {
+      title: "Minion Poison Chance",
+      formula: [["Yours", "40% = 40%"], ["Guide", "40% + 15% + 15% = 70%"]],
+      sections: [
+        { name: "Chance", u: "%", rows: [
+          ["Chance to Poison", "Gem", 40, 40], ["Ghastly Eye Jewel · tree socket", "Jewel", 0, 15],
+          ["Ghastly Eye Jewel · belt", "Jewel", 0, 15]
+        ] }
+      ]
+    },
+    life: {
+      title: "Life",
+      formula: [["Yours", "1,344 base × 248% = 3,333"], ["Guide", "1,469 base × 268% = 3,937"]],
+      sections: [
+        { name: "Base", u: "", rows: [
+          ["Level 68", "Base", 854, 854], ["Strength", "Base", 80, 95], ["Body Armour", "Gear", 90, 110],
+          ["Helmet", "Gear", 60, 80], ["Gloves", "Gear", 70, 70], ["Boots", "Gear", 70, 80],
+          ["Belt", "Gear", 60, 90], ["Rings", "Gear", 60, 90]
+        ] },
+        { name: "Increased", u: "%", rows: [["Tree", "Tree", 148, 160], ["Amulet", "Gear", 0, 8]] }
+      ]
+    }
+  };
+
+  var GAPS = [
+    { m: "Armour", kind: "Skill", t: "Determination", d: "Not socketed · Guide Lvl 18", v: 3949, unit: "Armour", act: "Socket" },
+    { m: "Armour", kind: "Tree", t: "Sanctity + 2 small", d: "+40% increased Armour", v: 1777, unit: "Armour", act: "Show tree" },
+    { m: "Armour", kind: "Gear", t: "Body Armour", d: "612 vs 1,180 base", v: 1454, unit: "Armour", act: "Trade" },
+    { m: "Armour", kind: "Gear", t: "Helmet", d: "No Armour base", v: 794, unit: "Armour", act: "Trade" },
+    { m: "Armour", kind: "Gear", t: "Shield", d: "220 vs 410 base", v: 486, unit: "Armour", act: "Trade" },
+    { m: "Minion", kind: "Jewel", t: "Ghastly Eye ×2", d: "Minion poison chance +15% each", v: 7894, unit: "Poison DPS", act: "Trade" },
+    { m: "Life", kind: "Tree", t: "Life nodes", d: "148% vs 160% increased", v: 176, unit: "Life", act: "Show tree" },
+    { m: "Life", kind: "Gear", t: "Amulet", d: "No % Life", v: 118, unit: "Life", act: "Trade" },
+    { m: "Life", kind: "Gear", t: "Belt", d: "60 vs 90 Life", v: 80, unit: "Life", act: "Trade" },
+    { m: "Life", kind: "Gear", t: "Rings", d: "60 vs 90 Life", v: 80, unit: "Life", act: "Trade" }
+  ];
+  var GAP_TOTALS = { Armour: "1,452 vs 7,686", Minion: "Poison DPS 9,610 vs 18,420", Life: "3,333 vs 3,937" };
+
+  var CONFIG = [
+    ["Is the enemy a Boss?", "No", "Pinnacle Boss"],
+    ["Do you have Fortification?", "No", "Yes"],
+    ["Withered stacks", "0", "15"]
+  ];
+
+  var state = { tab: "stats", cfg: "guide", scope: "all", same: false, q: "", why: "armour", metric: "All" };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function fmt(n, dp) {
+    return n.toLocaleString("en-US", { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 }).replace(/^-/, "−");
+  }
+  function withUnit(n, s) { return fmt(n, s.dp) + (s.u || ""); }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function yoursOf(s) { return state.cfg === "own" && s.own !== undefined ? s.own : s.y; }
+  function diffCell(d, s) {
+    var cls = d > 0 ? "pos" : d < 0 ? "neg" : "zero";
+    var sign = d > 0 ? "+" : d < 0 ? "−" : "";
+    return '<td class="r ' + cls + '">' + (d === 0 ? "—" : sign + withUnit(Math.abs(d), s)) + "</td>";
+  }
+
+  function renderStats() {
+    var q = state.q.trim().toLowerCase();
+    var html = "", lastGroup = null, shown = 0, whyVisible = false;
+    STATS.forEach(function (s) {
+      var y = yoursOf(s), d = +(y - s.gd).toFixed(s.dp || 0);
+      if (state.scope === "side" && !s.side) return;
+      if (!state.same && d === 0) return;
+      if (q && (s.g + " " + s.label).toLowerCase().indexOf(q) < 0) return;
+      if (s.g !== lastGroup) { html += '<tr class="group"><td colspan="5">' + esc(s.g) + "</td></tr>"; lastGroup = s.g; }
+      shown++;
+      var cfgTag = state.cfg === "own" && s.own !== undefined ? '<span class="tag cfg">CONFIG</span>' : "";
+      var calcTag = !s.side ? '<span class="tag">CALCS</span>' : "";
+      var sel = !!s.why && s.why === state.why;
+      if (sel) whyVisible = true;
+      html += '<tr class="stat' + (d === 0 ? " same" : "") + (sel ? " sel" : "") + '">' +
+        "<td>" + esc(s.label) + calcTag + cfgTag + "</td>" +
+        '<td class="r">' + withUnit(y, s) + "</td>" +
+        '<td class="r">' + withUnit(s.gd, s) + "</td>" +
+        diffCell(d, s) +
+        '<td class="r">' + (s.why ? '<button type="button" class="why-btn" data-why="' + s.why + '" aria-expanded="' + sel + '">Why</button>' : "") + "</td></tr>";
+    });
+    if (!shown) html = '<tr><td colspan="5" class="empty">' + (q ? "No matches" : "No differences") + "</td></tr>";
+    $("stats-body").innerHTML = html;
+    renderWhy(whyVisible);
+  }
+
+  function renderWhy(visible) {
+    var w = WHY[state.why];
+    var slot = $("why-slot");
+    if (!w || !visible) { slot.innerHTML = ""; return; }
+    var rows = "";
+    w.sections.forEach(function (sec) {
+      rows += '<tr class="sec"><td colspan="4">' + esc(sec.name) + "</td></tr>";
+      sec.rows.forEach(function (r) {
+        var d = r[2] - r[3];
+        if (!state.same && d === 0) return;
+        var s = { u: sec.u };
+        rows += "<tr" + (d === 0 ? ' class="same"' : "") + '><td><span class="kind ' + r[1] + '">' + r[1] + "</span>" + esc(r[0]) + "</td>" +
+          '<td class="r">' + withUnit(r[2], s) + '</td><td class="r">' + withUnit(r[3], s) + "</td>" + diffCell(d, s) + "</tr>";
+      });
+    });
+    slot.innerHTML =
+      '<div class="why" role="region" aria-label="Why">' +
+        '<div class="why-head"><span class="mk">2</span><h3>' + esc(w.title) + '</h3><span class="chip">Sources</span></div>' +
+        '<div class="formula">' + w.formula.map(function (f) { return "<div><b>" + f[0] + "</b><code>" + esc(f[1]) + "</code></div>"; }).join("") + "</div>" +
+        '<div class="scroll"><table><thead><tr><th>Source</th><th class="r">Yours</th><th class="r">Guide</th><th class="r">Diff</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+      "</div>";
+  }
+
+  function renderGaps() {
+    var metrics = ["All", "Armour", "Minion", "Life"];
+    $("gap-chips").innerHTML = metrics.map(function (m) {
+      return '<button type="button" data-metric="' + m + '" aria-pressed="' + (state.metric === m) + '">' + m + "</button>";
+    }).join("");
+    var html = "";
+    ["Armour", "Minion", "Life"].forEach(function (m) {
+      if (state.metric !== "All" && state.metric !== m) return;
+      var list = GAPS.filter(function (g) { return g.m === m; }).sort(function (a, b) { return b.v - a.v; });
+      var max = list[0] ? list[0].v : 1;
+      html += '<div class="gap-group"><h3>' + m + '<span class="tot num">' + GAP_TOTALS[m] + "</span></h3>";
+      list.forEach(function (g) {
+        html += '<div class="gap"><div><div class="t"><span class="kind ' + g.kind + '">' + g.kind + "</span>" + esc(g.t) + '</div><div class="d">' + esc(g.d) + "</div></div>" +
+          '<div class="imp num"><b>−' + fmt(g.v) + "</b><small>" + g.unit + "</small></div>" +
+          '<button type="button" class="act" data-act="' + g.act + '">' + g.act + "</button>" +
+          '<div class="bar-meter"><i style="width:' + Math.max(4, Math.round(g.v / max * 100)) + '%"></i></div></div>';
+      });
+      html += "</div>";
+    });
+    $("gaps-body").innerHTML = html;
+  }
+
+  function renderConfig() {
+    $("config-body").innerHTML = CONFIG.map(function (c) {
+      return "<tr><td>" + esc(c[0]) + '</td><td class="r">' + esc(state.cfg === "guide" ? c[2] : c[1]) + '</td><td class="r">' + esc(c[2]) + "</td></tr>";
+    }).join("");
+    var using = $("cfg-using");
+    using.textContent = state.cfg === "guide" ? "Yours: guide" : "Yours: own";
+    using.className = "chip " + (state.cfg === "guide" ? "good" : "warn");
+  }
+
+  function renderOverlay() {
+    var rows = [
+      ["Armour", "1,452 / 7,686", 1452 / 7686],
+      ["Minion poison", "40% / 70%", 40 / 70],
+      ["Life", "3,333 / 3,937", 3333 / 3937]
+    ];
+    $("ov-rows").innerHTML = rows.map(function (r) {
+      return '<div class="ov-row"><span class="s">' + r[0] + '</span><span class="v">' + r[1] + '</span><span class="m"><i style="width:' + Math.round(r[2] * 100) + '%"></i></span></div>';
+    }).join("");
+  }
+
+  function setCfg(c) {
+    state.cfg = c;
+    $("cfg-guide").setAttribute("aria-pressed", c === "guide");
+    $("cfg-own").setAttribute("aria-pressed", c === "own");
+    var st = $("cfg-status");
+    st.textContent = c === "guide" ? "Same" : CONFIG.length + " differ";
+    st.className = "chip " + (c === "guide" ? "good" : "warn");
+    renderStats(); renderConfig();
+  }
+
+  function setTab(t) {
+    state.tab = t;
+    document.querySelectorAll(".tab").forEach(function (b) {
+      var on = b.dataset.tab === t;
+      b.setAttribute("aria-selected", on);
+      b.tabIndex = on ? 0 : -1;
+    });
+    document.querySelectorAll("[role=tabpanel]").forEach(function (p) { p.hidden = p.id !== "panel-" + t; });
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg; el.classList.remove("off");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.add("off"); el.textContent = ""; }, 1800);
+  }
+
+  // Events
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  tabs.forEach(function (b, i) {
+    b.addEventListener("click", function () { setTab(b.dataset.tab); });
+    b.addEventListener("keydown", function (e) {
+      var j = e.key === "ArrowRight" ? (i + 1) % tabs.length : e.key === "ArrowLeft" ? (i - 1 + tabs.length) % tabs.length
+        : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
+      if (j < 0) return;
+      e.preventDefault();
+      setTab(tabs[j].dataset.tab);
+      tabs[j].focus();
+    });
+  });
+  $("cfg-guide").addEventListener("click", function () { setCfg("guide"); });
+  $("cfg-own").addEventListener("click", function () { setCfg("own"); });
+  $("scope-side").addEventListener("click", function () { state.scope = "side"; this.setAttribute("aria-pressed", true); $("scope-all").setAttribute("aria-pressed", false); renderStats(); });
+  $("scope-all").addEventListener("click", function () { state.scope = "all"; this.setAttribute("aria-pressed", true); $("scope-side").setAttribute("aria-pressed", false); renderStats(); });
+  $("show-same").addEventListener("change", function () { state.same = this.checked; renderStats(); });
+  $("stat-search").addEventListener("input", function () { state.q = this.value; renderStats(); });
+  $("stats-body").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-why]");
+    if (!b) return;
+    var id = b.dataset.why;
+    state.why = state.why === id ? null : id;
+    renderStats();
+    var again = document.querySelector('#stats-body [data-why="' + id + '"]');
+    if (again) again.focus();
+  });
+  $("gap-chips").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-metric]");
+    if (!b) return;
+    var m = b.dataset.metric;
+    state.metric = m;
+    renderGaps();
+    var again = document.querySelector('#gap-chips [data-metric="' + m + '"]');
+    if (again) again.focus();
+  });
+  $("gaps-body").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-act]");
+    if (b) toast(b.dataset.act + " (demo)");
+  });
+  $("ov-open").addEventListener("click", function () { setTab("gaps"); $("tab-gaps").focus(); });
+  $("refresh-btn").addEventListener("click", function () { toast("Refreshed (demo)"); });
+  $("b1-source").addEventListener("change", function () { toast(this.value + " (demo)"); });
+  $("notes-toggle").addEventListener("change", function () { $("page").classList.toggle("notes-off", !this.checked); });
+
+  renderStats(); renderGaps(); renderConfig(); renderOverlay();
+})();
+</script>
+</body>
+</html>

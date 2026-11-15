@@ -433,6 +433,14 @@ League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
 - Testing it in a browser: serve `web/dist-atlas` as plain files (`atlas.html` renamed
   `index.html`). Never through `vite preview` on 4173, which proxies to the exe.
 
+### Compare concept (demo)
+
+A static mock of a reworked **Compare** (same setup on both sides, per-stat sources,
+every calculated stat, ranked gaps, an in-game summary), with example data only. It's not
+part of the app: `compare-demo/index.html`, published by the **Strats page** workflow at
+<https://kobayashi-maru-1.github.io/lioneye/compare-demo/>. Not linked from anywhere;
+share the address.
+
 ## Overlay
 
 - While Path of Exile is the window in front and you're playing a character, the exe shows a
