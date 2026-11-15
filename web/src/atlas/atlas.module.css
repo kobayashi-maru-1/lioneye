@@ -481,7 +481,7 @@
 }
 
 .label text {
-  font-size: 95px;
+  font-size: 76px;
   font-weight: 700;
   fill: #101010;
   pointer-events: none;
@@ -494,6 +494,13 @@
 }
 
 .node {
+  cursor: pointer;
+}
+
+/* Transparent click targets under the nodes. */
+.hits circle {
+  fill: none;
+  pointer-events: all;
   cursor: pointer;
 }
 

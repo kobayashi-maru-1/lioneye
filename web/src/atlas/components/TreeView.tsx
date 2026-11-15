@@ -1,5 +1,11 @@
 import { mechanicOf, type AtlasData } from "../lib/types.ts";
 import { TRAVEL_COLOUR } from "../lib/mechanics.ts";
+import {
+  LABEL_RADIUS,
+  NODE_SIZE,
+  hitRadius,
+  unsetRadius,
+} from "../lib/geometry.ts";
 import styles from "../atlas.module.css";
 import classNames from "classnames";
 import {
@@ -65,9 +71,6 @@ interface Box {
   h: number;
 }
 
-const RADIUS = { start: 150, small: 79, notable: 113, keystone: 141 } as const;
-/** A cluster's letter badge: about a notable's size, so the passives around it read first. */
-const LABEL_RADIUS = 100;
 const PAD = 600;
 const DRAG = 5;
 
@@ -404,6 +407,7 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
         mechanic={marks.mechanic}
         pinned={marks.pinned}
       />
+      <Hits data={data} />
       <Nodes data={data} colours={colours} marks={marks} flash={flash} />
     </svg>
   );
@@ -545,6 +549,26 @@ const Labels = memo(function Labels({
   );
 });
 
+/**
+ * Click targets larger than the dots, in a layer under every node so a neighbour's
+ * target never covers a visible dot.
+ */
+const Hits = memo(function Hits({ data }: { data: AtlasData }) {
+  return (
+    <g className={styles.hits} aria-hidden="true">
+      {Object.entries(data.nodes).map(([id, node]) => (
+        <circle
+          key={id}
+          data-node={id}
+          cx={node.x}
+          cy={node.y}
+          r={hitRadius(node.kind)}
+        />
+      ))}
+    </g>
+  );
+});
+
 const Nodes = memo(function Nodes({
   data,
   colours,
@@ -560,7 +584,7 @@ const Nodes = memo(function Nodes({
   return (
     <g>
       {nodes.map(([id, node]) => {
-        const r = RADIUS[node.kind];
+        const size = NODE_SIZE[node.kind];
         const m = mechanicOf(node);
         const colour =
           node.kind === "start"
@@ -602,12 +626,12 @@ const Nodes = memo(function Nodes({
               [styles.start]: start,
             })}
           >
-            {(node.kind === "notable" || node.kind === "keystone") && (
+            {size.ring !== undefined && (
               <circle
                 className={styles.ring}
                 cx={node.x}
                 cy={node.y}
-                r={r * 1.3}
+                r={size.ring}
               />
             )}
             {marks.unset.has(id) && (
@@ -615,7 +639,7 @@ const Nodes = memo(function Nodes({
                 className={styles.unsetRing}
                 cx={node.x}
                 cy={node.y}
-                r={r * 1.75}
+                r={unsetRadius(node.kind)}
               />
             )}
             {node.kind === "small" &&
@@ -624,10 +648,15 @@ const Nodes = memo(function Nodes({
                   className={styles.halo}
                   cx={node.x}
                   cy={node.y}
-                  r={r * 1.45}
+                  r={size.dot * 1.45}
                 />
               )}
-            <circle className={styles.dot} cx={node.x} cy={node.y} r={r} />
+            <circle
+              className={styles.dot}
+              cx={node.x}
+              cy={node.y}
+              r={size.dot}
+            />
             {node.kind === "start" && (
               <text
                 x={node.x}
