@@ -21,7 +21,7 @@ const LIST_WAIT_MS = 15000;
  * The League page (the route and code keep its old name, Strats): the page from GitHub
  * Pages with the cheat sheet, builds and trade searches, live in a frame, under its own bar of section
  * buttons. The page lists its sections for that bar, scrolls when one is picked, and hands
- * its links over to open in your Edge profile (all by postMessage); atlas tree links open
+ * its links over to open in your default browser (all by postMessage); atlas tree links open
  * in the Atlas tab instead. Its copy buttons write to the clipboard themselves
  * (clipboard-write).
  */
@@ -76,7 +76,7 @@ export default function StratsContainer() {
         if (tree !== null) {
           const state: AtlasTreeState = { tree };
           navigateRef.current("/atlas", { state });
-        } else openInEdge(url);
+        } else openLink(url);
       }
     };
     window.addEventListener("message", onMessage);
@@ -170,10 +170,10 @@ function clickedLink(href: string, frame: HTMLIFrameElement | null) {
 
 /**
  * Opens a link from the sheet the way the guide's own links open: a click on a link here
- * is picked up by AutoProgress, which hands it to the exe (your signed-in Edge profile).
+ * is picked up by AutoProgress, which hands it to the exe (your default browser).
  * Outside the exe's window it opens in a new tab.
  */
-function openInEdge(url: URL) {
+function openLink(url: URL) {
   const link = document.createElement("a");
   link.href = url.href;
   link.target = "_blank";

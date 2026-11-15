@@ -19,6 +19,12 @@ export const pageMode: "own" | "migrate" | "other" = params.has("migrate")
 /** The guide's own window ("?own"), not another browser picked in Settings ("?own=edge"). */
 export const ownWindow = params.get("own") === "";
 
+/**
+ * An Edge window the exe opened: the own window, or one in your Edge profile ("?own=edge").
+ * Its links go to your default browser through the exe.
+ */
+export const edgeWindow = ownWindow || params.get("own") === "edge";
+
 /** In a "migrate" window: the old profile it was opened in ("edge:Default"). */
 export const migrateProfile = params.get("migrate") ?? "";
 

@@ -266,9 +266,11 @@ settings; otherwise it leaves it alone and says so.
   you pick. The trade site's stat and item lists drive the trade searches. The exe fetches
   all of them with curl.exe and caches them in `%LOCALAPPDATA%\exile-leveling\cache` for
   12 hours (the cached copy is used offline).
-- Links out of the guide (trade searches, the wiki, poe.re) open in a normal tab of your
-  last-used Edge profile, where you're signed in to the trade site, not in the guide's own
-  profile.
+- Links out of the guide (trade searches, the wiki, poe.re) open in your default browser,
+  where you're signed in to the trade site, whichever **Browser** opens the guide. The
+  exe starts the browser Windows has for https links with the address (so long trade
+  searches arrive whole), else lets Windows open it. Right-click → open in a new tab in
+  the guide's own window still stays in its Edge profile.
 - **Build health** (under the Tree) lists what to look at in the shown loadout, worst
   first, each with a link to the panel that fixes it. The checks are
   [PoB Redux](https://github.com/pobredux/pob-redux)'s (MIT): resistances, passive
@@ -360,7 +362,7 @@ settings; otherwise it leaves it alone and says so.
 - The copy buttons need the frame's `clipboard-write` permission, which the app grants
   from v0.4.48; older versions fall back to the browser's copy command.
 - It needs a connection: offline, or when the page doesn't answer, it shows **Not loaded**
-  with **Retry**. Links in the page open in your last-used Edge profile, like the guide's.
+  with **Retry**. Links in the page open in your default browser, like the guide's.
 - The page is `strats/index.html` in this repo. A push to `main` that changes `strats/`
   publishes it (workflow **Strats page**, `.github/workflows/strats.yml`), and the app shows
   the new version without a release (GitHub caches it for up to 10 minutes). Each
@@ -372,7 +374,7 @@ settings; otherwise it leaves it alone and says so.
 - The page runs in a sandboxed frame that can't navigate the app window. The app opens a
   link from it only right after a real click with the sheet focused, one link per click
   (5 s), so a changed page can't open links on load or a pile of tabs. Left and middle
-  clicks both go to your Edge profile.
+  clicks both go to your default browser.
 - Its fonts (Cinzel, Alegreya Sans, SIL OFL) are in `strats/fonts/`, so the page loads
   nothing from Google. When copying a new version of the cheat sheet in, keep the
   `@font-face` rules instead of a Google Fonts link, and keep the Builds, Trade, Atlas trees
@@ -391,7 +393,7 @@ settings; otherwise it leaves it alone and says so.
   link to the app, which switches to this tab with the planner on that link. The planner
   shows it as **Viewing a shared tree**, with **My draft** to go back and **Save as draft**
   to keep it. **Atlas** in the top bar opens the planner on your draft again. Any other
-  League page link still opens in Edge, and the same click rules apply (one per click).
+  League page link still opens in your default browser, and the same click rules apply (one per click).
 - If Edge blocks third-party cookies, it also blocks the framed site's storage: the
   planner still works but forgets trees.
 - The site runs its own analytics (Plausible, Google Analytics) in the frame.

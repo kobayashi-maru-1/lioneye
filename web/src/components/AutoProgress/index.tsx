@@ -25,6 +25,7 @@ import {
   firstRestore,
   markSynced,
   markSyncedAs,
+  edgeWindow,
   ownWindow,
   pageMode,
   syncedFingerprint,
@@ -275,10 +276,10 @@ export function useAutoProgress() {
     const timer = setInterval(() => uploadSavedState(sendMessage), 5000);
     return () => clearInterval(timer);
   }, [talks]);
-  // Links out of the guide's own window (trade, wiki) open in your last-used Edge
-  // profile, where you're signed in, through the exe.
+  // Links out of an Edge window the exe opened (trade, wiki) open through the exe, in your
+  // default browser, where you're signed in.
   useEffect(() => {
-    if (!talks || !ownWindow) return;
+    if (!talks || !edgeWindow) return;
     const onClick = (event: MouseEvent) => {
       if (event.defaultPrevented || (event.button !== 0 && event.button !== 1))
         return;
@@ -290,6 +291,8 @@ export function useAutoProgress() {
       const url = new URL(link.href, location.href);
       if (url.origin === location.origin) return;
       if (url.protocol !== "https:" && url.protocol !== "http:") return;
+      // What the exe turns down (edge.rs is_web_link) opens here as usual instead.
+      if (url.href.length > 8192 || /[\s"\\]/.test(url.href)) return;
       event.preventDefault();
       sendMessage(`open:${url.href}`);
     };
