@@ -1,8 +1,9 @@
 //! Path of Building's calculations for the guide's Stats tab.
 //!
 //! The build bundles PoB's Lua code and game data (fetch-pob.ps1). On first use it is
-//! unpacked to `%LOCALAPPDATA%\exile-leveling\pob\<version>-<bundle hash>` and run with
-//! LuaJIT on its own thread, through PoB's headless mode. Unloaded again after a while unused.
+//! unpacked to `%LOCALAPPDATA%\exile-leveling\pob\<version>-<bundle hash>` (`pob-dev` for dev
+//! and test builds), unpacked again if that copy goes missing, and run with LuaJIT on its own
+//! thread, through PoB's headless mode. Unloaded again after a while unused.
 //! Timeless jewel data is too big to bundle; it's downloaded from the same PoB release the
 //! first time a build needs it, and kept with the unpacked copy.
 
@@ -114,6 +115,13 @@ fn run(jobs: mpsc::Receiver<Job>, keep: impl Fn() -> bool) {
             continue;
         }
 
+        // Something removed the unpacked copy under a loaded PoB (another copy of the app
+        // unpacking a different bundle clears the others): PoB would fail on every module it
+        // hasn't loaded yet. Load it again, which unpacks it again.
+        if pob.as_ref().is_some_and(|loaded| !loaded.dir.join(".complete").exists()) {
+            warn!("PoB's unpacked copy is gone; loading it again");
+            pob = None;
+        }
         let cold = pob.is_none();
         let started = Instant::now();
         if cold {
@@ -159,12 +167,17 @@ struct Pob {
     // Declared first so it drops before the Lua state it belongs to.
     stats: Function,
     _lua: Lua,
+    /// The unpacked copy this PoB runs from.
+    dir: PathBuf,
+    /// `.complete`, held open while PoB is loaded (see `hold`).
+    _hold: fs::File,
 }
 
 impl Pob {
     fn load() -> Result<Pob, String> {
         let started = Instant::now();
         let dir = unpack()?;
+        let hold = hold(&dir).map_err(|err| format!("Couldn't open the unpacked PoB: {err}"))?;
         // For working on pob-host.lua without rebuilding the exe.
         let host = match std::env::var_os(HOST_OVERRIDE) {
             Some(path) => {
@@ -205,7 +218,7 @@ impl Pob {
         };
         let stats = setup().map_err(|err| message(&err))?;
         info!("PoB {} loaded in {:.1}s", version(), started.elapsed().as_secs_f32());
-        Ok(Pob { stats, _lua: lua })
+        Ok(Pob { stats, _lua: lua, dir, _hold: hold })
     }
 
     fn stats(&self, xml: &str, loadout: Option<&str>, pick: Option<&Pick>) -> Result<String, String> {
@@ -254,13 +267,14 @@ fn bundle_name() -> &'static str {
     })
 }
 
-/// Unpacks the bundled PoB once and removes copies from older bundles.
+/// Unpacks the bundled PoB once and removes copies from other bundles that aren't in use.
+/// Debug builds (cargo test, dev runs) use their own folder, apart from the installed app's.
 fn unpack() -> Result<PathBuf, String> {
     let root = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir)
         .join("exile-leveling")
-        .join("pob");
+        .join(if cfg!(debug_assertions) { "pob-dev" } else { "pob" });
     let dir = root.join(bundle_name());
     if dir.join(".complete").exists() {
         return Ok(dir);
@@ -280,14 +294,42 @@ fn unpack() -> Result<PathBuf, String> {
     fs::rename(&partial, &dir).map_err(|err| fail("unpack PoB", &err))?;
     info!("PoB unpacked to {}", dir.display());
 
+    // Copies another running copy of the app has loaded are held (see `hold`) and stay; so do
+    // folders another copy is still unpacking into, unless they were left behind long ago.
     if let Ok(entries) = fs::read_dir(&root) {
         for entry in entries.flatten() {
-            if entry.path() != dir {
-                let _ = fs::remove_dir_all(entry.path());
+            let path = entry.path();
+            if path == dir {
+                continue;
+            }
+            let unpacking = path.extension().is_some_and(|ext| ext == "partial")
+                && entry
+                    .metadata()
+                    .and_then(|meta| meta.modified())
+                    .ok()
+                    .and_then(|modified| modified.elapsed().ok())
+                    .is_none_or(|age| age < Duration::from_secs(60 * 60));
+            if !unpacking {
+                let _ = fs::remove_dir_all(&path);
             }
         }
     }
     Ok(dir)
+}
+
+/// Opens `dir`'s `.complete` for as long as PoB runs from `dir`. On Windows it is opened
+/// without delete sharing, so another copy of the app clearing old unpacked copies fails on
+/// it (the first entry it meets) and leaves this one whole.
+fn hold(dir: &Path) -> std::io::Result<fs::File> {
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_SHARE_READ: u32 = 0x1;
+        options.share_mode(FILE_SHARE_READ);
+    }
+    options.open(dir.join(".complete"))
 }
 
 /// True for the timeless jewel files PoB may ask for: `Data/TimelessJewelData/<Name>.zip`
@@ -367,6 +409,23 @@ mod tests {
         let pob = super::Pob::load().unwrap();
         let json = pob.stats(&xml, loadout.as_deref(), None).unwrap();
         std::fs::write(std::env::var("POB_DUMP_OUT").expect("POB_DUMP_OUT"), json).unwrap();
+    }
+
+    /// Another copy of the app clearing old unpacked copies can't remove the one a loaded PoB
+    /// runs from. Needs a build, and runs alone (it tries to remove `pob-dev`'s copy):
+    /// `POB_DUMP_XML=build.xml cargo test loaded_copy_survives_cleanup -- --ignored --test-threads=1`
+    #[cfg(windows)]
+    #[tokio::test]
+    #[ignore]
+    async fn loaded_copy_survives_cleanup() {
+        let xml = std::fs::read_to_string(std::env::var("POB_DUMP_XML").expect("POB_DUMP_XML")).unwrap();
+        let engine = super::Engine::start(|| true);
+        engine.stats(xml.clone(), None, None).await.unwrap();
+        let dir = super::unpack().unwrap();
+        assert!(std::fs::remove_dir_all(&dir).is_err());
+        assert!(dir.join(".complete").exists());
+        assert!(dir.join("Modules").join("CalcBreakdown.lua").exists());
+        engine.stats(xml, None, None).await.unwrap();
     }
 
     #[test]

@@ -320,7 +320,10 @@ settings; otherwise it leaves it alone and says so.
   skill gem, so the same skill stays selected in every loadout that has it; loadouts without
   it show PoB's own pick, tagged **PoB pick**. Loading a different build clears the pick.
 - The first stats after starting take a few seconds while PoB loads; it unloads after
-  10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`. A build with a
+  10 minutes unused. PoB is unpacked to `%LOCALAPPDATA%\exile-leveling\pob`. From v0.4.65,
+  another copy of the app (a test copy on another port) can't remove it while PoB is loaded,
+  and if it goes missing anyway the next stats unpack it again; before, stats failed until a
+  restart. Debug builds use `pob-dev`. A build with a
   timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub the first time.
   Specs on an older tree are calculated on the latest one (noted under the stats).
 
