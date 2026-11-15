@@ -40,6 +40,10 @@ jobs:
       - name: Download skill tree data
         run: npm -w seeding run seed tree
 
+      # The guide's type check covers the Atlas planner (web/src/atlas), which imports it.
+      - name: Download atlas tree data
+        run: npm -w seeding run seed atlas
+
       - name: Build the guide
         run: npm -w web run build:desktop
 
