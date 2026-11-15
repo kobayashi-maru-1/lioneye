@@ -275,8 +275,7 @@ export function Bonuses({
 /** Named plans in this browser, and the Export file. */
 export function Saved({
   saved,
-  current,
-  onSave,
+  currentId,
   onLoad,
   onRename,
   onDelete,
@@ -284,45 +283,20 @@ export function Saved({
   onImport,
 }: {
   saved: SavedPlan[];
-  current: Plan;
-  onSave: (name: string) => void;
+  /** The saved plan being edited, marked in the list. */
+  currentId: string | null;
   onLoad: (p: SavedPlan) => void;
   onRename: (p: SavedPlan, name: string) => void;
   onDelete: (p: SavedPlan) => void;
   onExport: () => void;
   onImport: (file: File) => void;
 }) {
-  const [name, setName] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   // Escape leaves a rename without saving it (the box's blur would otherwise save it).
   const cancelled = useRef(false);
-  const save = () => {
-    if (current.allocated.length === 0) return;
-    const clean = name.trim().slice(0, 60);
-    onSave(clean || `Plan ${saved.length + 1}`);
-    setName("");
-  };
   return (
     <>
-      <div className={styles.saveRow}>
-        <input
-          className={formStyles.formInput}
-          placeholder="Name"
-          aria-label="Name"
-          maxLength={60}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && save()}
-        />
-        <button
-          className={formStyles.formButton}
-          onClick={save}
-          disabled={current.allocated.length === 0}
-        >
-          Save
-        </button>
-      </div>
       {saved.length === 0 && <div className={styles.empty}>No saved plans</div>}
       {saved.map((p) => (
         <div key={p.id} className={styles.savedRow}>
@@ -353,9 +327,12 @@ export function Saved({
             />
           ) : (
             <button
-              className={styles.savedName}
+              className={classNames(styles.savedName, {
+                [styles.savedCurrent]: p.id === currentId,
+              })}
               onClick={() => onLoad(p)}
               title="Load"
+              aria-current={p.id === currentId ? "true" : undefined}
             >
               {p.name}
               <span className={styles.count}>{p.plan.allocated.length}</span>

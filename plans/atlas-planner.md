@@ -190,14 +190,23 @@ clears too).
    increased Maps found in your Maps" → one "16% …"); a line with one percentage among
    other numbers sums that percentage; other lines with no or several numbers are listed
    once with a count; clicking a line highlights its nodes.
-3. **Saved:** named plans: load (undoable), rename, delete. No bundled presets.
+3. **Saved:** named plans: load (undoable), rename, delete; the open one marked. No
+   bundled presets.
 
 ### Storage, sharing and links
 
 - **Draft:** saved to local storage on every change, restored on load. Keys prefixed
   `lioneye-atlas-` (the League page shares the `kobayashi-maru-1.github.io` storage).
   All storage access in try/catch.
-- **Save:** names the plan and adds it to Saved.
+- **Save** (start of the toolbar, review round 2, 2026-11-15): a new plan has a name box
+  and Save adds it to Saved. A loaded or saved plan shows its name as gold text with a dot
+  when it differs from the save; Save (off when unchanged) updates that save. Clicking
+  the name edits it in place: Enter or Save stores a copy under a new name and stays on
+  it (Save as), or with the same name saves over it; Escape or leaving the box keeps the
+  original. Clear stays on the save; Open, a link and deleting the save start a new
+  plan. Each undo step remembers its save, so undoing a Load or an opened link goes back
+  to the save that was open. The open save's id is kept (`lioneye-atlas-current`) so a
+  reload stays on it. Opening a link over an unchanged save makes no Draft copy.
 - **Export / Import:** all saved plans as one JSON file, so plans can move between
   browsers and into Lioneye's frame (which gets its own storage).
 - **Share:** `…/lioneye/atlas/#t=<base64url>` of

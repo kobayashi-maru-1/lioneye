@@ -37,6 +37,8 @@ import {
   exportFile,
   historyReducer,
   importFile,
+  newHistory,
+  samePlan,
   type History,
 } from "../src/atlas/store.ts";
 
@@ -290,7 +292,7 @@ test("undo and redo restore exact plans with choices", () => {
   const b: Plan = { allocated: path, choices: {}, budget: 150 };
   const c: Plan = { allocated: path, choices: { "45404": 5301 }, budget: 150 };
   const d: Plan = { allocated: path, choices: { "45404": 5301 }, budget: 90 };
-  let h: History = { plan: a, past: [], future: [] };
+  let h: History = newHistory(a, null);
   for (const plan of [b, c, d]) h = historyReducer(h, { type: "apply", plan });
   assert.equal(historyReducer(h, { type: "apply", plan: d }), h);
   h = historyReducer(h, { type: "undo" });
@@ -302,6 +304,53 @@ test("undo and redo restore exact plans with choices", () => {
   h = historyReducer(h, { type: "redo" });
   assert.deepEqual(h.plan, d);
   assert.equal(historyReducer(h, { type: "redo" }), h);
+});
+
+test("undo after a Load goes back to the save that was open", () => {
+  const path = route(graph, none, "45404")!;
+  const a: Plan = { allocated: [], choices: {}, budget: 150 };
+  const b: Plan = { allocated: path, choices: {}, budget: 150 };
+  let h: History = newHistory(a, "A");
+  h = historyReducer(h, { type: "apply", plan: b, current: "B" });
+  assert.equal(h.current, "B");
+  h = historyReducer(h, { type: "undo" });
+  assert.deepEqual([h.plan, h.current], [a, "A"]);
+  h = historyReducer(h, { type: "redo" });
+  assert.deepEqual([h.plan, h.current], [b, "B"]);
+  // An edit keeps the open save; switching saves on the same plan adds no step.
+  h = historyReducer(h, { type: "apply", plan: a });
+  assert.equal(h.current, "B");
+  const steps = h.past.length;
+  h = historyReducer(h, { type: "apply", plan: b });
+  h = historyReducer(h, { type: "undo" });
+  h = historyReducer(h, { type: "apply", plan: a, current: "C" });
+  assert.deepEqual(
+    [h.current, h.past.length, h.future.length],
+    ["C", steps, 0],
+  );
+  h = historyReducer(h, { type: "current", current: null });
+  assert.deepEqual([h.current, h.past.length], [null, steps]);
+});
+
+test("saving moves the session's steps to the save, not earlier sessions", () => {
+  const path = route(graph, none, "45404")!;
+  const p = (n: number): Plan => ({
+    allocated: path.slice(0, n),
+    choices: {},
+    budget: 150,
+  });
+  let h: History = newHistory(p(0), "A");
+  h = historyReducer(h, { type: "apply", plan: p(1) }); // edit A
+  h = historyReducer(h, { type: "apply", plan: p(2), current: null }); // open a link
+  h = historyReducer(h, { type: "apply", plan: p(3) }); // edit it
+  h = historyReducer(h, { type: "current", current: "B" }); // save it as B
+  h = historyReducer(h, { type: "undo" });
+  assert.deepEqual([h.plan, h.current], [p(2), "B"]);
+  h = historyReducer(h, { type: "undo" });
+  assert.deepEqual([h.plan, h.current], [p(1), "A"]);
+  h = historyReducer(h, { type: "redo" });
+  h = historyReducer(h, { type: "redo" });
+  assert.deepEqual([h.plan, h.current], [p(3), "B"]);
 });
 
 test("Export then Import restores saved plans", () => {
@@ -553,4 +602,16 @@ test("click targets are larger than small dots and clear of labels", () => {
         `${id}/label ${label.g}`,
       );
   }
+});
+
+test("samePlan: node order doesn't matter; budget, nodes and choices do", () => {
+  const base: Plan = { budget: 100, allocated: ["1", "2", "3"], choices: {} };
+  assert.ok(samePlan(base, { ...base, allocated: ["3", "1", "2"] }));
+  assert.ok(!samePlan(base, { ...base, budget: 99 }));
+  assert.ok(!samePlan(base, { ...base, allocated: ["1", "2", "4"] }));
+  assert.ok(!samePlan(base, { ...base, allocated: ["1", "2"] }));
+  const chosen = { ...base, choices: { "2": 7 } };
+  assert.ok(!samePlan(base, chosen));
+  assert.ok(!samePlan(chosen, { ...base, choices: { "2": 8 } }));
+  assert.ok(samePlan(chosen, { ...chosen, choices: { "2": 7 } }));
 });

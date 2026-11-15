@@ -14,12 +14,15 @@ import {
   exportFile,
   historyReducer,
   importFile,
+  newHistory,
   newId,
+  readCurrent,
   readDraft,
   readSaved,
+  samePlan,
+  writeCurrent,
   writeDraft,
   writeSaved,
-  type History,
   type SavedPlan,
 } from "./store.ts";
 import {
@@ -34,6 +37,7 @@ import {
   Saved,
   type Tab,
 } from "./components/Panel.tsx";
+import { PlanName } from "./components/PlanName.tsx";
 import {
   ChoiceDialog,
   ConfirmDialog,
@@ -82,9 +86,13 @@ function start(fix: (p: unknown) => Plan) {
   const draft = fix(readDraft());
   const saved = readSaved();
   const hash = hashLink();
+  // The saved plan the draft was being edited as, if it still exists.
+  const open = saved.find((s) => s.id === readCurrent()) ?? null;
+  const current = open?.id ?? null;
+  const alone = newHistory(draft, current);
   if (hash === null)
     return {
-      history: { plan: draft, past: [], future: [] } as History,
+      history: alone,
       saved,
       status: null as string | null,
       keepDraft: false,
@@ -92,19 +100,24 @@ function start(fix: (p: unknown) => Plan) {
   const link = parseLink(hash);
   if (!link.ok)
     return {
-      history: { plan: draft, past: [], future: [] } as History,
+      history: alone,
       saved,
       status: "Link not read. Copy it again.",
       keepDraft: false,
     };
   const plan = fix(link.plan);
-  const keepDraft = draft.allocated.length > 0 && !sameNodes(draft, plan);
+  // An unchanged save is already kept; anything else becomes a Draft.
+  const keepDraft =
+    draft.allocated.length > 0 &&
+    !sameNodes(draft, plan) &&
+    !(open && samePlan(fix(open.plan), draft));
   return {
-    history: {
+    // An opened link is a new plan; Undo goes back to the draft and its save.
+    history: newHistory(
       plan,
-      past: draft.allocated.length ? [draft] : [],
-      future: [],
-    } as History,
+      null,
+      draft.allocated.length ? [{ plan: draft, current, session: 0 }] : [],
+    ),
     saved: keepDraft
       ? [
           ...saved,
@@ -167,6 +180,40 @@ export function App({ data }: { data: AtlasData }) {
     setSaved(list);
     return writeSaved(list);
   }, []);
+
+  // The saved plan being edited (null for a new plan): part of each undo step, and kept
+  // across reloads.
+  const currentId = history.current;
+  const setCurrentId = useCallback(
+    (id: string | null) => dispatch({ type: "current", current: id }),
+    [],
+  );
+  const current = saved.find((s) => s.id === currentId) ?? null;
+  useEffect(() => {
+    writeCurrent(current?.id ?? null);
+  }, [current]);
+  const savedVersion = useMemo(
+    () => (current ? fix(current.plan) : null),
+    [current, fix],
+  );
+  /** Saves the plan: over the one being edited, or (with a name) as a new save. Nothing
+   *  changes on screen unless storage takes it. */
+  const savePlan = (name: string | null) => {
+    const at = new Date().toISOString();
+    const id = name === null && current ? current.id : newId();
+    const list =
+      id === current?.id
+        ? saved.map((s) => (s.id === id ? { ...s, plan, at } : s))
+        : [...saved, { id, name: name ?? "", plan, at }];
+    if (!writeSaved(list)) {
+      say("Not saved. Free or allow storage.");
+      return false;
+    }
+    setSaved(list);
+    setCurrentId(id);
+    say("Saved");
+    return true;
+  };
   const openPlan = useRef<(next: Plan) => void>(() => {});
   useEffect(() => {
     const onHash = () => {
@@ -186,6 +233,9 @@ export function App({ data }: { data: AtlasData }) {
   // The budget being typed applies at once; it becomes an undo step on Enter or leaving.
   const [typedBudget, setTypedBudget] = useState<number | null>(null);
   const budget = typedBudget ?? plan.budget;
+  // A budget being typed counts, so Save lights up before leaving the box.
+  const dirty =
+    savedVersion !== null && !samePlan(savedVersion, { ...plan, budget });
   const unset = useMemo(
     () =>
       new Set(
@@ -379,7 +429,12 @@ export function App({ data }: { data: AtlasData }) {
   const [openLink, setOpenLink] = useState(false);
   const [deleting, setDeleting] = useState<SavedPlan | null>(null);
   openPlan.current = (next: Plan) => {
-    if (plan.allocated.length > 0 && !sameNodes(plan, next))
+    // The plan is kept as a Draft unless it's already an unchanged save.
+    if (
+      plan.allocated.length > 0 &&
+      !sameNodes(plan, next) &&
+      !(current && !dirty)
+    )
       storeSaved([
         ...saved,
         {
@@ -389,7 +444,7 @@ export function App({ data }: { data: AtlasData }) {
           at: new Date().toISOString(),
         },
       ]);
-    apply(next);
+    dispatch({ type: "apply", plan: next, current: null });
     tree.current?.focus(next.allocated);
     say(`Opened · ${next.allocated.length} points`);
   };
@@ -512,17 +567,10 @@ export function App({ data }: { data: AtlasData }) {
           {tab === "saved" && (
             <Saved
               saved={saved}
-              current={plan}
-              onSave={(name) => {
-                const ok = storeSaved([
-                  ...saved,
-                  { id: newId(), name, plan, at: new Date().toISOString() },
-                ]);
-                say(ok ? "Saved" : "Not saved. Free or allow storage.");
-              }}
+              currentId={current?.id ?? null}
               onLoad={(p) => {
                 const next = fix(p.plan);
-                apply(next);
+                dispatch({ type: "apply", plan: next, current: p.id });
                 tree.current?.focus(next.allocated);
                 setPanelOpen(false);
               }}
@@ -559,6 +607,13 @@ export function App({ data }: { data: AtlasData }) {
           >
             Show panel
           </button>
+          <PlanName
+            current={current}
+            dirty={dirty}
+            empty={used === 0}
+            defaultName={`Plan ${saved.length + 1}`}
+            onSave={savePlan}
+          />
           <span
             className={classNames(styles.points, {
               [styles.costOver]: used > budget,
@@ -735,7 +790,10 @@ export function App({ data }: { data: AtlasData }) {
         title={deleting ? `Delete ${deleting.name}?` : null}
         action="Delete"
         onConfirm={() => {
-          if (deleting) storeSaved(saved.filter((s) => s.id !== deleting.id));
+          if (deleting) {
+            storeSaved(saved.filter((s) => s.id !== deleting.id));
+            if (deleting.id === currentId) setCurrentId(null);
+          }
           setDeleting(null);
         }}
         onClose={() => setDeleting(null)}

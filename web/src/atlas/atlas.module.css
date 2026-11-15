@@ -282,15 +282,9 @@
   color: var(--on-secondary);
 }
 
-.saveRow,
 .fileRow {
   display: flex;
   gap: var(--size-2);
-}
-
-.saveRow input {
-  flex: 1;
-  min-width: 0;
 }
 
 .fileRow {
@@ -327,6 +321,12 @@
   background-color: var(--highlight-primary);
 }
 
+/* The saved plan being edited. */
+.savedCurrent {
+  color: var(--gold);
+  font-weight: var(--font-heavy);
+}
+
 .fileButton {
   position: relative;
 }
@@ -360,6 +360,54 @@
 
 .panelButton {
   display: none;
+}
+
+/* The plan's name and Save: a name box for a new plan, gold text for a saved one. */
+.planName {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2);
+  min-width: 0;
+  margin-right: var(--size-3);
+}
+
+.nameInput {
+  width: 11rem;
+  min-width: 6rem;
+  flex: 0 1 auto;
+}
+
+.nameText {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2);
+  min-width: 0;
+  max-width: 16rem;
+  padding: var(--size-1) var(--size-2);
+  border-radius: var(--border-radius);
+  color: var(--gold);
+  font-size: 1.1rem;
+  font-weight: var(--font-heavy);
+  cursor: text;
+}
+
+.nameText:hover,
+.nameText:focus-visible {
+  background-color: var(--highlight-primary);
+}
+
+.nameLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dirtyDot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background-color: var(--gold);
 }
 
 .points {
@@ -771,5 +819,18 @@
   .closePanel,
   .panelButton {
     display: inline-block;
+  }
+
+  /* The name shares the first row with Show panel. */
+  .planName {
+    margin-right: 0;
+  }
+
+  .nameText {
+    max-width: 9rem;
+  }
+
+  .nameInput {
+    width: 7rem;
   }
 }

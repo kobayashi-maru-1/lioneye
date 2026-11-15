@@ -421,7 +421,10 @@ League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
   it at `/lioneye/atlas/` next to `strats/` on every run (a Pages deploy replaces the whole
   site, so both always go together).
 - **Plans** live in the browser's local storage (keys `lioneye-atlas-…`): the draft,
-  named **Saved** plans, and **Export** / **Import** as a JSON file. **Share** gives our
+  named **Saved** plans, and **Export** / **Import** as a JSON file. The plan's name and
+  **Save** start the toolbar: a new plan has a name box; a saved one shows its name in
+  gold (a dot when changed), **Save** updates it, and clicking the name saves a copy
+  under a new name. **Clear** stays on the save. **Share** gives our
   link (`#t=`: nodes, choices, budget) and the official pathofexile.com link (nodes only);
   **Open** takes our links, poeatlasplanner.com links (`#p=`, so the League page's trees
   open) and official links. An official link carries no choices, so its choice nodes open
