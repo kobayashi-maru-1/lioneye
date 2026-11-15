@@ -17,9 +17,9 @@ import { useEffect, useMemo } from "react";
 
 /** The panel each finding's link jumps to. */
 const PANELS: Record<string, string> = {
-  gear: "Gear",
+  gear: "Items",
   tree: "Tree",
-  gems: "Gems",
+  gems: "Skills",
   config: "Config",
   campaign: "Campaign",
 };

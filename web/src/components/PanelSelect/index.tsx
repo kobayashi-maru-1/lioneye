@@ -16,6 +16,8 @@ interface PanelSelectProps {
   className?: string;
   /** Id of a note about the choice (aria-describedby). */
   describedBy?: string;
+  /** The choice isn't the shown loadout's set: drawn gold so it stands out. */
+  mismatch?: boolean;
 }
 
 /** pob.codes-style dropdown for picking a set or loadout. */
@@ -27,14 +29,18 @@ export function PanelSelect({
   placeholder,
   className,
   describedBy,
+  mismatch,
 }: PanelSelectProps) {
   const shown = value >= 0 ? options[value] : placeholder;
+  const name = displaySetName(stripPob(shown ?? ""));
   return (
     <select
-      className={classNames(styles.select, className)}
+      className={classNames(styles.select, className, {
+        [styles.mismatch]: mismatch,
+      })}
       aria-label={label}
       aria-describedby={describedBy}
-      title={displaySetName(stripPob(shown ?? ""))}
+      title={mismatch ? `${name} · Not in loadout` : name}
       value={value}
       onChange={(event) => onChange(Number(event.target.value))}
       onClick={(event) => event.stopPropagation()}

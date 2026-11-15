@@ -138,7 +138,7 @@ export function GearPanel() {
     () => gear?.sets.map((set) => set.title) ?? [],
     [gear],
   );
-  const [index, choose] = usePanelSet(
+  const [index, choose, , loadoutAt] = usePanelSet(
     titles,
     lists ? lists.active.items - 1 : null,
   );
@@ -174,7 +174,7 @@ export function GearPanel() {
   return (
     <PageSection
       id="gear"
-      title="Gear"
+      title="Items"
       actions={
         <>
           {leagues && leagues.length > 0 && league !== null && (
@@ -191,6 +191,7 @@ export function GearPanel() {
               options={titles}
               value={index}
               onChange={choose}
+              mismatch={loadoutAt !== null && index !== loadoutAt}
             />
           )}
         </>

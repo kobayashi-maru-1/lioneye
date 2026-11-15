@@ -14,3 +14,22 @@
 .select:hover {
   border-color: #3a3a3a;
 }
+
+/* Not the loadout's set: gold with dark text, as the gold checkboxes. The open list keeps
+   the usual colours (options take the select's otherwise). */
+.select.mismatch {
+  color: var(--primary);
+  background-color: var(--gold);
+  border-color: var(--gold);
+  font-weight: var(--font-heavy);
+}
+
+.select.mismatch:hover {
+  border-color: #c99550;
+}
+
+.select.mismatch option {
+  color: var(--on-primary);
+  background-color: var(--input);
+  font-weight: normal;
+}

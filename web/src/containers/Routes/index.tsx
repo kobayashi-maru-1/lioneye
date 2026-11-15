@@ -244,8 +244,8 @@ function GuidePage({ campaign }: { campaign: ReactNode }) {
   const targets = useMemo(
     () => [
       { id: "campaign", label: "Campaign" },
-      ...(showStats ? [{ id: "gear", label: "Gear" }] : []),
-      ...(gemLinks.length > 0 ? [{ id: "gems", label: "Gems" }] : []),
+      ...(showStats ? [{ id: "gear", label: "Items" }] : []),
+      ...(gemLinks.length > 0 ? [{ id: "gems", label: "Skills" }] : []),
       ...(showStats ? [{ id: "trade", label: "Trade" }] : []),
       ...(urlTrees.length > 0 ? [{ id: "tree", label: "Tree" }] : []),
       ...(showStats ? [{ id: "health", label: "Health" }] : []),
@@ -397,7 +397,10 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
     () => [...new Set(gemLinks.map((link) => link.title))],
     [gemLinks],
   );
-  const [index, choose] = usePanelSet(titles, titleIndex(titles, sets?.skills));
+  const [index, choose, , loadoutAt] = usePanelSet(
+    titles,
+    titleIndex(titles, sets?.skills),
+  );
   // While the page shows your live character, the bar's Gems tooltip keeps the plan's.
   const viewingLive = useAtomValue(viewingLiveAtom);
   // The in-game Gems tooltip's ‹ › arrows: the set before or after the one shown, picked
@@ -485,14 +488,15 @@ function GemsPanel({ gemLinks }: { gemLinks: RouteData.GemLinkGroup[] }) {
   return (
     <PageSection
       id="gems"
-      title="Gems"
+      title="Skills"
       actions={
         titles.length > 1 && (
           <PanelSelect
-            label="Gem set"
+            label="Skill set"
             options={titles}
             value={index}
             onChange={choose}
+            mismatch={loadoutAt !== null && index !== loadoutAt}
           />
         )
       }
@@ -508,7 +512,7 @@ function ConfigPanel() {
     () => lists?.configs.map((set) => set.title) ?? [],
     [lists],
   );
-  const [index, choose] = usePanelSet(
+  const [index, choose, , loadoutAt] = usePanelSet(
     titles,
     lists ? lists.active.config - 1 : null,
   );
@@ -523,6 +527,7 @@ function ConfigPanel() {
             options={titles}
             value={index}
             onChange={choose}
+            mismatch={loadoutAt !== null && index !== loadoutAt}
           />
         )
       }
@@ -543,9 +548,15 @@ const TREE_COMPARE = [
 function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
   const sets = useLoadoutSets();
   const titles = useMemo(() => urlTrees.map((tree) => tree.name), [urlTrees]);
-  const [panelIndex, choose, picked] = usePanelSet(
+  // The loadout's tree by its place in PoB (two trees can share a title), else by title.
+  const activeTree = usePobStats()?.stats?.lists?.active.tree ?? null;
+  const bySpec =
+    sets !== null && activeTree !== null
+      ? urlTrees.findIndex((tree) => tree.spec === activeTree - 1)
+      : -1;
+  const [panelIndex, choose, picked, loadoutAt] = usePanelSet(
     titles,
-    titleIndex(titles, sets?.tree),
+    bySpec >= 0 ? bySpec : titleIndex(titles, sets?.tree),
   );
   // Your set's tree finished before your level reaches the next set: the next one you
   // haven't finished, unless you picked a set here.
@@ -615,6 +626,7 @@ function TreePanel({ urlTrees }: { urlTrees: UrlTree.Data[] }) {
               options={titles}
               value={index}
               onChange={choose}
+              mismatch={loadoutAt !== null && index !== loadoutAt}
             />
           )}
         </>

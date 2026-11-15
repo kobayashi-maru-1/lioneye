@@ -563,8 +563,17 @@ export function usePanelSet(titles: string[], loadoutIndex: number | null) {
     (index: number) => setOverride({ key, index }),
     [key],
   );
+  // The loadout's set, while a loadout is shown (null without loadouts): a panel showing
+  // another marks its dropdown.
+  const loadoutAt =
+    pob?.stats?.loadout != null &&
+    loadoutIndex !== null &&
+    loadoutIndex >= 0 &&
+    loadoutIndex < titles.length
+      ? loadoutIndex
+      : null;
   // `picked`: you chose this set in the panel.
-  return [index, choose, picked] as const;
+  return [index, choose, picked, loadoutAt] as const;
 }
 
 /** PoB's stats for a build as saved (its own loadout and main skill), e.g. for Compare. */

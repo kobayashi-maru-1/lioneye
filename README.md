@@ -2,7 +2,7 @@
 
 A Path of Exile leveling guide and Path of Building build view in one Windows app. It
 follows your zones from the game's log, ticks off the campaign as you go, and shows your
-build's stats, gear, gems, tree and trade searches for the loadout that matches your level.
+build's stats, items, skills, tree and trade searches for the loadout that matches your level.
 
 **[Download lioneye.zip](https://github.com/kobayashi-maru-1/lioneye/releases/latest/download/lioneye.zip)**
 (Windows 10 or 11; [all releases](https://github.com/kobayashi-maru-1/lioneye/releases)).
@@ -29,7 +29,7 @@ again and replace `lioneye.exe`.
 - **Campaign** steps that tick off as you change zones, level up and kill bosses. Gem
   rewards name the quest or NPC.
 - **Stats** from a bundled Path of Building, for the loadout that matches your level.
-- **Gear** with item tooltips (Copy, Trade), **Gems** with Wiki and Trade links, a
+- **Items** with item tooltips (Copy, Trade), **Skills** with Wiki and Trade links, a
   **Trade List** with pob.codes' search options, **Build health**, **Config** (with Custom
   Modifiers), the passive **Tree** and the build's **Notes**.
 - **Open file**: a build file from Path of Building, and the guide follows it: each save in
@@ -38,7 +38,7 @@ again and replace `lioneye.exe`.
 - **Compare** any PoB code or build link with the guide's loadout: Stats, Passives,
   Skills and Items.
 - An **in-game bar** over the game: its buttons jump the guide to a panel without leaving
-  the game. Hover **Gems** for your links, or **Campaign** for your next steps.
+  the game. Hover **Skills** for your links, or **Campaign** for your next steps.
 - On a wide screen, Campaign and the other panels sit side by side.
 - Trade and wiki links open in your usual Edge profile, where you're signed in.
 - **Settings → App**: the in-game bar, which game log to follow and which browser opens the
