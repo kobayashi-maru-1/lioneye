@@ -10,8 +10,8 @@ import { atom } from "jotai";
  */
 export const OVERLAY_PANELS = [
   { id: "campaign", label: "Campaign" },
-  { id: "gear", label: "Gear" },
-  { id: "gems", label: "Gems" },
+  { id: "gear", label: "Items" },
+  { id: "gems", label: "Skills" },
   { id: "trade", label: "Trade" },
   { id: "config", label: "Config" },
   { id: "tree", label: "Tree" },

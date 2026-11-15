@@ -121,8 +121,8 @@ impl Default for OverlayConfig {
             on: true,
             buttons: vec![
                 button("campaign", "Campaign"),
-                button("gear", "Gear"),
-                button("gems", "Gems"),
+                button("gear", "Items"),
+                button("gems", "Skills"),
                 button("tree", "Tree"),
                 button("notes", "Notes"),
             ],

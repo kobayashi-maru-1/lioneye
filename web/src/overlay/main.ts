@@ -629,7 +629,7 @@ function renderGems() {
     !Array.isArray(gems.groups) ||
     gems.groups.length === 0
   ) {
-    fill("Gems", el("div", "tipEmpty", "No gems"));
+    fill("Skills", el("div", "tipEmpty", "No skills"));
     return;
   }
   const search = validSearch(gems.search);
@@ -687,7 +687,7 @@ function texts(value: unknown) {
 function renderGear() {
   const gear = (tips.gear ?? null) as OverlayGear | null;
   if (gear === null || !Array.isArray(gear.items) || gear.items.length === 0) {
-    fill("Gear", el("div", "tipEmpty", "No gear"));
+    fill("Items", el("div", "tipEmpty", "No items"));
     return;
   }
   const items = gear.items.map((item) => {
@@ -717,7 +717,7 @@ function renderGear() {
   });
   fillWith(
     head(
-      typeof gear.title === "string" && gear.title ? gear.title : "Gear",
+      typeof gear.title === "string" && gear.title ? gear.title : "Items",
       "",
       [],
       setArrows("gear", gear.index, gear.count),

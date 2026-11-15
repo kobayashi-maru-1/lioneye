@@ -202,7 +202,7 @@ export function TradeListPanel() {
       </div>
       <div className={classNames(styles.lists)} data-panel-row>
         <section className={classNames(styles.list)}>
-          <h3 className={classNames(styles.listTitle)}>Gear</h3>
+          <h3 className={classNames(styles.listTitle)}>Items</h3>
           {items.length === 0 && (
             <p className={classNames(styles.empty)}>No items</p>
           )}
@@ -275,9 +275,9 @@ export function TradeListPanel() {
           })}
         </section>
         <section className={classNames(styles.list)}>
-          <h3 className={classNames(styles.listTitle)}>Gems</h3>
+          <h3 className={classNames(styles.listTitle)}>Skills</h3>
           {gems.length === 0 && (
-            <p className={classNames(styles.empty)}>No gems</p>
+            <p className={classNames(styles.empty)}>No skills</p>
           )}
           {gems.map((link) => {
             const gem = Data.Gems[link.id];

@@ -139,7 +139,7 @@ check it (**Build health**).
   opens, and when the guide gets focus while you're not signed in (at most every 20
   seconds).
 - **Loadout → Live character** (the first entry once one is set) shows it in the guide:
-  the left column's stats, the header's numbers, **Gear**, **Gems**, **Tree**, **Trade
+  the left column's stats, the header's numbers, **Items**, **Skills**, **Tree**, **Trade
   List** and **Config**. Its name and level show under the dropdown, and PoB's own main
   skill is used (no skill picker). **Campaign**, your gem list, **Notes** and your tree
   progress stay on the plan, **Compare**'s Build 2 is the plan's loadout, **Build health**
@@ -171,7 +171,7 @@ settings; otherwise it leaves it alone and says so.
   Others (Hillock, Merveil, Brutus and most Act 1-4 bosses) log nothing when they die;
   their step ticks when you leave the zone.
 - The page is laid out like a pob.codes build page. Panels fold from their gold header bars
-  (click anywhere on the bar): **Campaign**, **Gear**, **Gems**, **Trade List**, **Config**,
+  (click anywhere on the bar): **Campaign**, **Items**, **Skills**, **Trade List**, **Config**,
   **Tree**, **Notes** and
   **Search**. A panel's header (and the act header inside Campaign) stays pinned while
   you're in that panel. Folding a panel or act while you're inside it lands on the next one.
@@ -238,7 +238,7 @@ settings; otherwise it leaves it alone and says so.
   The exe's PoB sends these per tree (`treeExtras` in `log-api/src/pob-host.lua`).
 - When you have every main-tree point of the shown tree set, the **Tree** panel (and the
   in-game Tree tooltip) shows the next set you haven't finished, with "… done" in its
-  hint. Stats, gear and gems stay on the loadout's set. Picking a set in the panel turns
+  hint. Stats, items and skills stay on the loadout's set. Picking a set in the panel turns
   this off until the loadout, act or level set changes. Masteries and ascendancy points
   don't count toward finishing a set. Refunds aren't in the log, so a point you refunded
   still counts as taken.
@@ -260,7 +260,7 @@ settings; otherwise it leaves it alone and says so.
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.
-- **Gear** shows the loadout's item set as a paper doll (with flasks, weapon swap, abyssal
+- **Items** shows the loadout's item set as a paper doll (with flasks, weapon swap, abyssal
   sockets, grafts and the jewels in the tree's taken sockets). Base art comes from RePoE's
   base item list (every base, flasks included) and unique art from poe.ninja for the league
   you pick. The trade site's stat and item lists drive the trade searches. The exe fetches
@@ -298,18 +298,20 @@ settings; otherwise it leaves it alone and says so.
 - Hover an item or gem for its in-game tooltip, with its buttons underneath; click it to pin
   the tooltip and use them: items have **Copy** (the item as PoB text, to paste into PoB) and **Trade**; gems have
   **W** (the wiki) and **Trade**. Escape, a click elsewhere or a second click unpins it.
-- **Trade List** has a trade search for every item of the loadout's gear and every gem of
+- **Trade List** has a trade search for every item of the loadout's item set and every gem of
   its skill set, as on pob.codes. Pick the league, the search type (**Instant Buyout**,
   **In Person**, **Any**), **Min mods** (the share of a rare's mods a listing must have)
   and **Min values** (each mod's minimum, as a share of yours). The settings apply to the
   tooltip Trade buttons too.
 - Gem rows show level/quality from the PoB code.
-- Gems turned off in PoB are dimmed, in the Gems panel (its tooltip says **Off in PoB**)
-  and the in-game bar's Gems tooltip. They still count on the gem list, its searches and
+- Gems turned off in PoB are dimmed, in the Skills panel (its tooltip says **Off in PoB**)
+  and the in-game bar's Skills tooltip. They still count on the gem list, its searches and
   Trade. A build loaded before this version is read again once on start to pick them up
   (and its level/quality, if it predates those).
-- Gear, Gems, Config and Tree show the loadout's sets; each has its own dropdown to look at
-  another set until the loadout or act changes. **Config** lists only the options a set
+- Items, Skills, Config and Tree show the loadout's sets; each has its own dropdown to look at
+  another set until the loadout or act changes. A dropdown showing a set that isn't the
+  loadout's turns gold (also when Tree moves ahead to the next set on its own); builds
+  without loadouts have nothing to differ from, so theirs stay plain. **Config** lists only the options a set
   changes from PoB's defaults, and its Custom Modifiers (lines PoB doesn't apply, such as
   `#` notes, are dimmed). On the tree, Ctrl+scroll zooms and dragging pans.
 - Under **Stats** in the left column, pick the main skill as in PoB. The pick is remembered by
@@ -446,8 +448,8 @@ share the address.
 - While Path of Exile is the window in front and you're playing a character, the exe shows a
   small bar over the game (hidden on the login and character select screens, as the game's
   log tells: a zone shows it, logging in or out hides it) with an
-  icon button per guide panel: a flag for **Campaign**, plate armour for **Gear**, a cut
-  gem for **Gems**, two arrows for **Trade**, sliders for **Config**, linked nodes for
+  icon button per guide panel: a flag for **Campaign**, plate armour for **Items**, a cut
+  gem for **Skills**, two arrows for **Trade**, sliders for **Config**, linked nodes for
   **Tree**, a heart with a pulse for **Health**, a page for **Notes**, a magnifier for
   **Search** and stacked layers for **Loadout** (hover one for its name). **Health** turns red with a high finding and amber
   with a medium one; **Campaign** turns amber with missed quest points (which then don't
@@ -455,10 +457,10 @@ share the address.
   scrolls to it; **Campaign** scrolls to the step for your zone. The game keeps focus, and the
   guide window comes up without taking it. With no guide open, the button opens one first.
   **Loadout** has no panel: clicking it opens its tooltip.
-- Hover **Gems** for the Gems panel's links (the set it shows for your loadout, named in
-  the title; the small ‹ › after the name step the Gems panel to the set before or after,
+- Hover **Skills** for the Skills panel's links (the set it shows for your loadout, named in
+  the title; the small ‹ › after the name step the Skills panel to the set before or after,
   as picking it in the panel does, until your loadout, act or level set changes; each
-  group's header names the gear slot PoB socketed it in, as in the Gems panel; its copy
+  group's header names the gear slot PoB socketed it in, as in the Skills panel; its copy
   icon puts a search for the set's gems still unticked on the gem list on the clipboard,
   or for all the set's gems once none are left to get,
   to paste into a vendor or stash search: the gem list's soonest first, as many as fit the
@@ -467,9 +469,9 @@ share the address.
   gem is a short piece of its name that starts at a word and no other gem's name has,
   anchored to the name's start or end where that helps, as [poe.re](https://poe.re/gems)
   does: Arc is `arc$`, so Arctic Armour stays dark),
-  **Gear** for the Gear panel's items with their PoB mods (enchants and implicits, then
-  explicits; crafted lighter; the small ‹ › after the set name step the Gear panel's item
-  set, as Gems' do),
+  **Items** for the Items panel's items with their PoB mods (enchants and implicits, then
+  explicits; crafted lighter; the small ‹ › after the set name step the Items panel's item
+  set, as Skills' do),
   **Loadout** for the guide's loadouts (its button shows when the build has two or more;
   the one shown is gold, the one your level, act or tree points to is tagged **Auto**;
   click another to show it in the guide, as its **Loadout** dropdown does, back on the
@@ -487,7 +489,7 @@ share the address.
   `/passives`, list above the steps under **Missed points**, and turn the **Campaign**
   icon amber; its copy icon puts a vendor search on the
   clipboard for the gems to buy at your next vendor stop: from your zone on, the first
-  unticked gem to buy and every one after it until the route leaves town, as the Gems
+  unticked gem to buy and every one after it until the route leaves town, as the Skills
   search is built; quest reward gems are left out, since they come from the reward
   window), or **Tree** for the tree zoomed to your next points
   (for the set the Tree panel shows, named beside the title; the small ‹ › after the name
@@ -524,8 +526,8 @@ share the address.
 - Drag the bar by its dotted grip; its place is kept in `%LOCALAPPDATA%\exile-leveling\overlay.json`.
   The dot at its end is the auto-progress state (green, **Auto**: following the log).
 - **Settings** → **App** → **Overlay**: **Show in game**, **Auto tree** (on to start), and
-  **Buttons**: which panels get a button (Campaign, Gear,
-  Gems, Tree, Health, Notes and Loadout to start; a bar set up before Health or Loadout
+  **Buttons**: which panels get a button (Campaign, Items,
+  Skills, Tree, Health, Notes and Loadout to start; a bar set up before Health or Loadout
   existed gets it once, and unticking it keeps it off). Panels the build doesn't have are
   left off, and Loadout with fewer than two loadouts.
 - The bar is a page of the guide (`overlay.html`) in WebView2, the engine Edge uses (part of
