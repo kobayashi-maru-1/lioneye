@@ -316,7 +316,7 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
       return;
     }
     const { node, label } = gesture.current;
-    // The start clears the plan by mouse only: a mis-tap on a phone shouldn't.
+    // The start asks to clear the plan, by mouse only: a mis-tap on a phone shouldn't.
     if (node === data.start) {
       if (was.type === "mouse") onStart();
     } else if (node) onNode(node, was.type !== "mouse");

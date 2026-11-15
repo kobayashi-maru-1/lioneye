@@ -16,6 +16,7 @@ import {
   importFile,
   newHistory,
   newId,
+  nextPlanName,
   readCurrent,
   readDraft,
   readSaved,
@@ -37,6 +38,7 @@ import {
   Saved,
   type Tab,
 } from "./components/Panel.tsx";
+import { MoreMenu, type MenuItem } from "./components/MoreMenu.tsx";
 import { PlanName } from "./components/PlanName.tsx";
 import {
   ChoiceDialog,
@@ -56,6 +58,11 @@ import {
   useRef,
   useState,
 } from "react";
+
+/** Toolbar widths (px): every button in words at or above FULL; icons for Undo and Redo and
+ *  a More menu at or above ICONS; below it (phones), Undo and Redo in More too. */
+const TOOLBAR_FULL = 780;
+const TOOLBAR_ICONS = 540;
 
 const sameNodes = (a: Plan, b: Plan) =>
   a.allocated.length === b.allocated.length &&
@@ -428,6 +435,40 @@ export function App({ data }: { data: AtlasData }) {
   } | null>(null);
   const [openLink, setOpenLink] = useState(false);
   const [deleting, setDeleting] = useState<SavedPlan | null>(null);
+  /** The start node was clicked with nodes allocated: Clear asks first. */
+  const [confirmClear, setConfirmClear] = useState(false);
+  const undo = () => dispatch({ type: "undo" });
+  const redo = () => dispatch({ type: "redo" });
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
+  const share = () =>
+    setShareLinks({
+      ours: `${location.origin}${location.pathname}#${encodeShare(plan, data.version)}`,
+      official: encodeOfficial(plan.allocated),
+    });
+  const askClear = useCallback(() => {
+    if (plan.allocated.length) setConfirmClear(true);
+  }, [plan]);
+
+  // The toolbar keeps one row: narrower, Undo and Redo become icons and Clear, Share and
+  // Open move to More; narrower still (phones), Undo and Redo move to More too.
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarWidth, setToolbarWidth] = useState(Infinity);
+  useLayoutEffect(() => {
+    const bar = toolbarRef.current;
+    if (!bar) return;
+    const measure = () => setToolbarWidth(bar.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
+  const toolbar =
+    toolbarWidth >= TOOLBAR_FULL
+      ? "full"
+      : toolbarWidth >= TOOLBAR_ICONS
+        ? "icons"
+        : "phone";
   openPlan.current = (next: Plan) => {
     // The plan is kept as a Draft unless it's already an unchanged save.
     if (
@@ -600,18 +641,18 @@ export function App({ data }: { data: AtlasData }) {
       </aside>
 
       <main className={styles.main}>
-        <div className={styles.toolbar}>
+        <div className={styles.toolbar} ref={toolbarRef}>
           <button
             className={classNames(formStyles.formButton, styles.panelButton)}
             onClick={() => setPanelOpen(true)}
           >
-            Show panel
+            Panel
           </button>
           <PlanName
             current={current}
             dirty={dirty}
             empty={used === 0}
-            defaultName={`Plan ${saved.length + 1}`}
+            defaultName={nextPlanName(saved)}
             onSave={savePlan}
           />
           <span
@@ -629,46 +670,83 @@ export function App({ data }: { data: AtlasData }) {
               }}
             />
           </span>
-          <button
-            className={formStyles.formButton}
-            onClick={() => dispatch({ type: "undo" })}
-            disabled={history.past.length === 0}
-          >
-            Undo
-          </button>
-          <button
-            className={formStyles.formButton}
-            onClick={() => dispatch({ type: "redo" })}
-            disabled={history.future.length === 0}
-          >
-            Redo
-          </button>
-          <button
-            className={formStyles.formButton}
-            onClick={clear}
-            disabled={used === 0}
-          >
-            Clear
-          </button>
+          {toolbar !== "phone" && (
+            <>
+              <button
+                className={formStyles.formButton}
+                onClick={undo}
+                disabled={!canUndo}
+                aria-label={toolbar === "icons" ? "Undo" : undefined}
+                title={toolbar === "icons" ? "Undo" : undefined}
+              >
+                {toolbar === "icons" ? (
+                  <span aria-hidden className={styles.toolIcon}>
+                    ↶
+                  </span>
+                ) : (
+                  "Undo"
+                )}
+              </button>
+              <button
+                className={formStyles.formButton}
+                onClick={redo}
+                disabled={!canRedo}
+                aria-label={toolbar === "icons" ? "Redo" : undefined}
+                title={toolbar === "icons" ? "Redo" : undefined}
+              >
+                {toolbar === "icons" ? (
+                  <span aria-hidden className={styles.toolIcon}>
+                    ↷
+                  </span>
+                ) : (
+                  "Redo"
+                )}
+              </button>
+            </>
+          )}
+          {toolbar === "full" && (
+            <button
+              className={formStyles.formButton}
+              onClick={clear}
+              disabled={used === 0}
+            >
+              Clear
+            </button>
+          )}
           <span className={styles.spacer} />
-          <button
-            className={formStyles.formButton}
-            onClick={() =>
-              setShareLinks({
-                ours: `${location.origin}${location.pathname}#${encodeShare(plan, data.version)}`,
-                official: encodeOfficial(plan.allocated),
-              })
-            }
-            disabled={used === 0}
-          >
-            Share
-          </button>
-          <button
-            className={formStyles.formButton}
-            onClick={() => setOpenLink(true)}
-          >
-            Open
-          </button>
+          {toolbar === "full" ? (
+            <>
+              <button
+                className={formStyles.formButton}
+                onClick={share}
+                disabled={used === 0}
+              >
+                Share
+              </button>
+              <button
+                className={formStyles.formButton}
+                onClick={() => setOpenLink(true)}
+              >
+                Open
+              </button>
+            </>
+          ) : (
+            <MoreMenu
+              items={
+                [
+                  ...(toolbar === "phone"
+                    ? [
+                        { label: "Undo", onClick: undo, disabled: !canUndo },
+                        { label: "Redo", onClick: redo, disabled: !canRedo },
+                      ]
+                    : []),
+                  { label: "Clear", onClick: clear, disabled: used === 0 },
+                  { label: "Share", onClick: share, disabled: used === 0 },
+                  { label: "Open", onClick: () => setOpenLink(true) },
+                ] satisfies MenuItem[]
+              }
+            />
+          )}
         </div>
 
         <div className={styles.treeWrap}>
@@ -714,7 +792,7 @@ export function App({ data }: { data: AtlasData }) {
             onNode={onNode}
             onLabel={onLabel}
             onLabelHover={setPreviewMechanic}
-            onStart={clear}
+            onStart={askClear}
           />
           {/* Over the tree, so a message never changes the toolbar's height. */}
           <div
@@ -785,6 +863,15 @@ export function App({ data }: { data: AtlasData }) {
         isOpen={openLink}
         onOpen={openText}
         onClose={() => setOpenLink(false)}
+      />
+      <ConfirmDialog
+        title={confirmClear ? "Clear tree?" : null}
+        action="Clear"
+        onConfirm={() => {
+          clear();
+          setConfirmClear(false);
+        }}
+        onClose={() => setConfirmClear(false)}
       />
       <ConfirmDialog
         title={deleting ? `Delete ${deleting.name}?` : null}

@@ -152,7 +152,7 @@ export function combine(
 /**
  * The plan's combined effects, grouped by mechanic. A cluster node's lines go to its
  * mechanic; a travel node's lines go to the mechanic each one names (else Other, -1). A
- * picked choice is one line, "<node>: <effect>", under its mechanic.
+ * picked choice is one line, "<node>: <effect>", under its mechanic. Gateways add none.
  */
 export function bonuses(data: AtlasData, plan: Plan): Bonuses {
   const perMechanic = new Map<number, { line: string; node: string }[]>();
@@ -165,7 +165,8 @@ export function bonuses(data: AtlasData, plan: Plan): Bonuses {
   };
   for (const id of plan.allocated) {
     const node = data.nodes[id];
-    if (!node) continue;
+    // A gateway's only line is "Connects to <gateway>": a route, not a bonus.
+    if (!node || node.gateway) continue;
     if (node.kind === "keystone") keystones.push({ id, name: node.name });
     const stats = nodeStats(data, plan, id);
     if (node.choices && stats.length === 0) {

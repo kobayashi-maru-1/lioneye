@@ -38,6 +38,7 @@ import {
   historyReducer,
   importFile,
   newHistory,
+  nextPlanName,
   samePlan,
   type History,
 } from "../src/atlas/store.ts";
@@ -614,4 +615,35 @@ test("samePlan: node order doesn't matter; budget, nodes and choices do", () => 
   assert.ok(!samePlan(base, chosen));
   assert.ok(!samePlan(chosen, { ...base, choices: { "2": 8 } }));
   assert.ok(samePlan(chosen, { ...chosen, choices: { "2": 7 } }));
+});
+
+test("bonuses leave gateways out", () => {
+  const gateways = Object.entries(data.nodes).filter(([, n]) => n.gateway);
+  assert.ok(gateways.length > 0);
+  const [gate] = gateways[0];
+  const path = route(graph, none, gate);
+  assert.ok(path?.includes(gate));
+  const b = bonuses(data, {
+    allocated: path,
+    choices: {},
+    budget: 150,
+  });
+  for (const group of b.groups)
+    for (const line of group.lines) {
+      assert.ok(!/^Connects to /.test(line.text), line.text);
+      assert.ok(!line.nodes.includes(gate));
+    }
+});
+
+test("a new plan's default name is the first free Plan number", () => {
+  assert.equal(nextPlanName([]), "Plan 1");
+  assert.equal(nextPlanName([{ name: "Draft Nov 15, 05:28 AM" }]), "Plan 1");
+  assert.equal(
+    nextPlanName([{ name: "Plan 1" }, { name: "Plan 3" }]),
+    "Plan 2",
+  );
+  assert.equal(
+    nextPlanName([{ name: "Plan 2" }, { name: "Plan 1" }]),
+    "Plan 3",
+  );
 });

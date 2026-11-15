@@ -247,7 +247,7 @@ export function OpenDialog({
   );
 }
 
-/** A yes/no for something that can't be undone. */
+/** Asks before an action: deleting a save, or clearing the tree from the start node. */
 export function ConfirmDialog({
   title,
   action,

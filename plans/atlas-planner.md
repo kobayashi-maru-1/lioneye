@@ -174,8 +174,14 @@ the start. Click removes that set (and their choices) as one undo step.
 
 ### Points bar
 
-`used / budget`; budget editable 1–150. **Undo**, **Redo**, **Clear** (the start marker
-clears too).
+`used / budget`; budget editable 1–150. **Undo**, **Redo**, **Clear**. Clicking the start
+marker asks **Clear tree?** first (review round 3, 2026-11-15); a tap on it does nothing.
+
+The toolbar stays on one row (review round 3): narrower than 780px, Undo and Redo become
+arrows and Clear, Share and Open move to a **More** menu; narrower than 540px (phones),
+Undo and Redo move to More too. On phones the panel opens with **Panel**. A tap on a node
+opens its card (details, cost, **Allocate**); a mouse click allocates at once, as the
+tooltip already showed the cost.
 
 ### Panel tabs
 
@@ -186,7 +192,7 @@ clears too).
    node counts; keystones by name; a picked choice once, as `<node>: <effect>` under its
    mechanic; allocated choice nodes with no pick first, under **Unset** (click to pick);
    travel nodes' lines under the mechanic they name, else **Other**
-   (review round 1, 2026-11-15); identical lines summed (eight "2%
+   (review round 1, 2026-11-15); gateways add no line ("Connects to …", round 3); identical lines summed (eight "2%
    increased Maps found in your Maps" → one "16% …"); a line with one percentage among
    other numbers sums that percentage; other lines with no or several numbers are listed
    once with a count; clicking a line highlights its nodes.
@@ -199,7 +205,7 @@ clears too).
   `lioneye-atlas-` (the League page shares the `kobayashi-maru-1.github.io` storage).
   All storage access in try/catch.
 - **Save** (start of the toolbar, review round 2, 2026-11-15): a new plan has a name box
-  and Save adds it to Saved. A loaded or saved plan shows its name as gold text with a dot
+  and Save adds it to Saved (with no name typed: the first free "Plan <n>"). A loaded or saved plan shows its name as gold text with a dot
   when it differs from the save; Save (off when unchanged) updates that save. Clicking
   the name edits it in place: Enter or Save stores a copy under a new name and stays on
   it (Save as), or with the same name saves over it; Escape or leaving the box keeps the

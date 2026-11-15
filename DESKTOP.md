@@ -421,16 +421,20 @@ League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
   it at `/lioneye/atlas/` next to `strats/` on every run (a Pages deploy replaces the whole
   site, so both always go together).
 - **Plans** live in the browser's local storage (keys `lioneye-atlas-…`): the draft,
-  named **Saved** plans, and **Export** / **Import** as a JSON file. The plan's name and
+  named **Saved** plans, and **Export** / **Import** as a JSON file. Saving with no name
+  typed uses the first free "Plan <n>". The plan's name and
   **Save** start the toolbar: a new plan has a name box; a saved one shows its name in
   gold (a dot when changed), **Save** updates it, and clicking the name saves a copy
-  under a new name. **Clear** stays on the save. **Share** gives our
+  under a new name. **Clear** stays on the save; clicking the start node asks
+  **Clear tree?** first. The toolbar keeps one row: narrow windows get arrow icons for
+  Undo and Redo and a **More** menu, and phones put Undo and Redo in More too. **Share** gives our
   link (`#t=`: nodes, choices, budget) and the official pathofexile.com link (nodes only);
   **Open** takes our links, poeatlasplanner.com links (`#p=`, so the League page's trees
   open) and official links. An official link carries no choices, so its choice nodes open
   **Unset** (a dashed ring, listed first in Bonuses) until one is picked.
 - **Bonuses** files a travel node's lines under the mechanic they name ("Maps found" →
-  Maps), else **Other**; a picked choice shows once, under its mechanic.
+  Maps), else **Other**; a picked choice shows once, under its mechanic; gateways add
+  nothing.
 - **Colours:** clusters within 3,000 units never share a colour (16-colour palette; 3.30
   needs 14). Discs show only for the hovered or pinned mechanic.
 - **Keyboard:** Tab reaches the zoom buttons, then every cluster label and node; Enter or

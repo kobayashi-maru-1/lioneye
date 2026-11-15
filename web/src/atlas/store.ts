@@ -176,6 +176,14 @@ export function samePlan(a: Plan, b: Plan) {
   return ca.length === cb.length && ca.every(([k, v]) => b.choices[k] === v);
 }
 
+/** A new plan's name when none is typed: the first "Plan <n>" not already saved. */
+export function nextPlanName(saved: { name: string }[]) {
+  const names = new Set(saved.map((s) => s.name));
+  let n = 1;
+  while (names.has(`Plan ${n}`)) n += 1;
+  return `Plan ${n}`;
+}
+
 /** Clears this planner's storage (the page's Reset after a crash). */
 export function clearStorage() {
   try {

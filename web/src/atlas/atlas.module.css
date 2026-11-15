@@ -348,14 +348,23 @@
   min-width: 0;
 }
 
+/* One row: buttons that don't fit move to More (App's TOOLBAR_* widths); only the plan's
+   name shrinks. */
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--size-2);
   padding: var(--size-2) var(--size-3);
   background-color: var(--panel);
   border-bottom: var(--border-width) solid var(--panel-border);
+}
+
+.toolbar > * {
+  flex: none;
+}
+
+.toolbar > .planName {
+  flex: 0 1 auto;
 }
 
 .panelButton {
@@ -373,7 +382,7 @@
 
 .nameInput {
   width: 11rem;
-  min-width: 6rem;
+  min-width: 4rem;
   flex: 0 1 auto;
 }
 
@@ -424,8 +433,55 @@
   padding: var(--size-1) var(--size-2);
 }
 
-.spacer {
+.toolbar > .spacer {
   flex: 1;
+}
+
+/* Undo and Redo as arrows when the toolbar is narrow. */
+.toolIcon {
+  display: inline-block;
+  font-size: 1.35rem;
+  line-height: 1;
+  vertical-align: -0.1em;
+}
+
+/* More: the toolbar's overflow menu, below its button at the right. */
+.more {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + var(--size-2));
+  right: 0;
+  /* Over the tree's card and tooltip (5) and messages (6). The panel (4) can't be open
+     with it: opening the panel is a click outside, which closes the menu. */
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  min-width: 8rem;
+  padding: var(--size-2) 0;
+  background-color: var(--navy-deep);
+  border: var(--border-width) solid var(--navy-border);
+  border-radius: var(--border-radius);
+}
+
+.menuItem {
+  padding: var(--size-3) var(--size-4);
+  text-align: left;
+  font-weight: var(--font-heavy);
+  color: #dad5cd;
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible {
+  background-color: var(--highlight-primary);
+}
+
+.menuItem:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .status {
@@ -821,8 +877,21 @@
     display: inline-block;
   }
 
-  /* The name shares the first row with Show panel. */
-  .planName {
+  /* Phones: tighter buttons so Panel, the name, Save, points and More share one row. */
+  .toolbar {
+    gap: var(--size-2);
+    padding: var(--size-2);
+  }
+
+  .toolbar > button,
+  .planName > button:not(.nameText),
+  .more > button {
+    padding-left: var(--size-3);
+    padding-right: var(--size-3);
+  }
+
+  .planName,
+  .points {
     margin-right: 0;
   }
 
@@ -832,5 +901,9 @@
 
   .nameInput {
     width: 7rem;
+  }
+
+  .budget {
+    width: 3.25rem;
   }
 }
