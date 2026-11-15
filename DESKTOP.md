@@ -442,8 +442,11 @@ League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
 
 ### Compare concept (demo)
 
-A static mock of a reworked **Compare** (same setup on both sides, per-stat sources,
-every calculated stat, ranked gaps, an in-game summary), with example data only. It's not
+A static mock of a reworked **Compare** in the guide's layout (foldable panels, jump bar):
+the live character against the shown loadout (HRoC Early Maps), on the guide's config, with
+per-stat sources, ranked gaps (each one PoB recalculating your build with one guide piece
+swapped in) and an in-game summary. The numbers are real PoB output from a one-off run,
+frozen into the page; it doesn't update. It's not
 part of the app: `compare-demo/index.html`, published by the **Strats page** workflow at
 <https://kobayashi-maru-1.github.io/lioneye/compare-demo/>. Not linked from anywhere;
 share the address.

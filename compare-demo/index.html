@@ -5,618 +5,655 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Lioneye Compare Concept</title>
-<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <style>
-/* Layout: Lioneye's pob.codes look (near-black, gold small-caps bars, navy cards);
-   compare panel left, in-game overlay mock right, stacked on phones. Single dark theme on purpose. */
+/* Lioneye's guide look: near-black page, a pinned jump bar of gold small caps, and
+   foldable black panels whose gold headers pin under it. Single dark theme on purpose. */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 :root {
   color-scheme: dark;
-  --bg: #161616;
+  --primary: #161616;
   --panel: #111111;
-  --panel-2: #1b1b1b;
+  --panel-2: #1a1a1a;
   --border: #2a2a2a;
   --navy: #171e2a;
   --navy-border: #2f3b4d;
+  --navy-deep: #12171f;
   --fg: #c8c8c8;
   --fg-strong: #e8e8e8;
   --muted: #8b8b8b;
   --gold: #af8040;
+  --gold-hover: #c99550;
   --gold-soft: rgba(175, 128, 64, 0.16);
   --good: #79c27d;
   --bad: #e0716b;
   --warn: #dfab4a;
-  --note: #5ea7e0;
-  --note-soft: rgba(94, 167, 224, 0.16);
   --k-gear: #8fb0dc;
   --k-tree: #86c08a;
-  --k-skill: #d6ad66;
-  --k-jewel: #b394dc;
-  --k-gem: #d6ad66;
+  --k-gems: #d6ad66;
+  --k-links: #e0a0c8;
+  --k-config: #b8b8b8;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
   --radius: 6px;
+  --jumpbar: 2.25rem;
+  --panel-head: 2.75rem;
 }
-body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; }
-.page {
-  max-width: 1240px; margin: 0 auto;
-  padding-block: 20px 48px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: grid; gap: 16px;
-}
+html { scroll-padding-top: calc(var(--jumpbar) + 8px); }
+body { margin: 0; background: var(--primary); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; }
 button, input, select { font: inherit; color: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 .num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.pos { color: var(--good); }
+.neg { color: var(--bad); }
+.zero { color: var(--muted); }
 
-/* Header */
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
-.top h1 { font-size: 20px; font-weight: 600; color: var(--fg-strong); letter-spacing: 0.01em; }
-.top h1 span { color: var(--gold); font-variant: small-caps; letter-spacing: 0.06em; }
-.chip { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+/* Jump bar: the app's only bar, pinned at the top. */
+.jumpbar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: stretch; overflow-x: auto; scrollbar-width: none;
+  height: var(--jumpbar);
+  padding: 0 max(8px, env(safe-area-inset-left, 0px));
+  background: var(--primary); border-bottom: 1px solid var(--border);
+}
+.jumpbar::-webkit-scrollbar { display: none; }
+.jumpbar .inner { display: flex; align-items: stretch; width: 100%; max-width: 1100px; margin: 0 auto; }
+.jump {
+  display: flex; align-items: center; flex: none; padding: 0 10px;
+  color: var(--gold); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
+  white-space: nowrap; border-bottom: 2px solid transparent;
+}
+.jump:hover { color: var(--gold-hover); }
+.jump[aria-current="true"] { border-bottom-color: var(--gold); }
+.jumpbar .flag { margin-left: auto; display: flex; align-items: center; padding-left: 12px; }
+
+.page {
+  max-width: 1100px; margin: 0 auto;
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
+  display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr);
+}
+
+/* Chips and small controls */
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--muted); white-space: nowrap; line-height: 20px; }
 .chip.warn { color: var(--warn); border-color: rgba(223, 171, 74, 0.45); }
 .chip.good { color: var(--good); border-color: rgba(121, 194, 125, 0.4); }
-.legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
-.legend .item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg); }
-.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding-left: 6px; }
-.switch input { accent-color: var(--note); }
-
-/* Note markers */
-.mk { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--note); color: #0d1620; font-size: 11px; font-weight: 700; flex: none; }
-.notes-off .mk:not(.keep) { display: none; }
-.notes-off .legend .item { display: none; }
-
-/* Layout */
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
-@media (max-width: 920px) { .layout { grid-template-columns: minmax(0, 1fr); } }
-
-.panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; }
-.bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--gold); font-variant: small-caps; letter-spacing: 0.08em; font-size: 15px; font-weight: 600; }
-.panel-body { padding: 12px; display: grid; gap: 12px; }
-.panel-body, [role="tabpanel"] > div, #gaps-body, .gap-group, .why { grid-template-columns: minmax(0, 1fr); }
-.seg button:focus-visible { outline-offset: -2px; }
-
-/* Build cards */
-.builds { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-@media (max-width: 560px) { .builds { grid-template-columns: 1fr; } }
-.build { background: var(--navy); border: 1px solid var(--navy-border); border-radius: var(--radius); padding: 8px 10px; display: grid; gap: 4px; min-width: 0; }
-.build .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-.build .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.build select { background: var(--panel); border: 1px solid var(--navy-border); border-radius: 4px; padding: 3px 6px; min-width: 0; flex: 1; }
-.build .name { color: var(--fg-strong); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.build .sub { font-size: 12px; color: var(--muted); }
-.icon-btn { border: 1px solid var(--navy-border); background: var(--panel); border-radius: 4px; width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
-.icon-btn:hover { border-color: var(--gold); }
-
-/* Footing bar */
-.footing { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 8px 10px; border: 1px dashed var(--border); border-radius: var(--radius); background: var(--panel-2); }
-.footing .f { display: inline-flex; align-items: center; gap: 8px; }
-.footing .k { font-size: 12px; color: var(--muted); }
-.footing .v { color: var(--fg-strong); }
+.chip.gold { color: var(--gold); border-color: rgba(175, 128, 64, 0.5); }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
-.seg button { background: transparent; border: 0; padding: 2px 10px; font-size: 13px; color: var(--muted); }
+.seg button { padding: 1px 10px; font-size: 13px; color: var(--muted); }
 .seg button + button { border-left: 1px solid var(--border); }
 .seg button[aria-pressed="true"] { background: var(--gold-soft); color: var(--gold); }
-
-/* Tabs */
-.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border); }
-.tab { background: transparent; border: 1px solid transparent; border-bottom: 0; padding: 6px 12px; border-radius: 4px 4px 0 0; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; margin-bottom: -1px; }
-.tab:hover { color: var(--fg-strong); }
-.tab[aria-selected="true"] { color: var(--gold); border-color: var(--border); background: var(--panel); border-bottom: 1px solid var(--panel); }
-.new { font-size: 10px; color: var(--note); border: 1px solid var(--note); border-radius: 3px; padding: 0 4px; letter-spacing: 0.05em; }
-
-/* Toolbars */
-.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.search { flex: 1 1 200px; min-width: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 5px 9px; }
+.seg button:focus-visible { outline-offset: -2px; }
+.btn { border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; font-size: 12px; line-height: 22px; color: var(--fg); white-space: nowrap; }
+.btn:hover, .btn[aria-expanded="true"] { border-color: var(--gold); color: var(--gold); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid var(--border); border-radius: 999px; padding: 1px 11px; font-size: 13px; color: var(--muted); }
+.chips button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+.search { flex: 1 1 200px; min-width: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 4px 9px; }
 .search::placeholder { color: var(--muted); }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .check input { accent-color: var(--gold); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chips button { background: transparent; border: 1px solid var(--border); border-radius: 999px; padding: 2px 11px; font-size: 13px; color: var(--muted); }
-.chips button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+
+/* Builds card (not foldable) */
+.builds { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px 12px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.builds .title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.builds h1 { margin: 0; font-size: 0.8rem; color: var(--gold); text-transform: uppercase; letter-spacing: 0.02em; font-weight: 600; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 600px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+.build { background: var(--navy); border: 1px solid var(--navy-border); border-radius: var(--radius); padding: 8px 10px; display: grid; gap: 2px; min-width: 0; }
+.build .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; gap: 6px; }
+.build .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.build .name { color: var(--fg-strong); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.build select { flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--navy-border); border-radius: 4px; padding: 2px 6px; color: var(--fg-strong); font-weight: 600; }
+.build .sub { font-size: 12px; color: var(--muted); }
+.live { color: var(--good); border: 1px solid rgba(121, 194, 125, 0.45); border-radius: 3px; padding: 0 4px; font-size: 10px; letter-spacing: 0.06em; }
+.footing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 6px 10px; border: 1px dashed var(--border); border-radius: var(--radius); background: var(--panel-2); }
+.footing .f { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.footing .k { font-size: 12px; color: var(--muted); }
+.footing .v { color: var(--fg-strong); }
+
+/* Foldable panel (PageSection) */
+.section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 12px 4px; min-width: 0; scroll-margin-top: calc(var(--jumpbar) + 8px); }
+.section > .head {
+  position: sticky; top: var(--jumpbar); z-index: 3;
+  display: flex; align-items: center; gap: 10px; height: var(--panel-head);
+  margin: 0 -12px; padding: 0 12px; background: var(--panel); border-radius: var(--radius) var(--radius) 0 0; cursor: pointer;
+}
+.section > .head .toggle { display: flex; align-items: center; gap: 6px; color: var(--gold); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.section > .head .toggle:hover { color: var(--gold-hover); }
+.section > .head .toggle svg { width: 14px; height: 14px; }
+.section > .head .actions { margin-left: auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.section > .body { padding: 2px 0 10px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.section[data-collapsed] > .body { display: none; }
+
+/* Summary tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.tile { text-align: left; background: var(--navy-deep); border: 1px solid var(--navy-border); border-radius: var(--radius); padding: 7px 10px; display: grid; gap: 1px; min-width: 0; }
+.tile:hover { border-color: var(--gold); }
+.tile .t { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.tile .v { font-size: 20px; color: var(--fg-strong); font-variant-numeric: tabular-nums; line-height: 1.3; }
+.tile .g { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 6px; }
+
+/* Gaps */
+.gap-list { display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr); }
+.gap-head { color: var(--gold); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 0 0; }
+.gap { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 6px 10px; background: var(--navy-deep); border: 1px solid var(--navy-border); border-radius: var(--radius); }
+.gap .kind { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; justify-self: start; }
+.gap .kind.Gear { color: var(--k-gear); } .gap .kind.Tree { color: var(--k-tree); } .gap .kind.Gems { color: var(--k-gems); } .gap .kind.Links { color: var(--k-links); } .gap .kind.Config { color: var(--k-config); }
+.gap .what { min-width: 0; }
+.gap .what b { color: var(--fg-strong); font-weight: 600; }
+.gap .what .d { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.gap .pills { grid-column: 2 / 3; display: flex; flex-wrap: wrap; gap: 4px; }
+.pill { font-size: 12px; border-radius: 3px; padding: 0 5px; background: rgba(255, 255, 255, 0.04); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill.big { font-size: 14px; font-weight: 600; background: transparent; padding: 0; }
+.gap .act { grid-column: 3; grid-row: 1 / span 2; display: flex; gap: 6px; }
+@media (max-width: 560px) {
+  .gap { grid-template-columns: minmax(0, 1fr) auto; }
+  .gap .kind { grid-column: 1 / -1; }
+  .gap .pills { grid-column: 1 / -1; }
+  .gap .act { grid-column: 2; grid-row: 2; }
+}
 
 /* Tables */
 .scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); vertical-align: middle; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 4px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); vertical-align: middle; }
 td.r, th.r { text-align: right; white-space: nowrap; }
-tr.group td { color: var(--gold); font-variant: small-caps; letter-spacing: 0.06em; font-weight: 600; padding-top: 12px; border-bottom: 1px solid var(--border); }
+tr.group td { color: var(--gold); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 10px; border-bottom: 1px solid var(--border); }
 tr.same td { color: var(--muted); }
-tr.sel td { background: var(--gold-soft); }
-tbody tr.stat:hover td { background: rgba(255, 255, 255, 0.03); }
-tbody tr.sel:hover td { background: var(--gold-soft); }
+tr.open td { background: var(--gold-soft); }
 .tag { font-size: 10px; border: 1px solid var(--border); color: var(--muted); border-radius: 3px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; letter-spacing: 0.04em; }
-.tag.cfg { color: var(--warn); border-color: rgba(223, 171, 74, 0.45); }
-.pos { color: var(--good); }
-.neg { color: var(--bad); }
-.zero { color: var(--muted); }
-.why-btn { background: transparent; border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; font-size: 12px; color: var(--fg); }
-.why-btn:hover, .why-btn[aria-expanded="true"] { border-color: var(--gold); color: var(--gold); }
-.empty { color: var(--muted); padding: 14px 8px; }
+.empty { color: var(--muted); padding: 10px 8px; }
 
 /* Why drawer */
-.why { border: 1px solid var(--navy-border); background: var(--navy); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 10px; }
-.why-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.why-head h3 { font-size: 15px; color: var(--fg-strong); font-weight: 600; }
-.formula { display: grid; gap: 4px; font-size: 13px; }
-.formula div { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; }
-.formula b { color: var(--muted); font-weight: 600; }
-.formula code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; color: var(--fg-strong); overflow-wrap: anywhere; }
+td.drawer { padding: 6px 0 10px; background: none; }
+.why { border: 1px solid var(--navy-border); background: var(--navy); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+.why .formula { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; font-variant-numeric: tabular-nums; }
+.why .formula .who { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; align-self: center; }
 .why table td { border-bottom-color: rgba(255, 255, 255, 0.05); }
-.why tr.sec td { color: var(--gold); font-variant: small-caps; letter-spacing: 0.06em; font-weight: 600; padding-top: 10px; }
-.kind { display: inline-block; min-width: 42px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; border-radius: 3px; padding: 0 5px; margin-right: 8px; border: 1px solid currentColor; text-align: center; }
-.kind.Gear { color: var(--k-gear); } .kind.Tree { color: var(--k-tree); } .kind.Skill { color: var(--k-skill); }
-.kind.Jewel { color: var(--k-jewel); } .kind.Gem { color: var(--k-gem); } .kind.Base { color: var(--muted); }
+.why .src { color: var(--fg); }
+.why .src small { color: var(--muted); margin-left: 6px; }
+.why .k-Gear { color: var(--k-gear); } .why .k-Tree { color: var(--k-tree); } .why .k-Gems { color: var(--k-gems); } .why .k-Config { color: var(--k-config); }
 
-/* Gaps */
-.gap-group { display: grid; gap: 6px; }
-.gap-group h3 { display: flex; align-items: baseline; gap: 10px; font-size: 13px; color: var(--gold); font-variant: small-caps; letter-spacing: 0.08em; font-weight: 600; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
-.gap-group h3 .tot { margin-left: auto; font-variant: normal; letter-spacing: 0; color: var(--muted); font-weight: 400; font-size: 12px; }
-.gap { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 12px; align-items: center; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-2); }
-.gap .t { color: var(--fg-strong); font-weight: 600; }
-.gap .d { font-size: 12px; color: var(--muted); }
-.gap .imp { text-align: right; white-space: nowrap; }
-.gap .imp b { color: var(--bad); font-weight: 600; }
-.gap .imp small { display: block; font-size: 11px; color: var(--muted); }
-.act { background: transparent; border: 1px solid var(--border); border-radius: 4px; padding: 3px 10px; font-size: 13px; }
-.act:hover { border-color: var(--gold); color: var(--gold); }
-.bar-meter { height: 4px; border-radius: 2px; background: var(--border); grid-column: 1 / -1; overflow: hidden; }
-.bar-meter i { display: block; height: 100%; background: var(--bad); opacity: 0.7; }
-@media (max-width: 480px) { .gap { grid-template-columns: minmax(0, 1fr) auto; } .gap .act { grid-column: 2; } }
+/* Skills */
+.groups { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+@media (max-width: 380px) { .groups { grid-template-columns: minmax(0, 1fr); } }
+.grp { background: var(--navy-deep); border: 1px solid var(--navy-border); border-radius: var(--radius); padding: 6px 10px 8px; min-width: 0; }
+.grp h3 { margin: 0 0 2px; font-size: 13px; color: var(--fg-strong); font-weight: 600; }
+.grp .slots { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.grp table td { padding: 2px 6px; }
+.grp .miss { color: var(--bad); }
+.grp .extra { color: var(--warn); }
+
+/* Items */
+.item { background: var(--navy-deep); border: 1px solid var(--navy-border); border-radius: var(--radius); min-width: 0; }
+.item > summary { cursor: pointer; list-style: none; display: grid; grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr); gap: 4px 10px; padding: 6px 10px; align-items: baseline; }
+.item > summary::-webkit-details-marker { display: none; }
+.item > summary .slot { color: var(--gold); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.item > summary .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item > summary .nm small { color: var(--muted); }
+.item .lines { padding: 0 10px 8px; display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+.item .lines h4 { margin: 0 0 2px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.item .lines ul { margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.item .lines li { padding: 1px 0; overflow-wrap: anywhere; }
+.item .rolls { grid-column: 1 / -1; }
+.item.flash { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+@media (max-width: 600px) {
+  .item > summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .item > summary .slot { grid-column: 1 / -1; }
+  .item .lines { grid-template-columns: minmax(0, 1fr); }
+}
+.rare { color: #e6d85f; } .unique { color: #c5874b; } .magic { color: #8888ff; } .normal { color: var(--fg); }
 
 /* Overlay mock */
-.game { border-radius: var(--radius); border: 1px solid var(--border); padding: 14px; min-height: 280px; display: grid; align-content: start; gap: 12px;
-  background:
-    radial-gradient(120% 80% at 70% 10%, rgba(120, 90, 50, 0.22), transparent 60%),
-    radial-gradient(90% 70% at 10% 100%, rgba(40, 70, 90, 0.25), transparent 60%),
-    #0b0c0d; }
-.game .zone { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
-.ov { background: rgba(14, 14, 14, 0.94); border: 1px solid var(--gold); border-radius: var(--radius); padding: 10px; display: grid; gap: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); }
-.ov h4 { display: flex; align-items: center; gap: 8px; color: var(--gold); font-variant: small-caps; letter-spacing: 0.08em; font-size: 14px; }
-.ov h4 .chip { margin-left: auto; }
-.ov-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; }
-.ov-row .s { color: var(--fg-strong); }
-.ov-row .v { text-align: right; font-variant-numeric: tabular-nums; }
-.ov-row .m { grid-column: 1 / -1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-.ov-row .m i { display: block; height: 100%; background: var(--gold); }
-.ov .fix { font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 6px; }
-.ov .fix b { color: var(--fg-strong); font-weight: 600; }
-.aside-body { display: grid; gap: 12px; padding: 12px; }
+.scene { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: radial-gradient(120% 90% at 30% 10%, #2b2a24 0%, #15140f 55%, #0b0b09 100%); min-height: 220px; padding: 14px; display: grid; justify-items: end; align-content: start; }
+.ov { width: min(280px, 100%); background: rgba(10, 12, 16, 0.92); border: 1px solid var(--navy-border); border-radius: var(--radius); padding: 8px 10px; display: grid; gap: 6px; font-size: 13px; }
+.ov .h { display: flex; align-items: center; gap: 8px; color: var(--gold); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.ov .h .sub { color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: auto; }
+.ov .r { display: flex; justify-content: space-between; gap: 8px; }
+.ov .r span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Toast */
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--panel-2); border: 1px solid var(--gold); color: var(--fg-strong); padding: 6px 14px; border-radius: 999px; font-size: 13px; z-index: 20; }
+.toast { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--navy); border: 1px solid var(--gold); color: var(--fg-strong); padding: 6px 14px; border-radius: var(--radius); font-size: 13px; z-index: 10; transition: opacity 0.15s; }
 .toast.off { opacity: 0; pointer-events: none; }
-@media (prefers-reduced-motion: no-preference) { .toast { transition: opacity 0.2s; } }
 </style>
 </head>
 <body>
+<nav class="jumpbar" aria-label="Sections"><div class="inner" id="jumps"></div></nav>
 
-<div class="page" id="page">
-  <header class="top">
-    <h1><span>Lioneye</span> Compare</h1>
-    <span class="chip warn">Concept · Example data</span>
-    <div class="legend" role="group" aria-label="Ideas">
-      <span class="item"><span class="mk">1</span>Same setup</span>
-      <span class="item"><span class="mk">2</span>Why view</span>
-      <span class="item"><span class="mk">3</span>All stats</span>
-      <span class="item"><span class="mk">4</span>Gaps</span>
-      <span class="item"><span class="mk">5</span>In game</span>
-      <label class="switch"><input type="checkbox" id="notes-toggle" checked> Notes</label>
+<main class="page">
+  <section class="builds" aria-labelledby="builds-title">
+    <div class="title">
+      <h1 id="builds-title">Compare</h1>
+      <span class="chip gold">Concept</span>
+      <span class="chip" id="pob-chip"></span>
     </div>
-  </header>
-
-  <div class="layout">
-    <section class="panel" aria-label="Compare">
-      <div class="bar">Compare</div>
-      <div class="panel-body">
-        <div class="builds">
-          <div class="build">
-            <span class="lbl">Build 1</span>
-            <div class="row">
-              <select id="b1-source" aria-label="Build 1">
-                <option>Live character</option>
-                <option>Pasted build</option>
-              </select>
-              <button class="icon-btn" type="button" id="refresh-btn" title="Refresh" aria-label="Refresh">⟳</button>
-            </div>
-            <span class="sub">RelicWarden · Lvl 68 Necromancer</span>
-          </div>
-          <div class="build">
-            <span class="lbl">Build 2 · Guide</span>
-            <div class="row"><span class="name">Act 10 - Lvl 68</span></div>
-            <span class="sub">Holy Relic Necromancer</span>
-          </div>
-        </div>
-
-        <div class="footing" role="group" aria-label="Setup">
-          <span class="mk">1</span>
-          <span class="f"><span class="k">Skill</span><span class="v">Holy Relic's Nova</span><span class="chip good">Matched</span></span>
-          <span class="f"><span class="k">Config</span>
-            <span class="seg" role="group" aria-label="Config">
-              <button type="button" id="cfg-guide" aria-pressed="true">Guide</button>
-              <button type="button" id="cfg-own" aria-pressed="false">Own</button>
-            </span>
-            <span class="chip good" id="cfg-status">Same</span>
-          </span>
-        </div>
-
-        <div class="tabs" role="tablist" aria-label="Compare views">
-          <button class="tab" role="tab" type="button" data-tab="gaps" id="tab-gaps" aria-controls="panel-gaps" aria-selected="false" tabindex="-1">Gaps <span class="new">NEW</span></button>
-          <button class="tab" role="tab" type="button" data-tab="stats" id="tab-stats" aria-controls="panel-stats" aria-selected="true" tabindex="0">Stats</button>
-          <button class="tab" role="tab" type="button" data-tab="config" id="tab-config" aria-controls="panel-config" aria-selected="false" tabindex="-1">Config <span class="new">NEW</span></button>
-          <button class="tab" role="tab" type="button" data-tab="passives" id="tab-passives" aria-controls="panel-passives" aria-selected="false" tabindex="-1">Passives</button>
-          <button class="tab" role="tab" type="button" data-tab="skills" id="tab-skills" aria-controls="panel-skills" aria-selected="false" tabindex="-1">Skills</button>
-          <button class="tab" role="tab" type="button" data-tab="items" id="tab-items" aria-controls="panel-items" aria-selected="false" tabindex="-1">Items</button>
-        </div>
-
-        <!-- Stats -->
-        <div role="tabpanel" id="panel-stats" aria-labelledby="tab-stats">
-          <div style="display:grid; gap:10px;">
-            <div class="tools">
-              <span class="mk">3</span>
-              <input class="search" id="stat-search" type="search" placeholder="Search" aria-label="Search stats">
-              <span class="seg" role="group" aria-label="Stat list">
-                <button type="button" id="scope-side" aria-pressed="false">Sidebar</button>
-                <button type="button" id="scope-all" aria-pressed="true">All</button>
-              </span>
-              <label class="check"><input type="checkbox" id="show-same"> Same</label>
-            </div>
-            <div class="scroll">
-              <table>
-                <thead><tr><th>Stat</th><th class="r">Yours</th><th class="r">Guide</th><th class="r">Diff</th><th class="r" aria-label="Why"></th></tr></thead>
-                <tbody id="stats-body"></tbody>
-              </table>
-            </div>
-            <div id="why-slot"></div>
-          </div>
-        </div>
-
-        <!-- Gaps -->
-        <div role="tabpanel" id="panel-gaps" aria-labelledby="tab-gaps" hidden>
-          <div style="display:grid; gap:12px;">
-            <div class="tools">
-              <span class="mk">4</span>
-              <div class="chips" role="group" aria-label="Metric" id="gap-chips"></div>
-            </div>
-            <div id="gaps-body" style="display:grid; gap:14px;"></div>
-          </div>
-        </div>
-
-        <!-- Config -->
-        <div role="tabpanel" id="panel-config" aria-labelledby="tab-config" hidden>
-          <div style="display:grid; gap:10px;">
-            <div class="tools"><span class="mk">1</span><span class="chip" id="cfg-using"></span></div>
-            <div class="scroll">
-              <table>
-                <thead><tr><th>Option</th><th class="r">Yours</th><th class="r">Guide</th></tr></thead>
-                <tbody id="config-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Existing tabs (today) -->
-        <div role="tabpanel" id="panel-passives" aria-labelledby="tab-passives" hidden>
-          <div class="scroll"><table>
-            <thead><tr><th>Passive</th><th class="r">Yours</th><th class="r">Guide</th></tr></thead>
-            <tbody>
-              <tr class="group"><td colspan="3">Notables</td></tr>
-              <tr><td>Sanctity</td><td class="r">0</td><td class="r">1</td></tr>
-              <tr class="group"><td colspan="3">Sockets</td></tr>
-              <tr><td>Jewel Socket</td><td class="r">1</td><td class="r">2</td></tr>
-              <tr class="group"><td colspan="3">Normal</td></tr>
-              <tr><td>Armour and Energy Shield</td><td class="r">0</td><td class="r">2</td></tr>
-              <tr><td>Life Mastery</td><td class="r">0</td><td class="r">1</td></tr>
-            </tbody>
-          </table></div>
-        </div>
-        <div role="tabpanel" id="panel-skills" aria-labelledby="tab-skills" hidden>
-          <div class="scroll"><table>
-            <thead><tr><th>Group</th><th>Missing</th><th>Extra</th></tr></thead>
-            <tbody>
-              <tr><td>Determination</td><td>Determination</td><td class="zero">—</td></tr>
-              <tr><td>Summon Holy Relic</td><td>Withering Touch</td><td>Minion Damage</td></tr>
-            </tbody>
-          </table></div>
-        </div>
-        <div role="tabpanel" id="panel-items" aria-labelledby="tab-items" hidden>
-          <div class="scroll"><table>
-            <thead><tr><th>Slot</th><th>Yours</th><th>Guide</th></tr></thead>
-            <tbody>
-              <tr><td>Helmet</td><td>Gloom Visage<br><span class="zero">Leather Hood</span></td><td>Dread Crown<br><span class="zero">Eternal Burgonet</span></td></tr>
-              <tr><td>Body Armour</td><td>Eagle Shell<br><span class="zero">Chain Hauberk</span></td><td>Kraken Carapace<br><span class="zero">Sacrificial Garb</span></td></tr>
-              <tr><td>Belt</td><td>Stygian Vise<br><span class="zero">Empty abyss socket</span></td><td>Stygian Vise<br><span class="zero">Ghastly Eye Jewel</span></td></tr>
-            </tbody>
-          </table></div>
-        </div>
+    <div class="pair">
+      <div class="build">
+        <div class="lbl">Build 1 <span class="live">LIVE</span></div>
+        <div class="row"><span class="name" id="live-name"></span><button class="btn" data-toast="Refresh">Refresh</button></div>
+        <div class="sub" id="live-sub"></div>
       </div>
-    </section>
-
-    <aside class="panel" aria-label="In game">
-      <div class="bar"><span class="mk">5</span>In game</div>
-      <div class="aside-body">
-        <div class="game">
-          <span class="zone">THE FEEDING TROUGH · ACT 10</span>
-          <div class="ov">
-            <h4>Gaps <span class="chip">Lvl 68</span></h4>
-            <div id="ov-rows" style="display:grid; gap:8px;"></div>
-            <div class="fix">Top fix: <b>Determination</b> · ≈ +3,949 Armour</div>
-            <button class="act" type="button" id="ov-open">Compare</button>
-          </div>
-        </div>
+      <div class="build">
+        <div class="lbl">Build 2</div>
+        <div class="row"><select id="loadout" aria-label="Loadout"></select></div>
+        <div class="sub" id="guide-sub"></div>
       </div>
-    </aside>
-  </div>
-</div>
-<div class="toast off" id="toast" role="status"></div>
+    </div>
+    <div class="footing">
+      <div class="f"><span class="k">Skill</span><span class="v" id="skill"></span><span class="chip good">Same</span></div>
+      <div class="f"><span class="k">Config</span>
+        <div class="seg" role="group" aria-label="Config for Build 1">
+          <button type="button" data-mode="guide" aria-pressed="true">Guide</button>
+          <button type="button" data-mode="own" aria-pressed="false">Own</button>
+        </div>
+        <span class="chip warn" id="config-chip"></span>
+      </div>
+    </div>
+  </section>
 
+  <section class="section" id="summary" data-title="Summary"><div class="body">
+    <div class="tiles" id="tiles"></div>
+  </div></section>
+
+  <section class="section" id="gaps" data-title="Gaps"><div class="body">
+    <div class="chips" id="gap-chips" role="group" aria-label="Metric"></div>
+    <div class="gap-list" id="gap-list"></div>
+  </div></section>
+
+  <section class="section" id="stats" data-title="Stats"><div class="body">
+    <div class="tools">
+      <input class="search" id="stat-search" type="search" placeholder="Search" aria-label="Search stats">
+      <label class="check"><input type="checkbox" id="stat-same"> Show same</label>
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>Stat</th><th class="r">You</th><th class="r">Guide</th><th class="r">Diff</th><th class="r"><span hidden>Sources</span></th></tr></thead>
+      <tbody id="stat-body"></tbody>
+    </table></div>
+  </div></section>
+
+  <section class="section" id="config" data-title="Config"><div class="body" id="config-body"></div></section>
+  <section class="section" id="passives" data-title="Passives"><div class="body" id="passive-body"></div></section>
+  <section class="section" id="skills" data-title="Skills"><div class="body"><div class="groups" id="skill-body"></div></div></section>
+  <section class="section" id="items" data-title="Items"><div class="body" id="item-body"></div></section>
+
+  <section class="section" id="overlay" data-title="Overlay"><div class="body">
+    <div class="tools"><div class="chips" id="ov-chips" role="group" aria-label="Overlay metric"></div></div>
+    <div class="scene"><div class="ov" id="ov"></div></div>
+  </div></section>
+</main>
+<div class="toast off" id="toast" role="status" aria-live="polite"></div>
+
+<script type="application/json" id="data">{"meta":{"live":{"name":"KobayashiCoven","level":83,"ascendancy":"Necromancer","updated":"2026-11-15T16:06:07.187694Z"},"guide":{"loadout":"HRoC Early Maps","level":75},"loadouts":["Act 1 - 12 pts","Act 2 - 30 pts","Act 3 - 30 pts","Act 4-6 - 50 pts","Act 7-10 - 70 pts","SRS Early Maps","HRoC Swap","HRoC Early Maps","HRoC End Game","HRoC Min Max","Spectre Defilers"],"pob":"2.67.2","skill":"Summon Holy Relic of Conviction","minionSkill":"Nova"},"metrics":[{"key":"dps","label":"Relic DPS","fmt":"k"},{"key":"poison","label":"Poison chance","fmt":"%"},{"key":"armour","label":"Armour"},{"key":"life","label":"Life"},{"key":"ehp","label":"EHP","fmt":"k"},{"key":"phys","label":"Phys max hit"},{"key":"chaos","label":"Chaos res","fmt":"%"},{"key":"move","label":"Move speed","fmt":"%"}],"values":{"own":{"dps":118612.1,"poison":54,"armour":5273,"life":3791,"ehp":58010.5,"phys":7321,"chaos":47,"move":62},"guide":{"dps":183379.9,"poison":54,"armour":6410,"life":3791,"ehp":90053.7,"phys":11702,"chaos":36,"move":87},"target":{"dps":180858.8,"poison":70,"armour":6868,"life":4051,"ehp":123868.6,"phys":13388,"chaos":75,"move":90}},"stats":{"own":[{"section":"Minion","label":"Average Damage","yours":"22,479.7","guide":"23,964.3","diff":-1484.5999999999985},{"section":"Minion","label":"Effective Trigger Rate","yours":"3.34","guide":"4.27","diff":-0.9299999999999997},{"section":"Minion","label":"Hit DPS","yours":"75,157.3","guide":"102,237.1","diff":-27079.800000000003},{"section":"Minion","label":"Poison DPS","yours":"7,865.8","guide":"8,492.6","diff":-626.8000000000002},{"section":"Minion","label":"Total Damage per Poison","yours":"24,069.3","guide":"26,327","diff":-2257.7000000000007},{"section":"Minion","label":"Total DPS inc. Poison","yours":"118,612.1","guide":"180,858.8","diff":-62246.69999999998},{"section":"Minion","label":"Chance to Poison","yours":"54%","guide":"70%","calcs":true,"diff":-16,"why":"poison"},{"section":"Minion","label":"Poison Stacks","yours":"5.5","guide":"9.3","calcs":true,"diff":-3.8000000000000007},{"section":"Minion","label":"Poison Duration","yours":"3.06s","guide":"3.10s","calcs":true,"diff":-0.040000000000000036},{"section":"Minion","label":"Skill Cooldown","yours":"0.231s","guide":"0.231s","diff":0},{"section":"Minion","label":"Total Life","yours":"18,960","guide":"13,694","diff":5266},{"section":"Minion","label":"Life Recovery","yours":"379.2","guide":"330.1","diff":49.099999999999966},{"section":"Minion","label":"Life Leech/On Hit Rate","guide":"1,022.4"},{"section":"Minion","label":"Energy Shield","yours":"12,120","guide":"8,753","diff":3367},{"section":"Player","label":"Active Minion Limit","yours":"3","guide":"3","diff":0},{"section":"Player","label":"Cast Rate","yours":"0.5","guide":"0.5","diff":0},{"section":"Player","label":"Skill Cooldown","yours":"2.013s","guide":"2.013s","diff":0},{"section":"Player","label":"Mana Cost","yours":"40","guide":"47","diff":-7},{"section":"Player","label":"Mana Cost per second","yours":"19.87","guide":"23.35","diff":-3.4800000000000004},{"section":"Player","label":"Life Cost","yours":"7","guide":"8","diff":-1},{"section":"Player","label":"Life Cost per second","yours":"3.58","guide":"4.37","diff":-0.79},{"section":"Player","label":"Strength","yours":"268","guide":"174","diff":94},{"section":"Player","label":"Dexterity","yours":"63","guide":"114","diff":-51},{"section":"Player","label":"Intelligence","yours":"245","guide":"206","diff":39},{"section":"Player","label":"Effective Hit Pool","yours":"58,011","guide":"123,869","diff":-65858},{"section":"Player","label":"Phys Max Hit","yours":"7,321","guide":"13,388","diff":-6067},{"section":"Player","label":"Fire Max Hit","yours":"21,890","guide":"37,272","diff":-15382},{"section":"Player","label":"Cold Max Hit","yours":"21,079","guide":"29,072","diff":-7993},{"section":"Player","label":"Lightning Max Hit","yours":"21,079","guide":"29,072","diff":-7993},{"section":"Player","label":"Chaos Max Hit","yours":"8,515","guide":"24,552","diff":-16037},{"section":"Player","label":"Total Life","yours":"3,791","guide":"4,051","diff":-260,"why":"life"},{"section":"Player","label":"%Inc Life from Tree","yours":"139%","guide":"134%","diff":5},{"section":"Player","label":"Life Regen","yours":"229.6","guide":"258.7","diff":-29.099999999999994},{"section":"Player","label":"Total Mana","yours":"1,049","guide":"724","diff":325},{"section":"Player","label":"%Inc Mana from Tree","yours":"25%","guide":"20%","diff":5},{"section":"Player","label":"Unreserved Mana","yours":"224","guide":"155","diff":69},{"section":"Player","label":"Unreserved Mana (2)","yours":"21%","guide":"21%","diff":0},{"section":"Player","label":"Mana Regen","yours":"35.1","guide":"12.7","diff":22.400000000000002},{"section":"Player","label":"Energy Shield","yours":"416","guide":"508","diff":-92},{"section":"Player","label":"%Inc ES from Tree","yours":"30%","guide":"20%","diff":10},{"section":"Player","label":"Evasion rating","yours":"130","guide":"364","diff":-234},{"section":"Player","label":"Armour","yours":"5,273","guide":"6,868","diff":-1595,"why":"armour"},{"section":"Player","label":"%Inc Armour from Tree","yours":"132%","guide":"82%","diff":50},{"section":"Player","label":"Phys. Damage Reduction","yours":"51%","guide":"65%","diff":-14},{"section":"Player","label":"Block Chance","yours":"68%","guide":"70%","diff":-2},{"section":"Player","label":"Spell Block Chance","yours":"78% (+16%)","guide":"78%","diff":0},{"section":"Player","label":"Spell Suppression Chance","yours":"7%","guide":"10%","diff":-3},{"section":"Player","label":"Fire Resistance","yours":"77% (+26%)","guide":"77% (+51%)","diff":0},{"section":"Player","label":"Cold Resistance","yours":"76% (+14%)","guide":"76% (+12%)","diff":0},{"section":"Player","label":"Lightning Resistance","yours":"76% (+23%)","guide":"76% (+16%)","diff":0},{"section":"Player","label":"Chaos Resistance","yours":"47%","guide":"75% (+18%)","diff":-28,"why":"chaos"},{"section":"Player","label":"Movement Speed Modifier","yours":"+62%","guide":"+90%","diff":-28},{"section":"Player","label":"Full DPS","guide":"555,850.4"},{"section":"Player","label":"3x Summon Holy Relic of Conviction","guide":"306,711.2"},{"section":"Player","label":"Full Poison DPS","guide":"237,889.9"},{"section":"Player","label":"Raise Spectre","guide":"9,852.2"},{"section":"Player","label":"Animate Guardian","guide":"1,397"}],"guide":[{"section":"Minion","label":"Average Damage","yours":"30,101.5","guide":"23,964.3","diff":6137.200000000001},{"section":"Minion","label":"Effective Trigger Rate","yours":"3.94","guide":"4.27","diff":-0.3299999999999996},{"section":"Minion","label":"Hit DPS","yours":"118,599.8","guide":"102,237.1","diff":16362.699999999997},{"section":"Minion","label":"Poison DPS","yours":"9,950.2","guide":"8,492.6","diff":1457.6000000000004},{"section":"Minion","label":"Total Damage per Poison","yours":"30,447.5","guide":"26,327","diff":4120.5},{"section":"Minion","label":"Total DPS inc. Poison","yours":"183,379.9","guide":"180,858.8","diff":2521.100000000006},{"section":"Minion","label":"Chance to Poison","yours":"54%","guide":"70%","calcs":true,"diff":-16,"why":"poison"},{"section":"Minion","label":"Poison Stacks","yours":"6.5","guide":"9.3","calcs":true,"diff":-2.8000000000000007},{"section":"Minion","label":"Poison Duration","yours":"3.06s","guide":"3.10s","calcs":true,"diff":-0.040000000000000036},{"section":"Minion","label":"Skill Cooldown","yours":"0.231s","guide":"0.231s","diff":0},{"section":"Minion","label":"Total Life","yours":"18,960","guide":"13,694","diff":5266},{"section":"Minion","label":"Life Recovery","yours":"379.2","guide":"330.1","diff":49.099999999999966},{"section":"Minion","label":"Life Leech/On Hit Rate","guide":"1,022.4"},{"section":"Minion","label":"Energy Shield","yours":"12,120","guide":"8,753","diff":3367},{"section":"Player","label":"Active Minion Limit","yours":"3","guide":"3","diff":0},{"section":"Player","label":"Cast Rate","yours":"0.5","guide":"0.5","diff":0},{"section":"Player","label":"Skill Cooldown","yours":"2.013s","guide":"2.013s","diff":0},{"section":"Player","label":"Mana Cost","yours":"40","guide":"47","diff":-7},{"section":"Player","label":"Mana Cost per second","yours":"19.87","guide":"23.35","diff":-3.4800000000000004},{"section":"Player","label":"Life Cost","yours":"7","guide":"8","diff":-1},{"section":"Player","label":"Life Cost per second","yours":"3.58","guide":"4.37","diff":-0.79},{"section":"Player","label":"Strength","yours":"268","guide":"174","diff":94},{"section":"Player","label":"Dexterity","yours":"63","guide":"114","diff":-51},{"section":"Player","label":"Intelligence","yours":"245","guide":"206","diff":39},{"section":"Player","label":"Effective Hit Pool","yours":"90,054","guide":"123,869","diff":-33815},{"section":"Player","label":"Phys Max Hit","yours":"11,702","guide":"13,388","diff":-1686},{"section":"Player","label":"Fire Max Hit","yours":"32,287","guide":"37,272","diff":-4985},{"section":"Player","label":"Cold Max Hit","yours":"26,427","guide":"29,072","diff":-2645},{"section":"Player","label":"Lightning Max Hit","yours":"26,427","guide":"29,072","diff":-2645},{"section":"Player","label":"Chaos Max Hit","yours":"8,841","guide":"24,552","diff":-15711},{"section":"Player","label":"Total Life","yours":"3,791","guide":"4,051","diff":-260,"why":"life"},{"section":"Player","label":"%Inc Life from Tree","yours":"139%","guide":"134%","diff":5},{"section":"Player","label":"Life Regen","yours":"229.6","guide":"258.7","diff":-29.099999999999994},{"section":"Player","label":"Total Mana","yours":"1,049","guide":"724","diff":325},{"section":"Player","label":"%Inc Mana from Tree","yours":"25%","guide":"20%","diff":5},{"section":"Player","label":"Unreserved Mana","yours":"224","guide":"155","diff":69},{"section":"Player","label":"Unreserved Mana (2)","yours":"21%","guide":"21%","diff":0},{"section":"Player","label":"Mana Regen","yours":"35.1","guide":"12.7","diff":22.400000000000002},{"section":"Player","label":"Energy Shield","yours":"416","guide":"508","diff":-92},{"section":"Player","label":"%Inc ES from Tree","yours":"30%","guide":"20%","diff":10},{"section":"Player","label":"Evasion rating","yours":"130","guide":"364","diff":-234},{"section":"Player","label":"Armour","yours":"6,410","guide":"6,868","diff":-458,"why":"armour"},{"section":"Player","label":"%Inc Armour from Tree","yours":"132%","guide":"82%","diff":50},{"section":"Player","label":"Phys. Damage Reduction","yours":"63%","guide":"65%","diff":-2},{"section":"Player","label":"Block Chance","yours":"68%","guide":"70%","diff":-2},{"section":"Player","label":"Spell Block Chance","yours":"78% (+16%)","guide":"78%","diff":0},{"section":"Player","label":"Spell Suppression Chance","yours":"7%","guide":"10%","diff":-3},{"section":"Player","label":"Fire Resistance","yours":"77% (+26%)","guide":"77% (+51%)","diff":0},{"section":"Player","label":"Cold Resistance","yours":"76% (+14%)","guide":"76% (+12%)","diff":0},{"section":"Player","label":"Lightning Resistance","yours":"76% (+23%)","guide":"76% (+16%)","diff":0},{"section":"Player","label":"Chaos Resistance","yours":"36%","guide":"75% (+18%)","diff":-39,"why":"chaos"},{"section":"Player","label":"Movement Speed Modifier","yours":"+87%","guide":"+90%","diff":-3},{"section":"Player","label":"Full DPS","guide":"555,850.4"},{"section":"Player","label":"3x Summon Holy Relic of Conviction","guide":"306,711.2"},{"section":"Player","label":"Full Poison DPS","guide":"237,889.9"},{"section":"Player","label":"Raise Spectre","guide":"9,852.2"},{"section":"Player","label":"Animate Guardian","guide":"1,397"}]},"why":{"own":{"armour":{"total":[5273,6868],"formula":[{"flat":2273,"inc":132,"more":1,"total":5273},{"flat":2352,"inc":192,"more":1,"total":6868}],"blocks":[{"title":"Base armour","rows":[{"group":"Gear","key":"Helmet","yours":365,"guide":465,"yoursDetail":"Geofri's Crest","guideDetail":"Geofri's Crest"},{"group":"Gear","key":"Boots","yours":145,"guide":104,"yoursDetail":"Chimeric Span","guideDetail":"Zealot Boots"},{"group":"Gear","key":"Body Armour","yours":263,"guide":null,"yoursDetail":"Spirit Mantle"},{"group":"Gear","key":"Flask 4","yours":1500,"guide":1500,"yoursDetail":"Granite Flask of the Lizard","guideDetail":"Transgressor's Granite Flask of the Owl"},{"group":"Gear","key":"Gloves","yours":null,"guide":283,"guideDetail":"Wyvernscale Gauntlets"}]},{"title":"Increased","unit":"%","rows":[{"group":"Gear","key":"Flask 5","yours":null,"guide":60,"guideDetail":"Chemist's Quartz Flask of the Armadillo"},{"group":"Tree","key":"Inexorable","yours":null,"guide":50},{"group":"Tree","key":"Sanctity","yours":20,"guide":null},{"group":"Tree","key":"Combat Stamina","yours":20,"guide":null},{"group":"Tree","key":"Armour and Life Regeneration","yours":10,"guide":null},{"group":"Tree","key":"Armour","yours":50,"guide":50},{"group":"Tree","key":"Juggernaut","yours":24,"guide":24},{"group":"Tree","key":"Life and Armour","yours":8,"guide":8}]}]},"life":{"total":[3791,4051],"formula":[{"flat":1586,"inc":139,"more":1,"total":3791},{"flat":1731,"inc":134,"more":1,"total":4051}],"blocks":[{"title":"Base life","rows":[{"group":"Base","key":"Base","yours":1034,"guide":938},{"group":"Base","key":"Strength","yours":134,"guide":87},{"group":"Gear","key":"Weapon 2","yours":null,"guide":77,"guideDetail":"Fossilised Spirit Shield"},{"group":"Gear","key":"Boots","yours":null,"guide":77,"guideDetail":"Zealot Boots"},{"group":"Gear","key":"Belt","yours":68,"guide":null,"yoursDetail":"Cataclysm Shackle"},{"group":"Gear","key":"Rings","yours":42,"guide":108,"yoursDetail":"Sorrow Knot","guideDetail":"Life Int Chaos Ring"},{"group":"Gear","key":"Belt jewels","yours":null,"guide":62,"guideDetail":"Life Poison Chaos Jewel"},{"group":"Gear","key":"Body Armour","yours":132,"guide":166,"yoursDetail":"Spirit Mantle","guideDetail":"Occultist's Vestment"},{"group":"Gear","key":"Amulet","yours":40,"guide":62,"yoursDetail":"Doom Locket","guideDetail":"Lapis Amulet"},{"group":"Gear","key":"Gloves","yours":106,"guide":106,"yoursDetail":"Ghoul Hand","guideDetail":"Wyvernscale Gauntlets"},{"group":"Tree","key":"Minion Damage","yours":null,"guide":18},{"group":"Tree","key":"Discipline and Training","yours":30,"guide":30}]},{"title":"Increased","unit":"%","rows":[{"group":"Tree","key":"Combat Stamina","yours":5,"guide":null},{"group":"Tree","key":"Life and Cost Efficiency","yours":15,"guide":15},{"group":"Tree","key":"Heart and Soul","yours":8,"guide":8},{"group":"Tree","key":"Discipline and Training","yours":10,"guide":10},{"group":"Tree","key":"Bloodless","yours":10,"guide":10},{"group":"Tree","key":"Juggernaut","yours":8,"guide":8},{"group":"Tree","key":"Life and Energy Shield","yours":15,"guide":15},{"group":"Tree","key":"Life","yours":17,"guide":17},{"group":"Tree","key":"Barbarism","yours":8,"guide":8},{"group":"Tree","key":"Life and Elemental Resistances","yours":4,"guide":4},{"group":"Tree","key":"Tireless","yours":10,"guide":10},{"group":"Tree","key":"Purity of Flesh","yours":10,"guide":10},{"group":"Tree","key":"Devotion","yours":10,"guide":10},{"group":"Tree","key":"Mana and Life","yours":5,"guide":5},{"group":"Tree","key":"Life and Armour","yours":4,"guide":4}],"fold":true}]},"chaos":{"total":[47,75],"formula":[{"sum":47,"cap":75,"total":47},{"sum":93,"cap":75,"total":75}],"blocks":[{"title":"Chaos resistance","unit":"%","rows":[{"group":"Base","key":"Base","yours":-60,"guide":-60},{"group":"Gear","key":"Rings","yours":16,"guide":86,"yoursDetail":"Sorrow Knot","guideDetail":"Life Int Chaos Ring"},{"group":"Gear","key":"Belt jewels","yours":null,"guide":30,"guideDetail":"Life Poison Chaos Jewel"},{"group":"Gear","key":"Boots","yours":29,"guide":null,"yoursDetail":"Chimeric Span"},{"group":"Gear","key":"Helmet","yours":27,"guide":29,"yoursDetail":"Geofri's Crest","guideDetail":"Geofri's Crest"},{"group":"Tree","key":"Chaos Resistance and Minion Damage","yours":9,"guide":null},{"group":"Tree","key":"Gravepact","yours":7,"guide":null},{"group":"Tree","key":"Purity of Flesh","yours":8,"guide":8},{"group":"Config","key":"Custom mods (Viscera)","yours":11,"guide":null}]}]},"poison":{"total":[54,70],"formula":[{"sum":54,"cap":100,"total":54},{"sum":70,"cap":100,"total":70}],"blocks":[{"title":"Chance to Poison","unit":"%","rows":[{"group":"Gear","key":"Belt jewels","yours":null,"guide":30,"guideDetail":"Life Poison Chaos Jewel"},{"group":"Gear","key":"Tree jewel","yours":14,"guide":null,"yoursDetail":"Enthralling Orb"},{"group":"Gems","key":"Chance to Poison","yours":40,"guide":40}]}]}},"guide":{"armour":{"total":[6410,6868],"formula":[{"flat":2273,"inc":182,"more":1,"total":6410},{"flat":2352,"inc":192,"more":1,"total":6868}],"blocks":[{"title":"Base armour","rows":[{"group":"Gear","key":"Helmet","yours":365,"guide":465,"yoursDetail":"Geofri's Crest","guideDetail":"Geofri's Crest"},{"group":"Gear","key":"Boots","yours":145,"guide":104,"yoursDetail":"Chimeric Span","guideDetail":"Zealot Boots"},{"group":"Gear","key":"Body Armour","yours":263,"guide":null,"yoursDetail":"Spirit Mantle"},{"group":"Gear","key":"Flask 4","yours":1500,"guide":1500,"yoursDetail":"Granite Flask of the Lizard","guideDetail":"Transgressor's Granite Flask of the Owl"},{"group":"Gear","key":"Gloves","yours":null,"guide":283,"guideDetail":"Wyvernscale Gauntlets"}]},{"title":"Increased","unit":"%","rows":[{"group":"Gear","key":"Flask 5","yours":null,"guide":60,"guideDetail":"Chemist's Quartz Flask of the Armadillo"},{"group":"Tree","key":"Sanctity","yours":20,"guide":null},{"group":"Tree","key":"Combat Stamina","yours":20,"guide":null},{"group":"Tree","key":"Armour and Life Regeneration","yours":10,"guide":null},{"group":"Tree","key":"Armour","yours":50,"guide":50},{"group":"Tree","key":"Juggernaut","yours":24,"guide":24},{"group":"Tree","key":"Inexorable","yours":50,"guide":50},{"group":"Tree","key":"Life and Armour","yours":8,"guide":8}]}]},"life":{"total":[3791,4051],"formula":[{"flat":1586,"inc":139,"more":1,"total":3791},{"flat":1731,"inc":134,"more":1,"total":4051}],"blocks":[{"title":"Base life","rows":[{"group":"Base","key":"Base","yours":1034,"guide":938},{"group":"Base","key":"Strength","yours":134,"guide":87},{"group":"Gear","key":"Weapon 2","yours":null,"guide":77,"guideDetail":"Fossilised Spirit Shield"},{"group":"Gear","key":"Boots","yours":null,"guide":77,"guideDetail":"Zealot Boots"},{"group":"Gear","key":"Belt","yours":68,"guide":null,"yoursDetail":"Cataclysm Shackle"},{"group":"Gear","key":"Rings","yours":42,"guide":108,"yoursDetail":"Sorrow Knot","guideDetail":"Life Int Chaos Ring"},{"group":"Gear","key":"Belt jewels","yours":null,"guide":62,"guideDetail":"Life Poison Chaos Jewel"},{"group":"Gear","key":"Body Armour","yours":132,"guide":166,"yoursDetail":"Spirit Mantle","guideDetail":"Occultist's Vestment"},{"group":"Gear","key":"Amulet","yours":40,"guide":62,"yoursDetail":"Doom Locket","guideDetail":"Lapis Amulet"},{"group":"Gear","key":"Gloves","yours":106,"guide":106,"yoursDetail":"Ghoul Hand","guideDetail":"Wyvernscale Gauntlets"},{"group":"Tree","key":"Minion Damage","yours":null,"guide":18},{"group":"Tree","key":"Discipline and Training","yours":30,"guide":30}]},{"title":"Increased","unit":"%","rows":[{"group":"Tree","key":"Combat Stamina","yours":5,"guide":null},{"group":"Tree","key":"Life and Cost Efficiency","yours":15,"guide":15},{"group":"Tree","key":"Heart and Soul","yours":8,"guide":8},{"group":"Tree","key":"Discipline and Training","yours":10,"guide":10},{"group":"Tree","key":"Bloodless","yours":10,"guide":10},{"group":"Tree","key":"Juggernaut","yours":8,"guide":8},{"group":"Tree","key":"Life and Energy Shield","yours":15,"guide":15},{"group":"Tree","key":"Life","yours":17,"guide":17},{"group":"Tree","key":"Barbarism","yours":8,"guide":8},{"group":"Tree","key":"Life and Elemental Resistances","yours":4,"guide":4},{"group":"Tree","key":"Tireless","yours":10,"guide":10},{"group":"Tree","key":"Purity of Flesh","yours":10,"guide":10},{"group":"Tree","key":"Devotion","yours":10,"guide":10},{"group":"Tree","key":"Mana and Life","yours":5,"guide":5},{"group":"Tree","key":"Life and Armour","yours":4,"guide":4}],"fold":true}]},"chaos":{"total":[36,75],"formula":[{"sum":36,"cap":75,"total":36},{"sum":93,"cap":75,"total":75}],"blocks":[{"title":"Chaos resistance","unit":"%","rows":[{"group":"Base","key":"Base","yours":-60,"guide":-60},{"group":"Gear","key":"Rings","yours":16,"guide":86,"yoursDetail":"Sorrow Knot","guideDetail":"Life Int Chaos Ring"},{"group":"Gear","key":"Belt jewels","yours":null,"guide":30,"guideDetail":"Life Poison Chaos Jewel"},{"group":"Gear","key":"Boots","yours":29,"guide":null,"yoursDetail":"Chimeric Span"},{"group":"Gear","key":"Helmet","yours":27,"guide":29,"yoursDetail":"Geofri's Crest","guideDetail":"Geofri's Crest"},{"group":"Tree","key":"Chaos Resistance and Minion Damage","yours":9,"guide":null},{"group":"Tree","key":"Gravepact","yours":7,"guide":null},{"group":"Tree","key":"Purity of Flesh","yours":8,"guide":8}]}]},"poison":{"total":[54,70],"formula":[{"sum":54,"cap":100,"total":54},{"sum":70,"cap":100,"total":70}],"blocks":[{"title":"Chance to Poison","unit":"%","rows":[{"group":"Gear","key":"Belt jewels","yours":null,"guide":30,"guideDetail":"Life Poison Chaos Jewel"},{"group":"Gear","key":"Tree jewel","yours":14,"guide":null,"yoursDetail":"Enthralling Orb"},{"group":"Gems","key":"Chance to Poison","yours":40,"guide":40}]}]}}},"gaps":[{"id":"config","kind":"Config","title":"Guide config","detail":"Own → Guide","target":"config","d":{"dps":64767.8,"poison":0,"armour":1137,"life":0,"ehp":32043.2,"phys":4381,"chaos":-11,"move":25}},{"id":"six-link","kind":"Links","title":"Minion Damage link","detail":"Body Armour · own group","target":"skills","d":{"dps":69714.1,"poison":0,"armour":0,"life":0,"ehp":0,"phys":0,"chaos":0,"move":0}},{"id":"shield-charge","kind":"Gems","title":"Shield Charge 20","detail":"Yours: 6 · Faster Attacks 9","target":"skills","d":{"dps":13032.1,"poison":0,"armour":0,"life":0,"ehp":0,"phys":0,"chaos":0,"move":0}},{"id":"poison-gem","kind":"Gems","title":"Chance to Poison 16","detail":"Yours: 11","target":"skills","d":{"dps":10188.4,"poison":0,"armour":0,"life":0,"ehp":0,"phys":0,"chaos":0,"move":0}},{"id":"guards","kind":"Gems","title":"Guard skills 17","detail":"Yours: Arctic Armour 9 · Tempest Shield 14 · Flesh and Stone 14","target":"skills","d":{"dps":0,"poison":0,"armour":0,"life":0,"ehp":3163.8,"phys":669,"chaos":0,"move":0}},{"id":"guide-6l","kind":"Gems","title":"Guide's 6L","detail":"Lower gem levels · Meat Shield","target":"skills","d":{"dps":-50250.7,"poison":0,"armour":0,"life":0,"ehp":0,"phys":0,"chaos":0,"move":0}},{"id":"flasks","kind":"Gear","title":"Flasks","detail":"All 5 · Armadillo Quartz","target":"item:Flask 5","d":{"dps":0,"poison":0,"armour":1364,"life":0,"ehp":4021.2,"phys":303,"chaos":0,"move":6}},{"id":"slot-Weapon 1","kind":"Gear","title":"Weapon 1","detail":"Whalebone Rapier","target":"item:Weapon 1","d":{"dps":23800.3,"poison":0,"armour":0,"life":0,"ehp":-1708.9,"phys":0,"chaos":0,"move":0}},{"id":"slot-Weapon 2","kind":"Gear","title":"Weapon 2","detail":"Fossilised Spirit Shield","target":"item:Weapon 2","d":{"dps":11341.2,"poison":0,"armour":0,"life":184,"ehp":-14320.3,"phys":572,"chaos":0,"move":0}},{"id":"slot-Helmet","kind":"Gear","title":"Helmet","detail":"Geofri's Crest","target":"item:Helmet","d":{"dps":0,"poison":0,"armour":282,"life":0,"ehp":1970.8,"phys":148,"chaos":2,"move":0}},{"id":"slot-Body Armour","kind":"Gear","title":"Body Armour","detail":"Occultist's Vestment","target":"item:Body Armour","d":{"dps":2117,"poison":0,"armour":-742,"life":81,"ehp":4924,"phys":596,"chaos":0,"move":2}},{"id":"slot-Gloves","kind":"Gear","title":"Gloves","detail":"Wyvernscale Gauntlets","target":"item:Gloves","d":{"dps":7023.5,"poison":0,"armour":798,"life":0,"ehp":987.3,"phys":70,"chaos":0,"move":0}},{"id":"slot-Boots","kind":"Gear","title":"Boots","detail":"Zealot Boots","target":"item:Boots","d":{"dps":0,"poison":0,"armour":-116,"life":184,"ehp":-4450.3,"phys":392,"chaos":-29,"move":-5}},{"id":"slot-Amulet","kind":"Gear","title":"Amulet","detail":"Lapis Amulet","target":"item:Amulet","d":{"dps":0,"poison":0,"armour":0,"life":35,"ehp":227.9,"phys":27,"chaos":0,"move":0}},{"id":"slot-Ring 1","kind":"Gear","title":"Ring 1","detail":"Amethyst Ring","target":"item:Ring 1","d":{"dps":0,"poison":0,"armour":0,"life":109,"ehp":15439.3,"phys":270,"chaos":39,"move":0}},{"id":"slot-Ring 2","kind":"Gear","title":"Ring 2","detail":"Amethyst Ring","target":"item:Ring 2","d":{"dps":0,"poison":0,"armour":0,"life":28,"ehp":886.3,"phys":85,"chaos":27,"move":0}},{"id":"slot-Belt","kind":"Gear","title":"Belt","detail":"Darkness Enthroned · 2 Ghastly Eye","target":"item:Belt","d":{"dps":35989,"poison":30,"armour":0,"life":-46,"ehp":7977.8,"phys":-220,"chaos":30,"move":0}},{"id":"tree","kind":"Tree","title":"Guide tree","detail":"Its jewels · no Ghastly Eye socket","target":"passives","d":{"dps":-22684.4,"poison":-14,"armour":-1137,"life":-84,"ehp":9352,"phys":-625,"chaos":-16,"move":0}}],"config":{"rows":[{"label":"Bandit quest","yours":"Eramir","guide":null},{"label":"Major God","yours":"Soul of the Brine King","guide":"Soul of Lunaris"},{"label":"Minor God","yours":"Soul of Tukohama","guide":"Soul of Gruthkul"},{"label":"Disable EHP gain when hit","yours":"Yes","guide":null},{"label":"# of Brands attached to enemy (if not maximum)","yours":"1","guide":null},{"label":"Is the enemy near you?","yours":"Yes","guide":null},{"label":"Enable Holy Relic's Boon Aura","yours":"Yes","guide":null},{"label":"# of nearby Enemies","yours":"1","guide":"5"},{"label":"# of nearby Rare or Unique Enemies","yours":"1","guide":null},{"label":"Has a Minion Died Recently?","yours":"Yes","guide":null},{"label":"Have you been Hit Recently?","yours":"Yes","guide":null},{"label":"Have you been Hit by an Attack Recently?","yours":"Yes","guide":null},{"label":"Have you Blocked Recently?","yours":"Yes","guide":null},{"label":"Spawned a corpse Recently?","yours":"Yes","guide":null},{"label":"Consumed a corpse Recently?","yours":"Yes","guide":null},{"label":"Is the enemy Bleeding?","yours":"Yes","guide":null},{"label":"Is the enemy Blinded?","yours":"Yes","guide":null},{"label":"Is the enemy Ignited?","yours":"Yes","guide":null},{"label":"Is the enemy Chilled?","yours":"Yes","guide":null},{"label":"Time spent stationary","yours":null,"guide":"1"},{"label":"Is Feeding Frenzy active?","yours":null,"guide":"Yes"},{"label":"Do you have Onslaught?","yours":null,"guide":"Yes"},{"label":"Are you Fortified?","yours":null,"guide":"Yes"},{"label":"# of Nearby Corpses","yours":null,"guide":"20"},{"label":"# of Summoned Minions (if not maximum)","yours":null,"guide":"10"},{"label":"Have you used a Minion Skill Recently?","yours":null,"guide":"Yes"},{"label":"# of Corpses Consumed Recently","yours":null,"guide":"20"}],"modsYours":["+11% to Chaos Resistance","6% increased Attack Speed with Swords","Minions have +6% to Damage over Time Multiplier"],"modsGuide":["Curse Enemies with Temporal Chains on Hit","Nearby Enemies have 18% increased Effect of Curses on them","Nearby allies gain 18% increased Damage","You and nearby allies gain 50% increased Damage","You can apply an additional Curse"],"guideTitle":"HRoC Early Maps"},"passives":{"yours":114,"guide":106,"list":[{"kind":"Notable","name":"As The Mountain","yours":0,"guide":1},{"kind":"Notable","name":"Combat Stamina","yours":1,"guide":0},{"kind":"Notable","name":"Gravepact","yours":1,"guide":0},{"kind":"Notable","name":"Mystic Bulwark","yours":1,"guide":0},{"kind":"Notable","name":"Sanctity","yours":1,"guide":0},{"kind":"Mastery","name":"Life Mastery","effect":"15% increased maximum Life if there are no Life Modifiers on Equipped Body Armour","yours":0,"guide":1},{"kind":"Mastery","name":"Minion Defence Mastery","effect":"Minions Leech 1% of Damage as Life","yours":0,"guide":1},{"kind":"Mastery","name":"Shield Mastery","effect":"+1% Chance to Block Attack Damage per 5% Chance to Block on Equipped Shield","yours":0,"guide":1},{"kind":"Socket","name":"Basic Jewel Socket","yours":2,"guide":1},{"kind":"Socket","name":"Large Jewel Socket","yours":0,"guide":1},{"kind":"Normal","name":"Armour and Life Regeneration","yours":1,"guide":0},{"kind":"Normal","name":"Chaos Resistance and Minion Damage","yours":3,"guide":0},{"kind":"Normal","name":"Dexterity","yours":2,"guide":1},{"kind":"Normal","name":"Intelligence","yours":10,"guide":9},{"kind":"Normal","name":"Life Regeneration","yours":1,"guide":0},{"kind":"Normal","name":"Mana and Spell Block","yours":1,"guide":0},{"kind":"Normal","name":"Minion Damage","yours":1,"guide":4},{"kind":"Normal","name":"Strength","yours":18,"guide":15}]},"skills":[{"name":"Summon Holy Relic of Conviction","guide":{"label":"6L Holy Relic - Main Links","slot":"Body Armour","gems":[{"name":"Summon Holy Relic of Conviction","level":17,"quality":10,"support":false},{"name":"Chance to Poison","level":16,"quality":0,"support":true},{"name":"Added Chaos Damage","level":16,"quality":0,"support":true},{"name":"Void Manipulation","level":16,"quality":0,"support":true},{"name":"Meat Shield","level":16,"quality":0,"support":true},{"name":"Unbound Ailments","level":16,"quality":0,"support":true}]},"yours":{"label":"Summon Holy Relic of Conviction","slot":"Body Armour","gems":[{"name":"Unbound Ailments","level":19,"quality":0,"support":true},{"name":"Added Chaos Damage","level":19,"quality":0,"support":true},{"name":"Void Manipulation","level":17,"quality":0,"support":true},{"name":"Summon Holy Relic of Conviction","level":19,"quality":16,"support":false},{"name":"Chance to Poison","level":11,"quality":0,"support":true}]}},{"name":"Tempest Shield + Flesh and Stone + Arctic Armour + Summon Skitterbots","guide":{"label":"Auras","slot":"Gloves","gems":[{"name":"Tempest Shield","level":17,"quality":0,"support":false},{"name":"Flesh and Stone","level":17,"quality":0,"support":false},{"name":"Arctic Armour","level":17,"quality":0,"support":false},{"name":"Summon Skitterbots","level":17,"quality":0,"support":false}]},"yours":{"label":"Arctic Armour, Summon Skitterbots, Tempest Shield, Flesh and Stone","slot":"Boots","gems":[{"name":"Arctic Armour","level":9,"quality":0,"support":false},{"name":"Summon Skitterbots","level":17,"quality":0,"support":false},{"name":"Tempest Shield","level":14,"quality":0,"support":false},{"name":"Flesh and Stone","level":14,"quality":0,"support":false}]}},{"name":"Lancing Steel of Spraying","guide":{"label":"4L Lancing Steel","slot":"Boots","gems":[{"name":"Lancing Steel of Spraying","level":16,"quality":0,"support":false},{"name":"Life Gain on Hit","level":16,"quality":0,"support":true},{"name":"Withering Touch","level":16,"quality":0,"support":true},{"name":"Returning Projectiles","level":17,"quality":0,"support":true}]},"yours":{"label":"Lancing Steel of Spraying","slot":"Helmet","gems":[{"name":"Lancing Steel of Spraying","level":7,"quality":7,"support":false},{"name":"Returning Projectiles","level":1,"quality":0,"support":true},{"name":"Withering Touch","level":1,"quality":0,"support":true},{"name":"Life Gain on Hit","level":1,"quality":0,"support":true}]}},{"name":"Animate Guardian + Raise Spectre","guide":{"label":"4L Utility Minions","slot":"Helmet","gems":[{"name":"Animate Guardian","level":20,"quality":0,"support":false},{"name":"Raise Spectre","level":20,"quality":0,"support":false},{"name":"Meat Shield","level":20,"quality":0,"support":true},{"name":"Minion Life","level":20,"quality":0,"support":true}]},"yours":{"label":"Raise Spectre, Animate Guardian","slot":"Gloves","gems":[{"name":"Raise Spectre","level":19,"quality":0,"support":false},{"name":"Minion Life","level":19,"quality":0,"support":true},{"name":"Meat Shield","level":19,"quality":0,"support":true},{"name":"Animate Guardian","level":19,"quality":0,"support":false}]}},{"name":"Despair + Desecrate + Bone Offering","guide":{"label":"3S Trigger Weapon","slot":"Weapon 1","gems":[{"name":"Despair","level":20,"quality":20,"support":false},{"name":"Desecrate","level":1,"quality":0,"support":false},{"name":"Bone Offering","level":20,"quality":0,"support":false}]},"yours":{"label":"Desecrate, Bone Offering, Despair","slot":"Weapon 1","gems":[{"name":"Desecrate","level":1,"quality":0,"support":false},{"name":"Bone Offering","level":18,"quality":0,"support":false},{"name":"Despair","level":17,"quality":0,"support":false}]}},{"name":"Frostblink + Shield Charge","guide":{"label":"3L Movement Skills","slot":"Weapon 2","gems":[{"name":"Frostblink","level":20,"quality":0,"support":false},{"name":"Faster Attacks","level":20,"quality":0,"support":true},{"name":"Shield Charge","level":20,"quality":0,"support":false}]},"yours":{"label":"Shield Charge, Flame Dash","slot":"Weapon 2","gems":[{"name":"Shield Charge","level":6,"quality":0,"support":false},{"name":"Faster Attacks","level":9,"quality":0,"support":true},{"name":"Flame Dash","level":19,"quality":0,"support":false}]}},{"name":"Summon Holy Relic","yours":{"label":"Summon Holy Relic","slot":"Weapon 1 Swap","gems":[{"name":"Summon Holy Relic","level":14,"quality":0,"support":false}]}},{"name":"Bone Offering","yours":{"label":"Bone Offering","slot":"Weapon 1 Swap","gems":[{"name":"Bone Offering","level":18,"quality":0,"support":false}]}},{"name":"Raise Zombie + Divine Ire of Holy Lightning","yours":{"label":"Raise Zombie, Divine Ire of Holy Lightning","slot":"Weapon 2 Swap","gems":[{"name":"Unleash","level":18,"quality":0,"support":true},{"name":"Raise Zombie","level":19,"quality":0,"support":false},{"name":"Divine Ire of Holy Lightning","level":18,"quality":0,"support":false}]}},{"name":"Minion Damage","yours":{"label":"\u003cNo active skills>","slot":"Body Armour","gems":[{"name":"Minion Damage","level":19,"quality":0,"support":true}]}}],"items":[{"slot":"Weapon 1","yours":{"name":"Victory Beak","base":"Variscite Blade","rarity":"RARE"},"guide":{"name":"","base":"Whalebone Rapier","rarity":"RARE"},"onlyYours":["+240 to Accuracy Rating","Adds 57 to 87 Cold Damage","Adds 13 to 203 Lightning Damage","33% increased Stun Duration on Enemies"],"onlyGuide":["+25% to Global Critical Strike Multiplier","Minions deal 61% increased Damage"],"rolls":[["26% increased Attack Speed","15% increased Attack Speed"]]},{"slot":"Weapon 2","yours":{"name":"Corruption Emblem","base":"Ivory Spirit Shield","rarity":"RARE"},"guide":{"name":"","base":"Fossilised Spirit Shield","rarity":"RARE"},"onlyYours":["63% increased Chance to Block","9% Chance to Block Spell Damage","63% increased Spell Critical Strike Chance","+18% to Fire Resistance","Minions have 67% increased Critical Strike Chance"],"onlyGuide":["+77 to maximum Life"],"rolls":[["Minions deal 6% increased Damage","Minions deal 8% increased Damage"],["Minions deal 22% increased Damage","Minions deal 54% increased Damage"]]},{"slot":"Helmet","yours":{"name":"Geofri's Crest","base":"Great Crown","rarity":"UNIQUE"},"guide":{"name":"Geofri's Crest","base":"Great Crown","rarity":"UNIQUE"},"onlyYours":[],"onlyGuide":[],"rolls":[["148% increased Armour and Energy Shield","145% increased Armour and Energy Shield"],["+30% to Fire Resistance","+28% to Fire Resistance"],["+25% to Cold Resistance","+24% to Cold Resistance"],["+28% to Lightning Resistance","+27% to Lightning Resistance"],["+27% to Chaos Resistance","+29% to Chaos Resistance"]]},{"slot":"Body Armour","yours":{"name":"Spirit Mantle","base":"Holy Chainmail","rarity":"RARE"},"guide":{"name":"","base":"Occultist's Vestment","rarity":"RARE"},"onlyYours":["+30 to Armour","32% faster start of Energy Shield Recharge","+40 to maximum Mana","+18% to Fire and Cold Resistances"],"onlyGuide":["7% increased Spell Damage","+29% to Cold Resistance"],"rolls":[["+132 to maximum Life","+166 to maximum Life"],["+21% to Lightning Resistance","+29% to Lightning Resistance"]]},{"slot":"Gloves","yours":{"name":"Ghoul Hand","base":"Carnal Mitts","rarity":"RARE"},"guide":{"name":"","base":"Wyvernscale Gauntlets","rarity":"RARE"},"onlyYours":["+29 to Intelligence"],"onlyGuide":["Minions deal 18% increased Damage","+46% to Fire Resistance"],"rolls":[["+23% to Cold Resistance","+47% to Cold Resistance"],["+29% to Lightning Resistance","+48% to Lightning Resistance"]]},{"slot":"Boots","yours":{"name":"Chimeric Span","base":"Soldier Boots","rarity":"RARE"},"guide":{"name":"","base":"Zealot Boots","rarity":"RARE"},"onlyYours":["63% increased Armour and Energy Shield","+58 to maximum Mana","+29% to Chaos Resistance"],"onlyGuide":["+77 to maximum Life","+29% to Lightning Resistance"],"rolls":[["+19% to Fire Resistance","+29% to Fire Resistance"],["30% increased Movement Speed","25% increased Movement Speed"]]},{"slot":"Amulet","yours":{"name":"Doom Locket","base":"Onyx Amulet","rarity":"RARE"},"guide":{"name":"","base":"Lapis Amulet","rarity":"RARE"},"onlyYours":["+13 to all Attributes","15% increased maximum Energy Shield","Regenerate 8.4 Life per second","Gain 8 Life per Enemy Killed"],"onlyGuide":["+25 to Intelligence","+39 to Intelligence","+29% to Cold Resistance"],"rolls":[["+40 to maximum Life","+62 to maximum Life"]]},{"slot":"Ring 1","yours":{"name":"Wrath Loop","base":"Two-Stone Ring","rarity":"RARE"},"guide":{"name":"Life Int Chaos Ring","base":"Amethyst Ring","rarity":"RARE"},"onlyYours":["+15% to Cold and Lightning Resistances","+16 to all Attributes","Adds 1 to 2 Cold Damage to Attacks","13% increased Mana Regeneration Rate","0.36% of Physical Attack Damage Leeched as Life"],"onlyGuide":["+20% to Chaos Resistance","+23% to Chaos Resistance","+30 to Intelligence","+54 to maximum Life","+29% to Fire Resistance"],"rolls":[]},{"slot":"Ring 2","yours":{"name":"Sorrow Knot","base":"Amethyst Ring","rarity":"RARE"},"guide":{"name":"Life Int Chaos Ring","base":"Amethyst Ring","rarity":"RARE"},"onlyYours":["Adds 1 to 2 Fire Damage to Attacks","+21 to maximum Mana","+26% to Cold Resistance","+23% to Lightning Resistance"],"onlyGuide":["+23% to Chaos Resistance","+30 to Intelligence"],"rolls":[["+16% to Chaos Resistance","+20% to Chaos Resistance"],["+42 to maximum Life","+54 to maximum Life"],["+27% to Fire Resistance","+29% to Fire Resistance"]]},{"slot":"Belt","yours":{"name":"Cataclysm Shackle","base":"Heavy Belt","rarity":"RARE"},"guide":{"name":"Darkness Enthroned","base":"Stygian Vise","rarity":"UNIQUE"},"onlyYours":["+25 to Strength","+25 to maximum Energy Shield","+68 to maximum Life","Regenerate 27.9 Life per second","11% increased Stun Duration on Enemies","Reflects 10 Physical Damage to Melee Attackers"],"onlyGuide":["Has 1 Abyssal Socket","Has 1 Abyssal Socket","50% increased Effect of Socketed Abyss Jewels"],"rolls":[]},{"slot":"Belt Abyssal Socket 1","guide":{"name":"Life Poison Chaos Jewel","base":"Ghastly Eye Jewel","rarity":"RARE"},"onlyYours":[],"onlyGuide":["+21 to maximum Life","+10% to Chaos Resistance","Minions have 10% chance to Poison Enemies on Hit"],"rolls":[]},{"slot":"Belt Abyssal Socket 2","guide":{"name":"Life Poison Chaos Jewel","base":"Ghastly Eye Jewel","rarity":"RARE"},"onlyYours":[],"onlyGuide":["+21 to maximum Life","+10% to Chaos Resistance","Minions have 10% chance to Poison Enemies on Hit"],"rolls":[]},{"slot":"Flask 1","yours":{"name":"Dolomite Divine Life Flask of Quelling","base":"Divine Life Flask","rarity":"MAGIC"},"guide":{"name":"Condensed Divine Life Flask of Allaying","base":"Divine Life Flask","rarity":"MAGIC"},"onlyYours":["20% increased Charges per use","29% increased Amount Recovered","Grants Immunity to Ignite for 12 seconds if used while Ignited","Removes all Burning when used"],"onlyGuide":["63% increased Recovery rate","Grants Immunity to Bleeding for 12 seconds if used while Bleeding","Grants Immunity to Corrupted Blood for 12 seconds if used while affected by Corrupted Blood"],"rolls":[]},{"slot":"Flask 2","yours":{"name":"Doled Quartz Flask of the Sandpiper","base":"Quartz Flask","rarity":"MAGIC"},"guide":{"name":"Flagellant's Silver Flask","base":"Silver Flask","rarity":"MAGIC"},"onlyYours":["40% increased Charge Recovery","25% reduced effect","42% reduced Effect of Shock on you during Effect"],"onlyGuide":["Gain 3 Charges when you are Hit by an Enemy (Not supported in PoB yet)","Regenerate 3% of Life per second during Effect"],"rolls":[]},{"slot":"Flask 3","yours":{"name":"Full-bodied Divine Mana Flask of Warding","base":"Divine Mana Flask","rarity":"MAGIC"},"guide":{"name":"Brewer's Quicksilver Flask of the Hare","base":"Quicksilver Flask","rarity":"MAGIC"},"onlyYours":["55% increased Amount Recovered","33% reduced Recovery rate","Removes Curses on use"],"onlyGuide":["Used when Charges reach full (Not supported in PoB yet)","25% reduced Charges per use","6% increased Movement Speed during Effect"],"rolls":[]},{"slot":"Flask 4","yours":{"name":"Granite Flask of the Lizard","base":"Granite Flask","rarity":"MAGIC"},"guide":{"name":"Transgressor's Granite Flask of the Owl","base":"Granite Flask","rarity":"MAGIC"},"onlyYours":["49% less Duration","Immunity to Bleeding and Corrupted Blood during Effect"],"onlyGuide":["Used when Charges reach full (Not supported in PoB yet)","Gain 3 Charge when you are Hit by an Enemy (Not supported in PoB yet)","64% reduced Effect of Curses on you during Effect"],"rolls":[]},{"slot":"Flask 5","yours":{"name":"Wide Quicksilver Flask of the Crystal","base":"Quicksilver Flask","rarity":"MAGIC"},"guide":{"name":"Chemist's Quartz Flask of the Armadillo","base":"Quartz Flask","rarity":"MAGIC"},"onlyYours":["+16 to Maximum Charges","14% additional Elemental Resistances during Effect"],"onlyGuide":["Used when Charges reach full (Not supported in PoB yet)","27% reduced Charges per use","60% increased Armour during Effect"],"rolls":[]},{"slot":"Tree jewel 1","yours":{"name":"Fulgent Drop","base":"Cobalt Jewel","rarity":"RARE"},"guide":{"name":"Careful Planning","base":"Viridian Jewel","rarity":"UNIQUE"},"onlyYours":["+15 to Intelligence","8% increased maximum Energy Shield","8% increased maximum Mana","+10% to all Elemental Resistances"],"onlyGuide":["+20 to Dexterity","Intelligence from Passives in Radius is Transformed to Dexterity","Corrupted (Not supported in PoB yet)"],"rolls":[]},{"slot":"Tree jewel 2","yours":{"name":"Enthralling Orb","base":"Ghastly Eye Jewel","rarity":"RARE"},"guide":{"name":"Healthy Large Cluster Jewel of Ravaging","base":"Large Cluster Jewel","rarity":"MAGIC"},"onlyYours":["Minions have 14% chance to Poison Enemies on Hit","Minions deal 23 to 31 additional Fire Damage","Minions deal 3 to 53 additional Lightning Damage","Minions have 5% chance to Blind on Hit with Attacks (Not supported in PoB yet)"],"onlyGuide":["Adds 8 Passive Skills","2 Added Passive Skills are Jewel Sockets","Added Small Passive Skills grant: Minions deal 10% increased Damage","Added Small Passive Skills also grant: +6 to Maximum Life","Added Small Passive Skills also grant: Minions have 2% increased Attack and Cast Speed"],"rolls":[]}]}</script>
 <script>
-(function () {
-  "use strict";
-
-  // Example data. Armour and Life tie out: base × increased × more.
-  var STATS = [
-    { g: "Player", label: "Life", y: 3333, gd: 3937, side: true, why: "life" },
-    { g: "Player", label: "Energy Shield", y: 410, gd: 520, side: true },
-    { g: "Player", label: "Armour", y: 1452, gd: 7686, side: true, why: "armour" },
-    { g: "Player", label: "Evasion", y: 820, gd: 310, side: true },
-    { g: "Player", label: "Phys Max Hit", y: 5240, own: 4180, gd: 9860, side: true },
-    { g: "Player", label: "Fire Resistance", y: 75, gd: 75, side: true, u: "%" },
-    { g: "Player", label: "Cold Resistance", y: 68, gd: 75, side: true, u: "%" },
-    { g: "Player", label: "Lightning Resistance", y: 75, gd: 75, side: true, u: "%" },
-    { g: "Player", label: "Chaos Resistance", y: -12, gd: 18, side: true, u: "%" },
-    { g: "Player", label: "Movement Speed", y: 115, gd: 130, side: true, u: "%" },
-    { g: "Player", label: "Phys Damage Reduction", y: 9, gd: 34, side: false, u: "%" },
-    { g: "Minion: Holy Relic", label: "Total DPS", y: 21300, own: 24600, gd: 28950, side: true },
-    { g: "Minion: Holy Relic", label: "Poison DPS", y: 9610, own: 11200, gd: 18420, side: true },
-    { g: "Minion: Holy Relic", label: "Poison Chance", y: 40, gd: 70, side: false, u: "%", why: "poison" },
-    { g: "Minion: Holy Relic", label: "Poison Duration", y: 2.4, gd: 2.4, side: false, u: "s", dp: 2 },
-    { g: "Minion: Holy Relic", label: "Life", y: 6800, gd: 8120, side: true },
-    { g: "Minion: Holy Relic", label: "Crit Chance", y: 5, gd: 5, side: true, u: "%", dp: 1 },
-    { g: "Minion: Holy Relic", label: "Cast Rate", y: 1.6, gd: 1.6, side: true, dp: 2 }
-  ];
-
-  var WHY = {
-    armour: {
-      title: "Armour",
-      formula: [["Yours", "1,092 base × 133% × 100% = 1,452"], ["Guide", "3,002 base × 173% × 148% = 7,686"]],
-      sections: [
-        { name: "Base", u: "", rows: [
-          ["Body Armour", "Gear", 612, 1180], ["Helmet", "Gear", 0, 310], ["Shield", "Gear", 220, 410],
-          ["Gloves", "Gear", 120, 120], ["Boots", "Gear", 140, 140], ["Determination", "Skill", 0, 842]
-        ] },
-        { name: "Increased", u: "%", rows: [
-          ["Sanctity", "Tree", 0, 20], ["Faith and Steel", "Tree", 15, 15], ["Sanctum of Thought", "Tree", 18, 18],
-          ["Armour and Energy Shield ×2", "Tree", 0, 20]
-        ] },
-        { name: "More", u: "%", rows: [["Determination", "Skill", 0, 48]] }
-      ]
-    },
-    poison: {
-      title: "Minion Poison Chance",
-      formula: [["Yours", "40% = 40%"], ["Guide", "40% + 15% + 15% = 70%"]],
-      sections: [
-        { name: "Chance", u: "%", rows: [
-          ["Chance to Poison", "Gem", 40, 40], ["Ghastly Eye Jewel · tree socket", "Jewel", 0, 15],
-          ["Ghastly Eye Jewel · belt", "Jewel", 0, 15]
-        ] }
-      ]
-    },
-    life: {
-      title: "Life",
-      formula: [["Yours", "1,344 base × 248% = 3,333"], ["Guide", "1,469 base × 268% = 3,937"]],
-      sections: [
-        { name: "Base", u: "", rows: [
-          ["Level 68", "Base", 854, 854], ["Strength", "Base", 80, 95], ["Body Armour", "Gear", 90, 110],
-          ["Helmet", "Gear", 60, 80], ["Gloves", "Gear", 70, 70], ["Boots", "Gear", 70, 80],
-          ["Belt", "Gear", 60, 90], ["Rings", "Gear", 60, 90]
-        ] },
-        { name: "Increased", u: "%", rows: [["Tree", "Tree", 148, 160], ["Amulet", "Gear", 0, 8]] }
-      ]
-    }
+(() => {
+  const D = JSON.parse(document.getElementById("data").textContent);
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const MINUS = "−";
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("lioneye-compare-" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("lioneye-compare-" + k, JSON.stringify(v)); } catch {} },
   };
+  const metric = Object.fromEntries(D.metrics.map((m) => [m.key, m]));
+  const THRESH = { dps: 1000, poison: 1, armour: 50, life: 10, ehp: 200, phys: 50, chaos: 1, move: 1 };
+  // Stored choices can outlive a data rebuild: fall back when a key is gone.
+  const metricKey = (k, d) => (k === "all" || metric[k] ? k : d);
 
-  var GAPS = [
-    { m: "Armour", kind: "Skill", t: "Determination", d: "Not socketed · Guide Lvl 18", v: 3949, unit: "Armour", act: "Socket" },
-    { m: "Armour", kind: "Tree", t: "Sanctity + 2 small", d: "+40% increased Armour", v: 1777, unit: "Armour", act: "Show tree" },
-    { m: "Armour", kind: "Gear", t: "Body Armour", d: "612 vs 1,180 base", v: 1454, unit: "Armour", act: "Trade" },
-    { m: "Armour", kind: "Gear", t: "Helmet", d: "No Armour base", v: 794, unit: "Armour", act: "Trade" },
-    { m: "Armour", kind: "Gear", t: "Shield", d: "220 vs 410 base", v: 486, unit: "Armour", act: "Trade" },
-    { m: "Minion", kind: "Jewel", t: "Ghastly Eye ×2", d: "Minion poison chance +15% each", v: 7894, unit: "Poison DPS", act: "Trade" },
-    { m: "Life", kind: "Tree", t: "Life nodes", d: "148% vs 160% increased", v: 176, unit: "Life", act: "Show tree" },
-    { m: "Life", kind: "Gear", t: "Amulet", d: "No % Life", v: 118, unit: "Life", act: "Trade" },
-    { m: "Life", kind: "Gear", t: "Belt", d: "60 vs 90 Life", v: 80, unit: "Life", act: "Trade" },
-    { m: "Life", kind: "Gear", t: "Rings", d: "60 vs 90 Life", v: 80, unit: "Life", act: "Trade" }
-  ];
-  var GAP_TOTALS = { Armour: "1,452 vs 7,686", Minion: "Poison DPS 9,610 vs 18,420", Life: "3,333 vs 3,937" };
-
-  var CONFIG = [
-    ["Is the enemy a Boss?", "No", "Pinnacle Boss"],
-    ["Do you have Fortification?", "No", "Yes"],
-    ["Withered stacks", "0", "15"]
-  ];
-
-  var state = { tab: "stats", cfg: "guide", scope: "all", same: false, q: "", why: "armour", metric: "All" };
-  var $ = function (id) { return document.getElementById(id); };
-
-  function fmt(n, dp) {
-    return n.toLocaleString("en-US", { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 }).replace(/^-/, "−");
+  const n = (v, digits = 0) => Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: digits });
+  function fmt(key, v) {
+    if (v == null || Number.isNaN(v)) return "—";
+    const m = metric[key];
+    const sign = v < 0 ? MINUS : "";
+    if (m?.fmt === "k") return sign + (Math.abs(v) >= 10000 ? n(v / 1000, 1) + "k" : n(v));
+    if (m?.fmt === "%") return sign + n(v) + "%";
+    return sign + n(v);
   }
-  function withUnit(n, s) { return fmt(n, s.dp) + (s.u || ""); }
-  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-  function yoursOf(s) { return state.cfg === "own" && s.own !== undefined ? s.own : s.y; }
-  function diffCell(d, s) {
-    var cls = d > 0 ? "pos" : d < 0 ? "neg" : "zero";
-    var sign = d > 0 ? "+" : d < 0 ? "−" : "";
-    return '<td class="r ' + cls + '">' + (d === 0 ? "—" : sign + withUnit(Math.abs(d), s)) + "</td>";
+  function delta(key, v, exact) {
+    if (Math.abs(v) < (exact ? 0.05 : THRESH[key] ?? 0.5)) return `<span class="zero">0</span>`;
+    const cls = v > 0 ? "pos" : "neg";
+    return `<span class="${cls}">${v > 0 ? "+" : ""}${fmt(key, v)}</span>`;
   }
+  const plain = (v) => (v < 0 ? MINUS : "") + n(v, Math.abs(v) % 1 ? 1 : 0);
 
-  function renderStats() {
-    var q = state.q.trim().toLowerCase();
-    var html = "", lastGroup = null, shown = 0, whyVisible = false;
-    STATS.forEach(function (s) {
-      var y = yoursOf(s), d = +(y - s.gd).toFixed(s.dp || 0);
-      if (state.scope === "side" && !s.side) return;
-      if (!state.same && d === 0) return;
-      if (q && (s.g + " " + s.label).toLowerCase().indexOf(q) < 0) return;
-      if (s.g !== lastGroup) { html += '<tr class="group"><td colspan="5">' + esc(s.g) + "</td></tr>"; lastGroup = s.g; }
-      shown++;
-      var cfgTag = state.cfg === "own" && s.own !== undefined ? '<span class="tag cfg">CONFIG</span>' : "";
-      var calcTag = !s.side ? '<span class="tag">CALCS</span>' : "";
-      var sel = !!s.why && s.why === state.why;
-      if (sel) whyVisible = true;
-      html += '<tr class="stat' + (d === 0 ? " same" : "") + (sel ? " sel" : "") + '">' +
-        "<td>" + esc(s.label) + calcTag + cfgTag + "</td>" +
-        '<td class="r">' + withUnit(y, s) + "</td>" +
-        '<td class="r">' + withUnit(s.gd, s) + "</td>" +
-        diffCell(d, s) +
-        '<td class="r">' + (s.why ? '<button type="button" class="why-btn" data-why="' + s.why + '" aria-expanded="' + sel + '">Why</button>' : "") + "</td></tr>";
+  // ---- Header ----
+  let mode = store.get("mode", "guide");
+  $("pob-chip").textContent = "PoB " + D.meta.pob;
+  $("live-name").textContent = D.meta.live.name;
+  const upd = new Date(D.meta.live.updated);
+  $("live-sub").textContent = `Lvl ${D.meta.live.level} ${D.meta.live.ascendancy} · poe.ninja ${upd.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`;
+  $("loadout").innerHTML = D.meta.loadouts.map((l) => `<option${l === D.meta.guide.loadout ? " selected" : " disabled"}>${esc(l)}</option>`).join("");
+  $("guide-sub").textContent = `Lvl ${D.meta.guide.level} · Guide`;
+  $("skill").textContent = `${D.meta.skill.replace(/^Summon /, "")} › ${D.meta.minionSkill}`;
+  $("config-chip").textContent = `${D.config.rows.length} differ`;
+
+  // ---- Sections: fold, jump bar ----
+  const sections = [...document.querySelectorAll(".section")];
+  const storedFolds = store.get("folded", []);
+  const folded = new Set(Array.isArray(storedFolds) ? storedFolds : []);
+  const chevron = (open) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="${open ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6"}"/></svg>`;
+  for (const s of sections) {
+    const body = s.querySelector(".body");
+    if (!body.id) body.id = s.id + "-body";
+    const head = document.createElement("div");
+    head.className = "head";
+    head.innerHTML = `<button type="button" class="toggle" aria-expanded="true" aria-controls="${body.id}" id="${s.id}-title"><span>${esc(s.dataset.title)}</span>${chevron(true)}</button><div class="actions"></div>`;
+    s.prepend(head);
+    s.setAttribute("aria-labelledby", s.id + "-title");
+    head.addEventListener("click", (e) => { if (!e.target.closest(".actions")) toggle(s); });
+    setFold(s, folded.has(s.id));
+  }
+  function setFold(s, fold) {
+    s.toggleAttribute("data-collapsed", fold);
+    const b = s.querySelector(".toggle");
+    b.setAttribute("aria-expanded", String(!fold));
+    b.querySelector("svg").outerHTML = chevron(!fold);
+    if (fold) folded.add(s.id); else folded.delete(s.id);
+    store.set("folded", [...folded]);
+  }
+  function toggle(s) {
+    const head = s.querySelector(".head");
+    const inside = s.getBoundingClientRect().top < parseFloat(getComputedStyle(head).top) - 2;
+    const fold = !s.hasAttribute("data-collapsed");
+    setFold(s, fold);
+    if (fold && inside) (s.nextElementSibling || s).scrollIntoView({ block: "start" });
+  }
+  // Opens a section, scrolls to it and moves keyboard focus to its header (or `then`'s target).
+  function jumpTo(id, then) {
+    const s = $(id);
+    setFold(s, false);
+    requestAnimationFrame(() => {
+      s.scrollIntoView({ behavior: "smooth", block: "start" });
+      s.querySelector(".toggle").focus({ preventScroll: true });
+      then?.();
     });
-    if (!shown) html = '<tr><td colspan="5" class="empty">' + (q ? "No matches" : "No differences") + "</td></tr>";
-    $("stats-body").innerHTML = html;
-    renderWhy(whyVisible);
   }
-
-  function renderWhy(visible) {
-    var w = WHY[state.why];
-    var slot = $("why-slot");
-    if (!w || !visible) { slot.innerHTML = ""; return; }
-    var rows = "";
-    w.sections.forEach(function (sec) {
-      rows += '<tr class="sec"><td colspan="4">' + esc(sec.name) + "</td></tr>";
-      sec.rows.forEach(function (r) {
-        var d = r[2] - r[3];
-        if (!state.same && d === 0) return;
-        var s = { u: sec.u };
-        rows += "<tr" + (d === 0 ? ' class="same"' : "") + '><td><span class="kind ' + r[1] + '">' + r[1] + "</span>" + esc(r[0]) + "</td>" +
-          '<td class="r">' + withUnit(r[2], s) + '</td><td class="r">' + withUnit(r[3], s) + "</td>" + diffCell(d, s) + "</tr>";
-      });
-    });
-    slot.innerHTML =
-      '<div class="why" role="region" aria-label="Why">' +
-        '<div class="why-head"><span class="mk">2</span><h3>' + esc(w.title) + '</h3><span class="chip">Sources</span></div>' +
-        '<div class="formula">' + w.formula.map(function (f) { return "<div><b>" + f[0] + "</b><code>" + esc(f[1]) + "</code></div>"; }).join("") + "</div>" +
-        '<div class="scroll"><table><thead><tr><th>Source</th><th class="r">Yours</th><th class="r">Guide</th><th class="r">Diff</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
-      "</div>";
+  $("jumps").innerHTML = sections.map((s) => `<a class="jump" href="#${s.id}" data-jump="${s.id}">${esc(s.dataset.title)}</a>`).join("");
+  $("jumps").addEventListener("click", (e) => {
+    const a = e.target.closest("[data-jump]");
+    if (!a) return;
+    e.preventDefault();
+    jumpTo(a.dataset.jump);
+  });
+  // The section you're in: the last one whose top has reached the jump bar's bottom.
+  function current() {
+    const bar = document.querySelector(".jumpbar").getBoundingClientRect().bottom + 12;
+    let at = null;
+    for (const s of sections) if (s.getBoundingClientRect().top <= bar) at = s.id;
+    if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) at = sections[sections.length - 1].id;
+    for (const a of document.querySelectorAll("[data-jump]")) {
+      const on = a.dataset.jump === at;
+      if (on && a.getAttribute("aria-current") !== "true") {
+        // Keep the active link visible in a jump bar that scrolls sideways (phones).
+        const bar = document.querySelector(".jumpbar");
+        const r = a.getBoundingClientRect(), b = bar.getBoundingClientRect();
+        if (r.left < b.left || r.right > b.right) bar.scrollLeft += r.left - b.left - 8;
+      }
+      a.setAttribute("aria-current", String(on));
+    }
   }
+  addEventListener("scroll", current, { passive: true });
+  addEventListener("resize", current);
 
-  function renderGaps() {
-    var metrics = ["All", "Armour", "Minion", "Life"];
-    $("gap-chips").innerHTML = metrics.map(function (m) {
-      return '<button type="button" data-metric="' + m + '" aria-pressed="' + (state.metric === m) + '">' + m + "</button>";
-    }).join("");
-    var html = "";
-    ["Armour", "Minion", "Life"].forEach(function (m) {
-      if (state.metric !== "All" && state.metric !== m) return;
-      var list = GAPS.filter(function (g) { return g.m === m; }).sort(function (a, b) { return b.v - a.v; });
-      var max = list[0] ? list[0].v : 1;
-      html += '<div class="gap-group"><h3>' + m + '<span class="tot num">' + GAP_TOTALS[m] + "</span></h3>";
-      list.forEach(function (g) {
-        html += '<div class="gap"><div><div class="t"><span class="kind ' + g.kind + '">' + g.kind + "</span>" + esc(g.t) + '</div><div class="d">' + esc(g.d) + "</div></div>" +
-          '<div class="imp num"><b>−' + fmt(g.v) + "</b><small>" + g.unit + "</small></div>" +
-          '<button type="button" class="act" data-act="' + g.act + '">' + g.act + "</button>" +
-          '<div class="bar-meter"><i style="width:' + Math.max(4, Math.round(g.v / max * 100)) + '%"></i></div></div>';
-      });
-      html += "</div>";
-    });
-    $("gaps-body").innerHTML = html;
-  }
-
-  function renderConfig() {
-    $("config-body").innerHTML = CONFIG.map(function (c) {
-      return "<tr><td>" + esc(c[0]) + '</td><td class="r">' + esc(state.cfg === "guide" ? c[2] : c[1]) + '</td><td class="r">' + esc(c[2]) + "</td></tr>";
-    }).join("");
-    var using = $("cfg-using");
-    using.textContent = state.cfg === "guide" ? "Yours: guide" : "Yours: own";
-    using.className = "chip " + (state.cfg === "guide" ? "good" : "warn");
-  }
-
-  function renderOverlay() {
-    var rows = [
-      ["Armour", "1,452 / 7,686", 1452 / 7686],
-      ["Minion poison", "40% / 70%", 40 / 70],
-      ["Life", "3,333 / 3,937", 3333 / 3937]
-    ];
-    $("ov-rows").innerHTML = rows.map(function (r) {
-      return '<div class="ov-row"><span class="s">' + r[0] + '</span><span class="v">' + r[1] + '</span><span class="m"><i style="width:' + Math.round(r[2] * 100) + '%"></i></span></div>';
-    }).join("");
-  }
-
-  function setCfg(c) {
-    state.cfg = c;
-    $("cfg-guide").setAttribute("aria-pressed", c === "guide");
-    $("cfg-own").setAttribute("aria-pressed", c === "own");
-    var st = $("cfg-status");
-    st.textContent = c === "guide" ? "Same" : CONFIG.length + " differ";
-    st.className = "chip " + (c === "guide" ? "good" : "warn");
-    renderStats(); renderConfig();
-  }
-
-  function setTab(t) {
-    state.tab = t;
-    document.querySelectorAll(".tab").forEach(function (b) {
-      var on = b.dataset.tab === t;
-      b.setAttribute("aria-selected", on);
-      b.tabIndex = on ? 0 : -1;
-    });
-    document.querySelectorAll("[role=tabpanel]").forEach(function (p) { p.hidden = p.id !== "panel-" + t; });
-  }
-
-  var toastTimer;
-  function toast(msg) {
-    var el = $("toast");
-    el.textContent = msg; el.classList.remove("off");
+  // ---- Toast ----
+  let toastTimer;
+  function toast(text) {
+    const t = $("toast");
+    t.textContent = text + " (demo)";
+    t.classList.remove("off");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.add("off"); el.textContent = ""; }, 1800);
+    toastTimer = setTimeout(() => t.classList.add("off"), 1600);
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-toast]"); if (b) toast(b.dataset.toast); });
+
+  // ---- Summary ----
+  function renderTiles() {
+    const you = D.values[mode], g = D.values.target;
+    $("tiles").innerHTML = D.metrics.map((m) => `
+      <button type="button" class="tile" data-metric="${esc(m.key)}">
+        <span class="t">${esc(m.label)}</span>
+        <span class="v">${fmt(m.key, you[m.key])}</span>
+        <span class="g"><span>Guide ${fmt(m.key, g[m.key])}</span>${delta(m.key, you[m.key] - g[m.key], true)}</span>
+      </button>`).join("");
+  }
+  $("tiles").addEventListener("click", (e) => {
+    const t = e.target.closest("[data-metric]");
+    if (!t) return;
+    gapMetric = t.dataset.metric;
+    renderGaps();
+    jumpTo("gaps");
+  });
+
+  // ---- Gaps ----
+  let gapMetric = metricKey(store.get("gap-metric", "all"), "all");
+  const KIND_ORDER = ["Links", "Gems", "Gear", "Tree", "Config"];
+  const visibleGaps = () => D.gaps.filter((g) => mode === "own" || g.kind !== "Config");
+  function gapRow(g) {
+    const keys = gapMetric === "all" ? D.metrics.map((m) => m.key) : [gapMetric];
+    const pills = keys.filter((k) => Math.abs(g.d[k]) >= THRESH[k]);
+    const others = gapMetric === "all" ? [] : D.metrics.map((m) => m.key).filter((k) => k !== gapMetric && Math.abs(g.d[k]) >= THRESH[k]);
+    const pill = (k, big) => `<span class="pill${big ? " big" : ""}">${delta(k, g.d[k])} <span class="muted">${esc(metric[k].label)}</span></span>`;
+    const target = g.target || "";
+    const trade = g.kind === "Gear" ? `<button type="button" class="btn" data-toast="Trade search">Trade</button>` : "";
+    return `<div class="gap">
+      <span class="kind ${esc(g.kind)}">${esc(g.kind)}</span>
+      <div class="what"><b>${esc(g.title)}</b> <span class="d">${esc(g.detail)}</span></div>
+      <div class="act"><button type="button" class="btn" data-show="${esc(target)}">Show</button>${trade}</div>
+      <div class="pills">${pills.map((k) => pill(k, gapMetric !== "all")).join("")}${others.map((k) => pill(k, false)).join("")}</div>
+    </div>`;
+  }
+  function renderGaps() {
+    store.set("gap-metric", gapMetric);
+    const chips = [{ key: "all", label: "All" }, ...D.metrics];
+    $("gap-chips").innerHTML = chips.map((c) => `<button type="button" data-gm="${esc(c.key)}" aria-pressed="${c.key === gapMetric}">${esc(c.label)}</button>`).join("");
+    const list = visibleGaps();
+    let html = "";
+    if (gapMetric === "all") {
+      for (const kind of KIND_ORDER) {
+        const rows = list.filter((g) => g.kind === kind && D.metrics.some((m) => Math.abs(g.d[m.key]) >= THRESH[m.key]))
+          .sort((a, b) => b.d.dps - a.d.dps);
+        if (rows.length) html += `<div class="gap-head">${esc(kind)}</div>` + rows.map(gapRow).join("");
+      }
+    } else {
+      const rows = list.filter((g) => Math.abs(g.d[gapMetric]) >= THRESH[gapMetric]);
+      const gains = rows.filter((g) => g.d[gapMetric] > 0).sort((a, b) => b.d[gapMetric] - a.d[gapMetric]);
+      const costs = rows.filter((g) => g.d[gapMetric] < 0).sort((a, b) => a.d[gapMetric] - b.d[gapMetric]);
+      if (gains.length) html += `<div class="gap-head">Gains</div>` + gains.map(gapRow).join("");
+      if (costs.length) html += `<div class="gap-head">Losses</div>` + costs.map(gapRow).join("");
+    }
+    $("gap-list").innerHTML = html || `<div class="empty">No gaps</div>`;
+    const actions = $("gaps").querySelector(".actions");
+    actions.innerHTML = `<span class="chip">Guide config</span>`;
+  }
+  $("gap-chips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-gm]");
+    if (!b) return;
+    gapMetric = b.dataset.gm;
+    renderGaps();
+    $("gap-chips").querySelector(`[data-gm="${gapMetric}"]`)?.focus();
+  });
+  $("gap-list").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-show]");
+    if (!b) return;
+    const t = b.dataset.show;
+    if (t.startsWith("item:")) return showItem(t.slice(5));
+    jumpTo(t);
+  });
+
+  // ---- Stats ----
+  let openWhy = null;
+  function whyHtml(key) {
+    const w = D.why[mode][key];
+    const unit = (b) => (b.unit === "%" ? "%" : "");
+    let f = "";
+    const [a, b] = w.formula;
+    // Sum-type stats (resists, chances) list their parts when there are few.
+    const parts = (side) => w.blocks[0].rows.map((r) => r[side]).filter((v) => v != null && v !== 0);
+    const line = (x, side) => {
+      if (x.flat != null) return `${n(x.flat)} × (1 + ${plain(x.inc)}%)${x.more !== 1 ? ` × ${x.more.toFixed(2)}` : ""} = <b>${n(x.total)}</b>`;
+      const p = parts(side);
+      const sum = p.length > 1 && p.length <= 4
+        ? p.map((v, i) => (i === 0 ? plain(v) : v < 0 ? ` ${MINUS} ${n(v)}` : ` + ${n(v)}`)).join("") + "%"
+        : `${plain(x.sum)}%`;
+      return x.sum > x.cap ? `${sum} · cap ${x.cap}% = <b>${plain(x.total)}%</b>` : p.length > 1 && p.length <= 4 ? `${sum} = <b>${plain(x.total)}%</b>` : `<b>${plain(x.total)}%</b>`;
+    };
+    f = `<div class="formula"><span class="who">You</span><span>${line(a, "yours")}</span><span class="who">Guide</span><span>${line(b, "guide")}</span></div>`;
+    const blocks = w.blocks.map((blk) => {
+      const rows = blk.rows.map((r) => {
+        const d = (r.yours ?? 0) - (r.guide ?? 0);
+        const det = r.yoursDetail || r.guideDetail;
+        const same = r.yours === r.guide;
+        return `<tr${same ? ' class="same"' : ""}><td class="src"><span class="k-${esc(r.group)}">${esc(r.group)}</span> · ${esc(r.key)}${det ? `<small>${esc(r.yoursDetail && r.guideDetail && r.yoursDetail !== r.guideDetail ? r.yoursDetail + " / " + r.guideDetail : det)}</small>` : ""}</td>
+          <td class="r">${r.yours == null ? "—" : plain(r.yours) + unit(blk)}</td><td class="r">${r.guide == null ? "—" : plain(r.guide) + unit(blk)}</td>
+          <td class="r">${same ? '<span class="zero">0</span>' : `<span class="${d > 0 ? "pos" : "neg"}">${d > 0 ? "+" : ""}${plain(d)}${unit(blk)}</span>`}</td></tr>`;
+      }).join("");
+      const ta = blk.rows.reduce((s, r) => s + (r.yours ?? 0), 0), tb = blk.rows.reduce((s, r) => s + (r.guide ?? 0), 0);
+      return `<div class="scroll"><table><thead><tr><th>${esc(blk.title)}</th><th class="r">You</th><th class="r">Guide</th><th class="r">Diff</th></tr></thead>
+        <tbody>${rows}<tr class="group"><td>Total</td><td class="r">${plain(ta)}${unit(blk)}</td><td class="r">${plain(tb)}${unit(blk)}</td><td class="r">${ta === tb ? "0" : (ta > tb ? "+" : "") + plain(ta - tb) + unit(blk)}</td></tr></tbody></table></div>`;
+    }).join("");
+    return `<div class="why" role="region" aria-label="Sources">${f}${blocks}</div>`;
+  }
+  function renderStats() {
+    const q = $("stat-search").value.trim().toLowerCase();
+    const same = $("stat-same").checked;
+    const rows = D.stats[mode].filter((r) => (same || r.yours !== r.guide) && (!q || r.label.toLowerCase().includes(q)));
+    let html = "", section = "";
+    for (const r of rows) {
+      if (r.section !== section) { section = r.section; html += `<tr class="group"><td colspan="5">${esc(section)}</td></tr>`; }
+      const d = r.diff;
+      const diff = d == null ? "" : Math.abs(d) < 0.005 ? '<span class="zero">0</span>' : `<span class="${d > 0 ? "pos" : "neg"}">${d > 0 ? "+" : MINUS}${n(d, Math.abs(d) % 1 ? (Math.abs(d) < 10 ? 2 : 1) : 0)}</span>`;
+      const open = openWhy === r.why && r.why;
+      const whyBtn = r.why ? `<button type="button" class="btn" data-why="${esc(r.why)}" aria-expanded="${!!open}">Why</button>` : "";
+      html += `<tr class="${r.yours === r.guide ? "same" : ""}${open ? " open" : ""}"><td>${esc(r.label)}${r.calcs ? '<span class="tag">CALCS</span>' : ""}</td><td class="r">${esc(r.yours ?? "—")}</td><td class="r">${esc(r.guide ?? "—")}</td><td class="r">${diff}</td><td class="r">${whyBtn}</td></tr>`;
+      if (open) html += `<tr><td colspan="5" class="drawer">${whyHtml(r.why)}</td></tr>`;
+    }
+    $("stat-body").innerHTML = html || `<tr><td colspan="5" class="empty">${q ? "No matches" : "No differences"}</td></tr>`;
+    $("stats").querySelector(".actions").innerHTML = `<span class="chip">${mode === "guide" ? "Guide config" : "Own config"}</span>`;
+  }
+  $("stat-search").addEventListener("input", renderStats);
+  $("stat-same").addEventListener("change", renderStats);
+  $("stat-body").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-why]");
+    if (!b) return;
+    openWhy = openWhy === b.dataset.why ? null : b.dataset.why;
+    renderStats();
+    $("stat-body").querySelector(`[data-why="${b.dataset.why}"]`)?.focus();
+  });
+
+  // ---- Config ----
+  function renderConfig() {
+    const c = D.config;
+    const rows = c.rows.map((r) => `<tr><td>${esc(r.label)}</td><td>${esc(r.yours ?? "—")}</td><td>${esc(r.guide ?? "—")}</td></tr>`).join("");
+    const mods = (list) => list.length ? `<ul style="margin:0;padding-left:18px">${list.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : `<span class="muted">None</span>`;
+    $("config-body").innerHTML = `
+      <div class="scroll"><table><thead><tr><th>Setting</th><th>You</th><th>Guide</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="scroll"><table><thead><tr><th>Custom mods · You</th><th>Custom mods · Guide</th></tr></thead>
+        <tbody><tr><td style="vertical-align:top">${mods(c.modsYours)}</td><td style="vertical-align:top">${mods(c.modsGuide)}</td></tr></tbody></table></div>`;
+    $("config").querySelector(".actions").innerHTML = `<span class="chip">${esc(c.guideTitle)}</span>`;
   }
 
-  // Events
-  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
-  tabs.forEach(function (b, i) {
-    b.addEventListener("click", function () { setTab(b.dataset.tab); });
-    b.addEventListener("keydown", function (e) {
-      var j = e.key === "ArrowRight" ? (i + 1) % tabs.length : e.key === "ArrowLeft" ? (i - 1 + tabs.length) % tabs.length
-        : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
-      if (j < 0) return;
-      e.preventDefault();
-      setTab(tabs[j].dataset.tab);
-      tabs[j].focus();
-    });
-  });
-  $("cfg-guide").addEventListener("click", function () { setCfg("guide"); });
-  $("cfg-own").addEventListener("click", function () { setCfg("own"); });
-  $("scope-side").addEventListener("click", function () { state.scope = "side"; this.setAttribute("aria-pressed", true); $("scope-all").setAttribute("aria-pressed", false); renderStats(); });
-  $("scope-all").addEventListener("click", function () { state.scope = "all"; this.setAttribute("aria-pressed", true); $("scope-side").setAttribute("aria-pressed", false); renderStats(); });
-  $("show-same").addEventListener("change", function () { state.same = this.checked; renderStats(); });
-  $("stat-search").addEventListener("input", function () { state.q = this.value; renderStats(); });
-  $("stats-body").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-why]");
-    if (!b) return;
-    var id = b.dataset.why;
-    state.why = state.why === id ? null : id;
-    renderStats();
-    var again = document.querySelector('#stats-body [data-why="' + id + '"]');
-    if (again) again.focus();
-  });
-  $("gap-chips").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-metric]");
-    if (!b) return;
-    var m = b.dataset.metric;
-    state.metric = m;
-    renderGaps();
-    var again = document.querySelector('#gap-chips [data-metric="' + m + '"]');
-    if (again) again.focus();
-  });
-  $("gaps-body").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-act]");
-    if (b) toast(b.dataset.act + " (demo)");
-  });
-  $("ov-open").addEventListener("click", function () { setTab("gaps"); $("tab-gaps").focus(); });
-  $("refresh-btn").addEventListener("click", function () { toast("Refreshed (demo)"); });
-  $("b1-source").addEventListener("change", function () { toast(this.value + " (demo)"); });
-  $("notes-toggle").addEventListener("change", function () { $("page").classList.toggle("notes-off", !this.checked); });
+  // ---- Passives ----
+  function renderPassives() {
+    const p = D.passives;
+    let html = "", kind = "";
+    for (const r of p.list) {
+      if (r.kind !== kind) { kind = r.kind; html += `<tr class="group"><td colspan="4">${esc(kind)}</td></tr>`; }
+      const d = r.yours - r.guide;
+      html += `<tr><td>${esc(r.name)}${r.effect ? `<div class="muted" style="font-size:12px">${esc(r.effect)}</div>` : ""}</td><td class="r">${r.yours || "—"}</td><td class="r">${r.guide || "—"}</td><td class="r"><span class="${d > 0 ? "pos" : "neg"}">${d > 0 ? "+" : MINUS}${Math.abs(d)}</span></td></tr>`;
+    }
+    $("passive-body").innerHTML = `<div class="scroll"><table><thead><tr><th>Passive</th><th class="r">You</th><th class="r">Guide</th><th class="r">Diff</th></tr></thead><tbody>${html}</tbody></table></div>`;
+    $("passives").querySelector(".actions").innerHTML = `<span class="chip">${p.yours} vs ${p.guide} points</span>`;
+  }
 
-  renderStats(); renderGaps(); renderConfig(); renderOverlay();
+  // ---- Skills ----
+  function renderSkills() {
+    $("skill-body").innerHTML = D.skills.map((s) => {
+      const names = [...new Set([...(s.guide?.gems ?? []).map((g) => g.name), ...(s.yours?.gems ?? []).map((g) => g.name)])];
+      const find = (grp, name) => grp?.gems.find((g) => g.name === name);
+      const lvl = (g) => (g ? `${g.level}${g.quality ? "/" + g.quality : ""}` : "—");
+      const rows = names.map((name) => {
+        const y = find(s.yours, name), g = find(s.guide, name);
+        const cls = !y ? "miss" : !g ? "extra" : y.level < g.level ? "neg" : "";
+        return `<tr><td class="${!y ? "miss" : !g ? "extra" : ""}">${esc(name)}</td><td class="r ${cls}">${lvl(y)}</td><td class="r">${lvl(g)}</td></tr>`;
+      }).join("");
+      const ys = s.yours?.slot ?? "—", gs = s.guide?.slot ?? "—";
+      const slots = ys === gs ? esc(ys) : `${esc(ys)} / ${esc(gs)}`;
+      return `<div class="grp"><h3>${esc(s.name)}</h3><div class="slots">Slot: ${slots}</div>
+        <table><thead><tr><th>Gem</th><th class="r">You</th><th class="r">Guide</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("");
+  }
+
+  // ---- Items ----
+  const rarity = (it) => (it ? String(it.rarity || "normal").toLowerCase() : "normal");
+  const itemName = (it) => (it ? `<span class="${rarity(it)}">${esc(it.name || it.base)}</span>${it.name ? ` <small>${esc(it.base)}</small>` : ""}` : `<span class="muted">Empty</span>`);
+  function renderItems() {
+    $("item-body").innerHTML = D.items.map((d) => {
+      const list = (l) => l.length ? `<ul>${l.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : `<span class="muted">None</span>`;
+      const rolls = d.rolls.length ? `<div class="rolls"><h4>Rolls · You → Guide</h4><ul>${d.rolls.map(([a, b]) => `<li>${esc(a)} <span class="muted">→</span> ${esc(b)}</li>`).join("")}</ul></div>` : "";
+      return `<details class="item" id="item-${d.slot.replace(/\W+/g, "-")}">
+        <summary><span class="slot">${esc(d.slot)}</span><span class="nm">${itemName(d.yours)}</span><span class="nm">${itemName(d.guide)}</span></summary>
+        <div class="lines"><div><h4>You only</h4>${list(d.onlyYours)}</div><div><h4>Guide only</h4>${list(d.onlyGuide)}</div>${rolls}</div>
+      </details>`;
+    }).join("");
+    $("items").querySelector(".actions").innerHTML = `<span class="chip">You · Guide</span>`;
+  }
+  function showItem(slot) {
+    const el = $("item-" + slot.replace(/\W+/g, "-")) || $("item-" + (slot + " Abyssal Socket 1").replace(/\W+/g, "-"));
+    jumpTo("items", () => {
+      if (!el) return;
+      el.open = true;
+      el.querySelector("summary").focus({ preventScroll: true });
+      el.classList.add("flash");
+      setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 250);
+      setTimeout(() => el.classList.remove("flash"), 2200);
+    });
+  }
+
+  // ---- Overlay ----
+  let ovMetric = metricKey(store.get("ov-metric", "dps"), "dps");
+  if (ovMetric === "all") ovMetric = "dps";
+  function renderOverlay() {
+    store.set("ov-metric", ovMetric);
+    $("ov-chips").innerHTML = D.metrics.slice(0, 4).map((m) => `<button type="button" data-ov="${esc(m.key)}" aria-pressed="${m.key === ovMetric}">${esc(m.label)}</button>`).join("");
+    const top = D.gaps.filter((g) => g.kind !== "Config" && g.d[ovMetric] >= THRESH[ovMetric]).sort((a, b) => b.d[ovMetric] - a.d[ovMetric]).slice(0, 3);
+    $("ov").innerHTML = `<div class="h">Gaps<span class="sub">${esc(D.meta.guide.loadout)}</span></div>
+      ${top.map((g) => `<div class="r"><span>${esc(g.title)}</span>${delta(ovMetric, g.d[ovMetric])}</div>`).join("") || `<div class="muted">No gaps</div>`}
+      <div class="r"><span class="muted">${esc(metric[ovMetric].label)}</span><button type="button" class="btn" data-ov-open>Compare</button></div>`;
+  }
+  $("ov-chips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-ov]");
+    if (!b) return;
+    ovMetric = b.dataset.ov;
+    renderOverlay();
+    $("ov-chips").querySelector(`[data-ov="${ovMetric}"]`)?.focus();
+  });
+  $("ov").addEventListener("click", (e) => {
+    if (!e.target.closest("[data-ov-open]")) return;
+    gapMetric = ovMetric;
+    renderGaps();
+    jumpTo("gaps");
+  });
+
+  // ---- Config mode ----
+  function setMode(m) {
+    mode = m;
+    store.set("mode", m);
+    for (const b of document.querySelectorAll("[data-mode]")) b.setAttribute("aria-pressed", String(b.dataset.mode === m));
+    renderTiles();
+    renderGaps();
+    renderStats();
+  }
+  document.querySelector(".seg").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) setMode(b.dataset.mode); });
+
+  renderConfig();
+  renderPassives();
+  renderSkills();
+  renderItems();
+  renderOverlay();
+  setMode(mode === "own" ? "own" : "guide");
+  current();
 })();
 </script>
 </body>
