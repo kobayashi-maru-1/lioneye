@@ -1000,19 +1000,35 @@ function nodeHover(
     const node = id
       ? skillTree.graphs.find((graph) => graph.nodes[id])?.nodes[id]
       : undefined;
-    if (node) setNodeLine(line, node);
+    if (node && id) setNodeLine(line, node, pickedMastery(id, skillTree));
   });
   tip.addEventListener("pointerleave", () => setNodeLine(line, null));
 }
 
-function setNodeLine(line: HTMLElement, node: SkillTree.Node | null) {
+/** The stats of the mastery effect the guide's set picks on node `id`, if it picks one. */
+function pickedMastery(id: string, skillTree: SkillTree.Data) {
+  const picks = (tips.tree as TreeTip | undefined)?.masteries;
+  const effect = picks && typeof picks === "object" ? picks[id] : undefined;
+  const stats =
+    typeof effect === "string"
+      ? skillTree.masteryEffects[effect]?.stats
+      : undefined;
+  return Array.isArray(stats) ? stats : [];
+}
+
+function setNodeLine(
+  line: HTMLElement,
+  node: SkillTree.Node | null,
+  /** A mastery's picked effect, after the node's own stats. */
+  picked: string[] = [],
+) {
   if (!node) {
     line.replaceChildren(" ");
     line.removeAttribute("title");
     return;
   }
   // A stat's own line breaks only wrap it ("fewer than\n8 Grasping Vines").
-  const text = (node.stats ?? [])
+  const text = [...(node.stats ?? []), ...picked]
     .map((stat) => stat.replace(/\s*\n\s*/g, " "))
     .join(" · ");
   line.replaceChildren(

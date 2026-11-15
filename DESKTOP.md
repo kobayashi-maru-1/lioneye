@@ -514,7 +514,8 @@ share the address.
   its points are next). In the Tree tooltip the mouse wheel zooms around the pointer,
   dragging moves the tree and a double-click goes back to the next points; the zoom stays
   until your next points change. Hovering a node shows its name and stats on one line at
-  the tooltip's far edge (away from the bar; cut short when long). All need the guide open.
+  the tooltip's far edge (away from the bar; cut short when long); a mastery shows the
+  effect the set picks. All need the guide open.
 - Every tooltip's title row sits on its edge next to the bar, with two icons: the pin at
   its left keeps that tooltip open while you play (one at a time, kept after a restart),
   and the flip (**Show above** / **Show below**) at its right moves tooltips to the other

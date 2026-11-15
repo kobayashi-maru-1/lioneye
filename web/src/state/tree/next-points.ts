@@ -23,6 +23,8 @@ export interface TreeTip {
   remove?: string[];
   /** The area to show, in tree coordinates: the next points, or a finished set's points. */
   view: { x: number; y: number; w: number; h: number };
+  /** The set's mastery picks: mastery node id → effect id (the node line's stats). */
+  masteries?: Record<string, string>;
   /** Where the set is among the build's tree sets (the tooltip's ‹ › arrows). */
   index?: number;
   count?: number;
@@ -155,6 +157,7 @@ export function treeTip(
     ascend,
     remove,
     view: bounds(shown, main.nodes),
+    masteries: tree.masteries,
   };
 }
 
