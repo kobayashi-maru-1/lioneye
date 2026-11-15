@@ -130,9 +130,13 @@ Four headings (ours, one config file):
 ## 5. Rendering
 
 - One SVG; 967 nodes and 1,048 paths are fine without canvas.
-- Layers: cluster discs, edges, cluster labels, nodes, start marker.
-- Node radii in tree units: small ≈ 79, notable ≈ 113, keystone ≈ 141; notables and
-  keystones get an outer ring (≈ 1.3×). `vector-effect: non-scaling-stroke`.
+- Layers: cluster discs, edges, cluster labels, click targets, nodes, start marker.
+- Sizes in tree units (`web/src/atlas/lib/geometry.ts`): small dot 42; notable dot 54 with
+  a ring at 70; keystone dot 73 with a ring at 95; label disc 80. They fit the layout
+  (closest small pair 87 apart, notable–notable 162, passives 162 from their label), and a
+  unit test checks no dot, ring or unset ring meets another or a label (the search halo
+  on a small node may touch a neighbour). Each node has a transparent click target of at
+  least 60 under the dots. `vector-effect: non-scaling-stroke`.
 - **Colour:** by mechanic, travel nodes grey. Colour is never the only signal: the cluster
   label and tooltip name the mechanic. Only neighbouring clusters need to differ; hue by
   heading with lightness varied inside it is the fallback if 38 colours blur.

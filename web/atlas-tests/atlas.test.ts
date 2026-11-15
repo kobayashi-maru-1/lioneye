@@ -14,6 +14,14 @@ import {
   route,
 } from "../src/atlas/lib/graph.ts";
 import {
+  HIT_RADIUS,
+  LABEL_RADIUS,
+  NODE_SIZE,
+  hitRadius,
+  outerRadius,
+  unsetRadius,
+} from "../src/atlas/lib/geometry.ts";
+import {
   encodeOfficial,
   encodeShare,
   parseLink,
@@ -512,4 +520,37 @@ test("colours: neighbouring clusters differ; letters are unique", () => {
   assert.ok(new Set(colours).size <= PALETTE.length);
   const letters = mechanicLetters(data.mechanics);
   assert.equal(new Set(letters).size, letters.length, letters.join(" "));
+});
+
+test("no node circle meets another node or a label disc", () => {
+  const nodes = Object.entries(data.nodes);
+  const clashes: string[] = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const [aId, a] = nodes[i];
+    // A choice node can show its unset ring, so it needs that much room.
+    const aR = a.choices ? unsetRadius(a.kind) : outerRadius(a.kind);
+    for (let j = i + 1; j < nodes.length; j++) {
+      const [bId, b] = nodes[j];
+      const bR = b.choices ? unsetRadius(b.kind) : outerRadius(b.kind);
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d < aR + bR) clashes.push(`${aId}/${bId} ${d.toFixed(0)}`);
+    }
+    for (const label of data.labels) {
+      const d = Math.hypot(a.x - label.x, a.y - label.y);
+      if (d < aR + LABEL_RADIUS) clashes.push(`${aId}/label ${label.g}`);
+    }
+  }
+  assert.deepEqual(clashes, []);
+});
+
+test("click targets are larger than small dots and clear of labels", () => {
+  assert.ok(HIT_RADIUS > NODE_SIZE.small.dot);
+  for (const [id, node] of Object.entries(data.nodes)) {
+    for (const label of data.labels)
+      assert.ok(
+        Math.hypot(node.x - label.x, node.y - label.y) >
+          hitRadius(node.kind) + LABEL_RADIUS,
+        `${id}/label ${label.g}`,
+      );
+  }
 });
