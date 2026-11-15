@@ -867,6 +867,8 @@ interface TreeView {
   compiled: (context: object) => string;
   box: HTMLElement;
   css: HTMLStyleElement;
+  /** The hovered node's name and stats, on the edge away from the bar. */
+  line: HTMLElement;
 }
 let treeView: TreeView | null = null;
 /** Only the latest tree render may finish (the data loads asynchronously). */
@@ -913,7 +915,9 @@ function renderTree() {
       picture?.setAttribute("preserveAspectRatio", "xMidYMid meet");
       const css = document.createElement("style");
       zoomable(box);
-      treeView = { version: data.version, skillTree, compiled, box, css };
+      const line = el("div", "tipNode", " ");
+      nodeHover(box, line, skillTree);
+      treeView = { version: data.version, skillTree, compiled, box, css, line };
       try {
         drawTree(treeView, data);
       } catch {
@@ -944,10 +948,17 @@ function drawTree(view: TreeView, data: TreeTip) {
   const key = JSON.stringify(data);
   const row = tip.querySelector(".tipHead");
   if (key === drawnTree && view.box.parentNode === tip) {
-    // Same picture: only the title row (the pin, or its side after a flip) may change.
+    // Same picture: only the title row (the pin, or its side after a flip) and the node
+    // line on the other edge may move.
     row?.remove();
-    if (up) tip.append(treeHead(data));
-    else tip.prepend(treeHead(data));
+    view.line.remove();
+    if (up) {
+      tip.prepend(view.line);
+      tip.append(treeHead(data));
+    } else {
+      tip.prepend(treeHead(data));
+      tip.append(view.line);
+    }
     return;
   }
   const area = tipArea(data);
@@ -963,7 +974,52 @@ function drawTree(view: TreeView, data: TreeTip) {
   }
   drawnTree = key;
   showArea(view.box, treeArea);
-  fillWith(treeHead(data), [view.css, view.box]);
+  setNodeLine(view.line, null);
+  // The node line on the edge away from the bar (the title row is on the near one).
+  fillWith(
+    treeHead(data),
+    up ? [view.line, view.css, view.box] : [view.css, view.box, view.line],
+  );
+}
+
+/**
+ * Hovering a node shows its name and stats on one line under (or above) the tree; it's
+ * always there, blank, so the tooltip doesn't change size. The last node stays until
+ * another is hovered or the pointer leaves the tooltip, so the pointer can reach the line
+ * for a cut-off line's full text, and a drag keeps it.
+ */
+function nodeHover(
+  box: HTMLElement,
+  line: HTMLElement,
+  skillTree: SkillTree.Data,
+) {
+  box.addEventListener("pointerover", (event) => {
+    if (box.classList.contains("dragging")) return;
+    const target = event.target as Element | null;
+    const id = target?.id.match(/^n(\d+)$/)?.[1];
+    const node = id
+      ? skillTree.graphs.find((graph) => graph.nodes[id])?.nodes[id]
+      : undefined;
+    if (node) setNodeLine(line, node);
+  });
+  tip.addEventListener("pointerleave", () => setNodeLine(line, null));
+}
+
+function setNodeLine(line: HTMLElement, node: SkillTree.Node | null) {
+  if (!node) {
+    line.replaceChildren(" ");
+    line.removeAttribute("title");
+    return;
+  }
+  // A stat's own line breaks only wrap it ("fewer than\n8 Grasping Vines").
+  const text = (node.stats ?? [])
+    .map((stat) => stat.replace(/\s*\n\s*/g, " "))
+    .join(" · ");
+  line.replaceChildren(
+    el("span", "tipNodeName", node.text),
+    ...(text ? [`: ${text}`] : []),
+  );
+  line.title = text ? `${node.text}: ${text}` : node.text;
 }
 
 /** The points the zoom belongs to. */

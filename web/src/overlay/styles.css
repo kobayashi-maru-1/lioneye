@@ -177,6 +177,28 @@ body {
   cursor: grabbing;
 }
 
+/* The hovered node's name and stats, one line on the tree's far edge (overlay/main.ts
+   nodeHover). Always there, so the tooltip keeps its size. */
+.tipNode {
+  width: 380px;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #c8c8c8;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.frame.up .tipNode {
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.tipNodeName {
+  color: var(--gold);
+  font-weight: 600;
+}
+
 .tipGroup {
   padding: 4px 6px;
   background-color: #171e2a;
