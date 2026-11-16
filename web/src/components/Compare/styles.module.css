@@ -611,6 +611,49 @@ button.tugRow:hover,
   color: var(--muted);
 }
 
+/* DPS factors open into their parts, and a part into its sources. */
+.toggle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--size-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  color: var(--b1);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--b1);
+  outline-offset: 2px;
+}
+
+.caret {
+  width: 0.75em;
+  color: var(--muted);
+}
+
+.table tr.partRow td {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.table tr.partRow td:first-child {
+  padding-left: calc(var(--size-3) + 1.5em);
+}
+
+.table tr.sourcesRow > td {
+  padding: var(--size-2) var(--size-3) var(--size-3) calc(var(--size-3) + 2.5em);
+  background: rgba(255, 255, 255, 0.025);
+}
+
 /* Skills */
 .groups {
   display: grid;

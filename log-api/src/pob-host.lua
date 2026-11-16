@@ -1596,6 +1596,274 @@ local function compareSlots(breakdown, stat)
 	return slots
 end
 
+local DAMAGE_ORDER = { "Physical", "Lightning", "Cold", "Fire", "Chaos" }
+local ELEMENTAL = { Lightning = true, Cold = true, Fire = true }
+
+-- PoB's mod names for damage of these types together (its damageStatsForTypes).
+local function damageNames(...)
+	local list, elemental = { "Damage" }, false
+	for _, damageType in ipairs({ ... }) do
+		list[#list + 1] = damageType .. "Damage"
+		elemental = elemental or ELEMENTAL[damageType] or false
+	end
+	if elemental then
+		list[#list + 1] = "ElementalDamage"
+	end
+	return list
+end
+
+-- Increased and more over several shares of base damage, each with its own mod names (as
+-- PoB applies them per damage type), weighted by base so they multiply to the total.
+local function weightedMods(mods, cfg, shares)
+	local base, afterInc, afterMore = 0, 0, 0
+	for _, share in ipairs(shares) do
+		local inc = 1 + mods:Sum("INC", cfg, unpack(share.names)) / 100
+		local more = mods:More(cfg, unpack(share.names))
+		base = base + share.base
+		afterInc = afterInc + share.base * inc
+		afterMore = afterMore + share.base * inc * more
+	end
+	if base <= 0 or afterInc <= 0 then
+		return 1, 1
+	end
+	return afterInc / base, afterMore / afterInc
+end
+
+-- Every mod name the shares use, for their source tables.
+local function namesOf(shares)
+	local list, seen = {}, {}
+	for _, share in ipairs(shares) do
+		for _, name in ipairs(share.names) do
+			if not seen[name] then
+				seen[name] = true
+				list[#list + 1] = name
+			end
+		end
+	end
+	return list
+end
+
+-- Runs `fn` with `cfg`'s crit condition off: PoB leaves the ailment configs set to crit
+-- after its last pass, which would count crit-only mods for every ailment.
+local function withoutCrit(cfg, fn)
+	local cond = cfg and cfg.skillCond
+	if not cond then
+		return fn()
+	end
+	local was = rawget(cond, "CriticalStrike")
+	cond.CriticalStrike = false
+	local ok, result = pcall(fn)
+	cond.CriticalStrike = was
+	if not ok then
+		error(result)
+	end
+	return result
+end
+
+-- The main skill's DPS factors taken apart as PoB multiplies them, per build: the hit
+-- (base × increased × more × crit × enemy), the hit rate (base × increased × more, or a
+-- triggered skill's cooldown cap and trigger rate) and each damaging ailment (base ×
+-- increased × more × DoT multi × enemy, and for poison its chance, duration and hits).
+-- The guide puts what is left (conversion, double damage, crits on ailments and the like)
+-- in "Other", so a factor's parts always multiply to PoB's own number. Increased and more
+-- are per damage type, weighted by base; `mixed` says a part's source table (every mod of
+-- those types together) won't add up to it. Also adds the parts' source tables to `tabs`.
+local function compareParts(actor, skill, flags, cfg, names, minionMain, tabs)
+	local out = actor.output or {}
+	local h = out.MainHand or out
+	local mods = skill.skillModList
+	local parts = {}
+
+	-- Hit damage. Base per type is the skill's or weapon's, then added damage.
+	local base, baseOf, nonCrit, beforeResist = 0, {}, 0, 0
+	-- Each type's base in shares: what stays that type takes its own mods, and what converts
+	-- (or is gained as another type) takes both types' mods, as PoB applies them.
+	local conversion = (cfg and cfg.conversionTable) or skill.conversionTable or {}
+	local shares = {}
+	for _, damageType in ipairs(DAMAGE_ORDER) do
+		baseOf[damageType] = ((h[damageType .. "MinBase"] or 0) + (h[damageType .. "MaxBase"] or 0)) / 2
+		base = base + baseOf[damageType]
+		if baseOf[damageType] > 0 then
+			local row = conversion[damageType] or {}
+			local kept = row.mult or 1
+			if kept > 0 then
+				shares[#shares + 1] = { base = baseOf[damageType] * kept, names = damageNames(damageType) }
+			end
+			for _, other in ipairs(DAMAGE_ORDER) do
+				local share = other ~= damageType and row[other] or 0
+				if type(share) == "number" and share > 0 then
+					shares[#shares + 1] = { base = baseOf[damageType] * share, names = damageNames(damageType, other) }
+				end
+			end
+		end
+		local avg = h[damageType .. "HitAverage"] or 0
+		nonCrit = nonCrit + avg
+		local eff = h[damageType .. "EffMult"] or 1
+		beforeResist = beforeResist + (eff > 0 and avg / eff or avg)
+	end
+	-- Where the base comes from: added damage by source (after effectiveness), and the rest
+	-- is the skill's own (a minion's from its level, an attack's from the weapon).
+	local level = skill.activeEffect and skill.activeEffect.grantedEffectLevel or {}
+	local effectiveness = level.damageEffectiveness or (skill.skillData and skill.skillData.damageEffectiveness) or 1
+	local baseRows = setmetatable({}, ARRAY)
+	local added = 0
+	for _, damageType in ipairs(DAMAGE_ORDER) do
+		if baseOf[damageType] > 0 then
+			local a, b = "Added" .. damageType .. "Damage", "AddedDamage"
+			local mult = (1 + mods:Sum("INC", cfg, a, b) / 100) * mods:More(cfg, a, b)
+			for _, bound in ipairs({ "Min", "Max" }) do
+				for _, row in ipairs(compareTab(mods, "BASE", cfg, damageType .. bound)) do
+					if type(row.value) == "number" then
+						local value = row.value * effectiveness * mult / 2
+						added = added + value
+						baseRows[#baseRows + 1] = { value = value, name = damageType .. bound, source = row.source }
+					end
+				end
+			end
+		end
+	end
+	local own
+	if minionMain then
+		own = "Base:Minion base" .. (actor.level and ("|Level " .. actor.level) or "")
+	elseif flags.attack then
+		own = "Base:Weapon base"
+	else
+		local gem = skill.activeEffect and skill.activeEffect.level
+		own = "Base:Skill base" .. (gem and ("|Level " .. gem) or "")
+	end
+	if base > 0 then
+		table.insert(baseRows, 1, { value = math.max(0, base - added), name = "Base", source = own })
+	end
+	tabs.hitBase = baseRows
+	if base > 0 and nonCrit > 0 then
+		local inc, more = weightedMods(mods, cfg, shares)
+		parts.hit = {
+			base = base,
+			inc = inc,
+			more = more,
+			-- The damage tables list every type's mods (and conversion's): they add up to
+			-- the part only for one type, unconverted.
+			mixed = not (#shares == 1 and #names == #shares[1].names),
+			crit = (h.AverageHit or nonCrit) / nonCrit,
+			resist = beforeResist > 0 and nonCrit / beforeResist or 1,
+			critChance = h.CritChance,
+			critMulti = h.CritMultiplier,
+		}
+	end
+
+	-- Hit rate. A triggered skill (Holy Relic's Nova, Cast on Crit) runs at about the lower
+	-- of its cooldown's cap and the rate of what triggers it; otherwise the weapon's attack
+	-- rate or the skill's cast time, then speed mods. Skills with a fixed rate have none.
+	local data = skill.skillData or {}
+	local cap = out.TriggerRateCap or h.TriggerRateCap
+	if flags.hit and cap and cap > 0 and cap < math.huge then
+		parts.speed = {
+			cap = cap,
+			source = out.EffectiveSourceRate or h.EffectiveSourceRate,
+		}
+		tabs.cooldownRecovery = compareTab(mods, "INC", cfg, "CooldownRecovery")
+	elseif
+		flags.hit
+		and not (
+			data.timeOverride
+			or data.fixedCastTime
+			or data.triggerTime
+			or data.triggerRate
+			or data.triggered
+			or flags.warcry
+		)
+	then
+		local rate
+		if flags.attack then
+			rate = actor.weaponData1 and actor.weaponData1.AttackRate
+		else
+			local time = data.castTimeOverride
+				or (skill.activeEffect and skill.activeEffect.grantedEffect and skill.activeEffect.grantedEffect.castTime)
+			rate = time and time > 0 and 1 / time or nil
+		end
+		if rate and rate > 0 then
+			parts.speed = {
+				base = rate,
+				inc = 1 + mods:Sum("INC", cfg, "Speed") / 100,
+				more = mods:More(cfg, "Speed"),
+			}
+		end
+	end
+
+	-- Damaging ailments, from the hit's base damage of the types each one takes (each type
+	-- with its own mods: physical that poisons takes physical and chaos damage mods).
+	local misc = (_G.data and _G.data.misc) or {}
+	local ailments = {
+		{
+			name = "Poison",
+			cfg = skill.poisonCfg,
+			types = { Physical = { "Physical", "Chaos" }, Chaos = { "Chaos" } },
+			multi = { "DotMultiplier", "ChaosDotMultiplier" },
+			percent = misc.PoisonPercentBase or 0.3,
+		},
+		{
+			name = "Bleed",
+			cfg = skill.bleedCfg,
+			types = { Physical = { "Physical" } },
+			multi = { "DotMultiplier", "PhysicalDotMultiplier" },
+			percent = (data.bleedBasePercent or misc.BleedPercentBase or 70) / 100,
+		},
+		{
+			name = "Ignite",
+			cfg = skill.igniteCfg,
+			types = { Fire = { "Fire" } },
+			multi = { "DotMultiplier", "FireDotMultiplier" },
+			percent = misc.IgnitePercentBase or 0.9,
+		},
+	}
+	for _, ailment in ipairs(ailments) do
+		local acfg = ailment.cfg
+		local ailmentShares = {}
+		local source = 0
+		for _, damageType in ipairs(DAMAGE_ORDER) do
+			local types = ailment.types[damageType]
+			if types and (baseOf[damageType] or 0) > 0 then
+				source = source + baseOf[damageType]
+				ailmentShares[#ailmentShares + 1] = { base = baseOf[damageType], names = damageNames(unpack(types)) }
+			end
+		end
+		if acfg and source > 0 then
+			local key = ailment.name
+			local all = namesOf(ailmentShares)
+			withoutCrit(acfg, function()
+				tabs[key .. "Inc"] = compareTab(mods, "INC", acfg, unpack(all))
+				tabs[key .. "More"] = compareTab(mods, "MORE", acfg, unpack(all))
+				tabs[key .. "Multi"] = compareTab(mods, "BASE", acfg, unpack(ailment.multi))
+				local inc, more = weightedMods(mods, acfg, ailmentShares)
+				local part = {
+					base = source * ailment.percent,
+					inc = inc,
+					more = more,
+					mixed = #ailmentShares > 1,
+					-- A non-crit ailment's: crits' own multi is in "Other", as their damage.
+					multi = 1 + mods:Sum("BASE", acfg, unpack(ailment.multi)) / 100,
+					-- The enemy's resist and damage taken (curses, exposure, wither).
+					enemy = out[key .. "EffMult"] or h[key .. "EffMult"],
+				}
+				if key == "Poison" then
+					tabs.PoisonDuration = compareTab(
+						mods,
+						"INC",
+						acfg,
+						"EnemyPoisonDuration",
+						"EnemyAilmentDuration",
+						"DamagingAilmentDuration"
+					)
+					part.chance = out.PoisonChance or h.PoisonChance
+					part.duration = out.PoisonDuration or h.PoisonDuration
+				end
+				parts[key] = part
+			end)
+		end
+	end
+	return parts
+end
+
 local function compareExtra(full)
 	local main = build.calcsTab.mainEnv
 	local mainSkill = main.player.mainSkill
@@ -1692,6 +1960,12 @@ local function compareExtra(full)
 		tabs.speedMore = compareTab(skill.skillModList, "MORE", cfg, "Speed")
 		-- Skills PoB shows as an average hit, not per second (Essence Drain, Frostblink).
 		extra.average = skill.skillData and skill.skillData.showAverage and true or false
+		local ok, parts = pcall(compareParts, actor, skill, flags, cfg, names, minionMain, tabs)
+		if ok then
+			extra.parts = parts
+		else
+			host_log("Compare: DPS parts failed: " .. tostring(parts))
+		end
 	end
 	extra.tabs = tabs
 	extra.slots = {

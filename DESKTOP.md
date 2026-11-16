@@ -354,8 +354,17 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
   and its top gains. DPS breaks down as PoB adds it up: hit damage × hit chance × hits per
   second × a multiplier (projectiles, count) is the hit DPS, then poison, bleed, ignite,
   other damage over time, impale and cull; the multiplying factor with the widest ratio
-  is marked **Biggest**. Under it, the increased and more damage and speed mods of both
-  builds by source (for the damage types the skill deals; more mods multiply).
+  is marked **Biggest**. A factor opens (▸) into the parts PoB multiplies for it, each
+  with both builds and the ratio, the widest marked **Biggest**: hit damage is base
+  damage × increased × more × crit × vs enemy (the enemy's resists and damage taken);
+  hits/sec is base rate × increased × more, or for a triggered skill (Holy Relic's
+  Nova) the lower of its cooldown cap and its trigger rate; poison, bleed and ignite are
+  base damage × increased × more × DoT multi × vs enemy, and poison also × chance ×
+  duration × hits/sec. Whatever the parts leave out (conversion, double damage, crits on
+  ailments) is **Other**, shown when it isn't ×1, so the parts always multiply to the
+  factor. A part opens into its sources (gear slot, tree node, gem, party): base damage
+  is the skill's own (a minion's from its level, an attack's from the weapon) plus added
+  damage after effectiveness; more mods multiply.
 - **Gaps**: a table, a row per piece of Build 2 tried on Build 1 and recalculated by PoB
   (Build 2's config, each gear slot that differs (weapons as a pair around a two-hander,
   flasks as a set), all gear at once (one-slot swaps don't add up: Mageblood needs its

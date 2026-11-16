@@ -7,11 +7,11 @@ import { tradeIndex, tradeUrl } from "../Gear/trade-query";
 import { PageSection, useJumpToSection } from "../PageSection";
 import type { GearItem, Stats } from "../PobStats";
 import { itemDiffs, skillDiffs } from "./diff";
-import type { Factor, Metric, Why, WhyFormula, WhyRow } from "./metrics";
+import type { Factor, FactorFmt, Metric, Why, WhyBlock, WhyFormula, WhyRow } from "./metrics";
 import type { Gap, Result } from "./run";
 import styles from "./styles.module.css";
 import classNames from "classnames";
-import { useMemo, useState } from "react";
+import { Fragment, type ReactNode, useMemo, useState } from "react";
 
 // Numbers -----------------------------------------------------------------------------
 
@@ -41,8 +41,7 @@ const plain = (value: number) => (value < 0 ? MINUS : "") + n(value, value % 1 ?
 
 /** Which build a difference favours: 1 Build 1, -1 Build 2, 0 even. */
 const side = (difference: number) => (difference > 0 ? 1 : difference < 0 ? -1 : 0);
-const sideClass = (lead: number) =>
-  lead > 0 ? styles.b1 : lead < 0 ? styles.b2 : styles.muted;
+const sideClass = (lead: number) => (lead > 0 ? styles.b1 : lead < 0 ? styles.b2 : styles.muted);
 /** The leading value bold in its build's colour, the other dimmed. */
 const leadClass = (lead: number, mine: 1 | -1) =>
   lead === 0
@@ -66,12 +65,8 @@ function Bar({ lead, length, mini }: { lead: number; length: number; mini?: bool
   const width = { width: `${(length * 100).toFixed(1)}%` };
   return (
     <span className={classNames(styles.bar, { [styles.mini]: mini })} aria-hidden>
-      <span className={classNames(styles.half, styles.left)}>
-        {lead > 0 && <i style={width} />}
-      </span>
-      <span className={classNames(styles.half, styles.right)}>
-        {lead < 0 && <i style={width} />}
-      </span>
+      <span className={classNames(styles.half, styles.left)}>{lead > 0 && <i style={width} />}</span>
+      <span className={classNames(styles.half, styles.right)}>{lead < 0 && <i style={width} />}</span>
     </span>
   );
 }
@@ -120,8 +115,7 @@ export function SummarySection({
         {metrics.map((metric) => {
           const a = result.values.one[metric.key];
           const b = result.values.two[metric.key];
-          const lead =
-            a !== null && b !== null && Math.abs(a - b) >= metric.thresh ? side(a - b) : 0;
+          const lead = a !== null && b !== null && Math.abs(a - b) >= metric.thresh ? side(a - b) : 0;
           const heading = metric.section !== section;
           section = metric.section;
           const isOpen = open === metric.key;
@@ -135,9 +129,7 @@ export function SummarySection({
                 onClick={() => setOpen(isOpen ? null : metric.key)}
               >
                 <span className={classNames(styles.label)}>{metric.label}</span>
-                <span className={classNames(styles.right, leadClass(lead, 1))}>
-                  {fmt(metric, a)}
-                </span>
+                <span className={classNames(styles.right, leadClass(lead, 1))}>{fmt(metric, a)}</span>
                 <Bar
                   lead={lead}
                   length={lead && a !== null && b !== null ? reach(a, b, metric.fmt === "%") : 0}
@@ -150,14 +142,7 @@ export function SummarySection({
                   {lead > 0 ? "Build 1 ahead" : lead < 0 ? "Build 2 ahead" : "Even"}
                 </span>
               </button>
-              {isOpen && (
-                <SummaryDrawer
-                  result={result}
-                  metric={metric}
-                  onAll={onAll}
-                  onShow={onShow}
-                />
-              )}
+              {isOpen && <SummaryDrawer result={result} metric={metric} onAll={onAll} onShow={onShow} />}
             </div>
           );
         })}
@@ -197,9 +182,7 @@ function SummaryDrawer({
         </div>
       )}
       {!why && top.length === 0 && (
-        <div className={classNames(styles.empty)}>
-          {result.pending > 0 ? "Calculating" : "No gains"}
-        </div>
+        <div className={classNames(styles.empty)}>{result.pending > 0 ? "Calculating" : "No gains"}</div>
       )}
     </div>
   );
@@ -300,7 +283,9 @@ function GapTable({
                 {setSortKey ? (
                   <button
                     type="button"
-                    className={classNames(styles.sortButton, { [styles.sorted]: m.key === sortKey })}
+                    className={classNames(styles.sortButton, {
+                      [styles.sorted]: m.key === sortKey,
+                    })}
                     onClick={() => setSortKey(m.key)}
                   >
                     {m.label}
@@ -367,9 +352,7 @@ export function GapsSection({
               {total - result.pending} / {total}
             </span>
           )}
-          {result.failed > 0 && (
-            <span className={classNames(styles.chip)}>{result.failed} failed</span>
-          )}
+          {result.failed > 0 && <span className={classNames(styles.chip)}>{result.failed} failed</span>}
           <span className={classNames(styles.chip)} aria-label="Build 2 on Build 1">
             Build 2 → Build 1
           </span>
@@ -379,9 +362,7 @@ export function GapsSection({
       {gaps.length > 0 ? (
         <GapTable result={result} gaps={gaps} sortKey={key} setSortKey={setSortKey} onShow={onShow} />
       ) : (
-        <div className={classNames(styles.empty)}>
-          {result.pending > 0 ? "Calculating" : "No gaps"}
-        </div>
+        <div className={classNames(styles.empty)}>{result.pending > 0 ? "Calculating" : "No gaps"}</div>
       )}
     </PageSection>
   );
@@ -412,12 +393,8 @@ function PairCells({ a, b, unit }: { a: number | null; b: number | null; unit: s
   const lead = side((a ?? 0) - (b ?? 0));
   return (
     <>
-      <td className={classNames(styles.right, leadClass(lead, 1))}>
-        {a === null ? "—" : plain(a) + unit}
-      </td>
-      <td className={classNames(styles.right, leadClass(lead, -1))}>
-        {b === null ? "—" : plain(b) + unit}
-      </td>
+      <td className={classNames(styles.right, leadClass(lead, 1))}>{a === null ? "—" : plain(a) + unit}</td>
+      <td className={classNames(styles.right, leadClass(lead, -1))}>{b === null ? "—" : plain(b) + unit}</td>
       <td className={classNames(styles.right, sideClass(lead))}>
         {lead ? plain(Math.abs((a ?? 0) - (b ?? 0))) + unit : "="}
       </td>
@@ -431,28 +408,92 @@ function sourceDetail(row: WhyRow) {
   return row.oneDetail ?? row.twoDetail;
 }
 
-/** A factor's value: "23.8k", "75%", "×1.30", "3.76/s". */
-function factorValue(factor: Factor, value: number | null) {
+/** A factor's value: "23.8k", "75%", "×1.30", "+412%", "3.76/s", "2.4s". */
+function factorValue(fmtKind: FactorFmt, value: number | null) {
   if (value === null) return "—";
-  switch (factor.fmt) {
+  switch (fmtKind) {
     case "k":
       return fmt({ fmt: "k" } as Metric, value);
     case "%":
       return `${n(value, value % 1 && Math.abs(value) < 10 ? 1 : 0)}%`;
     case "x":
       return `×${n(value, 2)}`;
+    case "inc":
+      return `${value < 1 ? MINUS : "+"}${n(Math.abs(value - 1) * 100)}%`;
     case "rate":
       return `${n(value, 2)}/s`;
+    case "s":
+      return `${n(value, 2)}s`;
   }
 }
 
-/** The DPS factors side by side, the widest multiplying one marked. */
+/** How many times one build's value is the other's (1: level). */
+const ratioOf = (one: number | null, two: number | null) =>
+  one && two && one > 0 && two > 0 ? Math.max(one, two) / Math.min(one, two) : 1;
+
+/** The row with the widest ratio, if any is wide enough to matter. */
+function widestOf<T extends { one: number | null; two: number | null }>(rows: T[]) {
+  return rows
+    .filter((row) => ratioOf(row.one, row.two) >= 1.05)
+    .reduce<T | null>(
+      (best, row) => (best === null || ratioOf(row.one, row.two) > ratioOf(best.one, best.two) ? row : best),
+      null,
+    );
+}
+
+/** A factor or part row's values, ratio and note, in the leading build's colour. */
+function RatioCells({
+  fmtKind,
+  one,
+  two,
+  biggest,
+}: {
+  fmtKind: FactorFmt;
+  one: number | null;
+  two: number | null;
+  biggest: boolean;
+}) {
+  const a = one ?? 0;
+  const b = two ?? 0;
+  const lead = Math.abs(a - b) <= Math.max(Math.abs(a), Math.abs(b)) * 0.005 ? 0 : side(a - b);
+  const r = ratioOf(one, two);
+  return (
+    <>
+      <td className={classNames(styles.right, leadClass(lead, 1))}>{factorValue(fmtKind, one)}</td>
+      <td className={classNames(styles.right, leadClass(lead, -1))}>{factorValue(fmtKind, two)}</td>
+      <td className={classNames(styles.right, sideClass(lead))}>
+        {lead === 0 ? "=" : r > 1 && Number.isFinite(r) ? `×${n(r, r >= 10 ? 0 : 2)}` : "—"}
+      </td>
+      <td>{biggest && <span className={classNames(styles.chip)}>Biggest</span>}</td>
+    </>
+  );
+}
+
+/** A row label that opens what's under it. */
+function Toggle({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: ReactNode }) {
+  return (
+    <button type="button" className={classNames(styles.toggle)} aria-expanded={open} onClick={onToggle}>
+      <span className={classNames(styles.caret)} aria-hidden="true">
+        {open ? "▾" : "▸"}
+      </span>
+      {children}
+    </button>
+  );
+}
+
+/**
+ * The DPS factors side by side, the widest multiplying one marked. A factor opens into the
+ * parts it is the product of, and a part into its sources.
+ */
 function FactorTable({ factors }: { factors: Factor[] }) {
-  const ratio = (f: Factor) =>
-    f.one && f.two && f.one > 0 && f.two > 0 ? Math.max(f.one, f.two) / Math.min(f.one, f.two) : 1;
-  const widest = factors
-    .filter((f) => f.multiplies && ratio(f) >= 1.05)
-    .reduce<Factor | null>((best, f) => (best === null || ratio(f) > ratio(best) ? f : best), null);
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const toggle = (key: string) =>
+    setOpen((now) => {
+      const next = new Set(now);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  const widest = widestOf(factors.filter((f) => f.multiplies));
   return (
     <div className={classNames(styles.scroll)}>
       <table className={classNames(styles.table)}>
@@ -473,22 +514,106 @@ function FactorTable({ factors }: { factors: Factor[] }) {
         </thead>
         <tbody>
           {factors.map((f) => {
-            const a = f.one ?? 0;
-            const b = f.two ?? 0;
-            const lead = Math.abs(a - b) <= Math.max(Math.abs(a), Math.abs(b)) * 0.005 ? 0 : side(a - b);
-            const r = ratio(f);
+            const parts = f.parts ?? [];
+            const opened = parts.length > 0 && open.has(f.label);
+            const widestPart = opened && !f.lowest ? widestOf(parts) : null;
             return (
-              <tr key={f.label} className={classNames({ [styles.groupRow]: f.total })}>
-                <td>{f.label}</td>
-                <td className={classNames(styles.right, leadClass(lead, 1))}>{factorValue(f, f.one)}</td>
-                <td className={classNames(styles.right, leadClass(lead, -1))}>{factorValue(f, f.two)}</td>
-                <td className={classNames(styles.right, sideClass(lead))}>
-                  {lead === 0 ? "=" : r > 1 && Number.isFinite(r) ? `×${n(r, r >= 10 ? 0 : 2)}` : "—"}
+              <Fragment key={f.label}>
+                <tr className={classNames({ [styles.groupRow]: f.total })}>
+                  <td>
+                    {parts.length ? (
+                      <Toggle open={opened} onToggle={() => toggle(f.label)}>
+                        {f.label}
+                      </Toggle>
+                    ) : (
+                      f.label
+                    )}
+                  </td>
+                  <RatioCells fmtKind={f.fmt} one={f.one} two={f.two} biggest={f === widest} />
+                </tr>
+                {opened &&
+                  parts.map((p) => {
+                    const key = f.label + "|" + p.label;
+                    const partOpen = !!p.block && open.has(key);
+                    return (
+                      <Fragment key={key}>
+                        <tr className={classNames(styles.partRow)}>
+                          <td>
+                            {p.block ? (
+                              <Toggle open={partOpen} onToggle={() => toggle(key)}>
+                                {p.label}
+                              </Toggle>
+                            ) : (
+                              p.label
+                            )}
+                          </td>
+                          <RatioCells fmtKind={p.fmt} one={p.one} two={p.two} biggest={p === widestPart} />
+                        </tr>
+                        {partOpen && p.block && (
+                          <tr className={classNames(styles.sourcesRow)}>
+                            <td colSpan={5}>
+                              <SourceTable block={p.block} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** A source table: each source's value for both builds, and the total. */
+function SourceTable({ block }: { block: WhyBlock }) {
+  const unit = block.unit ?? "";
+  // "More" mods multiply; the rest add up.
+  const total = (pick: (row: WhyRow) => number | null) =>
+    block.product
+      ? (block.rows.reduce((s, row) => s * (1 + (pick(row) ?? 0) / 100), 1) - 1) * 100
+      : block.rows.reduce((s, row) => s + (pick(row) ?? 0), 0);
+  return (
+    <div className={classNames(styles.scroll)}>
+      <table className={classNames(styles.table)}>
+        <thead>
+          <tr>
+            <th>{block.title}</th>
+            <th className={classNames(styles.right)}>
+              <BuildName which={1} />
+            </th>
+            <th className={classNames(styles.right)}>
+              <BuildName which={2} />
+            </th>
+            <th className={classNames(styles.right)}>Diff</th>
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((row) => {
+            const detail = sourceDetail(row);
+            return (
+              <tr key={row.group + row.key} className={classNames({ [styles.same]: row.one === row.two })}>
+                <td className={classNames(styles.source)}>
+                  {row.group} · {row.key}
+                  {detail && <small>{detail}</small>}
                 </td>
-                <td>{f === widest && <span className={classNames(styles.chip)}>Biggest</span>}</td>
+                <PairCells a={row.one} b={row.two} unit={unit} />
               </tr>
             );
           })}
+          {!block.noTotal && (
+            <tr className={classNames(styles.groupRow)}>
+              <td>Total</td>
+              <PairCells
+                a={Math.round(total((r) => r.one) * 10) / 10}
+                b={Math.round(total((r) => r.two) * 10) / 10}
+                unit={unit}
+              />
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -515,57 +640,9 @@ export function WhyView({ why }: { why: Why }) {
         </div>
       )}
       {why.factors && <FactorTable factors={why.factors} />}
-      {why.blocks.map((block) => {
-        const unit = block.unit ?? "";
-        // "More" mods multiply; the rest add up.
-        const total = (pick: (row: WhyRow) => number | null) =>
-          block.product
-            ? (block.rows.reduce((s, row) => s * (1 + (pick(row) ?? 0) / 100), 1) - 1) * 100
-            : block.rows.reduce((s, row) => s + (pick(row) ?? 0), 0);
-        return (
-          <div key={block.title} className={classNames(styles.scroll)}>
-            <table className={classNames(styles.table)}>
-              <thead>
-                <tr>
-                  <th>{block.title}</th>
-                  <th className={classNames(styles.right)}>
-                    <BuildName which={1} />
-                  </th>
-                  <th className={classNames(styles.right)}>
-                    <BuildName which={2} />
-                  </th>
-                  <th className={classNames(styles.right)}>Diff</th>
-                </tr>
-              </thead>
-              <tbody>
-                {block.rows.map((row) => {
-                  const detail = sourceDetail(row);
-                  return (
-                    <tr
-                      key={row.group + row.key}
-                      className={classNames({ [styles.same]: row.one === row.two })}
-                    >
-                      <td className={classNames(styles.source)}>
-                        {row.group} · {row.key}
-                        {detail && <small>{detail}</small>}
-                      </td>
-                      <PairCells a={row.one} b={row.two} unit={unit} />
-                    </tr>
-                  );
-                })}
-                <tr className={classNames(styles.groupRow)}>
-                  <td>Total</td>
-                  <PairCells
-                    a={Math.round(total((r) => r.one) * 10) / 10}
-                    b={Math.round(total((r) => r.two) * 10) / 10}
-                    unit={unit}
-                  />
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        );
-      })}
+      {why.blocks.map((block) => (
+        <SourceTable key={block.title} block={block} />
+      ))}
     </div>
   );
 }
@@ -580,8 +657,7 @@ export function StatsSection({ result }: { result: Result }) {
   const rows = result.lines.filter(
     (line) => (same || line.one !== line.two) && (!q || line.label.toLowerCase().includes(q)),
   );
-  const number = (value: string | undefined) =>
-    parseFloat(String(value ?? "").replace(/,/g, ""));
+  const number = (value: string | undefined) => parseFloat(String(value ?? "").replace(/,/g, ""));
   let section = "";
   return (
     <PageSection id="compare-stats" title="Stats">
@@ -631,8 +707,7 @@ export function StatsSection({ result }: { result: Result }) {
               const heading = line.section !== section;
               section = line.section;
               const d = line.diff;
-              const lead =
-                d === undefined || Math.abs(d) < 0.005 ? 0 : side(d) * (line.lower ? -1 : 1);
+              const lead = d === undefined || Math.abs(d) < 0.005 ? 0 : side(d) * (line.lower ? -1 : 1);
               const percent = /%$/.test(line.one ?? "") || /%$/.test(line.two ?? "");
               const isOpen = !!line.why && open === line.why;
               return [
@@ -643,7 +718,10 @@ export function StatsSection({ result }: { result: Result }) {
                 ),
                 <tr
                   key={`r${i}`}
-                  className={classNames({ [styles.same]: line.one === line.two, [styles.open]: isOpen })}
+                  className={classNames({
+                    [styles.same]: line.one === line.two,
+                    [styles.open]: isOpen,
+                  })}
                 >
                   <td>
                     {line.label}
@@ -660,7 +738,9 @@ export function StatsSection({ result }: { result: Result }) {
                   </td>
                   <td className={leadClass(lead, -1)}>{line.two ?? "—"}</td>
                   <td className={classNames(styles.right)}>
-                    {d === undefined ? "" : lead === 0 ? (
+                    {d === undefined ? (
+                      ""
+                    ) : lead === 0 ? (
                       <span className={styles.muted}>=</span>
                     ) : (
                       <span className={sideClass(lead)}>
@@ -717,9 +797,7 @@ export function SkillsSection({ result }: { result: Result }) {
             <div key={`${diff.name}-${i}`} className={classNames(styles.card)}>
               <h3>{diff.name}</h3>
               {slots.length > 0 && (
-                <div className={classNames(styles.sub)}>
-                  {[...new Set(slots)].join(" / ")}
-                </div>
+                <div className={classNames(styles.sub)}>{[...new Set(slots)].join(" / ")}</div>
               )}
               <table className={classNames(styles.table)}>
                 <thead>
@@ -768,10 +846,7 @@ export const itemRowId = (slot: string) => "compare-item-" + slot.replace(/\W+/g
 function ItemLabel({ item, which }: { item?: GearItem; which: 1 | 2 }) {
   return (
     <span className={classNames(styles.itemName)}>
-      <span
-        className={classNames(styles.swatch, which === 1 ? styles.b1 : styles.b2)}
-        aria-hidden
-      />
+      <span className={classNames(styles.swatch, which === 1 ? styles.b1 : styles.b2)} aria-hidden />
       {item ? (
         <span style={{ color: RARITY_COLOURS[item.rarity ?? "NORMAL"] }}>{itemName(item)}</span>
       ) : (

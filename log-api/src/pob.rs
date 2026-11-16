@@ -473,8 +473,18 @@ mod tests {
         let xml = std::fs::read_to_string(std::env::var("POB_DUMP_XML").expect("POB_DUMP_XML")).unwrap();
         let loadout = std::env::var("POB_DUMP_LOADOUT").ok();
         let pob = super::Pob::load().unwrap();
+        // POB_DUMP_PICK: a main skill's gem id, as Compare picks Build 1's skill for Build 2.
+        let pick = std::env::var("POB_DUMP_PICK").ok().map(|id| super::Pick {
+            id,
+            label: None,
+            group: None,
+            skill: None,
+            part: None,
+            minion: None,
+            minion_skill: None,
+        });
         let json = if std::env::var("POB_DUMP_COMPARE").is_ok() {
-            pob.compare(&xml, loadout.as_deref(), None, true).unwrap()
+            pob.compare(&xml, loadout.as_deref(), pick.as_ref(), true).unwrap()
         } else {
             pob.stats(&xml, loadout.as_deref(), None).unwrap()
         };

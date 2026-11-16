@@ -39,6 +39,8 @@ export interface Extra {
   slots?: Record<string, SlotRow[]>;
   calcsPlayer?: Record<string, number>;
   calcsActor?: Record<string, number>;
+  /** The main skill's DPS factors taken apart (hit, speed, Poison, Bleed, Ignite). */
+  parts?: Record<string, Record<string, number>>;
 }
 
 /** A build as Compare has it: its numbers, and (the two compared) PoB's stats answer. */
@@ -49,9 +51,7 @@ export interface Calculated {
 
 // PoB's JSON writes an empty table as [] or {}: make each what it should be.
 const record = (value: unknown): Record<string, number> =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, number>)
-    : {};
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, number>) : {};
 const rowsOf = <T>(value: unknown): T[] => (Array.isArray(value) ? value : []);
 
 export function readExtra(raw: Partial<Extra>): Extra {
@@ -73,6 +73,9 @@ export function readExtra(raw: Partial<Extra>): Extra {
     slots: raw.slots ? slots : undefined,
     calcsPlayer: raw.calcsPlayer ? record(raw.calcsPlayer) : undefined,
     calcsActor: raw.calcsActor ? record(raw.calcsActor) : undefined,
+    parts: raw.parts
+      ? Object.fromEntries(Object.entries(record(raw.parts)).map(([k, v]) => [k, record(v)]))
+      : undefined,
   };
 }
 
@@ -160,8 +163,7 @@ function rules(minion: boolean): Rule[] {
       why: "life",
       section: "Defence",
       get: (x) => P(x).Life,
-      show: (x) =>
-        !ci(x) && (P(x).Life ?? 0) >= 0.3 * ((P(x).Life ?? 0) + (P(x).EnergyShield ?? 0)),
+      show: (x) => !ci(x) && (P(x).Life ?? 0) >= 0.3 * ((P(x).Life ?? 0) + (P(x).EnergyShield ?? 0)),
     },
     {
       key: "es",
@@ -170,8 +172,7 @@ function rules(minion: boolean): Rule[] {
       section: "Defence",
       get: (x) => P(x).EnergyShield ?? 0,
       show: (x) =>
-        (P(x).EnergyShield ?? 0) >=
-        0.3 * ((ci(x) ? 0 : (P(x).Life ?? 0)) + (P(x).EnergyShield ?? 0)),
+        (P(x).EnergyShield ?? 0) >= 0.3 * ((ci(x) ? 0 : (P(x).Life ?? 0)) + (P(x).EnergyShield ?? 0)),
     },
     {
       key: "ehp",
@@ -246,8 +247,7 @@ function rules(minion: boolean): Rule[] {
       why: "res-" + element,
       section: "Defence",
       get: (x) => P(x)[element + "Resist"] ?? 0,
-      show: (x) =>
-        (P(x)["Missing" + element + "Resist"] ?? 0) > 0 && !(element === "Chaos" && ci(x)),
+      show: (x) => (P(x)["Missing" + element + "Resist"] ?? 0) > 0 && !(element === "Chaos" && ci(x)),
     });
   list.push({
     key: "move",
@@ -439,25 +439,52 @@ export interface WhyBlock {
   unit?: "%";
   /** "more" mods multiply: the total is their product, not their sum. */
   product?: boolean;
+  /** The rows are separate values, not one total's sources. */
+  noTotal?: boolean;
   rows: WhyRow[];
 }
 
 /** A pool (flat × (1 + inc%) × more) or a chance (sum, capped). */
 export type WhyFormula =
-  | { kind: "pool"; flat: number; inc: number; more: number; total: number; ok: boolean }
+  | {
+      kind: "pool";
+      flat: number;
+      inc: number;
+      more: number;
+      total: number;
+      ok: boolean;
+    }
   | { kind: "chance"; sum: number; cap: number; total: number; ok: boolean };
+
+/**
+ * "k": big numbers; "%"; "x": a multiplier; "inc": an increase, as its multiplier (1.5 is
+ * +50%); "rate": per second; "s": seconds.
+ */
+export type FactorFmt = "k" | "%" | "x" | "inc" | "rate" | "s";
+
+/** A part of a factor: the factor is the product of its parts. */
+export interface Part {
+  label: string;
+  one: number;
+  two: number;
+  fmt: FactorFmt;
+  /** Where the part comes from, by source. */
+  block?: WhyBlock;
+}
 
 /** One factor of a DPS (both builds), as PoB multiplies and adds them. */
 export interface Factor {
   label: string;
   one: number | null;
   two: number | null;
-  /** "k": big numbers; "%"; "x": a multiplier; "rate": per second. */
-  fmt: "k" | "%" | "x" | "rate";
+  fmt: FactorFmt;
   /** A subtotal or the total (shown as a sum line). */
   total?: boolean;
   /** Multiplies the hit DPS: the factor with the widest ratio is marked. */
   multiplies?: boolean;
+  parts?: Part[];
+  /** The factor is the lower of its parts (a triggered skill's rate), not their product. */
+  lowest?: boolean;
 }
 
 export interface Why {
@@ -469,8 +496,7 @@ export interface Why {
 
 const numberRows = (rows: TabRow[] | undefined) =>
   (rows ?? []).filter((row): row is TabRow & { value: number } => typeof row.value === "number");
-const sumOf = (rows: TabRow[] | undefined) =>
-  numberRows(rows).reduce((s, row) => s + row.value, 0);
+const sumOf = (rows: TabRow[] | undefined) => numberRows(rows).reduce((s, row) => s + row.value, 0);
 const prodOf = (rows: TabRow[] | undefined) =>
   numberRows(rows).reduce((s, row) => s * (1 + row.value / 100), 1);
 
@@ -517,12 +543,14 @@ function label(slots: Map<string, string>, source: string | undefined): Source {
         .replace(/([a-z])([A-Z])/g, "$1 $2")
         .replace(/ (To|Of|And) /g, (m) => m.toLowerCase()),
     };
-  if (source?.startsWith("Custom:"))
-    return { group: "Config", key: `Custom mods (${source.slice(7)})` };
+  if (source?.startsWith("Custom:")) return { group: "Config", key: `Custom mods (${source.slice(7)})` };
   // A party member's buffs, set in the config: "Party - Leer Cast, Festival Mask".
   const party = /^Party - ([^,]*)(?:, (.*))?$/.exec(source ?? "");
   if (party) return { group: "Config", key: `Party: ${party[1]}`, detail: party[2] };
   if (source === "Base") return { group: "Base", key: "Base" };
+  // The skill's own base damage (pob-host.lua): "Base:Minion base|Level 84".
+  const own = /^Base:([^|]*)(?:\|(.*))?$/.exec(source ?? "");
+  if (own) return { group: "Base", key: own[1], detail: own[2] };
   if (source && ["Strength", "Dexterity", "Intelligence"].includes(source))
     return { group: "Base", key: source };
   return { group: "Other", key: source || "Other" };
@@ -632,13 +660,23 @@ function poolWhy(one: Calculated, two: Calculated, stat: string, key: string, ti
     const inc = sumOf(tabs[key + "Inc"]);
     const more = prodOf(tabs[key + "More"]);
     const total = Math.round(CP(x.extra)[stat] ?? 0);
-    return { kind: "pool", flat, inc, more, total, ok: close(flat * (1 + inc / 100) * more, total) };
+    return {
+      kind: "pool",
+      flat,
+      inc,
+      more,
+      total,
+      ok: close(flat * (1 + inc / 100) * more, total),
+    };
   };
   const tabsOne = one.extra.tabs ?? {};
   const tabsTwo = two.extra.tabs ?? {};
   let base: WhyBlock;
   if (key === "life")
-    base = { title: "Base life", rows: paired(one, tabsOne.lifeBase, two, tabsTwo.lifeBase) };
+    base = {
+      title: "Base life",
+      rows: paired(one, tabsOne.lifeBase, two, tabsTwo.lifeBase),
+    };
   else {
     const a = flatRows(one, stat, tabsOne[key + "Base"]);
     const b = flatRows(two, stat, tabsTwo[key + "Base"]);
@@ -663,7 +701,11 @@ function poolWhy(one: Calculated, two: Calculated, stat: string, key: string, ti
     formula: [side(one), side(two)],
     blocks: [
       base,
-      { title: "Increased", unit: "%", rows: paired(one, tabsOne[key + "Inc"], two, tabsTwo[key + "Inc"]) },
+      {
+        title: "Increased",
+        unit: "%",
+        rows: paired(one, tabsOne[key + "Inc"], two, tabsTwo[key + "Inc"]),
+      },
     ],
   };
 }
@@ -680,11 +722,23 @@ function chanceWhy(
     const sum = sumOf(rowsFor(x));
     const cap = capOf(x);
     const total = Math.round(totalOf(x) ?? 0);
-    return { kind: "chance", sum, cap, total, ok: close(Math.min(sum, cap), total) };
+    return {
+      kind: "chance",
+      sum,
+      cap,
+      total,
+      ok: close(Math.min(sum, cap), total),
+    };
   };
   return {
     formula: [side(one.extra), side(two.extra)],
-    blocks: [{ title, unit: "%", rows: paired(one, rowsFor(one.extra), two, rowsFor(two.extra)) }],
+    blocks: [
+      {
+        title,
+        unit: "%",
+        rows: paired(one, rowsFor(one.extra), two, rowsFor(two.extra)),
+      },
+    ],
   };
 }
 
@@ -727,8 +781,7 @@ export function whys(one: Calculated, two: Calculated): Record<string, Why> {
       () => 100,
       (x) => CA(x)[ailment + "Chance"],
     );
-  for (const [key, why] of Object.entries(out))
-    if (!why.formula?.every((f) => f.ok)) delete out[key];
+  for (const [key, why] of Object.entries(out)) if (!why.formula?.every((f) => f.ok)) delete out[key];
   const dps = dpsWhy(one, two);
   if (dps) out.dps = dps;
   return out;
@@ -783,36 +836,300 @@ function dpsWhy(one: Calculated, two: Calculated): Why | null {
   };
   const some = (key: keyof ReturnType<typeof parts>, min = 0) =>
     Math.abs(x[key]) > min || Math.abs(y[key]) > min;
-  const pair = (key: keyof ReturnType<typeof parts>) => ({ one: x[key], two: y[key] });
+  const pair = (key: keyof ReturnType<typeof parts>) => ({
+    one: x[key],
+    two: y[key],
+  });
   const hits = some("hit");
-  add({ label: "Hit damage", fmt: "k", multiplies: true, ...pair("hit") }, hits);
-  add({ label: "Crit chance", fmt: "%", ...pair("crit") }, hits && some("crit"));
-  add({ label: "Crit multi", fmt: "x", ...pair("critMulti") }, hits && some("crit"));
+  const split = factorParts(one, two, x.hit, y.hit, x.speed, y.speed);
+  add(
+    {
+      label: "Hit damage",
+      fmt: "k",
+      multiplies: true,
+      ...pair("hit"),
+      parts: split.hit,
+    },
+    hits,
+  );
+  // With the hit taken apart, crit is one of its parts.
+  add({ label: "Crit chance", fmt: "%", ...pair("crit") }, hits && !split.hit && some("crit"));
+  add({ label: "Crit multi", fmt: "x", ...pair("critMulti") }, hits && !split.hit && some("crit"));
   add({ label: "Hit chance", fmt: "%", multiplies: true, ...pair("chance") }, hits);
   // A skill PoB shows as an average hit has no per-second parts: its total is that hit.
   if (one.extra.average || two.extra.average) {
     add({ label: "Total", fmt: "k", total: true, ...pair("total") });
-    return { factors, blocks: dpsBlocks(one, two) };
+    return { factors, blocks: dpsBlocks(one, two, !split.hit, false) };
   }
-  add({ label: "Hits/sec", fmt: "rate", multiplies: true, ...pair("speed") }, hits);
+  add(
+    {
+      label: "Hits/sec",
+      fmt: "rate",
+      multiplies: true,
+      ...pair("speed"),
+      ...(hits ? split.speed : undefined),
+    },
+    hits,
+  );
   add(
     { label: "Multiplier", fmt: "x", multiplies: true, ...pair("multiplier") },
     hits && (Math.abs(x.multiplier - 1) > 0.01 || Math.abs(y.multiplier - 1) > 0.01),
   );
   add({ label: "Hit DPS", fmt: "k", total: true, ...pair("hitDps") }, hits);
   const small = Math.max(x.total, y.total) * 0.01;
-  add({ label: "Poison DPS", fmt: "k", ...pair("poison") }, some("poison"));
-  add({ label: "Bleed DPS", fmt: "k", ...pair("bleed") }, some("bleed"));
-  add({ label: "Ignite DPS", fmt: "k", ...pair("ignite") }, some("ignite"));
+  for (const [label, key, name] of [
+    ["Poison DPS", "poison", "Poison"],
+    ["Bleed DPS", "bleed", "Bleed"],
+    ["Ignite DPS", "ignite", "Ignite"],
+  ] as const)
+    add(
+      {
+        label,
+        fmt: "k",
+        ...pair(key),
+        parts: split.ailment(name, x[key], y[key]),
+      },
+      some(key),
+    );
   add({ label: "Other DoT", fmt: "k", ...pair("dot") }, some("dot", small));
   add({ label: "Impale DPS", fmt: "k", ...pair("impale") }, some("impale"));
   add({ label: "Cull & other", fmt: "k", ...pair("other") }, some("other", small));
   add({ label: "Total", fmt: "k", total: true, ...pair("total") });
-  return { factors, blocks: dpsBlocks(one, two) };
+  // The sources sit under the parts they make up; without parts, they follow the table.
+  return {
+    factors,
+    blocks: dpsBlocks(one, two, !split.hit, !(hits && split.speed?.parts)),
+  };
+}
+
+/**
+ * The parts of the hit, the hit rate and each ailment (pob-host.lua's compareParts), each
+ * with its sources. What the parts don't cover (conversion, double damage, crits on
+ * ailments and the like) is "Other", so the parts always multiply to the factor.
+ */
+function factorParts(
+  one: Calculated,
+  two: Calculated,
+  hitOne: number,
+  hitTwo: number,
+  speedOne: number,
+  speedTwo: number,
+) {
+  const pa = one.extra.parts ?? {};
+  const pb = two.extra.parts ?? {};
+  const both = one.stats && two.stats;
+  const tabsOne = one.extra.tabs ?? {};
+  const tabsTwo = two.extra.tabs ?? {};
+  /** `noTotal`: the table lists more than the part (several damage types' mods). */
+  const block = (
+    title: string,
+    key: string,
+    unit?: "%",
+    product?: boolean,
+    noTotal?: boolean,
+  ): WhyBlock | undefined => {
+    if (!both) return undefined;
+    const rows = paired(one, tabsOne[key], two, tabsTwo[key], product);
+    return rows.length ? { title, unit, product, noTotal, rows } : undefined;
+  };
+  const percentOf = (value: number | undefined) =>
+    typeof value === "number" && Number.isFinite(value) ? Math.round(value * 100) : null;
+  const num = (value: number | undefined) => (value !== undefined && Number.isFinite(value) ? value : 1);
+  const positive = (value: number | undefined): value is number =>
+    value !== undefined && Number.isFinite(value) && value > 0;
+  /** "Other": the factor over the product of the parts, shown when it isn't ×1 for both. */
+  const finish = (list: Part[], totalOne: number, totalTwo: number) => {
+    const product = (pick: (p: Part) => number) => list.reduce((s, p) => s * pick(p), 1);
+    const pOne = product((p) => (p.fmt === "%" ? p.one / 100 : p.one));
+    const pTwo = product((p) => (p.fmt === "%" ? p.two / 100 : p.two));
+    if (!(pOne > 0 && pTwo > 0)) return undefined;
+    const other: Part = {
+      label: "Other",
+      fmt: "x",
+      one: totalOne / pOne,
+      two: totalTwo / pTwo,
+    };
+    if (Math.abs(other.one - 1) > 0.01 || Math.abs(other.two - 1) > 0.01) list.push(other);
+    return list;
+  };
+
+  let hit: Part[] | undefined;
+  const ha = pa.hit;
+  const hb = pb.hit;
+  if (ha && hb && positive(ha.base) && positive(hb.base) && hitOne > 0 && hitTwo > 0) {
+    const mixed = !!ha.mixed || !!hb.mixed;
+    const list: Part[] = [
+      {
+        label: "Base damage",
+        fmt: "k",
+        one: ha.base,
+        two: hb.base,
+        block: block("Base damage", "hitBase"),
+      },
+      {
+        label: "Increased",
+        fmt: "inc",
+        one: num(ha.inc),
+        two: num(hb.inc),
+        block: block("Increased damage", "damageInc", "%", false, mixed),
+      },
+      {
+        label: "More",
+        fmt: "x",
+        one: num(ha.more),
+        two: num(hb.more),
+        block: block("More damage", "damageMore", "%", true, mixed),
+      },
+      {
+        label: "Crit",
+        fmt: "x",
+        one: num(ha.crit),
+        two: num(hb.crit),
+        block: {
+          title: "Crit",
+          unit: "%",
+          noTotal: true,
+          rows: [
+            {
+              group: "Base",
+              key: "Crit chance",
+              one: ha.critChance ?? null,
+              two: hb.critChance ?? null,
+            },
+            {
+              group: "Base",
+              key: "Crit multi",
+              one: percentOf(ha.critMulti),
+              two: percentOf(hb.critMulti),
+            },
+          ],
+        },
+      },
+    ];
+    const resistOne = num(ha.resist);
+    const resistTwo = num(hb.resist);
+    if (Math.abs(resistOne - 1) > 0.005 || Math.abs(resistTwo - 1) > 0.005)
+      list.push({
+        label: "Vs enemy",
+        fmt: "x",
+        one: resistOne,
+        two: resistTwo,
+      });
+    hit = finish(list, hitOne, hitTwo);
+  }
+
+  let speed: { parts?: Part[]; lowest?: boolean } | undefined;
+  const sa = pa.speed;
+  const sb = pb.speed;
+  if (sa && sb && positive(sa.cap) && positive(sb.cap) && positive(sa.source) && positive(sb.source)) {
+    const list: Part[] = [
+      {
+        label: "Cooldown cap",
+        fmt: "rate",
+        one: sa.cap,
+        two: sb.cap,
+        block: block("Cooldown recovery", "cooldownRecovery", "%"),
+      },
+      { label: "Trigger rate", fmt: "rate", one: sa.source, two: sb.source },
+    ];
+    // PoB's rate also counts trigger chance and skills sharing the trigger: "Other" is the
+    // rate over the lower of the two.
+    const other: Part = {
+      label: "Other",
+      fmt: "x",
+      one: speedOne / Math.min(sa.cap, sa.source),
+      two: speedTwo / Math.min(sb.cap, sb.source),
+    };
+    if (Math.abs(other.one - 1) > 0.01 || Math.abs(other.two - 1) > 0.01) list.push(other);
+    speed = { lowest: true, parts: list };
+  } else if (sa && sb && positive(sa.base) && positive(sb.base) && speedOne > 0 && speedTwo > 0)
+    speed = {
+      parts: finish(
+        [
+          { label: "Base rate", fmt: "rate", one: sa.base, two: sb.base },
+          {
+            label: "Increased",
+            fmt: "inc",
+            one: num(sa.inc),
+            two: num(sb.inc),
+            block: block("Increased speed", "speedInc", "%"),
+          },
+          {
+            label: "More",
+            fmt: "x",
+            one: num(sa.more),
+            two: num(sb.more),
+            block: block("More speed", "speedMore", "%", true),
+          },
+        ],
+        speedOne,
+        speedTwo,
+      ),
+    };
+
+  const ailment = (key: string, totalOne: number, totalTwo: number): Part[] | undefined => {
+    const a = pa[key];
+    const b = pb[key];
+    if (!a || !b || !positive(a.base) || !positive(b.base) || !(totalOne > 0 && totalTwo > 0))
+      return undefined;
+    const mixed = !!a.mixed || !!b.mixed;
+    const list: Part[] = [
+      { label: "Base damage", fmt: "k", one: a.base, two: b.base },
+      {
+        label: "Increased",
+        fmt: "inc",
+        one: num(a.inc),
+        two: num(b.inc),
+        block: block("Increased damage", key + "Inc", "%", false, mixed),
+      },
+      {
+        label: "More",
+        fmt: "x",
+        one: num(a.more),
+        two: num(b.more),
+        block: block("More damage", key + "More", "%", true, mixed),
+      },
+      {
+        label: "DoT multi",
+        fmt: "inc",
+        one: num(a.multi),
+        two: num(b.multi),
+        block: block("DoT multi", key + "Multi", "%"),
+      },
+    ];
+    const enemyOne = num(a.enemy);
+    const enemyTwo = num(b.enemy);
+    if (Math.abs(enemyOne - 1) > 0.005 || Math.abs(enemyTwo - 1) > 0.005)
+      list.push({ label: "Vs enemy", fmt: "x", one: enemyOne, two: enemyTwo });
+    if (key === "Poison") {
+      if (!positive(a.chance) || !positive(b.chance) || !positive(a.duration) || !positive(b.duration))
+        return undefined;
+      list.push(
+        {
+          label: "Poison chance",
+          fmt: "%",
+          one: a.chance,
+          two: b.chance,
+          block: block("Poison chance", "PoisonChance", "%"),
+        },
+        {
+          label: "Duration",
+          fmt: "s",
+          one: a.duration,
+          two: b.duration,
+          block: block("Increased duration", "PoisonDuration", "%"),
+        },
+        { label: "Hits/sec", fmt: "rate", one: speedOne, two: speedTwo },
+      );
+    }
+    return finish(list, totalOne, totalTwo);
+  };
+
+  return { hit, speed, ailment };
 }
 
 /** The damage and speed mods of both builds by source ("more" mods multiply). */
-function dpsBlocks(one: Calculated, two: Calculated) {
+function dpsBlocks(one: Calculated, two: Calculated, damage: boolean, speed: boolean) {
   const tabsOne = one.extra.tabs ?? {};
   const tabsTwo = two.extra.tabs ?? {};
   const blocks: WhyBlock[] = [];
@@ -820,10 +1137,14 @@ function dpsBlocks(one: Calculated, two: Calculated) {
     const rows = one.stats && two.stats ? paired(one, tabsOne[key], two, tabsTwo[key], product) : [];
     if (rows.length) blocks.push({ title, unit: "%", product, rows });
   };
-  block("Increased damage", "damageInc");
-  block("More damage", "damageMore", true);
-  block("Increased speed", "speedInc");
-  block("More speed", "speedMore", true);
+  if (damage) {
+    block("Increased damage", "damageInc");
+    block("More damage", "damageMore", true);
+  }
+  if (speed) {
+    block("Increased speed", "speedInc");
+    block("More speed", "speedMore", true);
+  }
   return blocks;
 }
 
@@ -854,7 +1175,11 @@ export function configDiff(one: Stats | undefined, two: Stats | undefined): Conf
   const labels = [...new Set([...a.rows.keys(), ...b.rows.keys()])];
   return {
     rows: labels
-      .map((l) => ({ label: l, one: a.rows.get(l) ?? null, two: b.rows.get(l) ?? null }))
+      .map((l) => ({
+        label: l,
+        one: a.rows.get(l) ?? null,
+        two: b.rows.get(l) ?? null,
+      }))
       .filter((row) => row.one !== row.two),
     modsOne: a.mods,
     modsTwo: b.mods,
