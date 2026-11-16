@@ -7,7 +7,19 @@ import { tradeIndex, tradeUrl } from "../Gear/trade-query";
 import { PageSection, useJumpToSection } from "../PageSection";
 import type { GearItem, Stats } from "../PobStats";
 import { itemDiffs, skillDiffs } from "./diff";
-import type { Factor, FactorFmt, Metric, Why, WhyBlock, WhyFormula, WhyRow } from "./metrics";
+import {
+  type CalcCell,
+  type CalcLine,
+  type Factor,
+  type FactorFmt,
+  type Metric,
+  type Why,
+  type WhyBlock,
+  type WhyFormula,
+  type WhyRow,
+  calcBlocks,
+  calcLines,
+} from "./metrics";
 import type { Gap, Result } from "./run";
 import styles from "./styles.module.css";
 import classNames from "classnames";
@@ -649,7 +661,8 @@ export function WhyView({ why }: { why: Why }) {
 
 // Stats -------------------------------------------------------------------------------
 
-export function StatsSection({ result }: { result: Result }) {
+/** PoB's sidebar stats for both builds (a comparison PoB sent no Calcs tab for). */
+function SidebarStats({ result }: { result: Result }) {
   const [query, setQuery] = useState("");
   const [same, setSame] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
@@ -778,6 +791,239 @@ export function StatsSection({ result }: { result: Result }) {
 }
 
 // Skills ------------------------------------------------------------------------------
+
+/** PoB's Calcs tab for both builds; the sidebar list when PoB sent no Calcs tab for one. */
+export function StatsSection({ result }: { result: Result }) {
+  // Both builds need PoB's Calcs tab, or neither column could be compared row by row.
+  if (!result.one.extra.calcsPage || !result.two.extra.calcsPage) return <SidebarStats result={result} />;
+  // A new Build 1 main skill starts the switch over (Minion for a minion's skill).
+  return <CalcsStats key={result.one.extra.minionMain ? "minion" : "player"} result={result} />;
+}
+
+function CalcsStats({ result }: { result: Result }) {
+  const hasMinion = !!(result.one.extra.calcsPage?.minion || result.two.extra.calcsPage?.minion);
+  const [who, setWho] = useState<"player" | "minion">(
+    hasMinion && result.one.extra.minionMain ? "minion" : "player",
+  );
+  const actor = hasMinion ? who : "player";
+  const [query, setQuery] = useState("");
+  const [same, setSame] = useState(false);
+  const [open, setOpen] = useState<number | null>(null);
+  const all = useMemo(() => calcLines(result.one.extra, result.two.extra, actor), [result, actor]);
+  const q = query.trim().toLowerCase();
+  const rows = all.filter(
+    (line) =>
+      (same || line.one?.value !== line.two?.value) &&
+      (!q || line.label.toLowerCase().includes(q) || line.section.toLowerCase().includes(q)),
+  );
+  const detailed = (cell: CalcCell | undefined) =>
+    !!cell && (cell.lines.length > 0 || cell.tables.length > 0 || cell.mods.some((m) => m.rows.length > 0));
+  let section = "";
+  return (
+    <PageSection id="compare-stats" title="Stats">
+      <div className={classNames(styles.tools)}>
+        {hasMinion && (
+          <div className={classNames(styles.switch)} role="group" aria-label="Stats of">
+            {(["player", "minion"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={classNames(styles.switchButton)}
+                aria-pressed={who === value}
+                onClick={() => {
+                  setWho(value);
+                  setOpen(null);
+                }}
+              >
+                {value === "player" ? "Player" : "Minion"}
+              </button>
+            ))}
+          </div>
+        )}
+        <input
+          className={classNames(styles.input, styles.search)}
+          type="search"
+          placeholder="Search"
+          aria-label="Search stats"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <label className={classNames(styles.check)}>
+          <input type="checkbox" checked={same} onChange={(e) => setSame(e.target.checked)} />
+          Show same
+        </label>
+      </div>
+      <div className={classNames(styles.scroll)}>
+        <table className={classNames(styles.table)}>
+          <thead>
+            <tr>
+              <th>Stat</th>
+              <th className={classNames(styles.right)}>
+                <BuildName which={1} />
+              </th>
+              <th className={classNames(styles.statBar)}>
+                <span className={classNames(styles.sr)}>Ahead</span>
+              </th>
+              <th>
+                <BuildName which={2} />
+              </th>
+              <th className={classNames(styles.right)}>Diff</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={5} className={classNames(styles.empty)}>
+                  {q ? "No matches" : "No differences"}
+                </td>
+              </tr>
+            )}
+            {rows.map((line) => {
+              const heading = line.section !== section;
+              section = line.section;
+              const d = line.diff;
+              const lead = d === undefined || Math.abs(d) < 0.005 ? 0 : side(d) * (line.lower ? -1 : 1);
+              const one = line.one?.value;
+              const two = line.two?.value;
+              const percent = /%/.test(one ?? "") || /%/.test(two ?? "");
+              const canOpen = detailed(line.one) || detailed(line.two);
+              const isOpen = canOpen && open === line.order;
+              return (
+                <Fragment key={line.order}>
+                  {heading && (
+                    <tr className={classNames(styles.groupRow)}>
+                      <td colSpan={5}>{line.section}</td>
+                    </tr>
+                  )}
+                  <tr className={classNames({ [styles.same]: one === two, [styles.open]: isOpen })}>
+                    <td>
+                      {canOpen ? (
+                        <Toggle open={isOpen} onToggle={() => setOpen(isOpen ? null : line.order)}>
+                          {line.label}
+                        </Toggle>
+                      ) : (
+                        line.label
+                      )}
+                    </td>
+                    <td className={classNames(styles.right, leadClass(lead, 1))}>{one || "—"}</td>
+                    <td className={classNames(styles.statBar)}>
+                      {lead !== 0 && (
+                        <>
+                          <Bar
+                            lead={lead}
+                            length={reach(Math.abs(calcValue(one)), Math.abs(calcValue(two)), percent)}
+                            mini
+                          />
+                          <span className={classNames(styles.sr)}>Build {lead > 0 ? 1 : 2}</span>
+                        </>
+                      )}
+                    </td>
+                    <td className={leadClass(lead, -1)}>{two || "—"}</td>
+                    <td className={classNames(styles.right)}>
+                      {d === undefined ? (
+                        ""
+                      ) : lead === 0 ? (
+                        <span className={styles.muted}>=</span>
+                      ) : (
+                        <span className={sideClass(lead)}>
+                          {n(d, Math.abs(d) % 1 ? (Math.abs(d) < 10 ? 2 : 1) : 0)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr>
+                      <td colSpan={5} className={classNames(styles.drawerCell)}>
+                        <CalcDetail result={result} line={line} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </PageSection>
+  );
+}
+
+/** A Calcs value's leading number ("x 1.158" → 1.158), 0 when it has none. */
+const calcValue = (value: string | undefined) =>
+  parseFloat(
+    String(value ?? "")
+      .replace(/^x\s*/, "")
+      .replace(/,/g, ""),
+  ) || 0;
+
+/** PoB's working for one build: its tooltip's lines and tables. */
+function Working({ cell }: { cell: CalcCell | undefined }) {
+  if (!cell || (cell.lines.length === 0 && cell.tables.length === 0))
+    return <div className={classNames(styles.muted)}>—</div>;
+  return (
+    <>
+      {cell.lines.length > 0 && (
+        <div className={classNames(styles.workingLines)}>
+          {cell.lines.map((line, i) => (
+            <div key={i}>{line || " "}</div>
+          ))}
+        </div>
+      )}
+      {cell.tables.map((table, i) => (
+        <div key={i} className={classNames(styles.scroll)}>
+          <table className={classNames(styles.table)}>
+            <thead>
+              <tr>
+                {table.cols.map((col, j) => (
+                  <th key={j}>{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {table.rows.map((row, j) => (
+                <tr key={j}>
+                  {row.map((value, k) => (
+                    <td key={k}>{value}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {table.footer && <div className={classNames(styles.workingLines)}>{table.footer}</div>}
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** A Calcs row opened: both builds' working side by side, then its mods by source. */
+function CalcDetail({ result, line }: { result: Result; line: CalcLine }) {
+  const blocks = useMemo(() => calcBlocks(result.one, result.two, line), [result, line]);
+  const hasWorking = [line.one, line.two].some((cell) => cell && (cell.lines.length || cell.tables.length));
+  return (
+    <div className={classNames(styles.why)} role="region" aria-label="Sources">
+      {hasWorking && (
+        <div className={classNames(styles.working)}>
+          <div>
+            <div className={classNames(styles.who)}>
+              <BuildName which={1} />
+            </div>
+            <Working cell={line.one} />
+          </div>
+          <div>
+            <div className={classNames(styles.who)}>
+              <BuildName which={2} />
+            </div>
+            <Working cell={line.two} />
+          </div>
+        </div>
+      )}
+      {blocks.map((block) => (
+        <SourceTable key={block.title} block={block} />
+      ))}
+    </div>
+  );
+}
 
 export function SkillsSection({ result }: { result: Result }) {
   const one = result.one.stats;

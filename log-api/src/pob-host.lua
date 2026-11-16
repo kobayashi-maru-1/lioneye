@@ -1542,6 +1542,12 @@ local function compareSource(source)
 		local node = build.spec.nodes[tonumber(id)]
 		return "Tree: " .. (node and (node.dn or node.name) or id)
 	end
+	-- A gem by its name as PoB shows it ("Summon Holy Relic of Conviction"), not its id.
+	local skillId = source:match("^Skill:(.+)$")
+	local granted = skillId and _G.data and _G.data.skills and _G.data.skills[skillId]
+	if granted and type(granted.name) == "string" and granted.name ~= "" then
+		return "Skill:" .. granted.name
+	end
 	return source
 end
 
@@ -1864,6 +1870,326 @@ local function compareParts(actor, skill, flags, cfg, names, minionMain, tabs)
 	return parts
 end
 
+-- PoB's Calcs tab for Compare's Stats: every section and row PoB would show for an actor
+-- (CalcSections, the same table PoB-C draws), each with its value, PoB's working (the
+-- breakdown text and tables of its tooltip) and its mods by source.
+
+local calcSections
+-- Each cell's place in the whole table, so both builds' rows line up whatever each shows.
+local calcsPlace = setmetatable({}, { __mode = "k" })
+
+-- PoB's colour codes out of a label: "^xE05030Fire:" → "Fire".
+local function plainLabel(text)
+	if type(text) ~= "string" then
+		return nil
+	end
+	text = text:gsub("%^x%x%x%x%x%x%x", ""):gsub("%^%d", ""):gsub(":%s*$", "")
+	return text
+end
+
+-- As PoB-C's CalcsTab:CheckFlag: whether a section, row or source applies to this actor.
+local function calcsFlag(obj, actor, player)
+	local skillFlags = actor.mainSkill and actor.mainSkill.skillFlags or {}
+	if obj.flag and not skillFlags[obj.flag] then
+		return false
+	end
+	for _, flag in ipairs(obj.flagList or {}) do
+		if not skillFlags[flag] then
+			return false
+		end
+	end
+	if obj.playerFlag then
+		local playerFlags = player and player.mainSkill and player.mainSkill.skillFlags or {}
+		if not playerFlags[obj.playerFlag] then
+			return false
+		end
+	end
+	if obj.notFlag and skillFlags[obj.notFlag] then
+		return false
+	end
+	for _, flag in ipairs(obj.notFlagList or {}) do
+		if skillFlags[flag] then
+			return false
+		end
+	end
+	if obj.haveOutput then
+		local output = actor.output or {}
+		local ns, var = obj.haveOutput:match("^(%a+)%.(%a+)$")
+		local value
+		if ns then
+			value = output[ns] and output[ns][var]
+		else
+			value = output[obj.haveOutput]
+		end
+		if not value or value == 0 then
+			return false
+		end
+	end
+	return true
+end
+
+-- Mod rows as Compare's tables take them: value (numbers and flags only; LIST values have
+-- no number), type, stat and where it comes from.
+local function calcsModRows(list)
+	local rows = setmetatable({}, ARRAY)
+	for _, row in ipairs(list or {}) do
+		local mod = row.mod or {}
+		local value = row.value
+		if type(value) == "boolean" then
+			value = value and 1 or 0
+		end
+		if type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge then
+			rows[#rows + 1] = {
+				value = value,
+				type = mod.type,
+				name = mod.name,
+				source = compareSource(mod.source),
+			}
+		end
+	end
+	return rows
+end
+
+-- A working table's cell as text: numbers to two places at most.
+local function calcsCellText(value)
+	if value == nil then
+		return ""
+	elseif type(value) == "number" then
+		if value ~= value or value == math.huge or value == -math.huge then
+			return ""
+		end
+		return value % 1 == 0 and tostring(value) or (string.format("%.2f", value):gsub("0+$", ""):gsub("%.$", ""))
+	end
+	return tostring(value)
+end
+
+-- Adds one of the tooltip's tables: `cols` are { label, key }.
+local function calcsTable(cell, label, footer, cols, list)
+	if type(list) ~= "table" or #list == 0 then
+		return
+	end
+	local labels = setmetatable({}, ARRAY)
+	for _, col in ipairs(cols) do
+		labels[#labels + 1] = plainLabel(col.label) or ""
+	end
+	local rows = setmetatable({}, ARRAY)
+	for _, row in ipairs(list) do
+		local cells = setmetatable({}, ARRAY)
+		for _, col in ipairs(cols) do
+			cells[#cells + 1] = calcsCellText(row[col.key])
+		end
+		rows[#rows + 1] = cells
+	end
+	cell.tables[#cell.tables + 1] = {
+		label = plainLabel(label),
+		footer = type(footer) == "string" and footer or nil,
+		cols = labels,
+		rows = rows,
+	}
+end
+
+-- A tooltip's working, as PoB-C's CalcBreakdownControl:AddBreakdownSection draws it: text
+-- lines, then its generic, reservation, damage type and per-slot tables, and its mods.
+local function calcsBreakdown(actor, source, cell)
+	local breakdowns = actor.breakdown or {}
+	local ns, key = source.breakdown:match("^(%a+)%.(%a+)$")
+	local breakdown
+	if ns then
+		breakdown = breakdowns[ns] and breakdowns[ns][key]
+	else
+		breakdown = breakdowns[source.breakdown]
+	end
+	if type(breakdown) ~= "table" then
+		return
+	end
+	for _, line in ipairs(breakdown) do
+		if type(line) == "string" then
+			cell.lines[#cell.lines + 1] = line
+		end
+	end
+	if type(breakdown.rowList) == "table" and type(breakdown.colList) == "table" and #breakdown.colList > 0 then
+		local list = { unpack(breakdown.rowList) }
+		-- PoB sorts these by their first column, except ailment breakdowns.
+		if breakdown.source then
+			local first = breakdown.colList[1].key
+			table.sort(list, function(a, b)
+				if a.reqNum and b.reqNum then
+					return a.reqNum > b.reqNum
+				end
+				local x, y = a[first], b[first]
+				if type(x) == type(y) and (type(x) == "number" or type(x) == "string") then
+					return x > y
+				end
+				return false
+			end)
+		end
+		calcsTable(cell, breakdown.label, breakdown.footer, breakdown.colList, list)
+	end
+	calcsTable(cell, nil, nil, {
+		{ label = "Skill", key = "skillName" },
+		{ label = "Base", key = "base" },
+		{ label = "MCM", key = "mult" },
+		{ label = "More/less", key = "more" },
+		{ label = "Inc/red", key = "inc" },
+		{ label = "Efficiency", key = "efficiency" },
+		{ label = "Efficiency More/less", key = "efficiencyMore" },
+		{ label = "Reservation", key = "total" },
+	}, breakdown.reservations)
+	calcsTable(cell, nil, nil, {
+		{ label = "From", key = "source" },
+		{ label = "Base", key = "base" },
+		{ label = "Inc/red", key = "inc" },
+		{ label = "More/less", key = "more" },
+		{ label = "Converted Damage", key = "convSrc" },
+		{ label = "Total", key = "total" },
+		{ label = "Conversion", key = "convDst" },
+		{ label = "Gain", key = "gainDst" },
+	}, breakdown.damageTypes)
+	if type(breakdown.slots) == "table" and #breakdown.slots > 0 then
+		local list = {}
+		for _, row in ipairs(breakdown.slots) do
+			if not source.gearOnly or (row.item and row.item.armourData) then
+				list[#list + 1] = {
+					base = row.base,
+					inc = row.inc,
+					more = row.more,
+					total = row.total,
+					source = row.source,
+					name = row.item and row.item.name or row.sourceName,
+				}
+			end
+		end
+		table.sort(list, function(a, b)
+			return (tonumber(a.base) or 0) > (tonumber(b.base) or 0)
+		end)
+		if source.gearOnly then
+			calcsTable(cell, nil, nil, {
+				{ label = "Value", key = "base" },
+				{ label = "Source", key = "source" },
+				{ label = "Name", key = "name" },
+			}, list)
+		else
+			calcsTable(cell, nil, nil, {
+				{ label = "Base", key = "base" },
+				{ label = "Inc/red", key = "inc" },
+				{ label = "More/less", key = "more" },
+				{ label = "Total", key = "total" },
+				{ label = "Source", key = "source" },
+				{ label = "Name", key = "name" },
+			}, list)
+		end
+	end
+	if type(breakdown.modList) == "table" and #breakdown.modList > 0 then
+		local rows = calcsModRows(breakdown.modList)
+		if #rows > 0 then
+			cell.mods[#cell.mods + 1] = { label = plainLabel(source.label), rows = rows }
+		end
+	end
+end
+
+-- A tooltip's mod table: every mod of these names with its type and where it comes from.
+local function calcsMods(actor, source, cell)
+	local skill = actor.mainSkill
+	local cfg = {}
+	if source.cfg and skill and skill[source.cfg .. "Cfg"] then
+		cfg = copyTable(skill[source.cfg .. "Cfg"], true)
+	end
+	cfg.source = source.modSource
+	cfg.actor = source.actor
+	local store = (source.enemy and actor.enemy and actor.enemy.modDB)
+		or (source.cfg and skill and skill.skillModList)
+		or actor.modDB
+	if not store then
+		return
+	end
+	local names = type(source.modName) == "table" and source.modName or { source.modName }
+	local ok, list = pcall(function()
+		return store:Tabulate(source.modType, cfg, unpack(names))
+	end)
+	if not ok or type(list) ~= "table" or #list == 0 then
+		return
+	end
+	cell.mods[#cell.mods + 1] = { label = plainLabel(source.label), rows = calcsModRows(list) }
+end
+
+-- The Calcs tab for one actor (calcsEnv.player or .minion): sections of rows, a row per
+-- cell PoB shows (a multi-column row such as Added Min names each column).
+local function compareCalcsPage(env, actor)
+	if not calcSections then
+		calcSections = LoadModule("Modules/CalcSections")
+		local place = 0
+		for _, section in ipairs(calcSections) do
+			for _, sub in ipairs(section[5] or {}) do
+				for _, row in ipairs(sub.data or {}) do
+					for _, col in ipairs(row) do
+						if type(col) == "table" then
+							place = place + 1
+							calcsPlace[col] = place
+						end
+					end
+				end
+			end
+		end
+	end
+	if not formatCalcStr then
+		LoadModule("Modules/CalcFormat")
+	end
+	local player = env.player
+	local out = setmetatable({}, ARRAY)
+	for _, section in ipairs(calcSections) do
+		local header
+		for _, sub in ipairs(section[5] or {}) do
+			local data = sub.data or {}
+			if calcsFlag(data, actor, player) then
+				local rows = setmetatable({}, ARRAY)
+				for _, row in ipairs(data) do
+					if not row.label then
+						header = {}
+						for i, col in ipairs(row) do
+							header[i] = plainLabel(col.format)
+						end
+					elseif calcsFlag(row, actor, player) then
+						for i, col in ipairs(row) do
+							if col.format and col.format ~= "" and calcsFlag(col, actor, player) then
+								local ok, value = pcall(formatCalcStr, col.format, actor, col)
+								local label = plainLabel(row.label)
+								-- A multi-column row names its column (Added Min (Physical)).
+								if #row > 1 and header and header[i] and header[i] ~= "" then
+									label = label .. " (" .. header[i] .. ")"
+								elseif i > 1 then
+									label = label .. " (" .. i .. ")"
+								end
+								local cell = {
+									label = label,
+									value = ok and plainLabel(tostring(value)) or "",
+									order = calcsPlace[col] or 0,
+									lines = setmetatable({}, ARRAY),
+									tables = setmetatable({}, ARRAY),
+									mods = setmetatable({}, ARRAY),
+								}
+								for _, source in ipairs(col) do
+									if type(source) == "table" and calcsFlag(source, actor, player) then
+										if source.breakdown then
+											pcall(calcsBreakdown, actor, source, cell)
+										elseif source.modName then
+											pcall(calcsMods, actor, source, cell)
+										end
+									end
+								end
+								rows[#rows + 1] = cell
+							end
+						end
+					end
+				end
+				if #rows > 0 then
+					out[#out + 1] = { id = section[2], label = plainLabel(sub.label) or section[2], rows = rows }
+				end
+			end
+		end
+	end
+	return out
+end
+
 local function compareExtra(full)
 	local main = build.calcsTab.mainEnv
 	local mainSkill = main.player.mainSkill
@@ -1973,6 +2299,18 @@ local function compareExtra(full)
 		Evasion = compareSlots(p.breakdown, "Evasion"),
 		EnergyShield = compareSlots(p.breakdown, "EnergyShield"),
 	}
+	-- PoB's Calcs tab, for Compare's Stats (the minion's too, for its Player/Minion switch).
+	local okPage, page = pcall(function()
+		return {
+			player = compareCalcsPage(calcs, p),
+			minion = calcs.minion and calcs.minion.mainSkill and compareCalcsPage(calcs, calcs.minion) or nil,
+		}
+	end)
+	if okPage then
+		extra.calcsPage = page
+	else
+		host_log("Compare: Calcs page failed: " .. tostring(page))
+	end
 	extra.calcsPlayer = compareNumbers(p.output)
 	extra.calcsActor = compareNumbers(actor and actor.output)
 	return extra

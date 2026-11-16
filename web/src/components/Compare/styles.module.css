@@ -751,3 +751,57 @@ button.tugRow:hover,
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Stats: Player/Minion switch, and PoB's working for a Calcs row. */
+.switch {
+  display: inline-flex;
+  border: var(--border-width) solid var(--panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.switchButton {
+  padding: 0 var(--size-3);
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.6rem;
+  cursor: pointer;
+}
+
+.switchButton[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gold);
+}
+
+.switchButton:focus-visible {
+  outline: 2px solid var(--b1);
+  outline-offset: -2px;
+}
+
+.working {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--size-4);
+  margin-bottom: var(--size-3);
+}
+
+.working > div {
+  min-width: 0;
+}
+
+.workingLines {
+  margin-top: var(--size-1);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .working {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

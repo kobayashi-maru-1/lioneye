@@ -10,6 +10,8 @@ export interface TabRow {
   value: number | string;
   name?: string;
   source?: string;
+  /** The mod's type (BASE, INC, MORE…), on Calcs rows' mod tables. */
+  type?: string;
 }
 
 /** PoB's per-slot breakdown of a defence. */
@@ -41,6 +43,8 @@ export interface Extra {
   calcsActor?: Record<string, number>;
   /** The main skill's DPS factors taken apart (hit, speed, Poison, Bleed, Ignite). */
   parts?: Record<string, Record<string, number>>;
+  /** PoB's Calcs tab, for the Stats section. */
+  calcsPage?: CalcPage;
 }
 
 /** A build as Compare has it: its numbers, and (the two compared) PoB's stats answer. */
@@ -73,6 +77,7 @@ export function readExtra(raw: Partial<Extra>): Extra {
     slots: raw.slots ? slots : undefined,
     calcsPlayer: raw.calcsPlayer ? record(raw.calcsPlayer) : undefined,
     calcsActor: raw.calcsActor ? record(raw.calcsActor) : undefined,
+    calcsPage: readCalcsPage(raw.calcsPage),
     parts: raw.parts
       ? Object.fromEntries(Object.entries(record(raw.parts)).map(([k, v]) => [k, record(v)]))
       : undefined,
@@ -534,15 +539,20 @@ function label(slots: Map<string, string>, source: string | undefined): Source {
     };
   }
   if (source?.startsWith("Tree: ")) return { group: "Tree", key: source.slice(6) };
-  if (source?.startsWith("Skill:"))
+  if (source?.startsWith("Skill:")) {
+    const gem = source.slice(6);
+    // pob-host.lua sends the gem's name; an id it couldn't name ("SupportChanceToPoison")
+    // is spelled out.
     return {
       group: "Gems",
-      key: source
-        .slice(6)
-        .replace(/^Support/, "")
-        .replace(/([a-z])([A-Z])/g, "$1 $2")
-        .replace(/ (To|Of|And) /g, (m) => m.toLowerCase()),
+      key: gem.includes(" ")
+        ? gem
+        : gem
+            .replace(/^Support/, "")
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .replace(/ (To|Of|And) /g, (m) => m.toLowerCase()),
     };
+  }
   if (source?.startsWith("Custom:")) return { group: "Config", key: `Custom mods (${source.slice(7)})` };
   // A party member's buffs, set in the config: "Party - Leer Cast, Festival Mask".
   const party = /^Party - ([^,]*)(?:, (.*))?$/.exec(source ?? "");
@@ -1184,4 +1194,181 @@ export function configDiff(one: Stats | undefined, two: Stats | undefined): Conf
     modsOne: a.mods,
     modsTwo: b.mods,
   };
+}
+
+// PoB's Calcs tab -----------------------------------------------------------------------
+
+/** A cell of PoB's Calcs tab (pob-host.lua's compareCalcsPage): value, working and mods. */
+export interface CalcCell {
+  label: string;
+  value: string;
+  /** Its place in PoB's whole Calcs table: the same cell on both builds. */
+  order: number;
+  /** PoB's working, as its tooltip shows it. */
+  lines: string[];
+  tables: { label?: string; footer?: string; cols: string[]; rows: string[][] }[];
+  /** The tooltip's mod tables: each mod with its type and source. */
+  mods: { label?: string; rows: TabRow[] }[];
+}
+
+export interface CalcPageSection {
+  id: string;
+  label: string;
+  rows: CalcCell[];
+}
+
+export interface CalcPage {
+  player: CalcPageSection[];
+  minion?: CalcPageSection[];
+}
+
+const text = (value: unknown) => stripPob(String(value ?? "")).trim();
+
+function readCalcPage(raw: unknown): CalcPageSection[] {
+  return rowsOf<Record<string, unknown>>(raw).map((section) => ({
+    id: String(section.id ?? ""),
+    label: text(section.label ?? section.id),
+    rows: rowsOf<Record<string, unknown>>(section.rows).map((cell) => ({
+      label: text(cell.label),
+      value: text(cell.value),
+      order: Number(cell.order) || 0,
+      lines: rowsOf<unknown>(cell.lines).map(text),
+      tables: rowsOf<Record<string, unknown>>(cell.tables).map((table) => ({
+        label: table.label ? text(table.label) : undefined,
+        footer: table.footer ? text(table.footer) : undefined,
+        cols: rowsOf<unknown>(table.cols).map(text),
+        rows: rowsOf<unknown>(table.rows).map((row) => rowsOf<unknown>(row).map(text)),
+      })),
+      mods: rowsOf<Record<string, unknown>>(cell.mods).map((mods) => ({
+        label: mods.label ? text(mods.label) : undefined,
+        rows: rowsOf<TabRow>(mods.rows),
+      })),
+    })),
+  }));
+}
+
+export function readCalcsPage(raw: unknown): CalcPage | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const page = raw as Record<string, unknown>;
+  const minion = readCalcPage(page.minion);
+  return { player: readCalcPage(page.player), minion: minion.length ? minion : undefined };
+}
+
+/** A Calcs row on both builds. */
+export interface CalcLine {
+  section: string;
+  label: string;
+  order: number;
+  one?: CalcCell;
+  two?: CalcCell;
+  /** Build 1's minus Build 2's, when both start with a number. */
+  diff?: number;
+  /** Lower is better (costs, cooldowns). */
+  lower: boolean;
+}
+
+/** Costs, cooldowns, requirements, use times and reservations: lower is better anywhere. */
+const LOWER_BETTER =
+  /cost|cooldown(?! recovery)|degen|required|recharge delay|reserved|(cast|channel|throwing|laying|placement) time/i;
+
+/** Rows where lower is better within a section: damage you take and effects on you. */
+const LOWER_IN: Record<string, RegExp> = {
+  "Skill type-specific Stats": /per second/i,
+  "Damage Taken": /./,
+  "Damaging Hits": /^Hit taken/,
+  'Effective "Health" Pool': /^Unmitigated/,
+  "Dots and Build Degens": /^DoT taken/,
+  "Other Ailment Defences": /./,
+  "Other Defences": /Effect on You|Exposure Effect|Wither Effect/,
+  "Stun Duration": /Stun Chance|Stun Duration/,
+  "Other Avoidance": /Blind Duration/,
+  Flasks: /Charges Used/,
+  Rage: /Inherent Rage Loss/,
+};
+
+const lowerBetter = (section: string, label: string) =>
+  LOWER_BETTER.test(label) || !!LOWER_IN[section]?.test(label);
+
+/** The leading number of a Calcs value: "x 1.158" → 1.158, "18,754 to 27,823" → 18754. */
+const calcNumber = (value: string | undefined) => leadingNumber(value?.replace(/^x\s*/, ""));
+
+/** Both builds' Calcs rows for the player or the minion, in PoB's order. */
+export function calcLines(one: Extra, two: Extra, who: "player" | "minion"): CalcLine[] {
+  const lines = new Map<number, CalcLine>();
+  const add = (sections: CalcPageSection[] | undefined, which: "one" | "two") => {
+    for (const section of sections ?? [])
+      for (const cell of section.rows) {
+        const line = lines.get(cell.order) ?? {
+          section: section.label,
+          label: cell.label,
+          order: cell.order,
+          lower: lowerBetter(section.label, cell.label),
+        };
+        line[which] = cell;
+        lines.set(cell.order, line);
+      }
+  };
+  add(one.calcsPage?.[who], "one");
+  add(two.calcsPage?.[who], "two");
+  return [...lines.values()]
+    .map((line) => {
+      const a = calcNumber(line.one?.value);
+      const b = calcNumber(line.two?.value);
+      return { ...line, diff: a !== undefined && b !== undefined ? a - b : undefined };
+    })
+    .sort((p, q) => p.order - q.order);
+}
+
+const MOD_TYPE: Record<string, string> = {
+  BASE: "Base",
+  INC: "Increased",
+  MORE: "More",
+  OVERRIDE: "Override",
+  FLAG: "Flag",
+  LIST: "List",
+};
+
+/**
+ * A Calcs row's mod tables for both builds, a table per mod type ("more" mods multiply).
+ * Base mods get a table per stat when there are several (max resist apart from resist);
+ * increases to several stats add up, as PoB adds them.
+ */
+export function calcBlocks(one: Calculated, two: Calculated, line: CalcLine): WhyBlock[] {
+  if (!one.stats || !two.stats) return [];
+  const groups = new Map<string, { a: TabRow[]; b: TabRow[] }>();
+  const baseNames = new Set(
+    [line.one, line.two].flatMap((cell) =>
+      (cell?.mods ?? []).flatMap((mods) => mods.rows.filter((r) => r.type === "BASE").map((r) => r.name)),
+    ),
+  );
+  const collect = (cell: CalcCell | undefined, which: "a" | "b") => {
+    for (const mods of cell?.mods ?? [])
+      for (const row of mods.rows) {
+        const stat = row.type === "BASE" && baseNames.size > 1 ? (row.name ?? "") : "";
+        const key = (mods.label ?? "") + "|" + (row.type ?? "") + "|" + stat;
+        const group = groups.get(key) ?? { a: [], b: [] };
+        group[which].push(row);
+        groups.set(key, group);
+      }
+  };
+  collect(line.one, "a");
+  collect(line.two, "b");
+  const blocks: WhyBlock[] = [];
+  for (const [key, group] of groups) {
+    const [label, type, stat] = key.split("|");
+    const product = type === "MORE";
+    const rows = paired(one, group.a, two, group.b, product);
+    if (!rows.length) continue;
+    blocks.push({
+      // "FireResistMax" → "Fire Resist Max".
+      title: [label, MOD_TYPE[type] ?? type, stat.replace(/([a-z])([A-Z])/g, "$1 $2")]
+        .filter(Boolean)
+        .join(" · "),
+      unit: type === "INC" || type === "MORE" ? "%" : undefined,
+      product,
+      noTotal: type === "FLAG" || type === "LIST" || type === "OVERRIDE",
+      rows,
+    });
+  }
+  return blocks;
 }

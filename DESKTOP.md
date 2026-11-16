@@ -374,8 +374,16 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
   ▼ in orange a loss, · too small to show (under a point, or 1% of Build 1's value).
   Click a stat's header to sort by it. **Show** opens the item or skills; **Trade**
   searches for Build 2's item.
-- **Stats** is every sidebar stat (search; **Show same** adds equal ones), and **Skills**
-  and **Items** what differs.
+- **Stats** is PoB's Calcs tab for both builds: the same sections, rows and labels PoB-C
+  shows for each build's main skill (search by row or section; **Show same** adds equal
+  rows). With a minion main skill, **Player**/**Minion** switches between you and the
+  minion, starting on the minion (PoB-C's Show Minion Stats). A row opens (▸) into PoB's
+  working for both builds side by side (its tooltip's lines and tables, e.g. "0.30s
+  (base) / 1.46 (increased/reduced cooldown recovery) … = 0.231s") and its mods by
+  source, a table per mod type (base mods per stat when there are several, such as max
+  resist apart from resist; more mods multiply). Gems show by name. A comparison PoB sent
+  no Calcs tab for shows the sidebar stats instead. **Skills** and **Items** list what
+  differs.
 - PoB calculates both builds in full, then each gap (15-30 builds, 1-2 seconds each), one
   at a time on the same PoB the guide uses: the guide's own requests wait for one at most.
   The Gaps header counts them. Leaving the page stops the rest; finished results are kept until the
