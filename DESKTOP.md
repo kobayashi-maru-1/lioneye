@@ -462,7 +462,13 @@ stats are picked by rules over PoB's output (an ailment's chance only when that 
 tenth of the damage, life or ES by which is the pool, resistances only below cap), and the
 gaps come from diffing the two builds (each differing slot, all gear at once, the tree,
 links, higher gem levels, unlinked supports). A second example (a public Lightning Strike
-Juggernaut against its Mageblood version) shows the same page picking different stats. The
+Juggernaut against its Mageblood version) shows the same page picking different stats. Each
+build has its own color (Build 1 blue, Build 2 orange) and nothing else on the page is
+colored, so whatever is in a build's color is where that build is ahead: the summary's rows
+are Calcs-style sections with a bar that grows from the center toward the leading build
+(clicking a row opens PoB's breakdown for both and the top gains), and a gap's bar points
+left when it pulls Build 1 ahead. Either side's source dropdown (Live, Loadout, Account,
+Pasted) and the swap button are mock-ups. The
 numbers are real PoB output from a one-off run, frozen into the page; it doesn't update. It's not
 part of the app: `compare-demo/index.html`, published by the **Strats page** workflow at
 <https://kobayashi-maru-1.github.io/lioneye/compare-demo/>. Not linked from anywhere;
