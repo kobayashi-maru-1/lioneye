@@ -96,6 +96,7 @@ const DRAWBACK =
   /(reduced Amount Recovered|less Duration|reduced Duration|more Cost|reduced Recovery rate)/;
 
 const NUM = /[+-]?\d+(?:\.\d+)?/g;
+const NOTABLE = /^1 Added Passive Skill is /;
 
 // Small whole numbers (gem levels, flask charges) stay exact.
 function minOf(value: number, share: number) {
@@ -140,6 +141,11 @@ function statFilter(
   const local = localKind(slot, base);
   // A crafted mod also counts when a listing has it as a normal mod, and vice versa.
   const groups = crafted ? ["crafted", "explicit"] : ["explicit"];
+  // Cluster notables have their number in the stat's text ("1 Added Passive Skill is Feasting Fiends").
+  if (NOTABLE.test(text)) {
+    const ids = groups.flatMap((group) => index.byText[group]?.get(text) ?? []);
+    if (ids.length) return { ids };
+  }
   for (const [t, sign] of tries) {
     const variants = local && local.test(t) ? [`${t} (Local)`, t] : [t];
     for (const variant of variants) {
@@ -169,6 +175,105 @@ export interface TradeSearch {
   /** Mods the search filters on, of the item's explicit mods (rares and magic items). */
   matched: number;
   total: number;
+  /** Cluster jewels: the passive count and item level the search requires (its mods are optional). */
+  cluster?: { passives?: number; level?: number };
+}
+
+const CLUSTER = /^(Large|Medium|Small) Cluster Jewel$/;
+const PASSIVES = /^Adds (\d+) Passive Skills$/;
+
+// The trade site lists each small-passive enchant as "<stat id>|<option>", and joins
+// enchants that come as a pair ("...with Bows\n...with Bow Skills") into one entry. One text
+// can have several options (curse effect: one for Medium, one for Small): any of them counts.
+function smallPassiveEnchant(index: TradeIndex, line: string) {
+  if (!line.startsWith("Added Small Passive Skills grant: ")) return null;
+  for (const [text, ids] of index.byText.enchant ?? []) {
+    if (!text.split("\n").includes(line)) continue;
+    return ids.map((full) => {
+      const [id, option] = full.split("|");
+      return option ? { id, value: { option: Number(option) } } : { id };
+    });
+  }
+  return null;
+}
+
+/**
+ * Cluster jewels, searched the way players do: the base, the exact passive count, the small
+ * passives' enchant and the item level or higher. The explicit mods (notables too) come
+ * unticked, to add on the trade site.
+ */
+function clusterSearch(
+  index: TradeIndex,
+  item: GearItem,
+  slot: string,
+  base: string,
+  query: Record<string, unknown>,
+  options: TradeOptions,
+) {
+  const required: unknown[] = [];
+  let grant: ReturnType<typeof smallPassiveEnchant> = null;
+  const cluster: NonNullable<TradeSearch["cluster"]> = {};
+  // PoB keeps a cluster's enchants as enchant lines; older items may have them as implicits.
+  for (const line of [...item.enchant, ...item.implicit]) {
+    const count = line.text.match(PASSIVES);
+    const countId = index.byText.enchant?.get("Adds # Passive Skills")?.[0];
+    if (count && countId && cluster.passives === undefined) {
+      cluster.passives = Number(count[1]);
+      required.push({
+        id: countId,
+        value: { min: cluster.passives, max: cluster.passives },
+      });
+      continue;
+    }
+    // A pair of enchant lines is one trade entry: the first line finds it.
+    grant ??= smallPassiveEnchant(index, line.text);
+  }
+  if (grant?.length === 1) required.push(grant[0]);
+  const optional: unknown[] = [];
+  // Mods whose text has several ids ("1 Added Passive Skill is Evil Eye"): any one counts.
+  const optionalGroups: unknown[] = [];
+  const seen = new Set<string>();
+  let matched = 0;
+  for (const line of item.explicit) {
+    const filter = statFilter(
+      index,
+      line.text,
+      !!line.crafted,
+      slot,
+      base,
+      options.valueShare,
+    );
+    if (!filter || seen.has(filter.ids[0])) continue;
+    seen.add(filter.ids[0]);
+    matched++;
+    const value = filter.value ? { value: filter.value } : {};
+    if (filter.ids.length === 1)
+      optional.push({ id: filter.ids[0], ...value, disabled: true });
+    else
+      optionalGroups.push({
+        type: "count",
+        value: { min: 1 },
+        filters: filter.ids.map((id) => ({ id, ...value })),
+        disabled: true,
+      });
+  }
+  const filters: Record<string, unknown> = {
+    type_filters: { filters: { rarity: { option: "nonunique" } } },
+  };
+  if (item.level) {
+    cluster.level = item.level;
+    filters.misc_filters = { filters: { ilvl: { min: item.level } } };
+  }
+  query.type = base;
+  query.filters = filters;
+  const stats: unknown[] = [];
+  if (required.length) stats.push({ type: "and", filters: required });
+  if (grant && grant.length > 1)
+    stats.push({ type: "count", value: { min: 1 }, filters: grant });
+  if (optional.length) stats.push({ type: "and", filters: optional });
+  stats.push(...optionalGroups);
+  if (stats.length) query.stats = stats;
+  return { matched, total: item.explicit.length, cluster };
 }
 
 export function tradeSearch(
@@ -203,6 +308,10 @@ export function tradeSearch(
           ? (item.base ?? name)
           : (index.bases.find((b) => name.includes(b)) ?? item.base ?? "");
     const base = tradeBase(rawBase);
+    if (CLUSTER.test(base)) {
+      const cluster = clusterSearch(index, item, slot, base, query, options);
+      return { url: searchUrl(league, query), ...cluster };
+    }
     // Rares search the slot's category; normal and magic items keep their base.
     const category =
       item.rarity !== "RARE"

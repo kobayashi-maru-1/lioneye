@@ -216,6 +216,16 @@ export function TradeListPanel() {
                 : null;
             const unique = item.rarity === "UNIQUE" || item.rarity === "RELIC";
             const icon = artFor(item, art);
+            // Cluster jewels: what the search requires, and whether mods are there to tick.
+            const clusterParts = search?.cluster && [
+              ...(search.cluster.passives !== undefined
+                ? [`${search.cluster.passives} passives`]
+                : []),
+              ...(search.cluster.level !== undefined
+                ? [`ilvl ${search.cluster.level}+`]
+                : []),
+              ...(search.matched > 0 ? ["mods optional"] : []),
+            ];
             return (
               <div
                 key={`${slot}-${id}-${i}`}
@@ -245,11 +255,20 @@ export function TradeListPanel() {
                           : (item.base ?? itemName(item))}
                       </span>
                     </span>
-                    {search && !unique && search.total > 0 && (
-                      <span className={classNames(styles.sub)}>
-                        Search for: {search.matched} of {search.total} modifiers
-                      </span>
-                    )}
+                    {clusterParts
+                      ? clusterParts.length > 0 && (
+                          <span className={classNames(styles.sub)}>
+                            Search for: {clusterParts.join(" · ")}
+                          </span>
+                        )
+                      : search &&
+                        !unique &&
+                        search.total > 0 && (
+                          <span className={classNames(styles.sub)}>
+                            Search for: {search.matched} of {search.total}{" "}
+                            modifiers
+                          </span>
+                        )}
                   </span>
                 </button>
                 <button

@@ -305,6 +305,9 @@ settings; otherwise it leaves it alone and says so.
   **In Person**, **Any**), **Min mods** (the share of a rare's mods a listing must have)
   and **Min values** (each mod's minimum, as a share of yours). The settings apply to the
   tooltip Trade buttons too.
+- Cluster jewel searches (from v0.4.66) require the base, the exact passive count, the small
+  passives' enchant and the jewel's item level or higher. Every explicit mod, notables too,
+  is on the search unticked, to tick on the trade site; **Min mods** doesn't apply.
 - Gem rows show level/quality from the PoB code.
 - Gems turned off in PoB are dimmed, in the Skills panel (its tooltip says **Off in PoB**)
   and the in-game bar's Skills tooltip. They still count on the gem list, its searches and
