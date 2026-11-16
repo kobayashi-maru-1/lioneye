@@ -85,7 +85,7 @@ export function App() {
                 />
               }
             />
-            {/* The atlas tree planner (poeatlasplanner.com), live in a frame. */}
+            {/* The Atlas tab: our planner (New) and poeatlasplanner.com (Old), live in frames. */}
             <Route
               path="/atlas"
               element={

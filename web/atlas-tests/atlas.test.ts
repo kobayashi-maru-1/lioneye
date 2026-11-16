@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { bonuses, combine, mechanicInText } from "../src/atlas/lib/bonuses.ts";
+import { ATLAS_NEW_URL, atlasTreeUrl } from "../src/state/atlas.ts";
 import {
   buildGraph,
   connected,
@@ -418,16 +419,17 @@ test("Share's official link re-opens to the same nodes", () => {
   );
 });
 
-test("League page poeatlasplanner links open with their point counts", () => {
-  const html = readFileSync(
-    new URL("../../strats/index.html", import.meta.url),
-    "utf8",
-  );
-  const links = [
-    ...html.matchAll(/https:\/\/poeatlasplanner\.com\/#p=[A-Za-z0-9_-]+/g),
-  ].map((m) => m[0]);
-  assert.equal(links.length, 3);
-  const points = links.map((l) => {
+// The League page's three trees as poeatlasplanner links (its cards until Nov 2026).
+const plannerLinks = readFileSync(
+  new URL("./poeatlasplanner-links.txt", import.meta.url),
+  "utf8",
+)
+  .split(/\r?\n/)
+  .filter(Boolean);
+
+test("poeatlasplanner links open with their point counts", () => {
+  assert.equal(plannerLinks.length, 3);
+  const points = plannerLinks.map((l) => {
     const r = parseLink(l);
     assert.ok(r.ok && r.kind === "planner");
     return normalise(graph, data, r.plan).allocated.length;
@@ -869,4 +871,69 @@ test("recalc keeps choices, and hardens loose input", () => {
     connected(graph, new Set(fixed.allocated)).size,
     fixed.allocated.length,
   );
+});
+
+test("Atlas tab: tree links open in New, fragment only", () => {
+  const ours =
+    "https://kobayashi-maru-1.github.io/lioneye/atlas/#t=WzEsIjMuMzAuMCJd";
+  assert.equal(atlasTreeUrl(ours), ours);
+  // Atlas Route links move onto New's address.
+  assert.equal(
+    atlasTreeUrl("https://poeatlasplanner.com/#p=WzEsIjMuMzAuMCJd"),
+    `${ATLAS_NEW_URL}#p=WzEsIjMuMzAuMCJd`,
+  );
+  // Plain base64 too, which New's Open reads as well.
+  assert.equal(
+    atlasTreeUrl("https://poeatlasplanner.com/#p=ab+c/d=="),
+    `${ATLAS_NEW_URL}#p=ab+c/d==`,
+  );
+  // Credentials, queries and other paths never reach the frame.
+  assert.equal(
+    atlasTreeUrl("https://a:b@poeatlasplanner.com/x?y=1#p=abc"),
+    `${ATLAS_NEW_URL}#p=abc`,
+  );
+  for (const bad of [
+    null,
+    42,
+    "",
+    "not a url",
+    "http://poeatlasplanner.com/#p=abc",
+    "https://kobayashi-maru-1.github.io/lioneye/strats/#t=abc",
+    "https://kobayashi-maru-1.github.io.evil.example/lioneye/atlas/#t=abc",
+    "https://poeatlasplanner.com/",
+    "https://poeatlasplanner.com/#p=abc&x=<script>",
+    "https://poeatlasplanner.com/#q=abc",
+    "https://www.pathofexile.com/fullscreen-atlas-skill-tree/AAAABgAA",
+  ])
+    assert.equal(atlasTreeUrl(bad), null, String(bad));
+});
+
+test("League page: tree links open in New with their point counts", () => {
+  const page = readFileSync(
+    new URL("../../strats/index.html", import.meta.url),
+    "utf8",
+  );
+  const section = page.slice(
+    page.indexOf('id="atlas-trees"'),
+    page.indexOf("</section>", page.indexOf('id="atlas-trees"')),
+  );
+  const cards = [
+    ...section.matchAll(
+      /<a class="t" href="([^"]+)"[^>]*>([^<]+)<\/a>.*?(\d+) points/g,
+    ),
+  ];
+  assert.equal(cards.length, 3);
+  cards.forEach(([, href, title, points], i) => {
+    const url = atlasTreeUrl(href);
+    assert.ok(url, title);
+    const link = parseLink(new URL(url).hash);
+    assert.ok(link.ok && link.kind === "share", title);
+    const plan = normalise(graph, data, link.plan);
+    assert.equal(plan.allocated.length, Number(points), title);
+    assert.equal(plan.allocated.length, link.plan.allocated.length, title);
+    // The same tree as the poeatlasplanner link it replaced: nodes, choices, budget.
+    const before = parseLink(plannerLinks[i]);
+    assert.ok(before.ok);
+    assert.deepEqual(plan, normalise(graph, data, before.plan), title);
+  });
 });

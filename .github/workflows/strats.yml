@@ -21,6 +21,8 @@ on:
       - "web/vite.atlas.config.ts"
       - "web/src/atlas/**"
       - "web/atlas-tests/**"
+      # The Atlas tab's link rules, tested with the planner.
+      - "web/src/state/atlas.ts"
       # What the Atlas planner borrows from the guide and the seeding.
       - "web/src/components/Modal/**"
       - "web/src/styles/**"

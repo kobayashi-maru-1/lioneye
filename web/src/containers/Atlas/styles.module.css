@@ -1,0 +1,56 @@
+/* The Atlas page (the page box, frame and offline styles are the League page's): a bar to
+   pick the planner, the same as Settings' (containers/Build), the one showing underlined. */
+.tabs {
+  display: flex;
+  flex: none;
+  gap: var(--size-2);
+  height: var(--settings-jump-height);
+  padding: 0 var(--size-3);
+  background-color: var(--primary);
+  border-bottom: var(--border-width) solid var(--panel-border);
+}
+
+.tab {
+  display: flex;
+  align-items: flex-end;
+  padding: 0 var(--size-3) var(--size-2);
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: var(--font-heavy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-bottom: 2px solid transparent;
+  margin-bottom: calc(-1 * var(--border-width));
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: #c99550;
+}
+
+.tab.active {
+  border-bottom-color: var(--gold);
+}
+
+/* Both planners in the same spot; the one not showing keeps its size (no resize, so its
+   view stays as it was) but can't be seen or reached. */
+.frames {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+}
+
+.slot {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hidden {
+  visibility: hidden;
+}
+
+.frame {
+  height: 100%;
+}

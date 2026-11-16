@@ -417,10 +417,13 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
   a copy button.
   The full links run past Discord's 2,000-character limit for big searches: share the
   page instead.
-- **Atlas trees**: a card per atlas tree, linking to its **Share tree** link from Atlas
-  Route (poeatlasplanner.com, the app's **Atlas** tab), with a copy button. The link holds
-  the whole tree, so opening it shows the tree in the planner. In the app (from v0.4.53) a
-  click on the tree's name opens it in the **Atlas** tab; in a browser it opens the planner.
+- **Atlas trees**: a card per atlas tree, linking to its **Share** link from our Atlas
+  planner (`/lioneye/atlas/#t=`), with a copy button, its point count and its top three
+  mechanics (by allocated nodes). The link holds the whole tree, so opening it shows the
+  tree in the planner. In the app a click on the tree's name opens it in the **Atlas**
+  tab's **New** planner; in a browser it opens the planner. (Until Nov 2026 these were
+  poeatlasplanner.com links; those still open in New. An app before the New tab opens our
+  links in your default browser instead.)
 - **Cheat sheets**: league mechanics with their own strats, as wide cards. **Betrayal** is a
   member × division table rebuilt as text from Ayeleth's 3.30 Syndicate sheet (credited in
   Sources): the best picks (`td.best`, with a hidden "Best:" for screen readers) are
@@ -450,30 +453,46 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
 
 ## Atlas
 
-- **Atlas** in the top bar loads <https://poeatlasplanner.com/> (Atlas Route, an
-  independent atlas tree planner; not open source) live in a frame. Lioneye doesn't copy
-  or change it: when the site changes, the tab does too.
-- The planner keeps its draft and **Saved trees** in its own browser storage. In the
-  frame that storage belongs to Lioneye: kept across restarts, separate from the same site
-  in a normal Edge tab, and gone if Edge's site data is cleared. **Share tree** links hold
-  the whole tree (nodes, effects, point budget), so keep one for any tree that matters.
-- A tree clicked on the League page (**Atlas trees**) opens here: the League page hands the
-  link to the app, which switches to this tab with the planner on that link. The planner
-  shows it as **Viewing a shared tree**, with **My draft** to go back and **Save as draft**
-  to keep it. **Atlas** in the top bar opens the planner on your draft again. Any other
-  League page link still opens in your default browser, and the same click rules apply (one per click).
-- If Edge blocks third-party cookies, it also blocks the framed site's storage: the
-  planner still works but forgets trees.
-- The site runs its own analytics (Plausible, Google Analytics) in the frame.
-- Offline it shows **Not loaded** with **Retry**. The frame can't navigate the app window
-  (its **About** link opens inside the frame). If the site ever refuses to be framed, the
-  tab shows a blank frame instead of **Not loaded**.
+- **Atlas** in the top bar has two planners, picked in the bar under it (the same bar as
+  Settings', the one showing underlined):
+  - **New** (the default): our planner (below), live in a frame from GitHub Pages, so
+    planner changes ship with the League page, not with an app release.
+  - **Old**: <https://poeatlasplanner.com/> (Atlas Route, an independent atlas tree
+    planner; not open source) live in a frame, kept so trees saved there can still be
+    opened. Lioneye doesn't copy or change it. It loads only the first time **Old** is
+    picked.
+  Switching keeps each planner as it was while you stay on the tab (both stay loaded,
+  the other one hidden and inert). Each visit to the tab starts on New; Old loads again
+  when picked.
+- **Moving a tree from Old to New:** in Old, **Share tree** copies the tree's link; in
+  New, **Open**, paste, **Open**, then **Save**. New reads the nodes, choices and budget.
+  One tree at a time: Old's saved trees are in its own site's storage, which Lioneye
+  can't read.
+- Each planner keeps its plans in its own browser storage. In the frame that storage
+  belongs to Lioneye: kept across restarts, separate from the same site in a normal Edge
+  tab (New's **Export** / **Import** moves plans between the two), and gone if Edge's site
+  data is cleared. Share links hold the whole tree, so keep one for any tree that matters.
+- A tree clicked on the League page (**Atlas trees**) opens here, in **New**: the League
+  page hands the link to the app, which switches to this tab with New on that link (our
+  `#t=` links and Atlas Route `#p=` links both open in New; only the link's fragment is
+  passed on). It opens once: Back/Forward or the window reloading don't open it again.
+  New opens it over the draft (kept in Saved if it had nodes; **Undo** goes
+  back). **Atlas** in the top bar opens New on its draft again. Any other League page link
+  still opens in your default browser, and the same click rules apply (one per click).
+- New's frame allows scripts, its own storage, downloads (**Export**) and writing the
+  clipboard (**Share**'s **Copy**); no popups or top navigation. Old's also allows forms,
+  modals and popups, for its prompts and links.
+- If Edge blocks third-party cookies, it also blocks the framed sites' storage: the
+  planners still work but forget trees.
+- Old's site runs its own analytics (Plausible, Google Analytics) in its frame.
+- Offline each shows **Not loaded** with **Retry**. Neither frame can navigate the app
+  window (Old's **About** link opens inside its frame). If a site ever refuses to be
+  framed, the tab shows a blank frame instead of **Not loaded**.
 
-### Our Atlas planner (testing)
+### Our Atlas planner
 
-A planner of our own, meant to replace poeatlasplanner.com in this tab once it's tested
-(plans/atlas-planner.md). For now it's a standalone page, not linked from the app or the
-League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
+The **New** planner in the Atlas tab (plans/atlas-planner.md), also a standalone page:
+<https://kobayashi-maru-1.github.io/lioneye/atlas/>.
 
 - **Data:** `npm -w seeding run seed atlas` reads GGG's official atlas tree export (pinned
   by commit in `seeding/src/build-atlas/index.ts`) and writes
@@ -499,8 +518,8 @@ League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
   undo step; "Freed N points", or "Already shortest"). The toolbar keeps one row: narrow windows get arrow icons for
   Undo and Redo and a **More** menu, and phones put Undo and Redo in More too. **Share** gives our
   link (`#t=`: nodes, choices, budget) and the official pathofexile.com link (nodes only);
-  **Open** takes our links, poeatlasplanner.com links (`#p=`, so the League page's trees
-  open) and official links. An official link carries no choices, so its choice nodes open
+  **Open** takes our links, poeatlasplanner.com links (`#p=`, so trees from Old and older
+  League page links open) and official links. An official link carries no choices, so its choice nodes open
   **Unset** (a dashed ring, listed first in Bonuses) until one is picked.
 - **Bonuses** files a travel node's lines under the mechanic they name ("Maps found" →
   Maps), else **Other**; a picked choice shows once, under its mechanic; gateways add

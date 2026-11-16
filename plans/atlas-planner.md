@@ -1,8 +1,8 @@
 # Atlas planner (PoE 1, 3.30): standalone web app, later Lioneye's Atlas tab
 
 A planner for Atlas passives, for planning and sharing only (no in-game progress). It is
-built as a standalone page on the Lioneye GitHub Pages site, tested there, and later
-replaces poeatlasplanner.com in Lioneye's **Atlas** tab. It behaves like
+built as a standalone page on the Lioneye GitHub Pages site, tested there, and is now
+the default (**New**) in Lioneye's **Atlas** tab, with poeatlasplanner.com kept as **Old**. It behaves like
 poeatlasplanner.com but is drawn in a colour-coded "lite" style only.
 
 Status: plan, revised 2026-11-14 after review. Facts marked **Verified** were checked on
@@ -18,7 +18,7 @@ during the build.
 | Storage | The browser's local storage, like poeatlasplanner.com; no accounts or server |
 | Sharing | A link to the page with the plan in the URL fragment; anyone can open it |
 | Tests | Node's built-in test runner (`node:test`); no new dependency |
-| Later | Lioneye's Atlas tab frames this page instead of poeatlasplanner.com |
+| In Lioneye | The Atlas tab frames this page as **New** (default), poeatlasplanner.com as **Old** |
 
 ## 2. Hard rules
 
@@ -233,8 +233,9 @@ tooltip already showed the cost.
 - **Open:** paste a link. Accepted:
   - our share links;
   - poeatlasplanner.com links (`#p=` base64url JSON
-    `[schema, "3.30.0", "3.30.0-r1", budget, [nodeIds], [[node, effect], …]]`), so the
-    League page's trees and old links keep working;
+    `[schema, "3.30.0", "3.30.0-r1", budget, [nodeIds], [[node, effect], …]]`), so trees from
+    poeatlasplanner (its Share tree is its only way out: no file export) and old League
+    page links keep working;
   - official links `https://www.pathofexile.com/fullscreen-atlas-skill-tree/<base64url>`
     (u32 version 6, class, ascendancy, node count, u16 ids, then two count bytes).
     **Check:** the trailing section may hold choices as (effect, node) pairs like passive
@@ -250,13 +251,18 @@ tooltip already showed the cost.
 Lioneye's window and phones: the tree fills the page; the panel opens over it with a close
 control; tooltips become a bottom card with **Allocate** / **Refund**.
 
-## 8. Later: into Lioneye
+## 8. Into Lioneye (done 2026-11-16)
 
-- Point the Atlas tab's frame at `/lioneye/atlas/` (`web/src/state/atlas.ts`:
-  `ATLAS_PLANNER_URL`, origin check in `atlasTreeUrl`) and allow our share links.
-- League page Atlas trees cards switch to our links (old poeatlasplanner links still open).
-- Trees saved in poeatlasplanner inside Lioneye don't move over automatically; open each
-  share link once, or Import.
+- The Atlas tab has a bar with **New** (this page, the default) and **Old**
+  (poeatlasplanner.com, loaded the first time it's picked), both live in frames
+  (`web/src/containers/Atlas`, `web/src/state/atlas.ts`). Switching keeps each as it was
+  while on the tab; each visit starts on New.
+- League page tree links open in New: our `#t=` links and poeatlasplanner `#p=` links,
+  carried over as the fragment only, onto New's address.
+- The League page's Atlas trees cards use our `#t=` links, with points and top three
+  mechanics.
+- Trees saved in poeatlasplanner don't move over automatically (its storage is its own
+  site's): Share tree in Old, then Open in New and Save, one at a time.
 
 ## 9. Order of work
 
@@ -295,7 +301,8 @@ the sample official link
 `https://www.pathofexile.com/fullscreen-atlas-skill-tree/AAAABgAAEQmdLrszg0GMW9lqJH0dkX2xXLH7xgzJqtdN4cHuzPJN-toAAA==`
 decodes to `2461, 11963, 13187, 16780, 23513, 27172, 32029, 37245, 45404, 45563, 50700,
 51626, 55117, 57793, 61132, 62029, 64218` and re-encodes the same; the League page's three
-poeatlasplanner links open with their point counts (64, 150, 109); reload restores the
+former poeatlasplanner links (now a test fixture) open with their point counts
+(64, 150, 109); reload restores the
 draft; Export then Import restores Saved.
 
 Rules: no image requests to GGG, no `<image>` in the SVG, nothing from the export's
