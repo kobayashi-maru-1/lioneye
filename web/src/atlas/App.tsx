@@ -6,6 +6,7 @@ import {
 } from "./lib/types.ts";
 import { buildGraph, fits, normalise, refundSet, route } from "./lib/graph.ts";
 import { nodeStats } from "./lib/bonuses.ts";
+import { recalc } from "./lib/recalc.ts";
 import { encodeOfficial, encodeShare, parseLink } from "./lib/links.ts";
 import { mechanicColours, mechanicLetters } from "./lib/mechanics.ts";
 import { KIND, byId, flat } from "./lib/text.ts";
@@ -61,7 +62,7 @@ import {
 
 /** Toolbar widths (px): every button in words at or above FULL; icons for Undo and Redo and
  *  a More menu at or above ICONS; below it (phones), Undo and Redo in More too. */
-const TOOLBAR_FULL = 780;
+const TOOLBAR_FULL = 820;
 const TOOLBAR_ICONS = 540;
 
 const sameNodes = (a: Plan, b: Plan) =>
@@ -446,12 +447,20 @@ export function App({ data }: { data: AtlasData }) {
       ours: `${location.origin}${location.pathname}#${encodeShare(plan, data.version)}`,
       official: encodeOfficial(plan.allocated),
     });
+  /** Recalc: the cheapest paths to the plan's cluster nodes, as one undo step. */
+  const recalcPaths = () => {
+    const next = recalc(graph, data, plan);
+    const freed = plan.allocated.length - next.allocated.length;
+    if (freed <= 0) return say("Already shortest");
+    apply(next);
+    say(`Freed ${freed} point${freed === 1 ? "" : "s"}`);
+  };
   const askClear = useCallback(() => {
     if (plan.allocated.length) setConfirmClear(true);
   }, [plan]);
 
-  // The toolbar keeps one row: narrower, Undo and Redo become icons and Clear, Share and
-  // Open move to More; narrower still (phones), Undo and Redo move to More too.
+  // The toolbar keeps one row: narrower, Undo and Redo become icons and Clear, Recalc,
+  // Share and Open move to More; narrower still (phones), Undo and Redo move to More too.
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [toolbarWidth, setToolbarWidth] = useState(Infinity);
   useLayoutEffect(() => {
@@ -713,6 +722,16 @@ export function App({ data }: { data: AtlasData }) {
               Clear
             </button>
           )}
+          {toolbar === "full" && (
+            <button
+              className={formStyles.formButton}
+              onClick={recalcPaths}
+              disabled={used === 0}
+              title="Cheapest paths to key nodes"
+            >
+              Recalc
+            </button>
+          )}
           <span className={styles.spacer} />
           {toolbar === "full" ? (
             <>
@@ -741,6 +760,11 @@ export function App({ data }: { data: AtlasData }) {
                       ]
                     : []),
                   { label: "Clear", onClick: clear, disabled: used === 0 },
+                  {
+                    label: "Recalc",
+                    onClick: recalcPaths,
+                    disabled: used === 0,
+                  },
                   { label: "Share", onClick: share, disabled: used === 0 },
                   { label: "Open", onClick: () => setOpenLink(true) },
                 ] satisfies MenuItem[]

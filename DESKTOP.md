@@ -429,7 +429,9 @@ League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
   **Save** start the toolbar: a new plan has a name box; a saved one shows its name in
   gold (a dot when changed), **Save** updates it, and clicking the name saves a copy
   under a new name. **Clear** stays on the save; clicking the start node asks
-  **Clear tree?** first. The toolbar keeps one row: narrow windows get arrow icons for
+  **Clear tree?** first. **Recalc** rejoins the plan's cluster nodes, notables, keystones
+  and choice nodes by the fewest points, dropping or swapping small pathing nodes (one
+  undo step; "Freed N points", or "Already shortest"). The toolbar keeps one row: narrow windows get arrow icons for
   Undo and Redo and a **More** menu, and phones put Undo and Redo in More too. **Share** gives our
   link (`#t=`: nodes, choices, budget) and the official pathofexile.com link (nodes only);
   **Open** takes our links, poeatlasplanner.com links (`#p=`, so the League page's trees

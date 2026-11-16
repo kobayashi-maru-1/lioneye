@@ -32,6 +32,7 @@ import {
   NEIGHBOUR_REACH,
   PALETTE,
 } from "../src/atlas/lib/mechanics.ts";
+import { kept, recalc } from "../src/atlas/lib/recalc.ts";
 import type { AtlasData, Plan } from "../src/atlas/lib/types.ts";
 import {
   exportFile,
@@ -645,5 +646,227 @@ test("a new plan's default name is the first free Plan number", () => {
   assert.equal(
     nextPlanName([{ name: "Plan 2" }, { name: "Plan 1" }]),
     "Plan 3",
+  );
+});
+
+// Recalc. A plan built the slow way: each target routed from the plan so far, in order.
+function routedPlan(targets: string[]): Plan {
+  const allocated = new Set<string>();
+  for (const t of targets)
+    for (const id of route(graph, allocated, t) ?? []) allocated.add(id);
+  return { allocated: [...allocated], choices: {}, budget: 150 };
+}
+
+/** The fewest points joining every kept node to the start, found for sure (Dreyfus-Wagner
+ *  over the kept parts; for checking Recalc on small plans only). */
+function exactPoints(keep: Set<string>): number {
+  const parts: Set<string>[] = [];
+  const seen = new Set<string>();
+  for (const id of [data.start, ...keep]) {
+    if (seen.has(id)) continue;
+    const part = new Set([id]);
+    const queue = [id];
+    for (let h = 0; h < queue.length; h++)
+      for (const n of graph.neighbours.get(queue[h])!)
+        if (keep.has(n) && !part.has(n)) (part.add(n), queue.push(n));
+    part.forEach((n) => seen.add(n));
+    parts.push(part);
+  }
+  const ids = [...graph.neighbours.keys()];
+  const w = (id: string) => (keep.has(id) || id === data.start ? 0 : 1);
+  const k = parts.length;
+  const dp: Map<string, number>[] = [];
+  const relax = (m: Map<string, number>) => {
+    // Dijkstra with 0/1 node weights, as a bucket queue.
+    const buckets: string[][] = [];
+    for (const [id, d] of m) (buckets[d] ??= []).push(id);
+    for (let d = 0; d < buckets.length; d++)
+      for (const id of buckets[d] ?? []) {
+        if (m.get(id)! < d) continue;
+        for (const n of graph.neighbours.get(id)!) {
+          const nd = d + w(n);
+          if (nd < (m.get(n) ?? Infinity)) {
+            m.set(n, nd);
+            (buckets[nd] ??= []).push(n);
+          }
+        }
+      }
+  };
+  for (let i = 0; i < k; i++) {
+    const m = new Map<string, number>();
+    for (const id of parts[i]) m.set(id, 0);
+    relax(m);
+    dp[1 << i] = m;
+  }
+  for (let mask = 1; mask < 1 << k; mask++) {
+    if ((mask & (mask - 1)) === 0) continue;
+    const m = new Map<string, number>();
+    for (let sub = (mask - 1) & mask; sub > 0; sub = (sub - 1) & mask) {
+      if (sub < (mask ^ sub)) continue;
+      const a = dp[sub];
+      const b = dp[mask ^ sub];
+      for (const id of ids) {
+        const v = a.get(id)! + b.get(id)! - w(id);
+        if (v < (m.get(id) ?? Infinity)) m.set(id, v);
+      }
+    }
+    relax(m);
+    dp[mask] = m;
+  }
+  return keep.size + dp[(1 << k) - 1].get(data.start)!;
+}
+
+const clusterNodes = Object.entries(data.nodes)
+  .filter(([id, n]) => n.m >= 0 && id !== data.start)
+  .map(([id]) => id)
+  .sort((a, b) => Number(a) - Number(b));
+function pick(seed: number, count: number) {
+  let s = seed;
+  const next = () => (s = (s * 1103515245 + 12345) % 2147483648);
+  return Array.from(
+    { length: count },
+    () => clusterNodes[next() % clusterNodes.length],
+  );
+}
+const travelSmall = Object.entries(data.nodes)
+  .filter(
+    ([, n]) => n.m < 0 && n.a === undefined && n.kind === "small" && !n.choices,
+  )
+  .map(([id]) => id)
+  .sort((a, b) => Number(a) - Number(b));
+/** A plan with real waste: targets reached by way of pathing nodes (not kept), plus a few
+ *  pathing nodes added next to the plan (spurs and loops). */
+function wastefulPlan(
+  seed: number,
+  targets: number,
+  detours: number,
+  extra: number,
+) {
+  let s = seed;
+  const next = () => (s = (s * 1103515245 + 12345) % 2147483648);
+  const order: string[] = [];
+  for (let i = 0; i < Math.max(targets, detours); i++) {
+    if (i < detours) order.push(travelSmall[next() % travelSmall.length]);
+    if (i < targets) order.push(clusterNodes[next() % clusterNodes.length]);
+  }
+  const plan = routedPlan(order);
+  const set = new Set(plan.allocated);
+  for (let i = 0; i < extra; i++) {
+    const edge = [...set]
+      .flatMap((id) => graph.neighbours.get(id)!)
+      .filter(
+        (n) => !set.has(n) && n !== data.start && travelSmall.includes(n),
+      );
+    if (edge.length) set.add(edge[next() % edge.length]);
+  }
+  return { ...plan, allocated: [...set] };
+}
+function checkRecalc(before: Plan) {
+  const after = recalc(graph, data, before);
+  const keep = kept(data, before);
+  const set = new Set(after.allocated);
+  assert.equal(set.size, after.allocated.length, "no duplicates");
+  assert.ok(!set.has(data.start), "the start isn't allocated");
+  assert.ok(
+    [...keep].every((id) => set.has(id)),
+    "keeps every kept node",
+  );
+  assert.equal(connected(graph, set).size, set.size, "joined to the start");
+  assert.ok(after.allocated.length <= before.allocated.length, "never more");
+  return after;
+}
+
+test("recalc: kept nodes are cluster nodes, notables, keystones and choice nodes", () => {
+  const travelSmall = Object.entries(data.nodes).find(
+    ([, n]) => n.m < 0 && n.a === undefined && n.kind === "small" && !n.choices,
+  )![0];
+  const travelKeystone = Object.entries(data.nodes).find(
+    ([, n]) => n.m < 0 && n.kind === "keystone",
+  )![0];
+  const travelChoice = Object.entries(data.nodes).find(
+    ([, n]) => n.m < 0 && n.choices,
+  )![0];
+  const keep = kept(data, {
+    allocated: [travelSmall, travelKeystone, travelChoice, clusterNodes[0]],
+    choices: {},
+    budget: 150,
+  });
+  assert.deepEqual(
+    [...keep].sort(),
+    [travelKeystone, travelChoice, clusterNodes[0]].sort(),
+  );
+});
+
+test("recalc removes detours, spurs and loops, matching the exact answer", () => {
+  let changed = 0;
+  let misses = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const plan = wastefulPlan(seed, 1 + (seed % 3), 1 + (seed % 2), seed % 4);
+    const keep = kept(data, plan);
+    const after = checkRecalc(plan);
+    const exact = exactPoints(keep);
+    // The search may miss the best by a point on rare plans; never by more, never below.
+    assert.ok(after.allocated.length >= exact, `seed ${seed} below exact`);
+    assert.ok(after.allocated.length <= exact + 1, `seed ${seed}`);
+    if (after.allocated.length > exact) misses += 1;
+    if (after.allocated.length < plan.allocated.length) changed += 1;
+  }
+  assert.ok(misses <= 2, `${misses} misses`);
+  assert.ok(changed >= 40, `only ${changed} of 60 plans changed`);
+});
+
+test("recalc: plans with nothing to remove come back as they are", () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const plan = routedPlan(pick(seed, 1));
+    assert.strictEqual(recalc(graph, data, plan), plan, `seed ${seed}`);
+  }
+});
+
+test("recalc: big plans stay valid, fast and stable", () => {
+  for (const seed of [11, 12, 13]) {
+    const plan = routedPlan(pick(seed, 24));
+    const t0 = performance.now();
+    const after = checkRecalc(plan);
+    const ms = performance.now() - t0;
+    assert.ok(ms < 2000, `${Math.round(ms)} ms`);
+    assert.deepEqual(
+      recalc(graph, data, plan),
+      after,
+      "same plan, same result",
+    );
+    assert.equal(
+      recalc(graph, data, after).allocated.length,
+      after.allocated.length,
+      "a second Recalc finds nothing more",
+    );
+    console.log(
+      `recalc seed ${seed}: ${plan.allocated.length} -> ${after.allocated.length} points in ${Math.round(ms)} ms`,
+    );
+  }
+});
+
+test("recalc keeps choices, and hardens loose input", () => {
+  const choice = Object.entries(data.nodes).find(
+    ([, n]) => n.choices && n.m >= 0,
+  )!;
+  const plan = routedPlan([travelSmall[40], choice[0]]);
+  plan.choices = { [choice[0]]: choice[1].choices![0].effect };
+  const after = checkRecalc(plan);
+  assert.ok(after.allocated.length < plan.allocated.length, "the detour went");
+  assert.deepEqual(after.choices, plan.choices);
+  // Not normalised: a kept node off on its own is joined, never dropped; the start is
+  // never counted.
+  const stray = clusterNodes.find((id) => route(graph, none, id)!.length > 12)!;
+  const loose = routedPlan([clusterNodes[3]]);
+  const withStray = {
+    ...loose,
+    allocated: [...loose.allocated, stray, data.start],
+  };
+  const fixed = recalc(graph, data, withStray);
+  assert.ok(fixed.allocated.includes(stray));
+  assert.ok(!fixed.allocated.includes(data.start));
+  assert.equal(
+    connected(graph, new Set(fixed.allocated)).size,
+    fixed.allocated.length,
   );
 });

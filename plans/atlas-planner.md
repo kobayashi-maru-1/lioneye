@@ -177,8 +177,20 @@ the start. Click removes that set (and their choices) as one undo step.
 `used / budget`; budget editable 1–150. **Undo**, **Redo**, **Clear**. Clicking the start
 marker asks **Clear tree?** first (review round 3, 2026-11-15); a tap on it does nothing.
 
-The toolbar stays on one row (review round 3): narrower than 780px, Undo and Redo become
-arrows and Clear, Share and Open move to a **More** menu; narrower than 540px (phones),
+**Recalc** (2026-11-15) rejoins the plan by the fewest points: it keeps every allocated
+cluster node, notable, keystone and choice node (with its pick) and treats small pathing
+nodes as free to drop or swap (their bonuses don't count). It's a Steiner tree search
+(`lib/recalc.ts`): joins built from the start several ways (seeded, so the same plan always
+gives the same result), each improved by tearing out stretches of pathing and joining
+again; the cheapest wins, ties going to the fewest nodes taken from clusters the plan
+didn't use (a later Recalc would keep those), then the fewest changes. It can route
+through nodes of unused clusters, as a click's route does. It never returns more points
+than the plan has, matches an exact search on small plans (tests), and takes about 0.2 s
+on a 140-point plan. One undo step; the message says **Freed N points** or **Already
+shortest**.
+
+The toolbar stays on one row (review round 3): narrower than 820px, Undo and Redo become
+arrows and Clear, Recalc, Share and Open move to a **More** menu; narrower than 540px (phones),
 Undo and Redo move to More too. On phones the panel opens with **Panel**. A tap on a node
 opens its card (details, cost, **Allocate**); a mouse click allocates at once, as the
 tooltip already showed the cost.
