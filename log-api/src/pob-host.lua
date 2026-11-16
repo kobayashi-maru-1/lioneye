@@ -1461,10 +1461,9 @@ local function safely(fn, fallback, what)
 	return fallback
 end
 
--- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
--- when the build is new to PoB, else the loadout picked last. `id` and the rest are the
--- guide's remembered main skill (all nil: PoB's own).
-function host_stats(xml, loadout, id, label, group, skill, part, minion, minionSkill)
+-- Loads `xml` (unless it's the build PoB has), picks `loadout` and the main skill, and
+-- calculates. Returns whether the pick was found (nil: no pick sent).
+local function prepare(xml, loadout, id, label, group, skill, part, minion, minionSkill)
 	if xml ~= loadedXml then
 		loadedXml = nil
 		undo = {}
@@ -1495,7 +1494,12 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 	if build.buildFlag then
 		recalc()
 	end
-	return json.encode({
+	return picked
+end
+
+-- The stats answer for the build PoB has now (see host_stats).
+local function statsAnswer(picked)
+	return {
 		loadouts = loadouts(),
 		loadoutSets = safely(loadoutSets, setmetatable({}, ARRAY), "Loadout sets"),
 		loadout = currentLoadout(),
@@ -1512,5 +1516,161 @@ function host_stats(xml, loadout, id, label, group, skill, part, minion, minionS
 		health = safely(healthFindings, setmetatable({}, ARRAY)),
 		rows = rows(),
 		warnings = warnings(),
+	}
+end
+
+-- Called by the exe: stats for `loadout` as JSON. nil: the loadout the build was saved on
+-- when the build is new to PoB, else the loadout picked last. `id` and the rest are the
+-- guide's remembered main skill (all nil: PoB's own).
+function host_stats(xml, loadout, id, label, group, skill, part, minion, minionSkill)
+	local picked = prepare(xml, loadout, id, label, group, skill, part, minion, minionSkill)
+	return json.encode(statsAnswer(picked))
+end
+
+-- Compare ----------------------------------------------------------------------------------
+-- Compare asks for every number PoB has, not just the sidebar's: its summary picks the stats
+-- that matter for the two builds, and each gap (one piece of Build 2 tried on Build 1) is a
+-- whole build of its own. For the two builds themselves (`full`) it also gets PoB's source
+-- tables, which its "why" breakdowns are made of, and the normal stats answer.
+
+local function compareSource(source)
+	if type(source) ~= "string" then
+		return tostring(source)
+	end
+	local id = source:match("^Tree:(%d+)")
+	if id then
+		local node = build.spec.nodes[tonumber(id)]
+		return "Tree: " .. (node and (node.dn or node.name) or id)
+	end
+	return source
+end
+
+-- A mod list's BASE/INC/MORE values for these mod names, each with where it comes from.
+-- An error (a mod PoB can't tabulate) gives no rows, which the guide shows as no breakdown.
+local function compareTab(modList, modType, cfg, ...)
+	local out = setmetatable({}, ARRAY)
+	local names = { ... }
+	local ok, list = pcall(function()
+		return modList:Tabulate(modType, cfg, unpack(names))
+	end)
+	if not ok then
+		host_log("Compare: Tabulate failed: " .. tostring(list))
+		return out
+	end
+	for _, row in ipairs(list) do
+		local value = row.value
+		if type(value) ~= "number" then
+			value = tostring(value)
+		end
+		out[#out + 1] = {
+			value = value,
+			name = row.mod and row.mod.name,
+			source = compareSource(row.mod and row.mod.source),
+		}
+	end
+	return out
+end
+
+-- Every top-level number in an output table (no NaN or infinity: JSON has none).
+local function compareNumbers(output)
+	local out = {}
+	for k, v in pairs(output or {}) do
+		if type(k) == "string" and type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then
+			out[k] = v
+		end
+	end
+	return out
+end
+
+-- PoB's per-slot breakdown of a defence (each item's base after its own mods, plus Global).
+local function compareSlots(breakdown, stat)
+	local slots = setmetatable({}, ARRAY)
+	for _, s in ipairs(breakdown and breakdown[stat] and breakdown[stat].slots or {}) do
+		slots[#slots + 1] = {
+			source = s.source,
+			base = s.base,
+			total = s.total,
+			item = s.item and s.item.name or nil,
+		}
+	end
+	return slots
+end
+
+local function compareExtra(full)
+	local main = build.calcsTab.mainEnv
+	local mainSkill = main.player.mainSkill
+	local minionMain = main.minion ~= nil and main.minion.mainSkill ~= nil
+	local actorSkill = minionMain and main.minion.mainSkill or mainSkill
+	local flags = actorSkill and actorSkill.skillFlags or {}
+	local extra = {
+		player = compareNumbers(main.player.output),
+		minion = minionMain and compareNumbers(main.minion.output) or nil,
+		minionMain = minionMain,
+		minionSkill = minionMain and main.minion.mainSkill.activeEffect.grantedEffect.name or nil,
+		attack = flags.attack and true or false,
+		spell = flags.spell and true or false,
+		hit = flags.hit and true or false,
+		-- The main skill's gem, so Build 2 and the gaps can use the same skill.
+		skillId = grantedId(select(2, mainActive())),
+	}
+	if not full then
+		return extra
+	end
+	-- The Calcs tab's own pass: the source tables come from it, so the totals checked
+	-- against them must too.
+	build.calcsTab:BuildOutput()
+	local calcs = build.calcsTab.calcsEnv
+	if not calcs then
+		return extra
+	end
+	local p = calcs.player
+	local db = p.modDB
+	local tabs = {
+		lifeBase = compareTab(db, "BASE", nil, "Life"),
+		lifeInc = compareTab(db, "INC", nil, "Life"),
+		lifeMore = compareTab(db, "MORE", nil, "Life"),
+		esBase = compareTab(db, "BASE", nil, "EnergyShield"),
+		esInc = compareTab(db, "INC", nil, "EnergyShield", "Defences"),
+		esMore = compareTab(db, "MORE", nil, "EnergyShield", "Defences"),
+		armourBase = compareTab(db, "BASE", nil, "Armour", "ArmourAndEvasion"),
+		armourInc = compareTab(db, "INC", nil, "Armour", "ArmourAndEvasion", "Defences"),
+		armourMore = compareTab(db, "MORE", nil, "Armour", "ArmourAndEvasion", "Defences"),
+		evasionBase = compareTab(db, "BASE", nil, "Evasion", "ArmourAndEvasion"),
+		evasionInc = compareTab(db, "INC", nil, "Evasion", "ArmourAndEvasion", "Defences"),
+		evasionMore = compareTab(db, "MORE", nil, "Evasion", "ArmourAndEvasion", "Defences"),
+		suppression = compareTab(db, "BASE", nil, "SpellSuppressionChance"),
+	}
+	for _, elem in ipairs({ "Fire", "Cold", "Lightning", "Chaos" }) do
+		local shared = elem ~= "Chaos" and "ElementalResist" or nil
+		tabs[elem .. "Resist"] = compareTab(db, "BASE", nil, elem .. "Resist", shared)
+		tabs[elem .. "ResistMax"] = compareTab(db, "BASE", nil, elem .. "ResistMax", shared and "ElementalResistMax")
+	end
+	local actor = (minionMain and calcs.minion) or p
+	local skill = actor and actor.mainSkill
+	if skill then
+		tabs.BleedChance = compareTab(skill.skillModList, "BASE", skill.skillCfg, "BleedChance")
+		tabs.PoisonChance = compareTab(skill.skillModList, "BASE", skill.skillCfg, "PoisonChance")
+		tabs.IgniteChance = compareTab(skill.skillModList, "BASE", skill.skillCfg, "EnemyIgniteChance")
+	end
+	extra.tabs = tabs
+	extra.slots = {
+		Armour = compareSlots(p.breakdown, "Armour"),
+		Evasion = compareSlots(p.breakdown, "Evasion"),
+		EnergyShield = compareSlots(p.breakdown, "EnergyShield"),
+	}
+	extra.calcsPlayer = compareNumbers(p.output)
+	extra.calcsActor = compareNumbers(actor and actor.output)
+	return extra
+end
+
+-- Called by the exe for Compare: { extra, stats } as JSON, `stats` (the host_stats answer)
+-- only when `full`. The loadout and pick work as in host_stats.
+function host_compare(xml, loadout, full, id, label, group, skill, part, minion, minionSkill)
+	local picked = prepare(xml, loadout, id, label, group, skill, part, minion, minionSkill)
+	local extra = compareExtra(full)
+	extra.picked = picked
+	return json.encode({
+		extra = extra,
+		stats = full and statsAnswer(picked) or nil,
 	})
 end

@@ -244,6 +244,10 @@ pub async fn serve(listener: TcpListener, state: AppState) -> anyhow::Result<()>
             "/api/pob/stats",
             post(pob_stats).layer(DefaultBodyLimit::max(32 * 1024 * 1024)),
         )
+        .route(
+            "/api/pob/compare",
+            post(pob_compare).layer(DefaultBodyLimit::max(32 * 1024 * 1024)),
+        )
         .route("/api/data/{name}", get(web_data))
         .route("/api/ninja/version", get(ninja_version))
         .route("/api/ninja/character", get(ninja_character))
@@ -677,6 +681,41 @@ async fn pob_stats(
     // Long enough for PoB's first load plus a first-time timeless jewel download.
     let stats = state.pob.stats(request.xml, request.loadout, request.pick);
     match tokio::time::timeout(Duration::from_secs(180), stats).await {
+        Ok(Ok(json)) => ([(header::CONTENT_TYPE, "application/json")], json).into_response(),
+        Ok(Err(msg)) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+        Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "PoB is taking too long. Restart the app.",
+        )
+            .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct CompareRequest {
+    /// The build as PoB XML.
+    xml: String,
+    /// Loadout name; none for the loadout the build was saved on.
+    loadout: Option<String>,
+    /// The main skill to use; none for PoB's own.
+    pick: Option<pob::Pick>,
+    /// Also PoB's source tables and the normal stats answer (Compare's two builds).
+    #[serde(default)]
+    full: bool,
+}
+
+/// Compare's numbers for one build (one of the two compared, or a gap: one piece of Build 2
+/// tried on Build 1). See host_compare in pob-host.lua.
+async fn pob_compare(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<CompareRequest>,
+) -> Response {
+    if !local_origin(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let answer = state.pob.compare(request.xml, request.loadout, request.pick, request.full);
+    match tokio::time::timeout(Duration::from_secs(180), answer).await {
         Ok(Ok(json)) => ([(header::CONTENT_TYPE, "application/json")], json).into_response(),
         Ok(Err(msg)) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
         Err(_) => (

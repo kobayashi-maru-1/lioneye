@@ -4,77 +4,9 @@ import type {
   Passive,
   SkillGroup,
   Stats,
-  StatRow,
 } from "../PobStats";
-import { stripPob } from "../PobText";
 
-// What differs between the pasted build ("yours" here: Build 1) and the guide's shown loadout
-// ("guide": Build 2). The pasted build may be anyone's.
-
-/** A sidebar stat whose value differs. */
-export interface StatDiff {
-  label: string;
-  yours?: string;
-  guide?: string;
-  /** Yours minus the guide's, when both are numbers. */
-  diff?: number;
-}
-
-/**
- * "Total Life:" → "Total Life". PoB lists a minion's stats under "Minion:" with the
- * player's labels, so those get "Minion " in front. Other repeats get " (2)", " (3)".
- */
-function statValues(rows: StatRow[]) {
-  const values = new Map<string, string>();
-  let section = "";
-  for (const row of rows) {
-    if ("text" in row) {
-      const header = stripPob(row.text).trim();
-      if (header === "Minion:") section = "Minion ";
-      else if (header === "Player:") section = "";
-      continue;
-    }
-    if (!("label" in row)) continue;
-    const base = section + stripPob(row.label).trim().replace(/:$/, "");
-    let label = base;
-    for (let n = 2; values.has(label); n++) label = `${base} (${n})`;
-    values.set(label, stripPob(row.value).trim());
-  }
-  return values;
-}
-
-/** The leading number of a PoB value: "3,706" → 3706, "75% (+15%)" → 75. */
-export function leadingNumber(value: string | undefined) {
-  const match = value ? /^[+-]?[\d,]*\.?\d+/.exec(value) : null;
-  if (!match) return undefined;
-  const number = Number(match[0].replace(/,/g, ""));
-  return Number.isFinite(number) ? number : undefined;
-}
-
-export function statDiffs(yours: Stats, guide: Stats): StatDiff[] {
-  const mine = statValues(yours.rows);
-  const theirs = statValues(guide.rows);
-  // The guide's order, then stats only the pasted build shows.
-  const labels = [
-    ...theirs.keys(),
-    ...[...mine.keys()].filter((l) => !theirs.has(l)),
-  ];
-  const out: StatDiff[] = [];
-  for (const label of labels) {
-    const a = mine.get(label);
-    const b = theirs.get(label);
-    if (a === b) continue;
-    const x = leadingNumber(a);
-    const y = leadingNumber(b);
-    out.push({
-      label,
-      yours: a,
-      guide: b,
-      diff: x !== undefined && y !== undefined ? x - y : undefined,
-    });
-  }
-  return out;
-}
+// What differs between Compare's two builds ("yours" here: Build 1; "guide": Build 2).
 
 // Items -------------------------------------------------------------------------------
 
@@ -240,6 +172,18 @@ function without(a: string[], b: string[]) {
   });
 }
 
+/** A gem both groups have at another level or quality. */
+function levelsDiffer(a: SkillGroup | undefined, b: SkillGroup | undefined) {
+  if (!a || !b) return false;
+  const key = (group: SkillGroup) =>
+    group.gems
+      .filter((gem) => gem.enabled)
+      .map((gem) => `${gem.name}:${gem.level ?? ""}:${gem.quality ?? ""}`)
+      .sort()
+      .join();
+  return key(a) !== key(b);
+}
+
 export function skillDiffs(yours: Stats, guide: Stats): SkillDiff[] {
   const mine = compared(yours.skills);
   const out: SkillDiff[] = [];
@@ -278,7 +222,8 @@ export function skillDiffs(yours: Stats, guide: Stats): SkillDiff[] {
       diff.yours === undefined ||
       diff.guide === undefined ||
       diff.missing.length > 0 ||
-      diff.extra.length > 0,
+      diff.extra.length > 0 ||
+      levelsDiffer(diff.yours, diff.guide),
   );
 }
 

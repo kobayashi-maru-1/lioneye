@@ -4,7 +4,7 @@ import { atom } from "jotai";
 
 /**
  * Your live character from poe.ninja (log-api/src/ninja-character.rs): the PoB code its
- * character page shows, for Compare and Build health. Kept in sync by LiveCharacterSync.
+ * character page shows, for Compare, the Live view and Build health. Kept in sync by LiveCharacterSync.
  */
 export interface LiveCharacter {
   /** poe.ninja's data version: changes each time poe.ninja re-reads the character. */
@@ -80,20 +80,13 @@ export const liveStatusAtom = atom<
 /** Bumped to read the character again now (Refresh). */
 export const liveRefreshAtom = atom(0);
 
-/** PoB's numbers for the live character, for Compare and Build health. */
+/** PoB's numbers for the live character, for the Live view and Build health. */
 export type LiveStats =
   | { code: string; state: "loading" }
   | { code: string; state: "ready"; stats: Stats }
   | { code: string; state: "error" };
 
 export const liveStatsAtom = atom<LiveStats | null>(null);
-
-/** Compare's Build 1: your live character, or a pasted build. */
-export const compareSourceAtom = persistentAtom<"live" | "code">(
-  "compare-source",
-  "live",
-  0,
-);
 
 /** What Build health checks: your live character, or the guide's loadout. */
 export const healthSourceAtom = persistentAtom<"live" | "plan">(

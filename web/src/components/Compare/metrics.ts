@@ -1,0 +1,735 @@
+// What Compare shows about two builds: the summary's stats (picked per comparison by rules
+// over PoB's output, so a poison build gets Poison chance and a crit build Crit chance),
+// the full sidebar list, and the "why" breakdowns built from PoB's own source tables.
+
+import type { StatRow, Stats } from "../PobStats";
+import { stripPob } from "../PobText";
+
+/** A row of one of PoB's source tables (Tabulate): a value and where it comes from. */
+export interface TabRow {
+  value: number | string;
+  name?: string;
+  source?: string;
+}
+
+/** PoB's per-slot breakdown of a defence. */
+export interface SlotRow {
+  source: string;
+  base?: number;
+  total?: number;
+  item?: string;
+}
+
+/** host_compare's numbers for one build (see pob-host.lua). */
+export interface Extra {
+  player: Record<string, number>;
+  minion?: Record<string, number>;
+  minionMain: boolean;
+  minionSkill?: string;
+  attack: boolean;
+  spell: boolean;
+  hit: boolean;
+  /** The main skill's gem (PoB's granted effect id). */
+  skillId?: string;
+  /** Whether the pick sent was found (unset: none sent). */
+  picked?: boolean;
+  tabs?: Record<string, TabRow[]>;
+  slots?: Record<string, SlotRow[]>;
+  calcsPlayer?: Record<string, number>;
+  calcsActor?: Record<string, number>;
+}
+
+/** A build as Compare has it: its numbers, and (the two compared) PoB's stats answer. */
+export interface Calculated {
+  extra: Extra;
+  stats?: Stats;
+}
+
+// PoB's JSON writes an empty table as [] or {}: make each what it should be.
+const record = (value: unknown): Record<string, number> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, number>)
+    : {};
+const rowsOf = <T>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+
+export function readExtra(raw: Partial<Extra>): Extra {
+  const tabs: Record<string, TabRow[]> = {};
+  if (raw.tabs && typeof raw.tabs === "object")
+    for (const [key, rows] of Object.entries(raw.tabs)) tabs[key] = rowsOf(rows);
+  const slots: Record<string, SlotRow[]> = {};
+  if (raw.slots && typeof raw.slots === "object")
+    for (const [key, rows] of Object.entries(raw.slots)) slots[key] = rowsOf(rows);
+  return {
+    ...raw,
+    player: record(raw.player),
+    minion: raw.minion ? record(raw.minion) : undefined,
+    minionMain: !!raw.minionMain,
+    attack: !!raw.attack,
+    spell: !!raw.spell,
+    hit: !!raw.hit,
+    tabs: raw.tabs ? tabs : undefined,
+    slots: raw.slots ? slots : undefined,
+    calcsPlayer: raw.calcsPlayer ? record(raw.calcsPlayer) : undefined,
+    calcsActor: raw.calcsActor ? record(raw.calcsActor) : undefined,
+  };
+}
+
+// Metrics ------------------------------------------------------------------------------
+
+export type MetricKey = string;
+
+export interface Metric {
+  key: MetricKey;
+  label: string;
+  /** "k": big numbers (k, M); "%": a percentage; none: a plain number. */
+  fmt?: "k" | "%";
+  /** Its "why" breakdown, when PoB's numbers add up for it. */
+  why?: string;
+  /** The smallest change worth showing on a gap. */
+  thresh: number;
+  /** "Offence", "Defence" or "Misc", as PoB's Calcs tab groups them. */
+  section: "Offence" | "Defence" | "Misc";
+}
+
+interface Rule {
+  key: string;
+  label: string;
+  fmt?: "k" | "%";
+  why?: string;
+  section: Metric["section"];
+  get: (x: Extra) => number | undefined;
+  show: (x: Extra) => boolean;
+}
+
+const actor = (x: Extra) => (x.minionMain ? (x.minion ?? {}) : x.player);
+const P = (x: Extra) => x.player;
+/** Chaos Inoculation: life is 1. */
+const ci = (x: Extra) => (P(x).Life ?? 0) <= 1;
+const AILMENT_DPS: Record<string, (a: Record<string, number>) => number> = {
+  Poison: (a) => a.TotalPoisonDPS ?? a.PoisonDPS ?? 0,
+  Bleed: (a) => a.BleedDPS ?? 0,
+  Ignite: (a) => a.TotalIgniteDPS ?? a.IgniteDPS ?? 0,
+};
+const dpsOf = (x: Extra) => actor(x).CombinedDPS ?? actor(x).TotalDPS ?? 0;
+
+function rules(minion: boolean): Rule[] {
+  const list: Rule[] = [
+    {
+      key: "dps",
+      label: minion ? "Minion DPS" : "DPS",
+      fmt: "k",
+      section: "Offence",
+      get: dpsOf,
+      show: () => true,
+    },
+  ];
+  for (const ailment of ["Poison", "Bleed", "Ignite"])
+    // An ailment's chance matters when that ailment is at least a tenth of the damage.
+    list.push({
+      key: ailment.toLowerCase(),
+      label: `${ailment} chance`,
+      fmt: "%",
+      why: "ail-" + ailment,
+      section: "Offence",
+      get: (x) => actor(x)[ailment + "Chance"] ?? 0,
+      show: (x) => dpsOf(x) > 0 && AILMENT_DPS[ailment](actor(x)) >= 0.1 * dpsOf(x),
+    });
+  list.push(
+    {
+      key: "crit",
+      label: "Crit chance",
+      fmt: "%",
+      section: "Offence",
+      get: (x) => actor(x).CritChance ?? 0,
+      show: (x) => (actor(x).CritChance ?? 0) >= 20,
+    },
+    {
+      key: "hit",
+      label: "Hit chance",
+      fmt: "%",
+      section: "Offence",
+      get: (x) => actor(x).HitChance ?? 100,
+      show: (x) => x.attack && (actor(x).HitChance ?? 100) < 99.5,
+    },
+    {
+      key: "life",
+      label: "Life",
+      why: "life",
+      section: "Defence",
+      get: (x) => P(x).Life,
+      show: (x) =>
+        !ci(x) && (P(x).Life ?? 0) >= 0.3 * ((P(x).Life ?? 0) + (P(x).EnergyShield ?? 0)),
+    },
+    {
+      key: "es",
+      label: "Energy shield",
+      why: "es",
+      section: "Defence",
+      get: (x) => P(x).EnergyShield ?? 0,
+      show: (x) =>
+        (P(x).EnergyShield ?? 0) >=
+        0.3 * ((ci(x) ? 0 : (P(x).Life ?? 0)) + (P(x).EnergyShield ?? 0)),
+    },
+    {
+      key: "ehp",
+      label: "EHP",
+      fmt: "k",
+      section: "Defence",
+      get: (x) => P(x).TotalEHP,
+      show: () => true,
+    },
+    {
+      key: "phys",
+      label: "Phys max hit",
+      fmt: "k",
+      section: "Defence",
+      get: (x) => P(x).PhysicalMaximumHitTaken,
+      show: () => true,
+    },
+    {
+      key: "armour",
+      label: "Armour",
+      why: "armour",
+      section: "Defence",
+      get: (x) => P(x).Armour ?? 0,
+      show: (x) => {
+        const armour = P(x).Armour ?? 0;
+        return armour >= 1000 && armour >= 0.25 * (armour + (P(x).Evasion ?? 0));
+      },
+    },
+    {
+      key: "evasion",
+      label: "Evasion",
+      why: "evasion",
+      section: "Defence",
+      get: (x) => P(x).Evasion ?? 0,
+      show: (x) => {
+        const evasion = P(x).Evasion ?? 0;
+        return evasion >= 1000 && evasion >= 0.25 * ((P(x).Armour ?? 0) + evasion);
+      },
+    },
+    {
+      key: "block",
+      label: "Block",
+      fmt: "%",
+      section: "Defence",
+      get: (x) => P(x).BlockChance ?? 0,
+      show: (x) => (P(x).BlockChance ?? 0) >= 25,
+    },
+    {
+      key: "spellBlock",
+      label: "Spell block",
+      fmt: "%",
+      section: "Defence",
+      get: (x) => P(x).SpellBlockChance ?? 0,
+      show: (x) => (P(x).SpellBlockChance ?? 0) >= 25,
+    },
+    {
+      key: "suppress",
+      label: "Suppression",
+      fmt: "%",
+      why: "suppression",
+      section: "Defence",
+      get: (x) => P(x).SpellSuppressionChance ?? 0,
+      show: (x) => (P(x).SpellSuppressionChance ?? 0) >= 25,
+    },
+  );
+  for (const element of ["Fire", "Cold", "Lightning", "Chaos"])
+    // A resistance matters below its cap (chaos doesn't under Chaos Inoculation).
+    list.push({
+      key: element.toLowerCase(),
+      label: `${element} res`,
+      fmt: "%",
+      why: "res-" + element,
+      section: "Defence",
+      get: (x) => P(x)[element + "Resist"] ?? 0,
+      show: (x) =>
+        (P(x)["Missing" + element + "Resist"] ?? 0) > 0 && !(element === "Chaos" && ci(x)),
+    });
+  list.push({
+    key: "move",
+    label: "Move speed",
+    fmt: "%",
+    section: "Misc",
+    get: (x) => ((P(x).MovementSpeedMod ?? 1) - 1) * 100,
+    show: () => true,
+  });
+  return list;
+}
+
+/** A missing output stays missing (shown as —), never a made-up number. */
+const round1 = (value: number | undefined) =>
+  value !== undefined && Number.isFinite(value) ? Math.round(value * 10) / 10 : null;
+
+export type Values = Record<MetricKey, number | null>;
+
+/**
+ * The summary's stats for these two builds: every rule that holds for either. DPS is each
+ * build's main skill (its minion's, for a minion skill), labelled "Minion DPS" only when
+ * both are minion builds; a minion build against a self-cast one shows as Different skills.
+ */
+export function pickMetrics(one: Extra, two: Extra) {
+  const all = rules(one.minionMain && two.minionMain);
+  const shown = all.filter((rule) => rule.show(one) || rule.show(two));
+  const values = (x: Extra): Values =>
+    Object.fromEntries(shown.map((rule) => [rule.key, round1(rule.get(x))]));
+  const metrics: Metric[] = shown.map((rule) => {
+    // A gap needs a change of 1 point (percent stats) or 1% of Build 1's value (the rest).
+    const ref = Math.abs(rule.get(one) ?? 0) || Math.abs(rule.get(two) ?? 0) || 1;
+    return {
+      key: rule.key,
+      label: rule.label,
+      fmt: rule.fmt,
+      why: rule.why,
+      section: rule.section,
+      thresh: rule.fmt === "%" ? 1 : Math.max(1, Math.round(ref * 0.01)),
+    };
+  });
+  return { metrics, values };
+}
+
+// Sidebar stats ------------------------------------------------------------------------
+
+/** One stat of PoB's sidebar (or Calcs, for the ailment chances it lacks), both builds. */
+export interface StatLine {
+  section: "Player" | "Minion";
+  label: string;
+  one?: string;
+  two?: string;
+  /** Build 1's minus Build 2's, when both are numbers. */
+  diff?: number;
+  /** Lower is better (costs). */
+  lower: boolean;
+  /** Its "why" breakdown. */
+  why?: string;
+  /** From PoB's Calcs tab, not its sidebar. */
+  calcs?: boolean;
+}
+
+/**
+ * "Total Life:" → "Total Life". PoB lists a minion's stats under "Minion:" with the
+ * player's labels, so those get "Minion " in front. Other repeats get " (2)", " (3)".
+ */
+function statValues(rows: StatRow[]) {
+  const values = new Map<string, string>();
+  let section = "";
+  for (const row of rows) {
+    if ("text" in row) {
+      const header = stripPob(row.text).trim();
+      if (header === "Minion:") section = "Minion ";
+      else if (header === "Player:") section = "";
+      continue;
+    }
+    if (!("label" in row)) continue;
+    const base = section + stripPob(row.label).trim().replace(/:$/, "");
+    let label = base;
+    for (let n = 2; values.has(label); n++) label = `${base} (${n})`;
+    values.set(label, stripPob(row.value).trim());
+  }
+  return values;
+}
+
+/** The leading number of a PoB value: "3,706" → 3706, "75% (+15%)" → 75. */
+export function leadingNumber(value: string | undefined) {
+  const match = value ? /^[+-]?[\d,]*\.?\d+/.exec(value) : null;
+  if (!match) return undefined;
+  const number = Number(match[0].replace(/,/g, ""));
+  return Number.isFinite(number) ? number : undefined;
+}
+
+const WHY_LABEL: Record<string, string> = {
+  "Total Life": "life",
+  "Energy Shield": "es",
+  Armour: "armour",
+  "Evasion rating": "evasion",
+  "Spell Suppression Chance": "suppression",
+  "Fire Resistance": "res-Fire",
+  "Cold Resistance": "res-Cold",
+  "Lightning Resistance": "res-Lightning",
+  "Chaos Resistance": "res-Chaos",
+};
+
+export function statLines(
+  one: Calculated,
+  two: Calculated,
+  metrics: Metric[],
+  whys: Record<string, Why>,
+): StatLine[] {
+  const a = statValues(one.stats?.rows ?? []);
+  const b = statValues(two.stats?.rows ?? []);
+  const minion = one.extra.minionMain;
+  // The ailment chances the summary picked aren't on PoB's sidebar: from Calcs.
+  const calcs = metrics
+    .filter((m) => m.why?.startsWith("ail-"))
+    .map((m) => {
+      const ailment = m.why!.slice(4);
+      const value = (x: Extra) => {
+        const chance = actor(x)[ailment + "Chance"];
+        return chance === undefined ? undefined : `${Math.round(chance)}%`;
+      };
+      return {
+        label: `${minion ? "Minion " : ""}${ailment} chance`,
+        one: value(one.extra),
+        two: value(two.extra),
+        why: m.why,
+      };
+    });
+  const out: StatLine[] = [];
+  const push = (
+    label: string,
+    x: string | undefined,
+    y: string | undefined,
+    why: string | undefined,
+    calc?: boolean,
+  ) => {
+    const isMinion = label.startsWith("Minion ");
+    const nx = leadingNumber(x);
+    const ny = leadingNumber(y);
+    out.push({
+      section: isMinion ? "Minion" : "Player",
+      label: isMinion ? label.slice(7) : label,
+      one: x,
+      two: y,
+      diff: nx !== undefined && ny !== undefined ? nx - ny : undefined,
+      // As PoB marks them: costs, cooldowns, degen, requirements and use times.
+      lower: /cost|cooldown|degen|required|(cast|channel|throwing|laying|placement) time/i.test(label),
+      why: why && whys[why] ? why : undefined,
+      calcs: calc || undefined,
+    });
+  };
+  // Build 2's order, then stats only Build 1 shows.
+  const labels = [...b.keys(), ...[...a.keys()].filter((label) => !b.has(label))];
+  let added = false;
+  for (const label of labels) {
+    // Calcs rows go after the actor's damage rows.
+    if (
+      !added &&
+      calcs.length > 0 &&
+      (minion
+        ? !label.startsWith("Minion ") && out.some((r) => r.section === "Minion")
+        : /Life|Max Hit|Effective Hit Pool/.test(label))
+    ) {
+      for (const c of calcs) push(c.label, c.one, c.two, c.why, true);
+      added = true;
+    }
+    push(label, a.get(label), b.get(label), label.startsWith("Minion ") ? undefined : WHY_LABEL[label]);
+  }
+  if (!added) for (const c of calcs) push(c.label, c.one, c.two, c.why, true);
+  return out;
+}
+
+// Why: PoB's own source tables, labelled by where each mod comes from -----------------
+
+export type SourceGroup = "Base" | "Gear" | "Tree" | "Gems" | "Config" | "Other";
+
+export interface WhyRow {
+  group: SourceGroup;
+  key: string;
+  one: number | null;
+  two: number | null;
+  oneDetail?: string;
+  twoDetail?: string;
+}
+
+export interface WhyBlock {
+  title: string;
+  unit?: "%";
+  rows: WhyRow[];
+}
+
+/** A pool (flat × (1 + inc%) × more) or a chance (sum, capped). */
+export type WhyFormula =
+  | { kind: "pool"; flat: number; inc: number; more: number; total: number; ok: boolean }
+  | { kind: "chance"; sum: number; cap: number; total: number; ok: boolean };
+
+export interface Why {
+  formula: [WhyFormula, WhyFormula];
+  blocks: WhyBlock[];
+}
+
+const numberRows = (rows: TabRow[] | undefined) =>
+  (rows ?? []).filter((row): row is TabRow & { value: number } => typeof row.value === "number");
+const sumOf = (rows: TabRow[] | undefined) =>
+  numberRows(rows).reduce((s, row) => s + row.value, 0);
+const prodOf = (rows: TabRow[] | undefined) =>
+  numberRows(rows).reduce((s, row) => s * (1 + row.value / 100), 1);
+
+const activeTree = (stats: Stats) =>
+  stats.treeExtras[(stats.lists?.active.tree ?? 1) - 1] ?? stats.treeExtras[0];
+
+/** Item ids of the shown item set (and the tree's jewels) by slot. */
+function itemSlots(stats: Stats) {
+  const bySlot = new Map<string, string>();
+  const gear = stats.gear;
+  if (!gear) return bySlot;
+  const set = gear.sets[(stats.lists?.active.items ?? 1) - 1] ?? gear.sets[0];
+  for (const slot of set?.slots ?? []) bySlot.set(String(slot.item), slot.slot);
+  for (const jewel of activeTree(stats)?.jewels ?? [])
+    if (!bySlot.has(String(jewel.item))) bySlot.set(String(jewel.item), "Tree jewel");
+  return bySlot;
+}
+
+interface Source {
+  group: SourceGroup;
+  key: string;
+  detail?: string;
+}
+
+/** Where a mod comes from, as a row label: "Gear · Body Armour", "Tree · Juggernaut". */
+function label(slots: Map<string, string>, source: string | undefined): Source {
+  const item = /^Item:(\d+):(.*)$/.exec(source ?? "");
+  if (item) {
+    const slot = slots.get(item[1]) ?? "Item";
+    const [name, base] = item[2].split(", ");
+    return {
+      group: "Gear",
+      key: slot.replace(/ Abyssal Socket \d/, " jewels").replace(/^Ring \d$/, "Rings"),
+      detail: !name || name === "New Item" ? base : name,
+    };
+  }
+  if (source?.startsWith("Tree: ")) return { group: "Tree", key: source.slice(6) };
+  if (source?.startsWith("Skill:"))
+    return {
+      group: "Gems",
+      key: source
+        .slice(6)
+        .replace(/^Support/, "")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/ (To|Of|And) /g, (m) => m.toLowerCase()),
+    };
+  if (source?.startsWith("Custom:"))
+    return { group: "Config", key: `Custom mods (${source.slice(7)})` };
+  if (source === "Base") return { group: "Base", key: "Base" };
+  if (source && ["Strength", "Dexterity", "Intelligence"].includes(source))
+    return { group: "Base", key: source };
+  return { group: "Other", key: source || "Other" };
+}
+
+function summed(stats: Stats, rows: TabRow[] | undefined) {
+  const slots = itemSlots(stats);
+  const out = new Map<string, Source & { value: number }>();
+  for (const row of numberRows(rows)) {
+    const source = label(slots, row.source);
+    const key = source.group + "|" + source.key;
+    const entry = out.get(key) ?? { ...source, value: 0 };
+    entry.value += row.value;
+    if (source.detail) entry.detail = source.detail;
+    out.set(key, entry);
+  }
+  return out;
+}
+
+const RANK: Record<SourceGroup, number> = {
+  Base: 0,
+  Gear: 1,
+  Tree: 2,
+  Gems: 3,
+  Config: 4,
+  Other: 5,
+};
+const byRank = (p: WhyRow, q: WhyRow) =>
+  RANK[p.group] - RANK[q.group] ||
+  Math.abs((q.two ?? 0) - (q.one ?? 0)) - Math.abs((p.two ?? 0) - (p.one ?? 0));
+
+function paired(one: Calculated, rowsOne: TabRow[] | undefined, two: Calculated, rowsTwo: TabRow[] | undefined) {
+  const a = summed(one.stats!, rowsOne);
+  const b = summed(two.stats!, rowsTwo);
+  return [...new Set([...a.keys(), ...b.keys()])]
+    .map((key): WhyRow => {
+      const x = a.get(key);
+      const y = b.get(key);
+      return {
+        group: (x ?? y)!.group,
+        key: (x ?? y)!.key,
+        one: x?.value ?? null,
+        two: y?.value ?? null,
+        oneDetail: x?.detail,
+        twoDetail: y?.detail,
+      };
+    })
+    .sort(byRank);
+}
+
+/** A defence's base per slot (after the item's own mods) plus the global flat mods. */
+function flatRows(x: Calculated, stat: string, baseTab: TabRow[] | undefined) {
+  const rows: (Source & { value: number })[] = [];
+  let global = false;
+  for (const slot of x.extra.slots?.[stat] ?? []) {
+    if (slot.source === "Global") {
+      global = true;
+      continue;
+    }
+    const [name, base] = (slot.item ?? "").split(", ");
+    rows.push({
+      group: "Gear",
+      key: slot.source,
+      detail: name === "New Item" ? base : name || undefined,
+      value: Number(slot.base) || 0,
+    });
+  }
+  // PoB's "Global" slot row is the sum of the flat mods (flasks, jewels, tree, gems).
+  if (global) {
+    const slots = itemSlots(x.stats!);
+    for (const row of numberRows(baseTab)) rows.push({ ...label(slots, row.source), value: row.value });
+  }
+  // One row per source: a tree node taken twenty times, or two rings, add up.
+  const merged = new Map<string, Source & { value: number }>();
+  for (const row of rows) {
+    const entry = merged.get(row.key);
+    if (!entry) merged.set(row.key, { ...row });
+    else {
+      entry.value += row.value;
+      if (entry.detail !== row.detail) entry.detail = undefined;
+    }
+  }
+  return [...merged.values()];
+}
+
+// Totals and checks use the Calcs pass, the same pass the source tables come from.
+const CP = (x: Extra) => x.calcsPlayer ?? P(x);
+const CA = (x: Extra) => x.calcsActor ?? actor(x);
+const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(1, Math.abs(b) * 0.02);
+
+function poolWhy(one: Calculated, two: Calculated, stat: string, key: string, title: string): Why {
+  const side = (x: Calculated): WhyFormula => {
+    const tabs = x.extra.tabs ?? {};
+    const flat =
+      key === "life"
+        ? sumOf(tabs.lifeBase)
+        : flatRows(x, stat, tabs[key + "Base"]).reduce((s, row) => s + row.value, 0);
+    const inc = sumOf(tabs[key + "Inc"]);
+    const more = prodOf(tabs[key + "More"]);
+    const total = Math.round(CP(x.extra)[stat] ?? 0);
+    return { kind: "pool", flat, inc, more, total, ok: close(flat * (1 + inc / 100) * more, total) };
+  };
+  const tabsOne = one.extra.tabs ?? {};
+  const tabsTwo = two.extra.tabs ?? {};
+  let base: WhyBlock;
+  if (key === "life")
+    base = { title: "Base life", rows: paired(one, tabsOne.lifeBase, two, tabsTwo.lifeBase) };
+  else {
+    const a = flatRows(one, stat, tabsOne[key + "Base"]);
+    const b = flatRows(two, stat, tabsTwo[key + "Base"]);
+    const keys = [...new Set([...a.map((r) => r.key), ...b.map((r) => r.key)])];
+    base = {
+      title: key === "es" ? "Base ES" : "Base " + title.toLowerCase(),
+      rows: keys.map((k) => {
+        const x = a.find((r) => r.key === k);
+        const y = b.find((r) => r.key === k);
+        return {
+          group: (x ?? y)!.group,
+          key: k,
+          one: x?.value ?? null,
+          two: y?.value ?? null,
+          oneDetail: x?.detail,
+          twoDetail: y?.detail,
+        };
+      }),
+    };
+  }
+  return {
+    formula: [side(one), side(two)],
+    blocks: [
+      base,
+      { title: "Increased", unit: "%", rows: paired(one, tabsOne[key + "Inc"], two, tabsTwo[key + "Inc"]) },
+    ],
+  };
+}
+
+function chanceWhy(
+  one: Calculated,
+  two: Calculated,
+  title: string,
+  rowsFor: (x: Extra) => TabRow[] | undefined,
+  capOf: (x: Extra) => number,
+  totalOf: (x: Extra) => number | undefined,
+): Why {
+  const side = (x: Extra): WhyFormula => {
+    const sum = sumOf(rowsFor(x));
+    const cap = capOf(x);
+    const total = Math.round(totalOf(x) ?? 0);
+    return { kind: "chance", sum, cap, total, ok: close(Math.min(sum, cap), total) };
+  };
+  return {
+    formula: [side(one.extra), side(two.extra)],
+    blocks: [{ title, unit: "%", rows: paired(one, rowsFor(one.extra), two, rowsFor(two.extra)) }],
+  };
+}
+
+/**
+ * The breakdowns for two builds (both calculated in full). Offered only where PoB's numbers
+ * add up on both sides (not shield block or Chaos Inoculation life), so a table's total is
+ * always the stat.
+ */
+export function whys(one: Calculated, two: Calculated): Record<string, Why> {
+  if (!one.stats || !two.stats || !one.extra.tabs || !two.extra.tabs) return {};
+  const out: Record<string, Why> = {
+    life: poolWhy(one, two, "Life", "life", "Life"),
+    es: poolWhy(one, two, "EnergyShield", "es", "Energy shield"),
+    armour: poolWhy(one, two, "Armour", "armour", "Armour"),
+    evasion: poolWhy(one, two, "Evasion", "evasion", "Evasion"),
+    suppression: chanceWhy(
+      one,
+      two,
+      "Suppression",
+      (x) => x.tabs?.suppression,
+      () => 100,
+      (x) => CP(x).SpellSuppressionChance,
+    ),
+  };
+  for (const element of ["Fire", "Cold", "Lightning", "Chaos"])
+    out["res-" + element] = chanceWhy(
+      one,
+      two,
+      `${element} res`,
+      (x) => (x.tabs?.[element + "Resist"] ?? []).filter((row) => /Resist$/.test(row.name ?? "")),
+      (x) => Math.min(90, sumOf(x.tabs?.[element + "ResistMax"])),
+      (x) => CP(x)[element + "Resist"],
+    );
+  for (const ailment of ["Poison", "Bleed", "Ignite"])
+    out["ail-" + ailment] = chanceWhy(
+      one,
+      two,
+      `${ailment} chance`,
+      (x) => x.tabs?.[ailment + "Chance"],
+      () => 100,
+      (x) => CA(x)[ailment + "Chance"],
+    );
+  for (const [key, why] of Object.entries(out))
+    if (!why.formula.every((f) => f.ok)) delete out[key];
+  return out;
+}
+
+// Config -------------------------------------------------------------------------------
+
+export interface ConfigDiff {
+  rows: { label: string; one: string | null; two: string | null }[];
+  modsOne: string[];
+  modsTwo: string[];
+}
+
+function configMap(stats: Stats | undefined) {
+  const rows = new Map<string, string>();
+  const mods: string[] = [];
+  const lists = stats?.lists;
+  const set = lists ? (lists.configs[(lists.active.config ?? 1) - 1] ?? lists.configs[0]) : undefined;
+  for (const row of set?.rows ?? []) {
+    if ("label" in row) rows.set(stripPob(row.label).replace(/:$/, ""), stripPob(row.value));
+    else if ("mod" in row && !row.off) mods.push(stripPob(row.mod));
+  }
+  return { rows, mods };
+}
+
+/** Settings that differ between the two builds' own configs, and their custom mods. */
+export function configDiff(one: Stats | undefined, two: Stats | undefined): ConfigDiff {
+  const a = configMap(one);
+  const b = configMap(two);
+  const labels = [...new Set([...a.rows.keys(), ...b.rows.keys()])];
+  return {
+    rows: labels
+      .map((l) => ({ label: l, one: a.rows.get(l) ?? null, two: b.rows.get(l) ?? null }))
+      .filter((row) => row.one !== row.two),
+    modsOne: a.mods,
+    modsTwo: b.mods,
+  };
+}

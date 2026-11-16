@@ -54,7 +54,17 @@ pub struct Pick {
     pub minion_skill: Option<String>,
 }
 
+/// What a job asks PoB for.
+#[derive(Clone, Copy)]
+enum Kind {
+    /// The guide's stats answer (host_stats).
+    Stats,
+    /// Compare's numbers (host_compare); `full` adds the source tables and the stats answer.
+    Compare { full: bool },
+}
+
 struct Job {
+    kind: Kind,
     xml: String,
     loadout: Option<String>,
     pick: Option<Pick>,
@@ -85,10 +95,32 @@ impl Engine {
         loadout: Option<String>,
         pick: Option<Pick>,
     ) -> Result<String, String> {
+        self.ask(Kind::Stats, xml, loadout, pick).await
+    }
+
+    /// Compare's numbers for a build (see host_compare in pob-host.lua) as JSON. Jobs share
+    /// the guide's queue, so Compare sends one at a time and the guide never waits long.
+    pub async fn compare(
+        &self,
+        xml: String,
+        loadout: Option<String>,
+        pick: Option<Pick>,
+        full: bool,
+    ) -> Result<String, String> {
+        self.ask(Kind::Compare { full }, xml, loadout, pick).await
+    }
+
+    async fn ask(
+        &self,
+        kind: Kind,
+        xml: String,
+        loadout: Option<String>,
+        pick: Option<Pick>,
+    ) -> Result<String, String> {
         let stopped = || "PoB isn't running. Restart the app.".to_string();
         let (reply, answer) = oneshot::channel();
         self.jobs
-            .send(Job { xml, loadout, pick, reply })
+            .send(Job { kind, xml, loadout, pick, reply })
             .map_err(|_| stopped())?;
         answer.await.map_err(|_| stopped())?
     }
@@ -136,11 +168,20 @@ fn run(jobs: mpsc::Receiver<Job>, keep: impl Fn() -> bool) {
         }
         let Some(loaded) = pob.as_ref() else { continue };
 
-        let result = match loaded.stats(&job.xml, job.loadout.as_deref(), job.pick.as_ref()) {
+        let answer = match job.kind {
+            Kind::Stats => loaded.stats(&job.xml, job.loadout.as_deref(), job.pick.as_ref()),
+            Kind::Compare { full } => loaded.compare(&job.xml, job.loadout.as_deref(), job.pick.as_ref(), full),
+        };
+        let what = match job.kind {
+            Kind::Stats => "stats",
+            Kind::Compare { full: true } => "compare (full)",
+            Kind::Compare { full: false } => "compare",
+        };
+        let result = match answer {
             Ok(json) => {
                 // Logged so a slow loadout switch can be told apart from a slow page.
                 info!(
-                    "PoB stats for {} in {:.1}s{}",
+                    "PoB {what} for {} in {:.1}s{}",
                     job.loadout.as_deref().unwrap_or("the saved loadout"),
                     started.elapsed().as_secs_f32(),
                     if cold { " (PoB loaded first)" } else { "" }
@@ -164,8 +205,9 @@ fn run(jobs: mpsc::Receiver<Job>, keep: impl Fn() -> bool) {
 }
 
 struct Pob {
-    // Declared first so it drops before the Lua state it belongs to.
+    // Declared first so they drop before the Lua state they belong to.
     stats: Function,
+    compare: Function,
     _lua: Lua,
     /// The unpacked copy this PoB runs from.
     dir: PathBuf,
@@ -188,7 +230,7 @@ impl Pob {
         };
         // PoB is our own bundled code and needs the full standard library (debug, jit, bit).
         let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL, LuaOptions::new()) };
-        let setup = || -> mlua::Result<Function> {
+        let setup = || -> mlua::Result<(Function, Function)> {
             let globals = lua.globals();
             globals.set("host_dir", dir.to_string_lossy().replace('\\', "/"))?;
             globals.set(
@@ -214,15 +256,44 @@ impl Pob {
                 lua.create_function(move |_, path: String| Ok(fetch(&fetch_dir, &path)))?,
             )?;
             lua.load(host.as_str()).set_name("pob-host").exec()?;
-            globals.get::<Function>("host_stats")
+            Ok((globals.get::<Function>("host_stats")?, globals.get::<Function>("host_compare")?))
         };
-        let stats = setup().map_err(|err| message(&err))?;
+        let (stats, compare) = setup().map_err(|err| message(&err))?;
         info!("PoB {} loaded in {:.1}s", version(), started.elapsed().as_secs_f32());
-        Ok(Pob { stats, _lua: lua, dir, _hold: hold })
+        Ok(Pob { stats, compare, _lua: lua, dir, _hold: hold })
     }
 
     fn stats(&self, xml: &str, loadout: Option<&str>, pick: Option<&Pick>) -> Result<String, String> {
-        let pick = pick.map(|p| {
+        let (id, label, group, skill, part, minion, minion_skill) = pick_args(pick);
+        self.stats
+            .call::<mlua::String>((xml, loadout, id, label, group, skill, part, minion, minion_skill))
+            .map(|json| json.to_string_lossy())
+            .map_err(|err| message(&err))
+    }
+
+    fn compare(&self, xml: &str, loadout: Option<&str>, pick: Option<&Pick>, full: bool) -> Result<String, String> {
+        let (id, label, group, skill, part, minion, minion_skill) = pick_args(pick);
+        self.compare
+            .call::<mlua::String>((xml, loadout, full, id, label, group, skill, part, minion, minion_skill))
+            .map(|json| json.to_string_lossy())
+            .map_err(|err| message(&err))
+    }
+}
+
+/// A pick as host_stats' and host_compare's arguments (all nil without one).
+#[allow(clippy::type_complexity)]
+fn pick_args(
+    pick: Option<&Pick>,
+) -> (
+    Option<&str>,
+    Option<&str>,
+    Option<i64>,
+    Option<i64>,
+    Option<&str>,
+    Option<&str>,
+    Option<&str>,
+) {
+    pick.map(|p| {
             (
                 Some(p.id.as_str()),
                 p.label.as_deref(),
@@ -232,13 +303,8 @@ impl Pob {
                 p.minion.as_deref(),
                 p.minion_skill.as_deref(),
             )
-        });
-        let (id, label, group, skill, part, minion, minion_skill) = pick.unwrap_or_default();
-        self.stats
-            .call::<mlua::String>((xml, loadout, id, label, group, skill, part, minion, minion_skill))
-            .map(|json| json.to_string_lossy())
-            .map_err(|err| message(&err))
-    }
+    })
+    .unwrap_or_default()
 }
 
 /// One line for the guide: the error itself, without Lua's "runtime error:" or the traceback.
@@ -400,14 +466,18 @@ mod tests {
 
     /// For working on pob-host.lua: runs the bundled PoB on a build and writes the guide's
     /// JSON. `POB_DUMP_XML=build.xml POB_DUMP_OUT=out.json cargo test dump_stats -- --ignored`
-    /// (POB_DUMP_LOADOUT picks a loadout).
+    /// (POB_DUMP_LOADOUT picks a loadout; POB_DUMP_COMPARE=1 writes Compare's full answer).
     #[test]
     #[ignore]
     fn dump_stats() {
         let xml = std::fs::read_to_string(std::env::var("POB_DUMP_XML").expect("POB_DUMP_XML")).unwrap();
         let loadout = std::env::var("POB_DUMP_LOADOUT").ok();
         let pob = super::Pob::load().unwrap();
-        let json = pob.stats(&xml, loadout.as_deref(), None).unwrap();
+        let json = if std::env::var("POB_DUMP_COMPARE").is_ok() {
+            pob.compare(&xml, loadout.as_deref(), None, true).unwrap()
+        } else {
+            pob.stats(&xml, loadout.as_deref(), None).unwrap()
+        };
         std::fs::write(std::env::var("POB_DUMP_OUT").expect("POB_DUMP_OUT"), json).unwrap();
     }
 

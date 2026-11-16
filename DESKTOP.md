@@ -142,7 +142,7 @@ check it (**Build health**).
   the left column's stats, the header's numbers, **Items**, **Skills**, **Tree**, **Trade
   List** and **Config**. Its name and level show under the dropdown, and PoB's own main
   skill is used (no skill picker). **Campaign**, your gem list, **Notes** and your tree
-  progress stay on the plan, **Compare**'s Build 2 is the plan's loadout, **Build health**
+  progress stay on the plan, **Compare** picks its own two builds, **Build health**
   follows its own **Live**/**Plan** dropdown, and the in-game bar's buttons and tooltips
   stay on the plan. Picking a loadout goes back to the plan (so does reopening the guide,
   or clearing the live character).
@@ -247,16 +247,8 @@ settings; otherwise it leaves it alone and says so.
   the set takes is next (green) once one of its own notables is yours or next, else later
   (dim green). The tree data lists each mastery's notables (`m`, from GGG's groups, made by
   `seeding/src/build-tree/tree.ts`).
-- The card's clipboard button copies the build's PoB code. **Compare** works like pob.codes'
-  "Compare my PoB": paste any build's PoB code (your character imported in PoB, a
-  streamer's, a poe.ninja player's) or a pobb.in, poe.ninja, pastebin or maxroll link. The
-  same bundled PoB calculates it as **Build 1**; **Build 2** is the guide's shown loadout.
-  The Stats, Passives, Skills and Items tabs list what differs between them. Passives
-  match by name, so a build on another tree version still lines up. The last code is
-  remembered; **Change** pastes another. With a live character set, the dropdown at the
-  top picks Build 1: **Live character** (tagged **Live**, with its level; **Refresh** reads
-  it again) or **Pasted build**. PoB holds one build at a time, so the guide's next
-  loadout change takes a few seconds longer after a compare.
+- The card's clipboard button copies the build's PoB code. **Compare** opens the Compare
+  page (see [Compare](#compare)).
 - The left column shows Path of Building's sidebar (life, DPS and the rest) for that
   loadout, calculated by the PoB release bundled in the exe. Its thin scrollbar only shows
   there's more; scroll it with the wheel.
@@ -329,6 +321,55 @@ settings; otherwise it leaves it alone and says so.
   restart. Debug builds use `pob-dev`. A build with a
   timeless jewel downloads that jewel's data (2-30 MB) from PoB's GitHub the first time.
   Specs on an older tree are calculated on the latest one (noted under the stats).
+
+## Compare
+
+The build card's **Compare** opens its own page (back with **Guide** in the top bar): two
+builds side by side, calculated by the bundled PoB, in pinned panels with a section bar
+(Summary, Gaps, Stats, Config, Passives, Skills, Items).
+
+- **Builds**: each side's dropdown picks what it is: **Live** (your live character),
+  **Loadout** (the imported build), **Account** (a character on a PoE account's public
+  poe.ninja profile: **Add…** an account (`Name#1234`, **Load**), then pick a character;
+  accounts are kept, **Remove** drops one) or **Pasted** (a PoB code or a pobb.in,
+  poe.ninja, pastebin or maxroll link; **Change** pastes another). A build with more than
+  one loadout gets a loadout dropdown. ⇄ swaps the sides. **Refresh** reads a live or
+  account character again. An account's character is read when it's picked and on Refresh
+  only, and is as new as poe.ninja's last read of it. The first side carried over the old
+  Compare's pasted code.
+- **Same footing**: Build 2 is calculated on Build 1's config, so the difference is the
+  builds, not their setups (**Config: Build 1**). Main skill: Build 1's own (for a Loadout,
+  the skill you picked in the guide), and Build 2 uses the same skill gem when it has it
+  (**Same**; else **Different**, and each uses its own).
+- **Colors**: Build 1 is blue and Build 2 orange, and nothing else is colored: whatever
+  is in a build's color is where that build is ahead (costs count lower as better).
+- **Summary**: the stats that matter for these two builds, picked by rules over PoB's
+  output: DPS, EHP, phys max hit and move speed always; an ailment's chance when that
+  ailment is at least a tenth of the damage; crit from 20%; hit chance for attacks under
+  99.5%; life or ES by which is the pool (not life under Chaos Inoculation); armour or
+  evasion by which the build uses; block and suppression from 25%; resistances below cap.
+  Grouped as PoB's Calcs tab (Offence, Defence, Misc), each row has a bar from the center
+  toward the build that's ahead. Click a row for PoB's breakdown of both (life, ES,
+  armour, evasion, suppression, resistances, ailment chances, where PoB's numbers add up)
+  and its top gains.
+- **Gaps**: Build 1 with one piece of Build 2 at a time, each recalculated by PoB: Build
+  2's config, each gear slot that differs (weapons as a pair around a two-hander, flasks
+  as a set), all gear at once (one-slot swaps don't add up: Mageblood needs its flasks),
+  Build 2's tree with its jewels, its main links, a support that's unlinked in the main
+  skill's item, a support Build 2 links that fits, and gems Build 2 has at a higher level.
+  Blue is a gain for Build 1, orange a loss. The chips pick one stat (gains and losses,
+  with bars). **Show** opens the item, passives, skills or config; **Trade** searches for
+  Build 2's item. Small changes (under a point, or 1% of Build 1's value) are left out.
+- **Stats** is every sidebar stat (search; **Show same** adds equal ones), **Config** the
+  settings that differ in the two builds' own configs, and **Passives**, **Skills** and
+  **Items** what differs (passives by name, so another tree version lines up).
+- PoB calculates both builds in full, then each gap (15-30 builds, 1-2 seconds each), one
+  at a time on the same PoB the guide uses: the guide's own requests wait for one at most.
+  The Gaps header counts them. Leaving the page stops the rest; finished results are kept until the
+  app restarts. Each side is first cut down to its loadout's sets, so every gap edits
+  "the" item, skill and config set. The exe's `/api/pob/compare` (host_compare in
+  `log-api/src/pob-host.lua`) answers with every number PoB has, and for the two builds
+  also PoB's source tables.
 
 ## League
 
@@ -454,7 +495,9 @@ League page: <https://kobayashi-maru-1.github.io/lioneye/atlas/>.
 
 ### Compare concept (demo)
 
-A static mock of a reworked **Compare** in the guide's layout (foldable panels, jump bar):
+The design the app's [Compare](#compare) page was built from (the app's runs Build 2 on
+Build 1's config; the demo shows Build 2's config or each build's own). A static mock in
+the guide's layout (foldable panels, jump bar):
 the live character against the shown loadout (HRoC Early Maps), on the guide's config, with
 per-stat sources, ranked gaps (each one PoB recalculating your build with one guide piece
 swapped in) and an in-game summary. Nothing in it is specific to one build: the summary's

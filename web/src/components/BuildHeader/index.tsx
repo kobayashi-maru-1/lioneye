@@ -10,7 +10,7 @@ import {
   openNinjaSignIn,
 } from "../../state/live-character";
 import { pobAtom } from "../../state/pob";
-import { BuildCompare } from "../BuildCompare";
+import { CompareButton } from "../Compare";
 import { LoadCode } from "../BuildCodeForm";
 import { BuildPicker } from "../BuildPicker";
 import { DesktopPob, SaveToPob } from "../DesktopPob";
@@ -76,7 +76,7 @@ export function BuildHeader() {
           </LoadCode>
         </div>
         <div className={classNames(styles.tools)}>
-          <BuildCompare buttonClassName={classNames(styles.tool)} />
+          <CompareButton className={classNames(styles.tool)} />
           <DesktopPob className={classNames(styles.tool)}>
             <FaDesktop aria-hidden />
             Edit PoB

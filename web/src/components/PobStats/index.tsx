@@ -292,7 +292,7 @@ export interface PobStatsValue {
    * `stats`, `loading` and `error` are its. The plan's own stay in `planStats`.
    */
   live: boolean;
-  /** The plan's shown loadout (Compare's Build 2), whatever the page shows. */
+  /** The plan's shown loadout, whatever the page shows (the header's Plan row). */
   planStats: Stats | null;
   /** The plan's own state: calculating (planStats may be the last loadout's), or failed. */
   planLoading: boolean;
@@ -741,7 +741,7 @@ export function useSetSteps(
   }, [steps, ready, waiting, viewingLive]);
 }
 
-/** PoB's stats for a build as saved (its own loadout and main skill), e.g. for Compare. */
+/** PoB's stats for a build as saved (its own loadout and main skill), e.g. the live character. */
 export function fetchBuildStats(xml: string, signal: AbortSignal) {
   return fetchStats(xml, null, null, signal);
 }
@@ -762,7 +762,11 @@ async function fetchStats(
     const text = response.status === 404 ? "" : await response.text();
     throw new Error(text || "PoB unavailable. Restart the app.");
   }
-  const stats = (await response.json()) as Partial<Stats>;
+  return readStats((await response.json()) as Partial<Stats>);
+}
+
+/** PoB's stats answer as JSON, with its empty lists (written as {}) made lists. */
+export function readStats(stats: Partial<Stats>): Stats {
   return {
     loadouts: list(stats.loadouts),
     loadoutSets: list(stats.loadoutSets),

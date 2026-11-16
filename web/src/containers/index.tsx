@@ -26,6 +26,7 @@ const BuildContainer = withBlank(lazy(() => import("./Build")));
 const EditRouteContainer = withBlank(lazy(() => import("./EditRoute")));
 const StratsContainer = withBlank(lazy(() => import("./Strats")));
 const AtlasContainer = withBlank(lazy(() => import("./Atlas")));
+const CompareContainer = withBlank(lazy(() => import("./Compare")));
 
 export function App() {
   useAutoProgress();
@@ -89,6 +90,16 @@ export function App() {
               path="/atlas"
               element={
                 <Page title="Lioneye - Atlas" component={<AtlasContainer />} />
+              }
+            />
+            {/* Compare: two builds (live, a loadout, an account's character, pasted). */}
+            <Route
+              path="/compare"
+              element={
+                <Page
+                  title="Lioneye - Compare"
+                  component={<CompareContainer />}
+                />
               }
             />
             <Route
