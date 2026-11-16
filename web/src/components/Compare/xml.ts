@@ -117,14 +117,21 @@ function weaponsInUse(xml: string): string {
   );
 }
 
-/** The config of `from` (flattened) in place of `xml`'s (flattened). */
+/**
+ * The setup of `from` (flattened) in place of `xml`'s: its config, and its party (the
+ * party members' buffs PoB keeps in a section of their own).
+ */
 export function withConfig(xml: string, from: string): string {
-  const source = section(from, "Config");
-  const target = section(xml, "Config");
-  if (!source) return xml;
-  return target
-    ? replaceBlock(xml, target, source.text)
-    : xml.replace("</PathOfBuilding>", `${source.text}\n</PathOfBuilding>`);
+  for (const tag of ["Config", "Party"]) {
+    const source = section(from, tag);
+    const target = section(xml, tag);
+    if (source)
+      xml = target
+        ? replaceBlock(xml, target, source.text)
+        : xml.replace("</PathOfBuilding>", () => `${source.text}\n</PathOfBuilding>`);
+    else if (target) xml = replaceBlock(xml, target, "");
+  }
+  return xml;
 }
 
 // Items --------------------------------------------------------------------------------
@@ -241,7 +248,7 @@ export interface Variant {
   kind: GapKind;
   title: string;
   detail: string;
-  /** Section to open: "items" (with `slot`), "passives", "skills" or "config". */
+  /** What its Show opens: "items" (with `slot`) or "skills"; "passives" and "config" have no Show. */
   target: string;
   /** The Items row to open, for gear. */
   slot?: string;
@@ -292,12 +299,18 @@ export function variants(
   const changed = [...new Set([...mine.keys(), ...theirs.keys()])].filter(
     (name) => mine.get(name) !== theirs.get(name),
   ).length;
-  if (section(two, "Config")?.text !== section(one, "Config")?.text)
+  const setup = (xml: string) =>
+    (section(xml, "Config")?.text ?? "") + (section(xml, "Party")?.text ?? "");
+  if (setup(two) !== setup(one))
     gap({
       id: "config",
       kind: "Config",
       title: "All config",
-      detail: changed ? `${changed} differ` : "Custom mods",
+      detail: changed
+        ? `${changed} differ`
+        : section(two, "Config")?.text === section(one, "Config")?.text
+          ? "Party"
+          : "Custom mods",
       target: "config",
       xml: withConfig(one, two),
     });

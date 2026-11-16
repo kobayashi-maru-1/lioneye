@@ -33,6 +33,8 @@ export interface Extra {
   skillId?: string;
   /** Whether the pick sent was found (unset: none sent). */
   picked?: boolean;
+  /** PoB shows the skill as an average hit, not per second (Essence Drain, Frostblink). */
+  average?: boolean;
   tabs?: Record<string, TabRow[]>;
   slots?: Record<string, SlotRow[]>;
   calcsPlayer?: Record<string, number>;
@@ -118,6 +120,7 @@ function rules(minion: boolean): Rule[] {
       key: "dps",
       label: minion ? "Minion DPS" : "DPS",
       fmt: "k",
+      why: "dps",
       section: "Offence",
       get: dpsOf,
       show: () => true,
@@ -434,6 +437,8 @@ export interface WhyRow {
 export interface WhyBlock {
   title: string;
   unit?: "%";
+  /** "more" mods multiply: the total is their product, not their sum. */
+  product?: boolean;
   rows: WhyRow[];
 }
 
@@ -442,8 +447,23 @@ export type WhyFormula =
   | { kind: "pool"; flat: number; inc: number; more: number; total: number; ok: boolean }
   | { kind: "chance"; sum: number; cap: number; total: number; ok: boolean };
 
+/** One factor of a DPS (both builds), as PoB multiplies and adds them. */
+export interface Factor {
+  label: string;
+  one: number | null;
+  two: number | null;
+  /** "k": big numbers; "%"; "x": a multiplier; "rate": per second. */
+  fmt: "k" | "%" | "x" | "rate";
+  /** A subtotal or the total (shown as a sum line). */
+  total?: boolean;
+  /** Multiplies the hit DPS: the factor with the widest ratio is marked. */
+  multiplies?: boolean;
+}
+
 export interface Why {
-  formula: [WhyFormula, WhyFormula];
+  /** Pools and chances: the formula per build. DPS: the factor table instead. */
+  formula?: [WhyFormula, WhyFormula];
+  factors?: Factor[];
   blocks: WhyBlock[];
 }
 
@@ -499,20 +519,26 @@ function label(slots: Map<string, string>, source: string | undefined): Source {
     };
   if (source?.startsWith("Custom:"))
     return { group: "Config", key: `Custom mods (${source.slice(7)})` };
+  // A party member's buffs, set in the config: "Party - Leer Cast, Festival Mask".
+  const party = /^Party - ([^,]*)(?:, (.*))?$/.exec(source ?? "");
+  if (party) return { group: "Config", key: `Party: ${party[1]}`, detail: party[2] };
   if (source === "Base") return { group: "Base", key: "Base" };
   if (source && ["Strength", "Dexterity", "Intelligence"].includes(source))
     return { group: "Base", key: source };
   return { group: "Other", key: source || "Other" };
 }
 
-function summed(stats: Stats, rows: TabRow[] | undefined) {
+/** Mods by source row; `product`: "more" mods, which multiply even within a row. */
+function summed(stats: Stats, rows: TabRow[] | undefined, product = false) {
   const slots = itemSlots(stats);
   const out = new Map<string, Source & { value: number }>();
   for (const row of numberRows(rows)) {
     const source = label(slots, row.source);
     const key = source.group + "|" + source.key;
     const entry = out.get(key) ?? { ...source, value: 0 };
-    entry.value += row.value;
+    entry.value = product
+      ? ((1 + entry.value / 100) * (1 + row.value / 100) - 1) * 100
+      : entry.value + row.value;
     if (source.detail) entry.detail = source.detail;
     out.set(key, entry);
   }
@@ -531,9 +557,15 @@ const byRank = (p: WhyRow, q: WhyRow) =>
   RANK[p.group] - RANK[q.group] ||
   Math.abs((q.two ?? 0) - (q.one ?? 0)) - Math.abs((p.two ?? 0) - (p.one ?? 0));
 
-function paired(one: Calculated, rowsOne: TabRow[] | undefined, two: Calculated, rowsTwo: TabRow[] | undefined) {
-  const a = summed(one.stats!, rowsOne);
-  const b = summed(two.stats!, rowsTwo);
+function paired(
+  one: Calculated,
+  rowsOne: TabRow[] | undefined,
+  two: Calculated,
+  rowsTwo: TabRow[] | undefined,
+  product = false,
+) {
+  const a = summed(one.stats!, rowsOne, product);
+  const b = summed(two.stats!, rowsTwo, product);
   return [...new Set([...a.keys(), ...b.keys()])]
     .map((key): WhyRow => {
       const x = a.get(key);
@@ -696,8 +728,103 @@ export function whys(one: Calculated, two: Calculated): Record<string, Why> {
       (x) => CA(x)[ailment + "Chance"],
     );
   for (const [key, why] of Object.entries(out))
-    if (!why.formula.every((f) => f.ok)) delete out[key];
+    if (!why.formula?.every((f) => f.ok)) delete out[key];
+  const dps = dpsWhy(one, two);
+  if (dps) out.dps = dps;
   return out;
+}
+
+/**
+ * Where a DPS comes from, as PoB adds it up: hit damage × hit chance × hits per second ×
+ * a multiplier (projectiles, count) is the hit DPS; ailments, damage over time and impale
+ * add to it; cull and the rest scale the total. Then the damage and speed mods by source.
+ */
+function dpsWhy(one: Calculated, two: Calculated): Why | null {
+  const a = CA(one.extra);
+  const b = CA(two.extra);
+  if (a.CombinedDPS === undefined || b.CombinedDPS === undefined) return null;
+  const parts = (x: Record<string, number>) => {
+    const chance = x.HitChance ?? 100;
+    // Attacks keep their average hit per hand; PoB combines only the damage after hit chance.
+    const hit =
+      x.AverageHit ?? (x.AverageDamage !== undefined && chance > 0 ? (x.AverageDamage * 100) / chance : 0);
+    const speed = x.HitSpeed ?? x.Speed ?? 0;
+    const hitDps = x.TotalDPS ?? 0;
+    const poison = x.TotalPoisonDPS ?? x.PoisonDPS ?? 0;
+    const bleed = x.BleedDPS ?? 0;
+    const ignite = x.TotalIgniteDPS ?? x.IgniteDPS ?? 0;
+    const dot = x.TotalDotDPS ?? 0;
+    const impale = x.ImpaleDPS ?? 0;
+    const total = x.CombinedDPS ?? 0;
+    const base = hit * (chance / 100) * speed;
+    return {
+      hit,
+      crit: x.CritChance ?? 0,
+      critMulti: x.CritMultiplier ?? 0,
+      chance,
+      speed,
+      multiplier: base > 0 ? hitDps / base : 0,
+      hitDps,
+      poison,
+      bleed,
+      ignite,
+      // Damage over time PoB adds besides the ailments listed (TotalDotDPS holds them).
+      dot: Math.max(0, dot - poison - bleed - ignite),
+      impale,
+      other: total - hitDps - Math.max(dot, poison + bleed + ignite) - impale,
+      total,
+    };
+  };
+  const x = parts(a);
+  const y = parts(b);
+  const factors: Factor[] = [];
+  const add = (factor: Factor, show = true) => {
+    if (show) factors.push(factor);
+  };
+  const some = (key: keyof ReturnType<typeof parts>, min = 0) =>
+    Math.abs(x[key]) > min || Math.abs(y[key]) > min;
+  const pair = (key: keyof ReturnType<typeof parts>) => ({ one: x[key], two: y[key] });
+  const hits = some("hit");
+  add({ label: "Hit damage", fmt: "k", multiplies: true, ...pair("hit") }, hits);
+  add({ label: "Crit chance", fmt: "%", ...pair("crit") }, hits && some("crit"));
+  add({ label: "Crit multi", fmt: "x", ...pair("critMulti") }, hits && some("crit"));
+  add({ label: "Hit chance", fmt: "%", multiplies: true, ...pair("chance") }, hits);
+  // A skill PoB shows as an average hit has no per-second parts: its total is that hit.
+  if (one.extra.average || two.extra.average) {
+    add({ label: "Total", fmt: "k", total: true, ...pair("total") });
+    return { factors, blocks: dpsBlocks(one, two) };
+  }
+  add({ label: "Hits/sec", fmt: "rate", multiplies: true, ...pair("speed") }, hits);
+  add(
+    { label: "Multiplier", fmt: "x", multiplies: true, ...pair("multiplier") },
+    hits && (Math.abs(x.multiplier - 1) > 0.01 || Math.abs(y.multiplier - 1) > 0.01),
+  );
+  add({ label: "Hit DPS", fmt: "k", total: true, ...pair("hitDps") }, hits);
+  const small = Math.max(x.total, y.total) * 0.01;
+  add({ label: "Poison DPS", fmt: "k", ...pair("poison") }, some("poison"));
+  add({ label: "Bleed DPS", fmt: "k", ...pair("bleed") }, some("bleed"));
+  add({ label: "Ignite DPS", fmt: "k", ...pair("ignite") }, some("ignite"));
+  add({ label: "Other DoT", fmt: "k", ...pair("dot") }, some("dot", small));
+  add({ label: "Impale DPS", fmt: "k", ...pair("impale") }, some("impale"));
+  add({ label: "Cull & other", fmt: "k", ...pair("other") }, some("other", small));
+  add({ label: "Total", fmt: "k", total: true, ...pair("total") });
+  return { factors, blocks: dpsBlocks(one, two) };
+}
+
+/** The damage and speed mods of both builds by source ("more" mods multiply). */
+function dpsBlocks(one: Calculated, two: Calculated) {
+  const tabsOne = one.extra.tabs ?? {};
+  const tabsTwo = two.extra.tabs ?? {};
+  const blocks: WhyBlock[] = [];
+  const block = (title: string, key: string, product?: boolean) => {
+    const rows = one.stats && two.stats ? paired(one, tabsOne[key], two, tabsTwo[key], product) : [];
+    if (rows.length) blocks.push({ title, unit: "%", product, rows });
+  };
+  block("Increased damage", "damageInc");
+  block("More damage", "damageMore", true);
+  block("Increased speed", "speedInc");
+  block("More speed", "speedMore", true);
+  return blocks;
 }
 
 // Config -------------------------------------------------------------------------------

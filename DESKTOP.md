@@ -326,7 +326,7 @@ settings; otherwise it leaves it alone and says so.
 
 The build card's **Compare** opens its own page (back with **Guide** in the top bar): two
 builds side by side, calculated by the bundled PoB, in pinned panels with a section bar
-(Summary, Gaps, Stats, Config, Passives, Skills, Items).
+(Summary, Gaps, Stats, Skills, Items).
 
 - **Builds**: each side's dropdown picks what it is: **Live** (your live character),
   **Loadout** (the imported build), **Account** (a character on a PoE account's public
@@ -337,7 +337,7 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
   account character again. An account's character is read when it's picked and on Refresh
   only, and is as new as poe.ninja's last read of it. The first side carried over the old
   Compare's pasted code.
-- **Same footing**: Build 2 is calculated on Build 1's config, so the difference is the
+- **Same footing**: Build 2 is calculated on Build 1's config and party (the party members' buffs), so the difference is the
   builds, not their setups (**Config: Build 1**). Main skill: Build 1's own (for a Loadout,
   the skill you picked in the guide), and Build 2 uses the same skill gem when it has it
   (**Same**; else **Different**, and each uses its own).
@@ -351,18 +351,22 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
   Grouped as PoB's Calcs tab (Offence, Defence, Misc), each row has a bar from the center
   toward the build that's ahead. Click a row for PoB's breakdown of both (life, ES,
   armour, evasion, suppression, resistances, ailment chances, where PoB's numbers add up)
-  and its top gains.
-- **Gaps**: Build 1 with one piece of Build 2 at a time, each recalculated by PoB: Build
-  2's config, each gear slot that differs (weapons as a pair around a two-hander, flasks
-  as a set), all gear at once (one-slot swaps don't add up: Mageblood needs its flasks),
-  Build 2's tree with its jewels, its main links, a support that's unlinked in the main
-  skill's item, a support Build 2 links that fits, and gems Build 2 has at a higher level.
-  Blue is a gain for Build 1, orange a loss. The chips pick one stat (gains and losses,
-  with bars). **Show** opens the item, passives, skills or config; **Trade** searches for
-  Build 2's item. Small changes (under a point, or 1% of Build 1's value) are left out.
-- **Stats** is every sidebar stat (search; **Show same** adds equal ones), **Config** the
-  settings that differ in the two builds' own configs, and **Passives**, **Skills** and
-  **Items** what differs (passives by name, so another tree version lines up).
+  and its top gains. DPS breaks down as PoB adds it up: hit damage × hit chance × hits per
+  second × a multiplier (projectiles, count) is the hit DPS, then poison, bleed, ignite,
+  other damage over time, impale and cull; the multiplying factor with the widest ratio
+  is marked **Biggest**. Under it, the increased and more damage and speed mods of both
+  builds by source (for the damage types the skill deals; more mods multiply).
+- **Gaps**: a table, a row per piece of Build 2 tried on Build 1 and recalculated by PoB
+  (Build 2's config, each gear slot that differs (weapons as a pair around a two-hander,
+  flasks as a set), all gear at once (one-slot swaps don't add up: Mageblood needs its
+  flasks), the whole tree with its jewels, the main links, a support that's unlinked in
+  the main skill's item, a support Build 2 links that fits, gems Build 2 has at a higher
+  level), a column per summary stat. Each cell is the change to Build 1: ▲ in blue a gain,
+  ▼ in orange a loss, · too small to show (under a point, or 1% of Build 1's value).
+  Click a stat's header to sort by it. **Show** opens the item or skills; **Trade**
+  searches for Build 2's item.
+- **Stats** is every sidebar stat (search; **Show same** adds equal ones), and **Skills**
+  and **Items** what differs.
 - PoB calculates both builds in full, then each gap (15-30 builds, 1-2 seconds each), one
   at a time on the same PoB the guide uses: the guide's own requests wait for one at most.
   The Gaps header counts them. Leaving the page stops the rest; finished results are kept until the

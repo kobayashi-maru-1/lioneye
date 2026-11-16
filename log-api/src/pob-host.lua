@@ -1651,6 +1651,47 @@ local function compareExtra(full)
 		tabs.BleedChance = compareTab(skill.skillModList, "BASE", skill.skillCfg, "BleedChance")
 		tabs.PoisonChance = compareTab(skill.skillModList, "BASE", skill.skillCfg, "PoisonChance")
 		tabs.IgniteChance = compareTab(skill.skillModList, "BASE", skill.skillCfg, "EnemyIgniteChance")
+		-- Where the hit damage and speed come from: damage mods for the types the skill deals,
+		-- and the types converted into them (PoB applies both). Attacks keep their per-type
+		-- hits per hand, and weapon mods ("with Swords") match the main hand's config.
+		local out = actor.output or {}
+		local order = { "Physical", "Lightning", "Cold", "Fire", "Chaos" }
+		local dealt = {}
+		for _, hand in ipairs({ out, out.MainHand or {}, out.OffHand or {} }) do
+			for _, damageType in ipairs(order) do
+				if (hand[damageType .. "HitAverage"] or 0) > 0 then
+					dealt[damageType] = true
+				end
+			end
+		end
+		-- Conversion only goes down this order, so walking it backwards catches chains.
+		local conversion = skill.conversionTable or {}
+		for i = #order, 1, -1 do
+			local row = conversion[order[i]]
+			for j = i + 1, #order do
+				if row and dealt[order[j]] and (row[order[j]] or 0) > 0 then
+					dealt[order[i]] = true
+				end
+			end
+		end
+		local names = { "Damage" }
+		local elemental = false
+		for _, damageType in ipairs(order) do
+			if dealt[damageType] then
+				names[#names + 1] = damageType .. "Damage"
+				elemental = elemental or (damageType ~= "Physical" and damageType ~= "Chaos")
+			end
+		end
+		if elemental then
+			names[#names + 1] = "ElementalDamage"
+		end
+		local cfg = (flags.attack and skill.weapon1Cfg) or skill.skillCfg
+		tabs.damageInc = compareTab(skill.skillModList, "INC", cfg, unpack(names))
+		tabs.damageMore = compareTab(skill.skillModList, "MORE", cfg, unpack(names))
+		tabs.speedInc = compareTab(skill.skillModList, "INC", cfg, "Speed")
+		tabs.speedMore = compareTab(skill.skillModList, "MORE", cfg, "Speed")
+		-- Skills PoB shows as an average hit, not per second (Essence Drain, Frostblink).
+		extra.average = skill.skillData and skill.skillData.showAverage and true or false
 	end
 	extra.tabs = tabs
 	extra.slots = {

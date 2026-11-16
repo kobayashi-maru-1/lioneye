@@ -6,14 +6,8 @@ import { useTradeData, useTradeLeague, useTradeOptions } from "../Gear/data";
 import { tradeIndex, tradeUrl } from "../Gear/trade-query";
 import { PageSection, useJumpToSection } from "../PageSection";
 import type { GearItem, Stats } from "../PobStats";
-import {
-  PASSIVE_KINDS,
-  type PassiveKind,
-  itemDiffs,
-  passiveDiffs,
-  skillDiffs,
-} from "./diff";
-import type { Metric, Why, WhyFormula, WhyRow } from "./metrics";
+import { itemDiffs, skillDiffs } from "./diff";
+import type { Factor, Metric, Why, WhyFormula, WhyRow } from "./metrics";
 import type { Gap, Result } from "./run";
 import styles from "./styles.module.css";
 import classNames from "classnames";
@@ -87,17 +81,6 @@ export function BuildName({ which }: { which: 1 | 2 }) {
     <span className={which === 1 ? styles.b1 : styles.b2}>
       <span className={classNames(styles.swatch)} aria-hidden />
       Build {which}
-    </span>
-  );
-}
-
-/** A change to Build 1: up in Build 1's colour, down in Build 2's. */
-function Change({ metric, value }: { metric: Metric; value: number }) {
-  if (Math.abs(value) < metric.thresh) return <span className={styles.muted}>0</span>;
-  return (
-    <span className={sideClass(side(value))}>
-      {value > 0 ? "+" : ""}
-      {fmt(metric, value)}
     </span>
   );
 }
@@ -205,9 +188,7 @@ function SummaryDrawer({
       {top.length > 0 && (
         <div className={classNames(styles.gapList)}>
           <div className={classNames(styles.gapHead, styles.b1)}>Top gains</div>
-          {top.map((gap) => (
-            <GapRow key={gap.id} gap={gap} result={result} focus={metric} onShow={onShow} />
-          ))}
+          <GapTable result={result} gaps={top} sortKey={metric.key} onShow={onShow} />
           <div>
             <button type="button" className={classNames(styles.button)} onClick={() => onAll(metric.key)}>
               Show all
@@ -226,8 +207,6 @@ function SummaryDrawer({
 
 // Gaps --------------------------------------------------------------------------------
 
-const KIND_ORDER = ["Links", "Gems", "Gear", "Tree", "Config"];
-
 /** Build 2's item in a slot, for its Trade search. */
 function itemIn(stats: Stats | undefined, slot: string): GearItem | undefined {
   const gear = stats?.gear;
@@ -237,17 +216,26 @@ function itemIn(stats: Stats | undefined, slot: string): GearItem | undefined {
   return id === undefined ? undefined : gear.items[String(id)];
 }
 
-function GapRow({
-  gap,
-  result,
-  focus,
-  onShow,
-}: {
-  gap: Gap;
-  result: Result;
-  focus: Metric | null;
-  onShow: (gap: Gap) => void;
-}) {
+/** A gap's change to one stat: ▲ in Build 1's colour (a gain), ▼ in Build 2's (a loss). */
+function ChangeCell({ metric, value }: { metric: Metric; value: number | null | undefined }) {
+  if (value === null || value === undefined || Math.abs(value) < metric.thresh)
+    return (
+      <span className={styles.muted}>
+        <span aria-hidden>·</span>
+        <span className={classNames(styles.sr)}>No change</span>
+      </span>
+    );
+  return (
+    <span className={sideClass(side(value))}>
+      <span aria-hidden>{value > 0 ? "▲ " : "▼ "}</span>
+      {value > 0 ? "+" : ""}
+      {fmt(metric, value)}
+    </span>
+  );
+}
+
+/** Show (and Trade, for one gear slot) for a gap. */
+function GapActions({ gap, result, onShow }: { gap: Gap; result: Result; onShow: (gap: Gap) => void }) {
   const trade = useTradeData();
   const index = useMemo(() => (trade ? tradeIndex(trade.stats, trade.items) : null), [trade]);
   const { league } = useTradeLeague();
@@ -256,115 +244,117 @@ function GapRow({
     gap.kind === "Gear" && gap.slot && gap.id !== "gear-all" && gap.id !== "gear-flasks"
       ? itemIn(result.two.stats, gap.slot)
       : undefined;
-  const others = result.metrics.filter(
-    (m) => m !== focus && Math.abs(gap.d[m.key] ?? 0) >= m.thresh,
-  );
-  const value = focus ? gap.d[focus.key] : null;
-  // The bar for the metric in focus: from Build 1's value to Build 1's after the change.
-  const base = focus ? (result.values.one[focus.key] ?? 0) : 0;
   return (
-    <div className={classNames(styles.gap)}>
-      <span className={classNames(styles.kind)}>{gap.kind}</span>
-      <div className={classNames(styles.what)}>
-        <b>{gap.title}</b> <span className={classNames(styles.detail)}>{gap.detail}</span>
-      </div>
-      <div className={classNames(styles.actions)}>
+    <span className={classNames(styles.row)}>
+      {(gap.target === "items" || gap.target === "skills") && (
         <button type="button" className={classNames(styles.button)} onClick={() => onShow(gap)}>
           Show
         </button>
-        {item && index && league && gap.slot && (
-          <a
-            className={classNames(styles.button)}
-            href={tradeUrl(index, item, gap.slot, league, options)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Trade
-          </a>
-        )}
-      </div>
-      {focus && value !== null && value !== undefined && Math.abs(value) >= focus.thresh && (
-        <div className={classNames(styles.pull)}>
-          <Bar lead={side(value)} length={reach(base + value, base, focus.fmt === "%")} />
-          <span>
-            <b>
-              <Change metric={focus} value={value} />
-            </b>{" "}
-            <span className={styles.muted}>{focus.label}</span>
-          </span>
-        </div>
       )}
-      <div className={classNames(styles.pills)}>
-        {others.map((m) => (
-          <span key={m.key} className={classNames(styles.pill)}>
-            <Change metric={m} value={gap.d[m.key]!} />{" "}
-            <span className={styles.muted}>{m.label}</span>
-          </span>
-        ))}
-      </div>
+      {item && index && league && gap.slot && (
+        <a
+          className={classNames(styles.button)}
+          href={tradeUrl(index, item, gap.slot, league, options)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Trade
+        </a>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Gaps as a table: a row per piece of Build 2 tried on Build 1, a column per stat, each
+ * cell the change to Build 1. Sorted by one stat's change, biggest gain first.
+ */
+function GapTable({
+  result,
+  gaps,
+  sortKey,
+  setSortKey,
+  onShow,
+}: {
+  result: Result;
+  gaps: Gap[];
+  sortKey: string;
+  setSortKey?: (key: string) => void;
+  onShow: (gap: Gap) => void;
+}) {
+  const rows = [...gaps].sort(
+    (a, b) => (b.d[sortKey] ?? 0) - (a.d[sortKey] ?? 0) || a.title.localeCompare(b.title),
+  );
+  return (
+    <div className={classNames(styles.scroll)}>
+      <table className={classNames(styles.table, styles.gapTable)}>
+        <thead>
+          <tr>
+            <th className={classNames(styles.swapCell)}>From Build 2</th>
+            {result.metrics.map((m) => (
+              <th
+                key={m.key}
+                className={classNames(styles.right)}
+                aria-sort={m.key === sortKey ? "descending" : undefined}
+              >
+                {setSortKey ? (
+                  <button
+                    type="button"
+                    className={classNames(styles.sortButton, { [styles.sorted]: m.key === sortKey })}
+                    onClick={() => setSortKey(m.key)}
+                  >
+                    {m.label}
+                  </button>
+                ) : (
+                  m.label
+                )}
+              </th>
+            ))}
+            <th>
+              <span className={classNames(styles.sr)}>Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((gap) => (
+            <tr key={gap.id}>
+              <td className={classNames(styles.swapCell)}>
+                <span className={classNames(styles.kind)}>{gap.kind}</span>{" "}
+                <b className={classNames(styles.swapTitle)}>{gap.title}</b>
+                <div className={classNames(styles.detail)}>{gap.detail}</div>
+              </td>
+              {result.metrics.map((m) => (
+                <td key={m.key} className={classNames(styles.right)}>
+                  <ChangeCell metric={m} value={gap.d[m.key]} />
+                </td>
+              ))}
+              <td>
+                <GapActions gap={gap} result={result} onShow={onShow} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
 export function GapsSection({
   result,
-  focus,
-  setFocus,
+  sortKey,
+  setSortKey,
   onShow,
 }: {
   result: Result;
-  focus: string;
-  setFocus: (key: string) => void;
+  sortKey: string;
+  setSortKey: (key: string) => void;
   onShow: (gap: Gap) => void;
 }) {
-  const metric = result.metrics.find((m) => m.key === focus) ?? null;
-  const shows = (gap: Gap, m: Metric) => Math.abs(gap.d[m.key] ?? 0) >= m.thresh;
-  let body: React.ReactNode;
-  if (metric === null) {
-    body = KIND_ORDER.map((kind) => {
-      const rows = result.gaps
-        .filter((gap) => gap.kind === kind && result.metrics.some((m) => shows(gap, m)))
-        .sort((a, b) => (b.d.dps ?? 0) - (a.d.dps ?? 0));
-      if (rows.length === 0) return null;
-      return (
-        <div key={kind} className={classNames(styles.gapList)}>
-          <div className={classNames(styles.gapHead)}>{kind}</div>
-          {rows.map((gap) => (
-            <GapRow key={gap.id} gap={gap} result={result} focus={null} onShow={onShow} />
-          ))}
-        </div>
-      );
-    });
-  } else {
-    const rows = result.gaps.filter((gap) => shows(gap, metric));
-    const value = (gap: Gap) => gap.d[metric.key] ?? 0;
-    const gains = rows.filter((gap) => value(gap) > 0).sort((a, b) => value(b) - value(a));
-    const losses = rows.filter((gap) => value(gap) < 0).sort((a, b) => value(a) - value(b));
-    body = (
-      <>
-        {gains.length > 0 && (
-          <div className={classNames(styles.gapList)}>
-            <div className={classNames(styles.gapHead, styles.b1)}>Gains</div>
-            {gains.map((gap) => (
-              <GapRow key={gap.id} gap={gap} result={result} focus={metric} onShow={onShow} />
-            ))}
-          </div>
-        )}
-        {losses.length > 0 && (
-          <div className={classNames(styles.gapList)}>
-            <div className={classNames(styles.gapHead, styles.b2)}>Losses</div>
-            {losses.map((gap) => (
-              <GapRow key={gap.id} gap={gap} result={result} focus={metric} onShow={onShow} />
-            ))}
-          </div>
-        )}
-      </>
-    );
-  }
-  const shown =
-    metric === null
-      ? result.gaps.some((gap) => result.metrics.some((m) => shows(gap, m)))
-      : result.gaps.some((gap) => shows(gap, metric));
+  const key = result.metrics.some((m) => m.key === sortKey) ? sortKey : (result.metrics[0]?.key ?? "dps");
+  // Gaps that change something worth showing.
+  const gaps = result.gaps.filter((gap) =>
+    result.metrics.some((m) => Math.abs(gap.d[m.key] ?? 0) >= m.thresh),
+  );
   const total = result.gaps.length + result.pending + result.failed;
   return (
     <PageSection
@@ -386,20 +376,9 @@ export function GapsSection({
         </>
       }
     >
-      <div className={classNames(styles.chips)} role="group" aria-label="Metric">
-        {[{ key: "all", label: "All" }, ...result.metrics].map((m) => (
-          <button
-            key={m.key}
-            type="button"
-            aria-pressed={m.key === (metric?.key ?? "all")}
-            onClick={() => setFocus(m.key)}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-      {body}
-      {!shown && (
+      {gaps.length > 0 ? (
+        <GapTable result={result} gaps={gaps} sortKey={key} setSortKey={setSortKey} onShow={onShow} />
+      ) : (
         <div className={classNames(styles.empty)}>
           {result.pending > 0 ? "Calculating" : "No gaps"}
         </div>
@@ -452,27 +431,97 @@ function sourceDetail(row: WhyRow) {
   return row.oneDetail ?? row.twoDetail;
 }
 
+/** A factor's value: "23.8k", "75%", "×1.30", "3.76/s". */
+function factorValue(factor: Factor, value: number | null) {
+  if (value === null) return "—";
+  switch (factor.fmt) {
+    case "k":
+      return fmt({ fmt: "k" } as Metric, value);
+    case "%":
+      return `${n(value, value % 1 && Math.abs(value) < 10 ? 1 : 0)}%`;
+    case "x":
+      return `×${n(value, 2)}`;
+    case "rate":
+      return `${n(value, 2)}/s`;
+  }
+}
+
+/** The DPS factors side by side, the widest multiplying one marked. */
+function FactorTable({ factors }: { factors: Factor[] }) {
+  const ratio = (f: Factor) =>
+    f.one && f.two && f.one > 0 && f.two > 0 ? Math.max(f.one, f.two) / Math.min(f.one, f.two) : 1;
+  const widest = factors
+    .filter((f) => f.multiplies && ratio(f) >= 1.05)
+    .reduce<Factor | null>((best, f) => (best === null || ratio(f) > ratio(best) ? f : best), null);
+  return (
+    <div className={classNames(styles.scroll)}>
+      <table className={classNames(styles.table)}>
+        <thead>
+          <tr>
+            <th>DPS</th>
+            <th className={classNames(styles.right)}>
+              <BuildName which={1} />
+            </th>
+            <th className={classNames(styles.right)}>
+              <BuildName which={2} />
+            </th>
+            <th className={classNames(styles.right)}>Ratio</th>
+            <th>
+              <span className={classNames(styles.sr)}>Note</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {factors.map((f) => {
+            const a = f.one ?? 0;
+            const b = f.two ?? 0;
+            const lead = Math.abs(a - b) <= Math.max(Math.abs(a), Math.abs(b)) * 0.005 ? 0 : side(a - b);
+            const r = ratio(f);
+            return (
+              <tr key={f.label} className={classNames({ [styles.groupRow]: f.total })}>
+                <td>{f.label}</td>
+                <td className={classNames(styles.right, leadClass(lead, 1))}>{factorValue(f, f.one)}</td>
+                <td className={classNames(styles.right, leadClass(lead, -1))}>{factorValue(f, f.two)}</td>
+                <td className={classNames(styles.right, sideClass(lead))}>
+                  {lead === 0 ? "=" : r > 1 && Number.isFinite(r) ? `×${n(r, r >= 10 ? 0 : 2)}` : "—"}
+                </td>
+                <td>{f === widest && <span className={classNames(styles.chip)}>Biggest</span>}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function WhyView({ why }: { why: Why }) {
   return (
     <div className={classNames(styles.why)} role="region" aria-label="Sources">
-      <div className={classNames(styles.formula)}>
-        <span className={classNames(styles.who)}>
-          <BuildName which={1} />
-        </span>
-        <span>
-          <FormulaLine f={why.formula[0]} />
-        </span>
-        <span className={classNames(styles.who)}>
-          <BuildName which={2} />
-        </span>
-        <span>
-          <FormulaLine f={why.formula[1]} />
-        </span>
-      </div>
+      {why.formula && (
+        <div className={classNames(styles.formula)}>
+          <span className={classNames(styles.who)}>
+            <BuildName which={1} />
+          </span>
+          <span>
+            <FormulaLine f={why.formula[0]} />
+          </span>
+          <span className={classNames(styles.who)}>
+            <BuildName which={2} />
+          </span>
+          <span>
+            <FormulaLine f={why.formula[1]} />
+          </span>
+        </div>
+      )}
+      {why.factors && <FactorTable factors={why.factors} />}
       {why.blocks.map((block) => {
         const unit = block.unit ?? "";
+        // "More" mods multiply; the rest add up.
         const total = (pick: (row: WhyRow) => number | null) =>
-          block.rows.reduce((s, row) => s + (pick(row) ?? 0), 0);
+          block.product
+            ? (block.rows.reduce((s, row) => s * (1 + (pick(row) ?? 0) / 100), 1) - 1) * 100
+            : block.rows.reduce((s, row) => s + (pick(row) ?? 0), 0);
         return (
           <div key={block.title} className={classNames(styles.scroll)}>
             <table className={classNames(styles.table)}>
@@ -506,7 +555,11 @@ export function WhyView({ why }: { why: Why }) {
                 })}
                 <tr className={classNames(styles.groupRow)}>
                   <td>Total</td>
-                  <PairCells a={total((r) => r.one)} b={total((r) => r.two)} unit={unit} />
+                  <PairCells
+                    a={Math.round(total((r) => r.one) * 10) / 10}
+                    b={Math.round(total((r) => r.two) * 10) / 10}
+                    unit={unit}
+                  />
                 </tr>
               </tbody>
             </table>
@@ -639,160 +692,6 @@ export function StatsSection({ result }: { result: Result }) {
             })}
           </tbody>
         </table>
-      </div>
-    </PageSection>
-  );
-}
-
-// Config ------------------------------------------------------------------------------
-
-export function ConfigSection({ result }: { result: Result }) {
-  const { rows, modsOne, modsTwo } = result.config;
-  const mods = (list: string[]) =>
-    list.length ? (
-      <ul>
-        {list.map((mod, i) => (
-          <li key={i}>{mod}</li>
-        ))}
-      </ul>
-    ) : (
-      <span className={styles.muted}>None</span>
-    );
-  return (
-    <PageSection
-      id="compare-config"
-      title="Config"
-      actions={<span className={classNames(styles.chip)}>{rows.length} differ</span>}
-    >
-      <div className={classNames(styles.scroll)}>
-        <table className={classNames(styles.table)}>
-          <thead>
-            <tr>
-              <th>Setting</th>
-              <th>
-                <BuildName which={1} />
-              </th>
-              <th>
-                <BuildName which={2} />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={3} className={classNames(styles.empty)}>
-                  No differences
-                </td>
-              </tr>
-            )}
-            {rows.map((row) => (
-              <tr key={row.label}>
-                <td>{row.label}</td>
-                <td>{row.one ?? "—"}</td>
-                <td>{row.two ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {(modsOne.length > 0 || modsTwo.length > 0) && (
-        <div className={classNames(styles.scroll)}>
-          <table className={classNames(styles.table)}>
-            <thead>
-              <tr>
-                <th>
-                  Mods · <BuildName which={1} />
-                </th>
-                <th>
-                  Mods · <BuildName which={2} />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>{mods(modsOne)}</td>
-                <td>{mods(modsTwo)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-    </PageSection>
-  );
-}
-
-// Passives ----------------------------------------------------------------------------
-
-const KIND_TITLES: Record<PassiveKind, string> = {
-  Keystone: "Keystones",
-  Notable: "Notables",
-  Ascendancy: "Ascendancy",
-  Mastery: "Masteries",
-  Socket: "Sockets",
-  Normal: "Small passives",
-};
-
-export function PassivesSection({ result }: { result: Result }) {
-  const one = result.one.stats;
-  const two = result.two.stats;
-  const diffs = useMemo(() => (one && two ? passiveDiffs(one, two) : []), [one, two]);
-  const count = (value: number, mine: 1 | -1, lead: number) =>
-    value === 0 ? (
-      <span className={styles.muted}>—</span>
-    ) : (
-      <span className={lead === mine ? (mine > 0 ? styles.b1 : styles.b2) : undefined}>
-        {value === 1 ? "✓" : value}
-      </span>
-    );
-  return (
-    <PageSection
-      id="compare-passives"
-      title="Passives"
-      actions={
-        <span className={classNames(styles.chip)}>
-          {one?.passives.length ?? 0} vs {two?.passives.length ?? 0}
-        </span>
-      }
-    >
-      <div className={classNames(styles.scroll)}>
-        <table className={classNames(styles.table)}>
-          <thead>
-            <tr>
-              <th>Passive</th>
-              <th className={classNames(styles.right)}>
-                <BuildName which={1} />
-              </th>
-              <th className={classNames(styles.right)}>
-                <BuildName which={2} />
-              </th>
-            </tr>
-          </thead>
-          {PASSIVE_KINDS.map((kind) => {
-            const rows = diffs.filter((diff) => diff.kind === kind);
-            if (rows.length === 0) return null;
-            return (
-              <tbody key={kind}>
-                <tr className={classNames(styles.groupRow)}>
-                  <td colSpan={3}>{KIND_TITLES[kind]}</td>
-                </tr>
-                {rows.map((row) => {
-                  const lead = side(row.yours - row.guide);
-                  return (
-                    <tr key={`${row.name}\n${row.effect ?? ""}`}>
-                      <td>
-                        {row.name}
-                        {row.effect && <div className={classNames(styles.effect)}>{row.effect}</div>}
-                      </td>
-                      <td className={classNames(styles.right)}>{count(row.yours, 1, lead)}</td>
-                      <td className={classNames(styles.right)}>{count(row.guide, -1, lead)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            );
-          })}
-        </table>
-        {diffs.length === 0 && <div className={classNames(styles.empty)}>No differences</div>}
       </div>
     </PageSection>
   );
@@ -939,7 +838,7 @@ export function useShowGap() {
   const jump = useJumpToSection();
   return (gap: Gap) => {
     if (gap.target !== "items" || !gap.slot) {
-      jump(`compare-${gap.target}`);
+      if (gap.target === "skills" || gap.target === "items") jump(`compare-${gap.target}`);
       return;
     }
     jump("compare-items");

@@ -190,12 +190,10 @@ export async function compare(
         id: variant.id,
         kind: variant.kind,
         title: variant.title,
-        // The config gap counts what the Config section lists.
+        // The config gap counts the settings PoB labels (as its Config tab lists them).
         detail:
-          variant.id === "config"
-            ? result.config.rows.length
-              ? `${result.config.rows.length} differ`
-              : "Custom mods"
+          variant.id === "config" && result.config.rows.length
+            ? `${result.config.rows.length} differ`
             : variant.detail,
         target: variant.target,
         slot: variant.slot,

@@ -1,10 +1,8 @@
 import { BuildTitle } from "../../components/BuildHeader/headline";
 import { URL_REWRITERS } from "../../components/BuildImportForm";
 import {
-  ConfigSection,
   GapsSection,
   ItemsSection,
-  PassivesSection,
   SkillsSection,
   StatsSection,
   SummarySection,
@@ -53,8 +51,6 @@ const SECTIONS = [
   { id: "compare-summary", label: "Summary" },
   { id: "compare-gaps", label: "Gaps" },
   { id: "compare-stats", label: "Stats" },
-  { id: "compare-config", label: "Config" },
-  { id: "compare-passives", label: "Passives" },
   { id: "compare-skills", label: "Skills" },
   { id: "compare-items", label: "Items" },
 ];
@@ -205,7 +201,7 @@ export default function CompareContainer() {
   const loadoutsOf = (resolved: Resolved) =>
     resolved.state === "ready" ? loadouts.current.get(resolved.input.xml) : undefined;
 
-  const [focus, setFocus] = useState("all");
+  const [sortKey, setSortKey] = useState("dps");
   const jump = useJumpToSection();
   const showGap = useShowGap();
   const setLiveRefresh = useSetAtom(liveRefreshAtom);
@@ -297,14 +293,12 @@ export default function CompareContainer() {
               result={result}
               onShow={showGap}
               onAll={(metric) => {
-                setFocus(metric);
+                setSortKey(metric);
                 jump("compare-gaps");
               }}
             />
-            <GapsSection result={result} focus={focus} setFocus={setFocus} onShow={showGap} />
+            <GapsSection result={result} sortKey={sortKey} setSortKey={setSortKey} onShow={showGap} />
             <StatsSection result={result} />
-            <ConfigSection result={result} />
-            <PassivesSection result={result} />
             <SkillsSection result={result} />
             <ItemsSection result={result} />
           </>

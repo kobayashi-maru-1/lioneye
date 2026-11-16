@@ -392,27 +392,6 @@ button.tugRow:hover,
 }
 
 /* Gaps */
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--size-2);
-}
-
-.chips button {
-  padding: 1px var(--size-3);
-  color: var(--muted);
-  font-size: 0.8rem;
-  border: var(--border-width) solid var(--panel-border);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.chips button[aria-pressed="true"] {
-  color: var(--gold);
-  border-color: var(--gold);
-  background-color: rgba(175, 128, 64, 0.16);
-}
-
 .gapList {
   display: flex;
   flex-direction: column;
@@ -436,17 +415,6 @@ button.tugRow:hover,
   color: var(--b2);
 }
 
-.gap {
-  display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--size-2) var(--size-3);
-  padding: var(--size-2) var(--size-3);
-  background-color: var(--navy-deep);
-  border: var(--border-width) solid var(--navy-border);
-  border-radius: var(--border-radius);
-}
-
 .kind {
   justify-self: start;
   padding: 0 var(--size-2);
@@ -458,64 +426,50 @@ button.tugRow:hover,
   border-radius: 3px;
 }
 
-.what {
-  min-width: 0;
-}
-
-.what b {
-  color: var(--strong);
-  font-weight: var(--font-heavy);
-}
-
 .detail {
   color: var(--muted);
   font-size: 0.8rem;
   overflow-wrap: anywhere;
 }
 
-.actions {
-  grid-column: 3;
-  grid-row: 1 / span 2;
-  display: flex;
-  gap: var(--size-2);
-}
-
-.pills {
-  grid-column: 2;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--size-2);
-}
-
-.pill {
-  padding: 0 var(--size-2);
-  font-size: 0.8rem;
+/* Gaps table: a row per swap, a column per stat. The swap column stays put when the
+   stats scroll sideways. */
+.gapTable td {
+  padding-top: var(--size-2);
+  padding-bottom: var(--size-2);
   white-space: nowrap;
-  background-color: rgba(255, 255, 255, 0.04);
-  border-radius: 3px;
 }
 
-.pull {
-  grid-column: 2;
-  display: grid;
-  grid-template-columns: minmax(5rem, 16rem) auto;
-  align-items: center;
-  gap: var(--size-3);
+.swapCell {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 13rem;
+  max-width: 20rem;
+  white-space: normal !important;
+  background-color: var(--panel);
 }
 
-@media (max-width: 35rem) {
-  .gap {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .kind,
-  .pills,
-  .pull {
-    grid-column: 1 / -1;
-  }
-  .actions {
-    grid-column: 2;
-    grid-row: 2;
-  }
+.swapTitle {
+  color: var(--strong);
+  font-weight: var(--font-heavy);
+}
+
+.sortButton {
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.sortButton:hover,
+.sortButton.sorted {
+  color: var(--gold);
+}
+
+.sortButton.sorted::after {
+  content: " ▼";
 }
 
 /* Tables */
@@ -624,11 +578,6 @@ button.tugRow:hover,
   letter-spacing: 0.04em;
   border: var(--border-width) solid var(--panel-border);
   border-radius: 3px;
-}
-
-.effect {
-  color: var(--muted);
-  font-size: 0.8rem;
 }
 
 .empty {
