@@ -134,8 +134,25 @@
   color: #e06c75;
 }
 
+/* Search, with Clear highlights beside it (always there, so picking never moves the list). */
+.searchRow {
+  display: flex;
+  align-items: stretch;
+  gap: var(--size-2);
+}
+
 .search {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding-inline: var(--size-2);
+  font-size: 1.1rem;
 }
 
 .results {
@@ -177,15 +194,6 @@
   font-size: 0.85rem;
 }
 
-.pinRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--size-3);
-  margin-top: var(--size-3);
-  color: var(--on-secondary);
-}
-
 /* The mechanic list: compact rows, so all 38 fit in less scrolling. */
 .mechanic {
   display: flex;
@@ -196,6 +204,9 @@
   border-radius: var(--border-radius);
   cursor: pointer;
   text-align: left;
+  /* A long press takes the mechanic: no text selection or callout on touch. */
+  user-select: none;
+  -webkit-touch-callout: none;
   font-size: 0.85rem;
   line-height: 1.35;
 }
@@ -582,6 +593,7 @@
 
 .label {
   cursor: pointer;
+  -webkit-touch-callout: none;
 }
 
 .label text {

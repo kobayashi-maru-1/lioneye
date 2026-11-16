@@ -141,10 +141,12 @@ Four headings (ours, one config file):
   label and tooltip name the mechanic. Only neighbouring clusters need to differ; hue by
   heading with lightness varied inside it is the fallback if 38 colours blur.
 - **Cluster label:** a disc with the mechanic's first letter (two where neighbours clash)
-  at the mastery's position; a button that toggles that mechanic's highlight.
+  at the mastery's position; a button that adds or removes that mechanic's highlight
+  (several at once). Right-click, long-press or Shift+Enter takes that cluster (allocates it, or
+  refunds it when it's all allocated).
 - **States:** idle (fill ≈ 30%), allocated (≈ 90%, bright outline and edges), route
   preview (lighter outline, dashed edges), refund preview (red), search match (halo),
-  mechanic highlight (others dim), gateway hover (rings both ends).
+  mechanic highlights (others dim), gateway hover (rings both ends).
 - Pan by drag, zoom by wheel and pinch; **Zoom in**, **Zoom out**, **Fit** (whole tree),
   **Focus** (fit to allocated; not "Route", which means the campaign in Lioneye).
 
@@ -199,7 +201,8 @@ tooltip already showed the cost.
 
 1. **Explore:** search (names and stat text; halo on matches; list with a locate action)
    and the mechanic list under the four headings (swatch + letter, name, cluster count;
-   hover highlights, click pins, **Clear**).
+   hover highlights, a click adds or removes a highlight (any number), the **Clear
+   highlights** icon beside Search; right-click or long-press takes the whole mechanic).
 2. **Bonuses:** `used / budget`; combined effects grouped by heading then mechanic, with
    node counts; keystones by name; a picked choice once, as `<node>: <effect>` under its
    mechanic; allocated choice nodes with no pick first, under **Unset** (click to pick);

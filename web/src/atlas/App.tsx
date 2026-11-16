@@ -7,6 +7,7 @@ import {
 import { buildGraph, fits, normalise, refundSet, route } from "./lib/graph.ts";
 import { nodeStats } from "./lib/bonuses.ts";
 import { recalc } from "./lib/recalc.ts";
+import { clusterNodes, mechanicNodes, take } from "./lib/take.ts";
 import { encodeOfficial, encodeShare, parseLink } from "./lib/links.ts";
 import { mechanicColours, mechanicLetters } from "./lib/mechanics.ts";
 import { KIND, byId, flat } from "./lib/text.ts";
@@ -310,8 +311,27 @@ export function App({ data }: { data: AtlasData }) {
       );
   }, [query, data]);
   const matchSet = useMemo(() => new Set(matches), [matches]);
-  const [pinned, setPinned] = useState<number | null>(null);
+  // Mechanics picked in Explore or on the tree's cluster labels: each click adds or removes one.
+  const [pinned, setPinned] = useState<ReadonlySet<number>>(() => new Set());
+  const togglePin = useCallback(
+    (m: number) =>
+      setPinned((p) => {
+        const next = new Set(p);
+        if (!next.delete(m)) next.add(m);
+        return next;
+      }),
+    [],
+  );
+  const clearPins = useCallback(() => setPinned(new Set()), []);
+  // The picked mechanics plus the one hovered: a new set only when either changes.
   const [previewMechanic, setPreviewMechanic] = useState<number | null>(null);
+  const highlighted = useMemo(
+    () =>
+      previewMechanic === null || pinned.has(previewMechanic)
+        ? pinned
+        : new Set([...pinned, previewMechanic]),
+    [pinned, previewMechanic],
+  );
   const [lit, setLit] = useState<{ key: string; nodes: Set<string> } | null>(
     null,
   );
@@ -329,7 +349,7 @@ export function App({ data }: { data: AtlasData }) {
       refund: preview?.kind === "refund" ? preview.nodes : none,
       matches: matchSet,
       lit: lit?.nodes ?? none,
-      mechanic: previewMechanic ?? pinned,
+      mechanics: highlighted,
       pinned,
       gatewayPair,
       unset,
@@ -340,7 +360,7 @@ export function App({ data }: { data: AtlasData }) {
       preview,
       matchSet,
       lit,
-      previewMechanic,
+      highlighted,
       pinned,
       gatewayPair,
       unset,
@@ -413,9 +433,33 @@ export function App({ data }: { data: AtlasData }) {
   const onHover = useCallback((id: string | null, x: number, y: number) => {
     setHover((h) => (h?.id === id ? h : id ? { id, x, y } : null));
   }, []);
-  const onLabel = useCallback(
-    (m: number) => setPinned((p) => (p === m ? null : m)),
-    [],
+  const onLabel = togglePin;
+  // Right-click or long-press: a whole mechanic (Explore) or cluster (tree label) at once,
+  // refunded instead when it's all allocated already. One undo step.
+  const takeNodes = useCallback(
+    (targets: string[]) => {
+      const result = take(graph, data, { ...plan, budget }, targets, budget);
+      if (result.kind === "over")
+        return say(`Needs ${result.needs}, ${result.left} left`);
+      if (result.kind === "none") return;
+      apply(fix(result.plan));
+      say(
+        result.kind === "allocate"
+          ? `Allocated ${result.points}`
+          : result.rerouted > 0
+            ? `Refunded ${result.points}, rerouted ${result.rerouted}`
+            : `Refunded ${result.points}`,
+      );
+    },
+    [graph, plan, budget, apply, fix, say],
+  );
+  const takeMechanic = useCallback(
+    (m: number) => takeNodes(mechanicNodes(data, m)),
+    [takeNodes, data],
+  );
+  const takeCluster = useCallback(
+    (group: string) => takeNodes(clusterNodes(graph, data, group)),
+    [takeNodes, graph, data],
   );
 
   // View.
@@ -593,7 +637,9 @@ export function App({ data }: { data: AtlasData }) {
               matches={matches}
               onLocate={locate}
               pinned={pinned}
-              onPin={setPinned}
+              onPin={togglePin}
+              onClearPins={clearPins}
+              onTake={takeMechanic}
               onPreview={setPreviewMechanic}
             />
           )}
@@ -815,6 +861,7 @@ export function App({ data }: { data: AtlasData }) {
             onHover={onHover}
             onNode={onNode}
             onLabel={onLabel}
+            onLabelTake={takeCluster}
             onLabelHover={setPreviewMechanic}
             onStart={askClear}
           />

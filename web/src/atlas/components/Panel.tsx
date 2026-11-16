@@ -6,7 +6,9 @@ import { formStyles } from "../../styles";
 import styles from "../atlas.module.css";
 import classNames from "classnames";
 import { KIND, flat } from "../lib/text.ts";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { LONG_PRESS } from "./TreeView.tsx";
+import { LuFilterX } from "react-icons/lu";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 export type Tab = "explore" | "bonuses" | "saved";
 
@@ -62,6 +64,8 @@ export function Explore({
   onLocate,
   pinned,
   onPin,
+  onClearPins,
+  onTake,
   onPreview,
 }: {
   data: AtlasData;
@@ -71,8 +75,12 @@ export function Explore({
   onQuery: (q: string) => void;
   matches: string[];
   onLocate: (id: string) => void;
-  pinned: number | null;
-  onPin: (m: number | null) => void;
+  /** Mechanics picked: a click adds or removes one. */
+  pinned: ReadonlySet<number>;
+  onPin: (m: number) => void;
+  onClearPins: () => void;
+  /** Right-click or long-press: allocate (or refund) the whole mechanic. */
+  onTake: (m: number) => void;
   onPreview: (m: number | null) => void;
 }) {
   const clusters = useMemo(() => {
@@ -80,16 +88,46 @@ export function Explore({
     for (const label of data.labels) count[label.m]++;
     return count;
   }, [data]);
+  // A touch held on a mechanic takes it once: the click or context menu event a touch
+  // browser sends for the same hold (before or after it) neither picks nor takes it again.
+  const press = useRef<{ timer: number; m: number } | null>(null);
+  const took = useRef<{ m: number; at: number } | null>(null);
+  const endPress = () => {
+    if (press.current) window.clearTimeout(press.current.timer);
+    press.current = null;
+  };
+  useEffect(() => endPress, []);
+  const tookByHold = (m: number) =>
+    took.current !== null &&
+    took.current.m === m &&
+    performance.now() - took.current.at < 5000;
+  const search = useRef<HTMLInputElement>(null);
   return (
     <>
-      <input
-        type="search"
-        className={classNames(formStyles.formInput, styles.search)}
-        placeholder="Search"
-        aria-label="Search"
-        value={query}
-        onChange={(e) => onQuery(e.target.value)}
-      />
+      <div className={styles.searchRow}>
+        <input
+          ref={search}
+          type="search"
+          className={classNames(formStyles.formInput, styles.search)}
+          placeholder="Search"
+          aria-label="Search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+        />
+        <button
+          className={classNames(formStyles.formButton, styles.iconButton)}
+          aria-label="Clear highlights"
+          title="Clear highlights"
+          disabled={pinned.size === 0}
+          onClick={() => {
+            onClearPins();
+            // The button turns off: focus goes to Search, not the page.
+            search.current?.focus();
+          }}
+        >
+          <LuFilterX aria-hidden />
+        </button>
+      </div>
       {query.trim().length >= 2 && (
         <div className={styles.results}>
           {matches.length === 0 && (
@@ -118,14 +156,7 @@ export function Explore({
           )}
         </div>
       )}
-      {pinned !== null && (
-        <div className={styles.pinRow}>
-          <span>{data.mechanics[pinned]}</span>
-          <button className={formStyles.formButton} onClick={() => onPin(null)}>
-            Clear
-          </button>
-        </div>
-      )}
+
       {HEADINGS.map((heading) => {
         const members = data.mechanics
           .map((name, m) => ({ name, m }))
@@ -138,16 +169,49 @@ export function Explore({
               <button
                 key={m}
                 className={classNames(styles.mechanic, {
-                  [styles.mechanicOn]: pinned === m,
+                  [styles.mechanicOn]: pinned.has(m),
                 })}
-                aria-pressed={pinned === m}
-                onClick={() => onPin(pinned === m ? null : m)}
+                aria-pressed={pinned.has(m)}
+                aria-keyshortcuts="Shift+Enter"
+                onClick={() => {
+                  if (!tookByHold(m)) onPin(m);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" || !e.shiftKey || e.repeat) return;
+                  e.preventDefault();
+                  onTake(m);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  // A browser that reports the hold before the timer: take it now.
+                  if (press.current?.m === m) {
+                    endPress();
+                    took.current = { m, at: performance.now() };
+                    onTake(m);
+                  } else if (!tookByHold(m)) onTake(m);
+                }}
+                onPointerDown={(e) => {
+                  endPress();
+                  took.current = null;
+                  if (e.pointerType === "mouse") return;
+                  press.current = {
+                    m,
+                    timer: window.setTimeout(() => {
+                      press.current = null;
+                      took.current = { m, at: performance.now() };
+                      onTake(m);
+                    }, LONG_PRESS),
+                  };
+                }}
+                onPointerUp={endPress}
+                onPointerCancel={endPress}
                 onPointerEnter={(e) =>
                   e.pointerType === "mouse" && onPreview(m)
                 }
-                onPointerLeave={(e) =>
-                  e.pointerType === "mouse" && onPreview(null)
-                }
+                onPointerLeave={(e) => {
+                  endPress();
+                  if (e.pointerType === "mouse") onPreview(null);
+                }}
                 onFocus={() => onPreview(m)}
                 onBlur={() => onPreview(null)}
               >

@@ -12,6 +12,7 @@ import {
   type CSSProperties,
   type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   forwardRef,
   memo,
@@ -31,10 +32,10 @@ export interface TreeMarks {
   matches: ReadonlySet<string>;
   /** Nodes to bring out (a Bonuses line); empty for none. */
   lit: ReadonlySet<string>;
-  /** A mechanic brought out (its clusters full, the rest dim); null for none. */
-  mechanic: number | null;
-  /** The mechanic pinned by a click (mechanic is the hovered one, else this). */
-  pinned: number | null;
+  /** Mechanics brought out (their clusters full, the rest dim); empty for none. */
+  mechanics: ReadonlySet<number>;
+  /** The mechanics picked by a click (mechanics adds the hovered one to these). */
+  pinned: ReadonlySet<number>;
   /** The gateway pair under the pointer, ringed. */
   gatewayPair: ReadonlySet<string>;
   /** Allocated choice nodes with no option picked. */
@@ -59,6 +60,8 @@ interface TreeViewProps {
   /** A node clicked or tapped; `touch` when there was no hover first. */
   onNode: (id: string, touch: boolean) => void;
   onLabel: (mechanic: number) => void;
+  /** A cluster label right-clicked or long-pressed: take that cluster (its group). */
+  onLabelTake: (group: string) => void;
   /** A cluster label under a mouse pointer (null when it leaves one). */
   onLabelHover: (mechanic: number | null) => void;
   onStart: () => void;
@@ -73,6 +76,8 @@ interface Box {
 
 const PAD = 600;
 const DRAG = 5;
+/** How long a touch holds a cluster label to take the cluster (ms). */
+export const LONG_PRESS = 500;
 
 function boxAround(points: { x: number; y: number }[], pad: number): Box {
   let minX = Infinity;
@@ -102,6 +107,7 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
     onHover,
     onNode,
     onLabel,
+    onLabelTake,
     onLabelHover,
     onStart,
   },
@@ -215,6 +221,7 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
     /** What was pressed, read before the capture (after it, events all report the SVG). */
     node: string | null;
     label: string | null;
+    group: string | null;
   }>({
     moved: false,
     startX: 0,
@@ -222,23 +229,37 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
     pinch: null,
     node: null,
     label: null,
+    group: null,
   });
+  // A long press on a cluster label (touch) takes the cluster, as a right-click does, once:
+  // the context menu event a touch browser sends for the same hold (before the timer, or
+  // when the finger lifts) doesn't take it again.
+  const press = useRef<{ timer: number; group: string } | null>(null);
+  const took = useRef<{ group: string; at: number } | null>(null);
+  const endPress = () => {
+    if (press.current) window.clearTimeout(press.current.timer);
+    press.current = null;
+  };
+  useEffect(() => endPress, []);
 
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    took.current = null;
     // The left button only: right and middle clicks neither pan nor act.
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const target = e.target as Element;
     const node =
       target.closest("[data-node]")?.getAttribute("data-node") ?? null;
-    const label =
-      target.closest("[data-label]")?.getAttribute("data-label") ?? null;
+    const labelEl = target.closest("[data-label]");
+    const label = labelEl?.getAttribute("data-label") ?? null;
+    const group = labelEl?.getAttribute("data-group") ?? null;
     svgRef.current?.setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, {
       x: e.clientX,
       y: e.clientY,
       type: e.pointerType,
     });
-    if (pointers.current.size === 1)
+    endPress();
+    if (pointers.current.size === 1) {
       gesture.current = {
         moved: false,
         startX: e.clientX,
@@ -246,8 +267,20 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
         pinch: null,
         node,
         label,
+        group,
       };
-    else {
+      if (e.pointerType !== "mouse" && group !== null && node === null)
+        press.current = {
+          group,
+          timer: window.setTimeout(() => {
+            press.current = null;
+            // Held without moving: the cluster, and no tap after it.
+            gesture.current.moved = true;
+            took.current = { group, at: performance.now() };
+            onLabelTake(group);
+          }, LONG_PRESS),
+        };
+    } else {
       const [a, b] = [...pointers.current.values()];
       gesture.current.moved = true;
       gesture.current.pinch = Math.hypot(a.x - b.x, a.y - b.y);
@@ -293,6 +326,7 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
     )
       return;
     gesture.current.moved = true;
+    endPress();
     const from = toTree(previous.x, previous.y);
     const to = toTree(e.clientX, e.clientY);
     pointers.current.set(e.pointerId, {
@@ -309,6 +343,7 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
   };
 
   const onPointerUp = (e: ReactPointerEvent<SVGSVGElement>) => {
+    endPress();
     const was = pointers.current.get(e.pointerId);
     pointers.current.delete(e.pointerId);
     if (pointers.current.size > 0 || !was || gesture.current.moved) {
@@ -325,6 +360,7 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
 
   // A cancelled touch (the browser took it over) is never a tap.
   const onPointerCancel = (e: ReactPointerEvent<SVGSVGElement>) => {
+    endPress();
     pointers.current.delete(e.pointerId);
     if (pointers.current.size === 0) gesture.current.pinch = null;
     gesture.current.moved = true;
@@ -337,10 +373,34 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
     const target = e.target as Element;
     const node = target.getAttribute("data-node");
     const label = target.getAttribute("data-label");
-    if (node !== null && node !== data.start) onNode(node, false);
+    const group = target.getAttribute("data-group");
+    // Shift+Enter on a cluster label: take the cluster (as a right-click).
+    if (e.key === "Enter" && e.shiftKey && group !== null) {
+      if (!e.repeat) onLabelTake(group);
+    } else if (node !== null && node !== data.start) onNode(node, false);
     else if (label !== null) onLabel(Number(label));
     else return;
     e.preventDefault();
+  };
+  // Right-click (or the menu key, Shift+F10) on a cluster label takes the cluster. A long
+  // press that a touch browser also reports as a context menu is taken only once.
+  const onContextMenu = (e: ReactMouseEvent<SVGSVGElement>) => {
+    const group = (e.target as Element)
+      .closest("[data-label]")
+      ?.getAttribute("data-group");
+    if (group == null) return;
+    e.preventDefault();
+    if (press.current?.group === group) {
+      // Reported before the timer: take it now, and no tap after it.
+      endPress();
+      gesture.current.moved = true;
+      took.current = { group, at: performance.now() };
+      onLabelTake(group);
+    } else if (
+      took.current?.group !== group ||
+      performance.now() - took.current.at > 5000
+    )
+      onLabelTake(group);
   };
   // Keyboard focus only: a click or tap also focuses a node, and must not pan the view or
   // turn into a hover (that would hide the touch card).
@@ -393,18 +453,19 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
         onLabelHover(null);
       }}
       onKeyDown={onKeyDown}
+      onContextMenu={onContextMenu}
       onFocus={onFocus}
       onBlur={onBlur}
       role="group"
       aria-label="Atlas tree"
     >
-      <StaticLayers data={data} colours={colours} mechanic={marks.mechanic} />
+      <StaticLayers data={data} colours={colours} mechanics={marks.mechanics} />
       <Edges data={data} marks={marks} />
       <Labels
         data={data}
         colours={colours}
         letters={letters}
-        mechanic={marks.mechanic}
+        mechanics={marks.mechanics}
         pinned={marks.pinned}
       />
       <Hits data={data} />
@@ -413,15 +474,15 @@ export const TreeView = forwardRef<TreeHandle, TreeViewProps>(function TreeView(
   );
 });
 
-/** Cluster discs: only for the mechanic brought out (hovered or pinned), none otherwise. */
+/** Cluster discs: only for the mechanics brought out (hovered or picked), none otherwise. */
 const StaticLayers = memo(function StaticLayers({
   data,
   colours,
-  mechanic,
+  mechanics,
 }: {
   data: AtlasData;
   colours: string[];
-  mechanic: number | null;
+  mechanics: ReadonlySet<number>;
 }) {
   const discs = useMemo(() => {
     const members = new Map<string, { x: number; y: number }[]>();
@@ -440,11 +501,11 @@ const StaticLayers = memo(function StaticLayers({
       return { ...label, r };
     });
   }, [data]);
-  if (mechanic === null) return null;
+  if (mechanics.size === 0) return null;
   return (
     <g className={styles.discs}>
       {discs
-        .filter((d) => d.m === mechanic)
+        .filter((d) => mechanics.has(d.m))
         .map((d) => (
           <circle
             key={d.g}
@@ -510,14 +571,14 @@ const Labels = memo(function Labels({
   data,
   colours,
   letters,
-  mechanic,
+  mechanics,
   pinned,
 }: {
   data: AtlasData;
   colours: string[];
   letters: string[];
-  mechanic: number | null;
-  pinned: number | null;
+  mechanics: ReadonlySet<number>;
+  pinned: ReadonlySet<number>;
 }) {
   return (
     <g className={styles.labels}>
@@ -525,12 +586,14 @@ const Labels = memo(function Labels({
         <g
           key={label.g}
           data-label={label.m}
+          data-group={label.g}
           role="button"
           tabIndex={0}
           aria-label={data.mechanics[label.m]}
-          aria-pressed={pinned === label.m}
+          aria-pressed={pinned.has(label.m)}
+          aria-keyshortcuts="Shift+Enter"
           className={classNames(styles.label, {
-            [styles.dim]: mechanic !== null && mechanic !== label.m,
+            [styles.dim]: mechanics.size > 0 && !mechanics.has(label.m),
           })}
         >
           <title>{data.mechanics[label.m]}</title>
@@ -619,8 +682,8 @@ const Nodes = memo(function Nodes({
               // A highlighted mechanic never dims the plan itself; a lit Bonuses line
               // does (it picks out some allocated nodes from the rest).
               [styles.dim]:
-                (marks.mechanic !== null &&
-                  m !== marks.mechanic &&
+                (marks.mechanics.size > 0 &&
+                  !marks.mechanics.has(m) &&
                   !allocated) ||
                 (marks.lit.size > 0 && !marks.lit.has(id)),
               [styles.start]: start,

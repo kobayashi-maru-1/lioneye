@@ -524,10 +524,29 @@ The **New** planner in the Atlas tab (plans/atlas-planner.md), also a standalone
 - **Bonuses** files a travel node's lines under the mechanic they name ("Maps found" →
   Maps), else **Other**; a picked choice shows once, under its mechanic; gateways add
   nothing.
+- **Highlights:** a click on a mechanic in **Explore**, or on a cluster label on the tree,
+  adds it to the highlighted mechanics or takes it out; any number at once (their clusters
+  full colour with a disc, the rest dim; hovering another adds it while hovered). The
+  **Clear highlights** icon beside Search clears them; it's always there, so picking never
+  moves the list.
+- **Take a mechanic or cluster:** right-click (or long-press on touch, Shift+Enter, or the
+  menu key) a
+  mechanic in **Explore** to allocate every node of it (its clusters and the travel
+  notables in its colour), or a cluster label on the tree for that cluster only. The
+  cheapest way in: from what's allocated, the nearest of its nodes not yet taken, again
+  and again. One undo step, "Allocated N". Over the budget it takes nothing and says
+  "Needs N, M left". When all of it is allocated already, the same action refunds it
+  ("Refunded N"), with the small pathing nodes that led only to it (back to where the
+  path branches). What the plan is for stays: notables, keystones, choice nodes and every
+  node of a cluster it holds (one with a notable, keystone or choice node allocated);
+  anything the refunded nodes joined to the start is routed around them ("Refunded N,
+  rerouted M"), never dropped. Choice nodes come in **Unset**.
+  `web/src/atlas/lib/take.ts`.
 - **Colours:** clusters within 3,000 units never share a colour (16-colour palette; 3.30
-  needs 14). Discs show only for the hovered or pinned mechanic.
+  needs 14). Discs show only for the hovered or highlighted mechanics.
 - **Keyboard:** Tab reaches the zoom buttons, then every cluster label and node; Enter or
-  Space acts as a click, and a focused node shows its tooltip.
+  Space acts as a click, Shift+Enter (or the menu key, Shift+F10) on a mechanic or cluster
+  label as a right-click, and a focused node shows its tooltip.
 - **Routes** are the shortest path from what's allocated (ties go to the lower node id, so
   they're stable); refunding a node drops everything only it joined to the start.
 - Testing it in a browser: serve `web/dist-atlas` as plain files (`atlas.html` renamed

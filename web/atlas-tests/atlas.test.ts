@@ -9,6 +9,7 @@ import {
   buildGraph,
   connected,
   costs,
+  emptyPlan,
   fits,
   normalise,
   refundSet,
@@ -34,7 +35,16 @@ import {
   PALETTE,
 } from "../src/atlas/lib/mechanics.ts";
 import { kept, recalc } from "../src/atlas/lib/recalc.ts";
-import type { AtlasData, Plan } from "../src/atlas/lib/types.ts";
+import {
+  clusterNodes as takeClusterNodes,
+  mechanicNodes,
+  take,
+} from "../src/atlas/lib/take.ts";
+import {
+  mechanicOf,
+  type AtlasData,
+  type Plan,
+} from "../src/atlas/lib/types.ts";
 import {
   exportFile,
   historyReducer,
@@ -936,4 +946,222 @@ test("League page: tree links open in New with their point counts", () => {
     assert.ok(before.ok);
     assert.deepEqual(plan, normalise(graph, data, before.plan), title);
   });
+});
+
+test("take: a whole mechanic, cheapest, one step; again refunds it", () => {
+  const breach = data.mechanics.indexOf("Breach");
+  const targets = mechanicNodes(data, breach);
+  assert.equal(targets.length, 35);
+  const empty: Plan = { allocated: [], choices: {}, budget: 150 };
+  const r = take(graph, data, empty, targets, 150);
+  assert.ok(r.kind === "allocate");
+  const got = new Set(r.plan.allocated);
+  assert.ok(targets.every((id) => got.has(id)));
+  assert.equal(r.points, r.plan.allocated.length);
+  assert.equal(connected(graph, got).size, got.size, "joined to the start");
+  assert.equal(new Set(r.plan.allocated).size, r.plan.allocated.length);
+  // No worse than allocating its nodes one by one (the click route).
+  assert.ok(r.points <= routedPlan(targets).allocated.length);
+  // Close to what Recalc (a search over many joins) finds for the same nodes.
+  const best = recalc(graph, data, r.plan).allocated.length;
+  assert.ok(r.points <= best + 3, `${r.points} vs ${best}`);
+  // Again: refunded, with the paths only it needed.
+  const back = take(graph, data, r.plan, targets, 150);
+  assert.ok(back.kind === "refund");
+  assert.deepEqual(back.plan.allocated, []);
+  assert.equal(back.points, r.points);
+});
+
+test("take: over budget allocates nothing and says the cost", () => {
+  const breach = data.mechanics.indexOf("Breach");
+  const targets = mechanicNodes(data, breach);
+  const plan: Plan = { allocated: [], choices: {}, budget: 20 };
+  const r = take(graph, data, plan, targets, 20);
+  assert.ok(r.kind === "over");
+  assert.equal(r.left, 20);
+  assert.ok(r.needs > 20);
+  // The same count the allocation would spend.
+  const free = take(graph, data, plan, targets, 150);
+  assert.ok(free.kind === "allocate");
+  assert.equal(r.needs, free.points);
+});
+
+test("take: partly allocated tops up; existing nodes stay", () => {
+  const incursion = data.mechanics.indexOf("Incursion");
+  const targets = mechanicNodes(data, incursion);
+  const plan = normalise(graph, data, routedPlan(targets.slice(0, 3)));
+  const withChoice = Object.keys(data.nodes).find(
+    (id) => data.nodes[id].choices,
+  );
+  const base = normalise(graph, data, {
+    ...plan,
+    allocated: [...plan.allocated, ...routedPlan([withChoice!]).allocated],
+    choices: { [withChoice!]: data.nodes[withChoice!].choices![0].effect },
+  });
+  const r = take(graph, data, base, targets, 150);
+  assert.ok(r.kind === "allocate");
+  assert.ok(base.allocated.every((id) => r.plan.allocated.includes(id)));
+  assert.deepEqual(r.plan.choices, base.choices);
+  assert.equal(r.points, r.plan.allocated.length - base.allocated.length);
+});
+
+test("take: one cluster is its group plus its travel notables", () => {
+  for (const label of data.labels) {
+    const nodes = takeClusterNodes(graph, data, label.g);
+    assert.ok(nodes.length > 0, label.g);
+    for (const id of nodes) {
+      const n = data.nodes[id];
+      assert.ok(n.g === label.g || (n.m < 0 && n.a === label.m), id);
+    }
+  }
+  // The clusters of a mechanic together are the mechanic.
+  for (let m = 0; m < data.mechanics.length; m++) {
+    const fromClusters = new Set(
+      data.labels
+        .filter((l) => l.m === m)
+        .flatMap((l) => takeClusterNodes(graph, data, l.g)),
+    );
+    const all = mechanicNodes(data, m);
+    assert.ok(
+      all.every((id) => fromClusters.has(id)),
+      data.mechanics[m],
+    );
+  }
+});
+
+/** Checks a refund of `targets` from `plan`: they're gone, `keep` all stays, joined up. */
+function checkRefund(
+  plan: Plan,
+  targets: string[],
+  keep: string[],
+  what: string,
+) {
+  const r = take(graph, data, plan, targets, 150);
+  assert.ok(r.kind === "refund", what);
+  const left = new Set(r.plan.allocated);
+  assert.equal(left.size, r.plan.allocated.length, `${what}: no duplicates`);
+  assert.ok(!targets.some((id) => left.has(id)), `${what}: targets gone`);
+  const lost = keep.filter((id) => !left.has(id));
+  assert.deepEqual(lost, [], `${what}: kept`);
+  assert.equal(connected(graph, left).size, left.size, `${what}: joined`);
+  const before = new Set(plan.allocated);
+  assert.equal(
+    r.points,
+    plan.allocated.filter((id) => !left.has(id)).length,
+    `${what}: count`,
+  );
+  assert.equal(
+    r.rerouted,
+    r.plan.allocated.filter((id) => !before.has(id)).length,
+    `${what}: rerouted count`,
+  );
+  for (const [id, effect] of Object.entries(plan.choices))
+    if (left.has(id))
+      assert.equal(r.plan.choices[id], effect, `${what}: choice`);
+  return r;
+}
+
+test("take: refunding a mechanic never drops another taken after it", () => {
+  // Strongboxes then Mercenaries: Mercenaries was routed through Strongboxes.
+  const sb = data.mechanics.indexOf("Strongboxes");
+  const me = data.mechanics.indexOf("Mercenaries");
+  const a = take(graph, data, emptyPlan(), mechanicNodes(data, sb), 150);
+  assert.ok(a.kind === "allocate");
+  const b = take(graph, data, a.plan, mechanicNodes(data, me), 150);
+  assert.ok(b.kind === "allocate");
+  const r = checkRefund(
+    b.plan,
+    mechanicNodes(data, sb),
+    mechanicNodes(data, me),
+    "Strongboxes",
+  );
+  assert.ok(r.kind === "refund" && r.rerouted > 0, "routed around");
+  // A sweep of pairs (every 13th, in a fixed order), both orders.
+  const n = data.mechanics.length;
+  for (let x = 0; x < n; x++)
+    for (let y = 0; y < n; y++) {
+      if (x === y || (x * n + y) % 13 !== 0) continue;
+      const first = take(graph, data, emptyPlan(), mechanicNodes(data, x), 150);
+      if (first.kind !== "allocate") continue;
+      const both = take(graph, data, first.plan, mechanicNodes(data, y), 150);
+      if (both.kind !== "allocate") continue;
+      checkRefund(
+        both.plan,
+        mechanicNodes(data, x),
+        mechanicNodes(data, y).filter(
+          (id) => !mechanicNodes(data, x).includes(id),
+        ),
+        `${data.mechanics[x]} after ${data.mechanics[y]}`,
+      );
+    }
+});
+
+test("take: a refund keeps clusters the plan holds, and their small nodes", () => {
+  // A whole cluster held, then a mechanic taken and refunded beside it.
+  for (const label of data.labels) {
+    if (Number(label.g) % 9 !== 0) continue;
+    const cluster = takeClusterNodes(graph, data, label.g);
+    const held = take(graph, data, emptyPlan(), cluster, 150);
+    if (held.kind !== "allocate") continue;
+    for (let m = 0; m < data.mechanics.length; m += 5) {
+      if (m === label.m) continue;
+      const more = take(graph, data, held.plan, mechanicNodes(data, m), 150);
+      if (more.kind !== "allocate") continue;
+      checkRefund(
+        more.plan,
+        mechanicNodes(data, m),
+        cluster,
+        `${data.mechanics[m]} beside ${label.g}`,
+      );
+    }
+  }
+  // A cluster refunded on its own leaves its mechanic's other clusters.
+  const ess = data.mechanics.indexOf("Essence");
+  const all = take(graph, data, emptyPlan(), mechanicNodes(data, ess), 150);
+  assert.ok(all.kind === "allocate");
+  for (const label of data.labels.filter((l) => l.m === ess)) {
+    const one = takeClusterNodes(graph, data, label.g);
+    const others = mechanicNodes(data, ess).filter((id) => !one.includes(id));
+    checkRefund(all.plan, one, others, `Essence cluster ${label.g}`);
+  }
+});
+
+test("take: a refund keeps picked choices on the nodes it keeps", () => {
+  const withChoice = Object.keys(data.nodes).find(
+    (id) => data.nodes[id].choices && mechanicOf(data.nodes[id]) >= 0,
+  )!;
+  const m = mechanicOf(data.nodes[withChoice]);
+  const other = (m + 1) % data.mechanics.length;
+  const a = take(graph, data, emptyPlan(), mechanicNodes(data, m), 150);
+  assert.ok(a.kind === "allocate");
+  const picked = {
+    ...a.plan,
+    choices: { [withChoice]: data.nodes[withChoice].choices![0].effect },
+  };
+  const b = take(graph, data, picked, mechanicNodes(data, other), 150);
+  assert.ok(b.kind === "allocate");
+  assert.deepEqual(b.plan.choices, picked.choices, "allocating keeps choices");
+  const r = checkRefund(
+    b.plan,
+    mechanicNodes(data, other),
+    mechanicNodes(data, m),
+    "other",
+  );
+  assert.ok(r.kind === "refund");
+  assert.deepEqual(r.plan.choices, picked.choices);
+  // Refunding the choice node's own mechanic drops its pick.
+  const back = take(graph, data, picked, mechanicNodes(data, m), 150);
+  assert.ok(back.kind === "refund");
+  assert.equal(back.plan.choices[withChoice], undefined);
+});
+
+test("take: refunding Atlas Anomalies keeps a held Mercenaries cluster", () => {
+  const cluster = takeClusterNodes(graph, data, "195");
+  assert.ok(cluster.includes("9314"));
+  const held = take(graph, data, emptyPlan(), cluster, 150);
+  assert.ok(held.kind === "allocate");
+  const aa = data.mechanics.indexOf("Atlas Anomalies");
+  const more = take(graph, data, held.plan, mechanicNodes(data, aa), 150);
+  assert.ok(more.kind === "allocate");
+  checkRefund(more.plan, mechanicNodes(data, aa), cluster, "Atlas Anomalies");
 });
