@@ -10,9 +10,10 @@
   Each <section> with an id and data-jump becomes a jump button in the app's bar, and its
   .ph header bar folds it (state kept per section id). Edit the content freely; keep those
   two attributes and the .ph > h2 header on the sections.
-  Builds, Trade, Atlas trees and Cheat sheets are Lioneye's own sections, not part of the
-  cheat sheet artifact: keep them, their CSS (the "(Lioneye)" blocks at the end of the
-  style), builds/ and the script when copying a new version of the sheet in.
+  Builds, Holy Relic upgrades, Trade, Atlas trees and Cheat sheets are Lioneye's own
+  sections, not part of the cheat sheet artifact: keep them, their CSS (the "(Lioneye)"
+  blocks at the end of the style), builds/ and the script when copying a new version of
+  the sheet in.
   Fonts are served from fonts/ (SIL OFL, licenses there), not Google Fonts.
 -->
 <style>
@@ -195,6 +196,28 @@
     .sheet col.who { width: 25%; }
     .sheet thead th { font-family: var(--font-body); font-weight: 700; font-size: 10px; text-transform: none; overflow-wrap: normal; padding: 4px 2px; }
   }
+  /* Holy Relic upgrades (Lioneye): the gear table's narrow columns, space above each card's notes. */
+  .sheet.relic col.n { width: 6%; }
+  .sheet.relic col.slot { width: 15%; }
+  .sheet.relic col.num { width: 11%; }
+  .sheet.relic col.cd { width: 19%; }
+  .sheet.relic td:nth-child(4), .sheet.relic td:nth-child(6) { white-space: nowrap; }
+  #relic .farm > div:not(.top) + ul { margin-top: 8px; }
+  @media (max-width: 640px) {
+    .sheet.relic col.n { width: 7%; }
+    .sheet.relic col.slot { width: 17%; }
+    .sheet.relic col.num { width: 13%; }
+    .sheet.relic col.cd { width: 21%; }
+    .sheet.relic td:nth-child(4), .sheet.relic td:nth-child(6) { white-space: normal; }
+  }
+  @media (max-width: 480px) {
+    .sheet.relic col.n { width: 6%; }
+    .sheet.relic col.slot { width: 21%; }
+    .sheet.relic col.num { width: 14%; }
+    .sheet.relic col.cd { width: 19%; }
+    .sheet.relic th, .sheet.relic td { padding: 4px 3px; }
+    .sheet.relic td:nth-child(3), .sheet.relic td:nth-child(4), .sheet.relic td:nth-child(6) { overflow-wrap: normal; }
+  }
 </style>
 </head>
 <body>
@@ -213,6 +236,65 @@
       <div class="farm card"><div class="top"><span class="t">Holy Relic · SRS start</span><button class="copy" type="button" data-code="builds/hroc-necro-srs.txt" aria-label="Copy code" title="Copy code"></button></div><ul><li>Necromancer · Holy Relic of Conviction</li><li>BalorMage's poison SRS leveling</li><li>HRoC from level 53, Spectre Defilers</li></ul></div>
       <div class="farm card"><div class="top"><span class="t">Holy Relic · Absolution start</span><button class="copy" type="button" data-code="builds/hroc-necro-absolution.txt" aria-label="Copy code" title="Copy code"></button></div><ul><li>Necromancer · Holy Relic of Conviction</li><li>BalorMage's Absolution leveling</li><li>HRoC from level 53, Spectre Defilers</li></ul></div>
       <div class="farm card"><div class="top"><span class="t">Frostbearer Spectres</span><button class="copy" type="button" data-code="builds/frostbearer-necro-srs.txt" aria-label="Copy code" title="Copy code"></button></div><ul><li>Necromancer · SRS start</li><li>BalorMage's poison SRS leveling</li><li>Frostbearers once you have corpses, Spectre Defilers</li></ul></div>
+    </div>
+  </section>
+
+  <!-- Holy Relic upgrades (Lioneye, not part of the cheat sheet artifact): gear in the order
+       that adds the most minion DPS, worked out in PoB 3.30 from a level 90 Holy Relic of
+       Conviction build (0.198s Nova cooldown) toward the Holy Relic · SRS start build's End
+       Game loadout (2.79M minion DPS without its Feeding Frenzy setting; neither build has the
+       gem). Each step is measured on top of the ones before it, on the End Game's config,
+       with Lancing Steel's all-projectiles part as Nova's trigger. The End Game's weapon is a
+       hand-made foil (minion damage with attack speed) the trade site has none of: it's the
+       last row, without a link, its gain measured after the gloves.
+       Trade links work as in Trade (data-query + Trade's data-league). -->
+  <section class="panel" id="relic" data-jump="Holy Relic" aria-labelledby="h-relic">
+    <div class="ph"><h2 id="h-relic">Holy Relic upgrades</h2><span class="sub">SRS start · End Game</span></div>
+    <div class="farms">
+      <div class="farm ref wide"><div class="top"><span class="t" id="t-relic-gear">Gear order</span><span class="tag">From level 90</span></div>
+        <div class="key" aria-hidden="true"><span><i class="best"></i>New breakpoint</span></div>
+        <div>
+          <table class="sheet relic" aria-labelledby="t-relic-gear">
+            <colgroup><col class="n"><col><col class="slot"><col class="num"><col class="cd"><col class="num"></colgroup>
+            <thead><tr><th scope="col">#</th><th scope="col">Item</th><th scope="col">Slot</th><th scope="col">DPS gain</th><th scope="col">Cooldown</th><th scope="col">End Game %</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">–</th><td>Start</td><td>–</td><td>–</td><td>0.198s · 66% CDR</td><td>21%</td></tr>
+              <tr><th scope="row">1</th><td><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"name":"Ashes of the Stars","type":"Onyx Amulet","stats":[{"type":"and","filters":[{"id":"explicit.stat_3655769732","value":{"min":26}}]}]},"sort":{"price":"asc"}}'>Ashes of the Stars</a> · 26%+ gem quality</td><td>Amulet</td><td>+51%</td><td class="best"><span class="vh">New breakpoint: </span>0.165s · 96% CDR</td><td>32%</td></tr>
+              <tr><th scope="row">2</th><td><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"name":"Dialla&#39;s Malefaction","type":"Sage&#39;s Robe"},"sort":{"price":"asc"}}'>Dialla's Malefaction</a> · Relic in green, Enhance in red</td><td>Body</td><td>+36%</td><td class="best"><span class="vh">New breakpoint: </span>0.132s · 132% CDR</td><td>43%</td></tr>
+              <tr><th scope="row">3</th><td><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"name":"Asenath&#39;s Gentle Touch","type":"Silk Gloves"},"sort":{"price":"asc"}}'>Asenath's Gentle Touch</a> + <a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"name":"Windscream","type":"Reinforced Greaves"},"sort":{"price":"asc"}}'>Windscream</a> · pair only</td><td>Animate Guardian</td><td>+24%</td><td>–</td><td>53%</td></tr>
+              <tr><th scope="row">4</th><td><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"stats":[{"type":"and","filters":[{"id":"implicit.stat_1589917703","value":{"min":12}},{"id":"explicit.stat_3299347043","value":{"min":70}},{"id":"pseudo.pseudo_total_elemental_resistance","value":{"min":80}}]}],"filters":{"type_filters":{"filters":{"category":{"option":"armour.gloves"}}}}},"sort":{"price":"asc"}}'>Minion damage gloves</a> · Exarch implicit, life, resists</td><td>Gloves</td><td>+3%</td><td>–</td><td>55%</td></tr>
+              <tr><th scope="row">5</th><td><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"type":"Bone Ring","stats":[{"type":"and","filters":[{"id":"explicit.stat_1589917703","value":{"min":10}},{"id":"explicit.stat_3299347043","value":{"min":60}}]}]},"sort":{"price":"asc"}}'>Bone Ring</a> · minion damage, life</td><td>Ring</td><td>+2%</td><td>–</td><td>56%</td></tr>
+              <tr><th scope="row">6</th><td><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"name":"Darkness Enthroned","type":"Stygian Vise"},"sort":{"price":"asc"}}'>Darkness Enthroned</a> + 2 <a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"type":"Ghastly Eye Jewel","stats":[{"type":"and","filters":[{"id":"explicit.stat_1974445926","value":{"min":10}},{"id":"explicit.stat_2889601781"}]}]},"sort":{"price":"asc"}}'>Ghastly Eyes</a> · minion poison, chaos</td><td>Belt</td><td>+1%</td><td>–</td><td>57%</td></tr>
+              <tr><th scope="row">7</th><td>Crafted foil · minion damage, attack speed</td><td>Weapon</td><td>+2%</td><td>–</td><td>58%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul><li>PoB 3.30 · gains stack in order</li><li>Trigger: Lancing Steel</li></ul>
+      </div>
+      <div class="farm ref"><div class="top"><span class="t" id="t-relic-cd">Cooldown breakpoints</span></div>
+        <div class="key" aria-hidden="true"><span><i class="best"></i>End Game</span></div>
+        <div>
+          <table class="sheet relic-cd" aria-labelledby="t-relic-cd">
+            <thead><tr><th scope="col">Cooldown</th><th scope="col">CDR needed</th><th scope="col">Novas/s</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">0.264s</th><td>14%</td><td>3.79</td></tr>
+              <tr><th scope="row">0.231s</th><td>30%</td><td>4.33</td></tr>
+              <tr><th scope="row">0.198s</th><td>52%</td><td>5.05</td></tr>
+              <tr><th scope="row">0.165s</th><td>82%</td><td>6.06</td></tr>
+              <tr><th scope="row">0.132s</th><td class="best"><span class="vh">End Game breakpoint: </span>128%</td><td>7.58</td></tr>
+              <tr><th scope="row">0.099s</th><td>204%</td><td>10.10</td></tr>
+              <tr><th scope="row">0.066s</th><td>355%</td><td>15.15</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul><li>CDR: Relic gem quality + 20% mastery</li><li>Gem level adds no CDR</li><li>Base 0.30s · rounded up to 0.033s ticks</li></ul>
+      </div>
+      <div class="farm ref"><div class="top"><span class="t">After gear</span></div><ul>
+        <li>Relic gem 20 · +10%</li>
+        <li>Relic gem 21 (Vaal) · +10%</li>
+        <li>End Game tree and jewels · +6%</li>
+        <li>Malevolence over Skitterbots · +5%</li>
+      </ul></div>
     </div>
   </section>
 
