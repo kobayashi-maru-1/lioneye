@@ -235,9 +235,15 @@ tooltip already showed the cost.
   reload stays on it. Opening a link over an unchanged save makes no Draft copy.
 - **Export / Import:** all saved plans as one JSON file, so plans can move between
   browsers and into Lioneye's frame (which gets its own storage).
-- **Share:** `…/lioneye/atlas/#t=<base64url>` of
-  `[formatVersion, treeVersion, budget, allocatedIds, [[nodeId, effectId], …]]`, in a
-  small dialog with **Copy**.
+- **Share:** `…/lioneye/atlas/#t=<base64url>`, in a small dialog with **Copy**. Since
+  2026-11-17 the link is compact binary (format 2): `[2, budget, one bit per node of the
+  frozen 3.30 node list, then one byte per allocated choice node in the frozen choice
+  list's order: 0 unset, else its option's place + 1]` (share-nodes.ts holds both lists;
+  a test pins them to 3_30.json and a fixture pins the layout). About 220 characters on
+  the live site with three choice nodes, 258 at most (all 31). Earlier links
+  (format 1, ~1,100 characters at 124 points) were base64url JSON
+  `[1, treeVersion, budget, allocatedIds, [[nodeId, effectId], …]]`; they still open,
+  and a tree other than 3.30 would still share in that form until it gets its own list.
 - **Open:** paste a link. Accepted:
   - our share links;
   - poeatlasplanner.com links (`#p=` base64url JSON

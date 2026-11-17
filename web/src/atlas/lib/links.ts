@@ -1,3 +1,4 @@
+import { SHARE_CHOICES_3_30, SHARE_NODES_3_30 } from "./share-nodes.ts";
 import { MAX_BUDGET, type Plan } from "./types.ts";
 
 /**
@@ -7,7 +8,15 @@ import { MAX_BUDGET, type Plan } from "./types.ts";
  * before it's used.
  */
 
+/** Share links before compact ones: base64url of a JSON array (still read). */
 const SHARE_FORMAT = 1;
+/** Compact share links: binary, one bit per 3.30 node (SHARE_NODES_3_30). */
+const COMPACT_FORMAT = 2;
+const COMPACT_TREE = "3.30.0";
+const COMPACT_BITS = Math.ceil(SHARE_NODES_3_30.length / 8);
+/** Format, budget, then the node bits; one pick byte per allocated choice node follows. */
+const COMPACT_HEAD = 2 + COMPACT_BITS;
+const compactIndex = new Map(SHARE_NODES_3_30.map((id, i) => [id, i]));
 
 function toBase64Url(bytes: Uint8Array, padded: boolean) {
   let binary = "";
@@ -38,12 +47,41 @@ const sortedIds = (ids: string[]) =>
     .filter(Number.isInteger)
     .sort((a, b) => a - b);
 
-/** Our share fragment: `t=` + base64url of [format, treeVersion, budget, ids, choices]. */
+const isSet = (bytes: Uint8Array, i: number) =>
+  (bytes[2 + (i >> 3)] & (1 << (i & 7))) !== 0;
+
+/**
+ * Our share fragment, `t=` + base64url. On the 3.30 tree it's compact: bytes [2, budget,
+ * node bits (bit i = SHARE_NODES_3_30[i], low bit first), then one byte per allocated
+ * choice node in SHARE_CHOICES_3_30's order: 0 for no pick, else its option's place in
+ * that list + 1]. That's 123 bytes plus one per allocated choice node: on the live site
+ * about 220 characters for a plan with three, 258 at most. Ids outside the list (none in
+ * a normalised plan) and picks on nodes not allocated are left out.
+ * Other trees: the JSON form, [1, treeVersion, budget, ids, choices].
+ */
 export function encodeShare(plan: Plan, treeVersion: string) {
-  const choices = Object.entries(plan.choices)
-    .map(([node, effect]) => [Number(node), effect])
-    .sort((a, b) => a[0] - b[0]);
-  return `t=${encodeJson([SHARE_FORMAT, treeVersion, plan.budget, sortedIds(plan.allocated), choices])}`;
+  if (treeVersion !== COMPACT_TREE) {
+    const choices = Object.entries(plan.choices)
+      .map(([node, effect]) => [Number(node), effect])
+      .sort((a, b) => a[0] - b[0]);
+    return `t=${encodeJson([SHARE_FORMAT, treeVersion, plan.budget, sortedIds(plan.allocated), choices])}`;
+  }
+  const head = new Uint8Array(COMPACT_HEAD);
+  head[0] = COMPACT_FORMAT;
+  head[1] = Math.max(1, Math.min(255, Math.round(plan.budget)));
+  for (const id of sortedIds(plan.allocated)) {
+    const i = compactIndex.get(id);
+    if (i !== undefined) head[2 + (i >> 3)] |= 1 << (i & 7);
+  }
+  const picks: number[] = [];
+  for (const [node, effects] of SHARE_CHOICES_3_30) {
+    if (!isSet(head, compactIndex.get(node)!)) continue;
+    picks.push(effects.indexOf(plan.choices[String(node)]) + 1);
+  }
+  const bytes = new Uint8Array(COMPACT_HEAD + picks.length);
+  bytes.set(head);
+  bytes.set(picks, COMPACT_HEAD);
+  return `t=${toBase64Url(bytes, false)}`;
 }
 
 /** The official atlas tree link's bytes: version 6, class, ascendancy, ids, two empty counts. */
@@ -89,8 +127,39 @@ function budgetOf(v: unknown) {
   return Number.isFinite(n) && n > 0 ? n : MAX_BUDGET;
 }
 
+/** A compact share link's bytes (see encodeShare); anything off by a byte is refused. */
+function decodeCompact(bytes: Uint8Array): LinkResult {
+  if (bytes.length < COMPACT_HEAD || bytes[0] !== COMPACT_FORMAT)
+    return { ok: false };
+  const allocated: string[] = [];
+  for (let i = 0; i < SHARE_NODES_3_30.length; i++)
+    if (isSet(bytes, i)) allocated.push(String(SHARE_NODES_3_30[i]));
+  // Bits past the list's end are never set by encodeShare.
+  for (let i = SHARE_NODES_3_30.length; i < COMPACT_BITS * 8; i++)
+    if (isSet(bytes, i)) return { ok: false };
+  const choices: Record<string, number> = {};
+  let at = COMPACT_HEAD;
+  for (const [node, effects] of SHARE_CHOICES_3_30) {
+    if (!isSet(bytes, compactIndex.get(node)!)) continue;
+    if (at >= bytes.length) return { ok: false };
+    const pick = bytes[at++];
+    if (pick > effects.length) return { ok: false };
+    if (pick > 0) choices[String(node)] = effects[pick - 1];
+  }
+  // One byte per allocated choice node, no more.
+  if (at !== bytes.length) return { ok: false };
+  return {
+    ok: true,
+    kind: "share",
+    plan: { allocated, choices, budget: budgetOf(bytes[1]) },
+  };
+}
+
 function decodeShare(text: string): LinkResult {
-  const value = decodeJson(text);
+  const bytes = fromBase64Url(text);
+  // A JSON link starts with "[", a compact one with its format byte.
+  if (bytes[0] === COMPACT_FORMAT) return decodeCompact(bytes);
+  const value: unknown = JSON.parse(new TextDecoder().decode(bytes));
   if (!Array.isArray(value) || value[0] !== SHARE_FORMAT || !isIdList(value[3]))
     return { ok: false };
   return {

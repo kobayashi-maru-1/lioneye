@@ -45,6 +45,10 @@ import {
 } from "../src/atlas/lib/mechanics.ts";
 import { kept, recalc } from "../src/atlas/lib/recalc.ts";
 import {
+  SHARE_CHOICES_3_30,
+  SHARE_NODES_3_30,
+} from "../src/atlas/lib/share-nodes.ts";
+import {
   clusterNodes as takeClusterNodes,
   mechanicNodes,
   take,
@@ -306,6 +310,141 @@ test("share link round-trips nodes, choices and budget", () => {
   );
   assert.deepEqual(out.choices, { "45404": 5301 });
   assert.equal(out.budget, 77);
+});
+
+test("compact share links: frozen lists are the 3.30 tree's, in id order", () => {
+  assert.equal(data.version, "3.30.0");
+  assert.deepEqual(
+    [...SHARE_NODES_3_30],
+    Object.keys(data.nodes)
+      .map(Number)
+      .sort((a, b) => a - b),
+  );
+  assert.deepEqual(
+    SHARE_CHOICES_3_30.map(([node, effects]) => [node, [...effects]]),
+    Object.entries(data.nodes)
+      .filter(([, n]) => n.choices)
+      .map(([id, n]) => [Number(id), n.choices!.map((c) => c.effect)])
+      .sort((a, b) => (a[0] as number) - (b[0] as number)),
+  );
+});
+
+const destructiveJson = () =>
+  readFileSync(
+    new URL("./destructive-play-link.txt", import.meta.url),
+    "utf8",
+  ).trim();
+const destructiveCompact = () =>
+  readFileSync(
+    new URL("./destructive-play-compact.txt", import.meta.url),
+    "utf8",
+  ).trim();
+
+test("compact share links: short, and the same plan as the old JSON link", () => {
+  const old = destructiveJson();
+  const before = parseLink(old);
+  assert.ok(before.ok && before.kind === "share");
+  assert.equal(before.plan.allocated.length, 124);
+  const fragment = encodeShare(before.plan, data.version);
+  assert.match(fragment, /^t=A[A-Za-z0-9_-]+$/);
+  const link = `https://kobayashi-maru-1.github.io/lioneye/atlas/#${fragment}`;
+  assert.ok(old.length > 1000 && link.length < 230, `${link.length}`);
+  // The desktop app's League page handoff accepts it.
+  assert.equal(atlasTreeUrl(link), link);
+  const after = parseLink(link);
+  assert.ok(after.ok && after.kind === "share");
+  assert.deepEqual(
+    normalise(graph, data, after.plan),
+    normalise(graph, data, before.plan),
+  );
+  assert.deepEqual(after.plan.choices, {
+    "712": 8618,
+    "12887": 20818,
+    "28477": 49076,
+  });
+  assert.equal(after.plan.budget, 150);
+  // Another tree keeps the JSON form ("[" is "W" in base64).
+  assert.match(encodeShare(before.plan, "3.31.0"), /^t=W/);
+});
+
+test("compact share links: the byte layout is pinned (links already shared)", () => {
+  // Made once by encodeShare and kept: if this fails, links people shared would change.
+  const pinned = destructiveCompact();
+  const before = parseLink(destructiveJson());
+  const after = parseLink(pinned);
+  assert.ok(before.ok && after.ok);
+  assert.deepEqual(
+    normalise(graph, data, after.plan),
+    normalise(graph, data, before.plan),
+  );
+  assert.equal(after.plan.allocated.length, 124);
+  assert.deepEqual(after.plan.choices, {
+    "712": 8618,
+    "12887": 20818,
+    "28477": 49076,
+  });
+  assert.equal(
+    `https://kobayashi-maru-1.github.io/lioneye/atlas/#${encodeShare(before.plan, data.version)}`,
+    pinned,
+  );
+});
+
+test("compact share links: worst case stays short, every node and pick back", () => {
+  // Every node, and every choice node on its last option.
+  const all = Object.keys(data.nodes);
+  const choices = Object.fromEntries(
+    SHARE_CHOICES_3_30.map(([node, effects]) => [
+      String(node),
+      effects[effects.length - 1],
+    ]),
+  );
+  const fragment = encodeShare(
+    { allocated: all, choices, budget: 150 },
+    data.version,
+  );
+  const link = `https://kobayashi-maru-1.github.io/lioneye/atlas/#${fragment}`;
+  assert.ok(link.length <= 260, `${link.length}`);
+  const back = parseLink(link);
+  assert.ok(back.ok);
+  assert.deepEqual([...back.plan.allocated].sort(), [...all].sort());
+  assert.deepEqual(back.plan.choices, choices);
+  // A pick on a node not allocated is left out; an unknown effect reads back unset.
+  const one = route(graph, none, "45404")!;
+  const odd = parseLink(
+    `#${encodeShare({ allocated: one, choices: { "45404": 999999, "712": 8618 }, budget: 40 }, data.version)}`,
+  );
+  assert.ok(odd.ok);
+  assert.deepEqual(odd.plan.choices, {});
+  assert.equal(odd.plan.budget, 40);
+});
+
+test("compact share links: a byte off is refused", () => {
+  const plan: Plan = {
+    allocated: route(graph, none, "45404")!,
+    choices: { "45404": 5301 },
+    budget: 77,
+  };
+  const bytes = Buffer.from(
+    encodeShare(plan, data.version).slice(2),
+    "base64url",
+  );
+  const read = (b: Uint8Array) =>
+    parseLink(`#t=${Buffer.from(b).toString("base64url")}`).ok;
+  const head = 2 + Math.ceil(SHARE_NODES_3_30.length / 8);
+  assert.equal(bytes.length, head + 1); // one allocated choice node: one pick byte
+  assert.equal(read(bytes), true);
+  assert.equal(read(bytes.subarray(0, bytes.length - 1)), false); // pick missing
+  assert.equal(read(Buffer.concat([bytes, Buffer.from([0])])), false); // extra byte
+  assert.equal(read(bytes.subarray(0, head - 1)), false); // too short
+  const format = Buffer.from(bytes);
+  format[0] = 3;
+  assert.equal(read(format), false);
+  const pastEnd = Buffer.from(bytes);
+  pastEnd[head - 1] |= 0x80; // bit 967: the first past the 967 nodes
+  assert.equal(read(pastEnd), false);
+  const badPick = Buffer.from(bytes);
+  badPick[head] = 99; // no node has 99 options
+  assert.equal(read(badPick), false);
 });
 
 test("undo and redo restore exact plans with choices", () => {
