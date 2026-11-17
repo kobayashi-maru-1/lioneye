@@ -243,6 +243,14 @@ tooltip already showed the cost.
     (u32 version 6, class, ascendancy, node count, u16 ids, then two count bytes).
     **Check:** the trailing section may hold choices as (effect, node) pairs like passive
     masteries; test with a link made with a choice picked before relying on it.
+  - poeplanner.com atlas links `https://poeplanner.com/atlas-tree/<code>` (PoE 1; `/atlas-tree2/` is
+    PoE 2 and isn't read). The code is URL-safe base64 (padded) of, little endian: u16 format
+    (1-5 read; poeplanner refuses newer ones itself), u16 tree version (poeplanner's own
+    numbering from cdn.poeplanner.com/json/versions.json: 30 is 3.30.0, 29 3.30 Ruthless), a
+    PoE 2 byte (format 5+; non-zero is refused), u16 count, u16 node ids (our ids), then u16
+    length + gzipped notes (format 4+, not read). No choices: they open Unset. A code whose
+    first three bytes are zero is the official format. Checked Nov 2026 against poeplanner's
+    own re-encoded code (`web/atlas-tests/poeplanner-link.txt`). No request is made.
   - maxroll.gg planner links `https://maxroll.gg/poe/<…planner>/<id>` (its farming
     strategy planner's share links). The link is only an id, so Open fetches
     `https://planners.maxroll.gg/profiles/poe/<id>` (it allows cross-site reads) once, when

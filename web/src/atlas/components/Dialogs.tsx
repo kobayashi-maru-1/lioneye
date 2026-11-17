@@ -185,9 +185,9 @@ const OPEN_ERRORS = {
 };
 
 /**
- * Paste a tree link to open: ours, poeatlasplanner.com's, the official one or a maxroll
- * planner link (fetched, so Open waits for it; Cancel, closing or an edit stops the fetch
- * and drops its answer).
+ * Paste a tree link to open: ours, poeatlasplanner.com's, the official one, a
+ * poeplanner.com atlas link or a maxroll planner link (fetched, so Open waits for it;
+ * Cancel, closing or an edit stops the fetch and drops its answer).
  */
 export function OpenDialog({
   isOpen,

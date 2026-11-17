@@ -633,6 +633,68 @@ test("Open fetches a maxroll link once, without cookies; failures say so", async
   }
 });
 
+// poeplanner.com's own code for the maxroll fixture's tree: it loaded that tree (142 of
+// 150) and rewrote its address to this.
+const poeplannerLink = readFileSync(
+  new URL("./poeplanner-link.txt", import.meta.url),
+  "utf8",
+).trim();
+
+test("a poeplanner.com atlas link opens its nodes, no choices", () => {
+  const r = parseLink(poeplannerLink);
+  assert.ok(r.ok && r.kind === "poeplanner");
+  const fromMaxroll = decodeMaxroll(maxrollProfile);
+  assert.ok(fromMaxroll.ok);
+  assert.deepEqual(
+    [...r.plan.allocated].sort(),
+    [...fromMaxroll.plan.allocated].sort(),
+  );
+  assert.deepEqual(r.plan.choices, {});
+  const plan = normalise(graph, data, r.plan);
+  assert.equal(plan.allocated.length, 142);
+  // Also with www, a trailing slash or a query.
+  const code = poeplannerLink.split("/atlas-tree/")[1];
+  for (const link of [
+    `https://www.poeplanner.com/atlas-tree/${code}`,
+    `https://poeplanner.com/atlas-tree/${code}/`,
+    `  https://poeplanner.com/atlas-tree/${code}?x=1 `,
+    `https://poeplanner.com/atlas-tree/${code}#x`,
+  ])
+    assert.ok(parseLink(link).ok, link);
+});
+
+test("poeplanner: the official format under its path opens too", () => {
+  const official = encodeOfficial(["8132", "47222"]).split("/").pop()!;
+  const r = parseLink(`https://poeplanner.com/atlas-tree/${official}`);
+  assert.ok(r.ok && r.kind === "poeplanner");
+  assert.deepEqual(r.plan.allocated, ["8132", "47222"]);
+});
+
+test("poeplanner: PoE 2, newer formats and broken codes open nothing", () => {
+  const code = (bytes: number[]) =>
+    "https://poeplanner.com/atlas-tree/" +
+    Buffer.from(bytes).toString("base64url");
+  const good = [5, 0, 30, 0, 0, 1, 0, 0x64, 0x1f];
+  assert.ok(parseLink(code(good)).ok);
+  // An empty tree opens empty, as an empty official link does.
+  const empty = parseLink(code([5, 0, 30, 0, 0, 0, 0]));
+  assert.ok(empty.ok && empty.plan.allocated.length === 0);
+  for (const [name, link] of [
+    ["PoE 2 byte", code([5, 0, 30, 0, 1, 1, 0, 0x64, 0x1f])],
+    ["format 6", code([6, 0, 30, 0, 0, 1, 0, 0x64, 0x1f])],
+    ["format 0", code([0, 0, 30, 0, 0, 1, 0, 0x64, 0x1f])],
+    ["truncated ids", code([5, 0, 30, 0, 0, 3, 0, 0x64, 0x1f])],
+    ["too short", code([5, 0])],
+    ["atlas-tree2", poeplannerLink.replace("/atlas-tree/", "/atlas-tree2/")],
+    [
+      "other host",
+      poeplannerLink.replace("poeplanner.com", "poeplanner.evil.com"),
+    ],
+    ["passive tree", poeplannerLink.replace("/atlas-tree/", "/")],
+  ])
+    assert.equal(parseLink(link).ok, false, name);
+});
+
 test("other text is not a link", () => {
   for (const s of [
     "",

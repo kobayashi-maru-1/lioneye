@@ -2,8 +2,9 @@ import { MAX_BUDGET, type Plan } from "./types.ts";
 
 /**
  * Tree links: our share links (`#t=`), poeatlasplanner.com links (`#p=`), the official
- * pathofexile.com atlas tree links and maxroll.gg planner links (fetched). Decoding never
- * trusts the input: the result goes through normalise() before it's used.
+ * pathofexile.com atlas tree links, poeplanner.com atlas links and maxroll.gg planner
+ * links (fetched). Decoding never trusts the input: the result goes through normalise()
+ * before it's used.
  */
 
 const SHARE_FORMAT = 1;
@@ -61,7 +62,7 @@ export function encodeOfficial(ids: string[]) {
 export type LinkResult =
   | {
       ok: true;
-      kind: "share" | "planner" | "official" | "maxroll";
+      kind: "share" | "planner" | "official" | "maxroll" | "poeplanner";
       plan: Plan;
     }
   | { ok: false };
@@ -149,6 +150,40 @@ function decodeOfficial(text: string): LinkResult {
     ok: true,
     kind: "official",
     plan: { allocated, choices, budget: MAX_BUDGET },
+  };
+}
+
+/** The newest poeplanner.com atlas format read; its own client refuses newer ones too. */
+const POEPLANNER_FORMAT = 5;
+
+/**
+ * poeplanner.com atlas links (`/atlas-tree/<code>`, PoE 1): URL-safe base64 of, little
+ * endian, u16 format, u16 tree version (its own numbering: 30 is 3.30), a PoE 2 byte
+ * (format 5+), u16 count, u16 node ids, then gzipped notes (format 4+, not read). No
+ * choices. A code starting with three zero bytes is the official format instead.
+ */
+function decodePoeplanner(text: string): LinkResult {
+  const bytes = fromBase64Url(text);
+  if (bytes.length >= 3 && bytes[0] + bytes[1] + bytes[2] === 0) {
+    const official = decodeOfficial(text);
+    return official.ok ? { ...official, kind: "poeplanner" } : official;
+  }
+  const u16 = (at: number) => bytes[at] | (bytes[at + 1] << 8);
+  if (bytes.length < 6) return { ok: false };
+  const format = u16(0);
+  if (format < 1 || format > POEPLANNER_FORMAT) return { ok: false };
+  let at = 4;
+  if (format >= 5 && bytes[at++] !== 0) return { ok: false }; // a PoE 2 atlas
+  if (at + 2 > bytes.length) return { ok: false };
+  const count = u16(at);
+  at += 2;
+  if (at + count * 2 > bytes.length) return { ok: false };
+  const allocated: string[] = [];
+  for (let i = 0; i < count; i++) allocated.push(String(u16(at + i * 2)));
+  return {
+    ok: true,
+    kind: "poeplanner",
+    plan: { allocated, choices: {}, budget: MAX_BUDGET },
   };
 }
 
@@ -318,6 +353,11 @@ export function parseLink(input: string): LinkResult {
   try {
     const official = /atlas-skill-tree\/([A-Za-z0-9_\-+/=]+)/.exec(text);
     if (official) return decodeOfficial(official[1]);
+    const poeplanner =
+      /^https?:\/\/(?:www\.)?poeplanner\.com\/atlas-tree\/([A-Za-z0-9_\-=]+)\/?(?:[?#].*)?$/.exec(
+        text,
+      );
+    if (poeplanner) return decodePoeplanner(poeplanner[1]);
     const share = /(?:^|[#&])t=([A-Za-z0-9_\-+/=]+)/.exec(text);
     if (share) return decodeShare(share[1]);
     const planner = /(?:^|[#&])p=([A-Za-z0-9_\-+/=]+)/.exec(text);
