@@ -81,10 +81,7 @@ impl Engine {
     /// `keep`: whether PoB should stay loaded though idle (a guide page is open).
     pub fn start(keep: impl Fn() -> bool + Send + 'static) -> Engine {
         let (jobs, rx) = mpsc::channel();
-        if let Err(err) = thread::Builder::new()
-            .name("pob".into())
-            .spawn(move || run(rx, keep))
-        {
+        if let Err(err) = thread::Builder::new().name("pob".into()).spawn(move || run(rx, keep)) {
             error!("Couldn't start the PoB thread: {err}");
         }
         Engine { jobs }
@@ -123,13 +120,7 @@ impl Engine {
         let stopped = || "PoB isn't running. Restart the app.".to_string();
         let (reply, answer) = oneshot::channel();
         self.jobs
-            .send(Job {
-                kind,
-                xml,
-                loadout,
-                pick,
-                reply,
-            })
+            .send(Job { kind, xml, loadout, pick, reply })
             .map_err(|_| stopped())?;
         answer.await.map_err(|_| stopped())?
     }
@@ -159,10 +150,7 @@ fn run(jobs: mpsc::Receiver<Job>, keep: impl Fn() -> bool) {
         // Something removed the unpacked copy under a loaded PoB (another copy of the app
         // unpacking a different bundle clears the others): PoB would fail on every module it
         // hasn't loaded yet. Load it again, which unpacks it again.
-        if pob
-            .as_ref()
-            .is_some_and(|loaded| !loaded.dir.join(".complete").exists())
-        {
+        if pob.as_ref().is_some_and(|loaded| !loaded.dir.join(".complete").exists()) {
             warn!("PoB's unpacked copy is gone; loading it again");
             pob = None;
         }
@@ -182,9 +170,7 @@ fn run(jobs: mpsc::Receiver<Job>, keep: impl Fn() -> bool) {
 
         let answer = match job.kind {
             Kind::Stats => loaded.stats(&job.xml, job.loadout.as_deref(), job.pick.as_ref()),
-            Kind::Compare { full } => {
-                loaded.compare(&job.xml, job.loadout.as_deref(), job.pick.as_ref(), full)
-            }
+            Kind::Compare { full } => loaded.compare(&job.xml, job.loadout.as_deref(), job.pick.as_ref(), full),
         };
         let what = match job.kind {
             Kind::Stats => "stats",
@@ -237,13 +223,8 @@ impl Pob {
         // For working on pob-host.lua without rebuilding the exe.
         let host = match std::env::var_os(HOST_OVERRIDE) {
             Some(path) => {
-                info!(
-                    "Using {} from {}",
-                    HOST_OVERRIDE,
-                    Path::new(&path).display()
-                );
-                fs::read_to_string(&path)
-                    .map_err(|err| format!("Couldn't read {HOST_OVERRIDE}: {err}"))?
+                info!("Using {} from {}", HOST_OVERRIDE, Path::new(&path).display());
+                fs::read_to_string(&path).map_err(|err| format!("Couldn't read {HOST_OVERRIDE}: {err}"))?
             }
             None => HOST.to_string(),
         };
@@ -265,9 +246,7 @@ impl Pob {
                     let mut out = Vec::new();
                     flate2::read::ZlibDecoder::new(&data.as_bytes()[..])
                         .read_to_end(&mut out)
-                        .map_err(|err| {
-                            mlua::Error::runtime(format!("Couldn't unpack PoB data: {err}"))
-                        })?;
+                        .map_err(|err| mlua::Error::runtime(format!("Couldn't unpack PoB data: {err}")))?;
                     lua.create_string(out)
                 })?,
             )?;
@@ -277,70 +256,25 @@ impl Pob {
                 lua.create_function(move |_, path: String| Ok(fetch(&fetch_dir, &path)))?,
             )?;
             lua.load(host.as_str()).set_name("pob-host").exec()?;
-            Ok((
-                globals.get::<Function>("host_stats")?,
-                globals.get::<Function>("host_compare")?,
-            ))
+            Ok((globals.get::<Function>("host_stats")?, globals.get::<Function>("host_compare")?))
         };
         let (stats, compare) = setup().map_err(|err| message(&err))?;
-        info!(
-            "PoB {} loaded in {:.1}s",
-            version(),
-            started.elapsed().as_secs_f32()
-        );
-        Ok(Pob {
-            stats,
-            compare,
-            _lua: lua,
-            dir,
-            _hold: hold,
-        })
+        info!("PoB {} loaded in {:.1}s", version(), started.elapsed().as_secs_f32());
+        Ok(Pob { stats, compare, _lua: lua, dir, _hold: hold })
     }
 
-    fn stats(
-        &self,
-        xml: &str,
-        loadout: Option<&str>,
-        pick: Option<&Pick>,
-    ) -> Result<String, String> {
+    fn stats(&self, xml: &str, loadout: Option<&str>, pick: Option<&Pick>) -> Result<String, String> {
         let (id, label, group, skill, part, minion, minion_skill) = pick_args(pick);
         self.stats
-            .call::<mlua::String>((
-                xml,
-                loadout,
-                id,
-                label,
-                group,
-                skill,
-                part,
-                minion,
-                minion_skill,
-            ))
+            .call::<mlua::String>((xml, loadout, id, label, group, skill, part, minion, minion_skill))
             .map(|json| json.to_string_lossy())
             .map_err(|err| message(&err))
     }
 
-    fn compare(
-        &self,
-        xml: &str,
-        loadout: Option<&str>,
-        pick: Option<&Pick>,
-        full: bool,
-    ) -> Result<String, String> {
+    fn compare(&self, xml: &str, loadout: Option<&str>, pick: Option<&Pick>, full: bool) -> Result<String, String> {
         let (id, label, group, skill, part, minion, minion_skill) = pick_args(pick);
         self.compare
-            .call::<mlua::String>((
-                xml,
-                loadout,
-                full,
-                id,
-                label,
-                group,
-                skill,
-                part,
-                minion,
-                minion_skill,
-            ))
+            .call::<mlua::String>((xml, loadout, full, id, label, group, skill, part, minion, minion_skill))
             .map(|json| json.to_string_lossy())
             .map_err(|err| message(&err))
     }
@@ -360,15 +294,15 @@ fn pick_args(
     Option<&str>,
 ) {
     pick.map(|p| {
-        (
-            Some(p.id.as_str()),
-            p.label.as_deref(),
-            p.group,
-            p.skill,
-            p.part.as_deref(),
-            p.minion.as_deref(),
-            p.minion_skill.as_deref(),
-        )
+            (
+                Some(p.id.as_str()),
+                p.label.as_deref(),
+                p.group,
+                p.skill,
+                p.part.as_deref(),
+                p.minion.as_deref(),
+                p.minion_skill.as_deref(),
+            )
     })
     .unwrap_or_default()
 }
@@ -380,15 +314,8 @@ fn message(err: &mlua::Error) -> String {
         mlua::Error::RuntimeError(msg) => msg.clone(),
         other => other.to_string(),
     };
-    let first = text
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .unwrap_or("PoB failed");
-    first
-        .strip_prefix("runtime error: ")
-        .unwrap_or(first)
-        .to_string()
+    let first = text.lines().map(str::trim).find(|line| !line.is_empty()).unwrap_or("PoB failed");
+    first.strip_prefix("runtime error: ").unwrap_or(first).to_string()
 }
 
 /// The bundled PoB release, e.g. "v2.67.2".
@@ -413,11 +340,7 @@ fn unpack() -> Result<PathBuf, String> {
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir)
         .join("exile-leveling")
-        .join(if cfg!(debug_assertions) {
-            "pob-dev"
-        } else {
-            "pob"
-        });
+        .join(if cfg!(debug_assertions) { "pob-dev" } else { "pob" });
     let dir = root.join(bundle_name());
     if dir.join(".complete").exists() {
         return Ok(dir);
@@ -427,8 +350,8 @@ fn unpack() -> Result<PathBuf, String> {
     let partial = root.join(format!("{}.partial", bundle_name()));
     let _ = fs::remove_dir_all(&partial);
     fs::create_dir_all(&partial).map_err(|err| fail("create the PoB folder", &err))?;
-    let mut archive = zip::ZipArchive::new(Cursor::new(ARCHIVE))
-        .map_err(|err| fail("read the bundled PoB", &err))?;
+    let mut archive =
+        zip::ZipArchive::new(Cursor::new(ARCHIVE)).map_err(|err| fail("read the bundled PoB", &err))?;
     archive
         .extract(&partial)
         .map_err(|err| fail("unpack PoB", &err))?;
@@ -501,24 +424,13 @@ fn fetch(dir: &Path, path: &str) -> bool {
     }
     let target = dir.join(path);
     let partial = target.with_extension("download");
-    let url = format!(
-        "https://raw.githubusercontent.com/{REPO}/{}/src/{path}",
-        version()
-    );
+    let url = format!("https://raw.githubusercontent.com/{REPO}/{}/src/{path}", version());
     let started = Instant::now();
 
     let mut curl = Command::new("curl.exe");
-    curl.args([
-        "--fail",
-        "--silent",
-        "--show-error",
-        "--location",
-        "--retry",
-        "2",
-        "--output",
-    ])
-    .arg(&partial)
-    .arg(&url);
+    curl.args(["--fail", "--silent", "--show-error", "--location", "--retry", "2", "--output"])
+        .arg(&partial)
+        .arg(&url);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -531,10 +443,7 @@ fn fetch(dir: &Path, path: &str) -> bool {
         Ok(out) => {
             // 22: HTTP error, e.g. 404 for a part number past the last one.
             if out.status.code() != Some(22) {
-                warn!(
-                    "Downloading {url} failed: {}",
-                    String::from_utf8_lossy(&out.stderr).trim()
-                );
+                warn!("Downloading {url} failed: {}", String::from_utf8_lossy(&out.stderr).trim());
             }
             false
         }
@@ -546,10 +455,7 @@ fn fetch(dir: &Path, path: &str) -> bool {
     if !ok {
         let _ = fs::remove_file(&partial);
     } else {
-        info!(
-            "Downloaded {path} in {:.1}s",
-            started.elapsed().as_secs_f32()
-        );
+        info!("Downloaded {path} in {:.1}s", started.elapsed().as_secs_f32());
     }
     ok
 }
@@ -583,11 +489,9 @@ mod tests {
             }
         }
         assert!(checked > 100, "only {checked} Lua files in the bundle");
-        assert!(
-            failed.is_empty(),
-            "PoB code the embedded LuaJIT can't compile:\n{}",
-            failed.join("\n")
-        );
+        assert!(failed.is_empty(), "PoB code the embedded LuaJIT can't compile:
+{}", failed.join("
+"));
     }
 
     /// For working on pob-host.lua: runs the bundled PoB on a build and writes the guide's
@@ -596,8 +500,7 @@ mod tests {
     #[test]
     #[ignore]
     fn dump_stats() {
-        let xml =
-            std::fs::read_to_string(std::env::var("POB_DUMP_XML").expect("POB_DUMP_XML")).unwrap();
+        let xml = std::fs::read_to_string(std::env::var("POB_DUMP_XML").expect("POB_DUMP_XML")).unwrap();
         let loadout = std::env::var("POB_DUMP_LOADOUT").ok();
         let pob = super::Pob::load().unwrap();
         // POB_DUMP_PICK: a main skill's gem id, as Compare picks Build 1's skill for Build 2.
@@ -611,8 +514,7 @@ mod tests {
             minion_skill: None,
         });
         let json = if std::env::var("POB_DUMP_COMPARE").is_ok() {
-            pob.compare(&xml, loadout.as_deref(), pick.as_ref(), true)
-                .unwrap()
+            pob.compare(&xml, loadout.as_deref(), pick.as_ref(), true).unwrap()
         } else {
             pob.stats(&xml, loadout.as_deref(), None).unwrap()
         };
@@ -626,8 +528,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn loaded_copy_survives_cleanup() {
-        let xml =
-            std::fs::read_to_string(std::env::var("POB_DUMP_XML").expect("POB_DUMP_XML")).unwrap();
+        let xml = std::fs::read_to_string(std::env::var("POB_DUMP_XML").expect("POB_DUMP_XML")).unwrap();
         let engine = super::Engine::start(|| true);
         engine.stats(xml.clone(), None, None).await.unwrap();
         let dir = super::unpack().unwrap();
@@ -640,12 +541,8 @@ mod tests {
     #[test]
     fn only_timeless_jewel_files_download() {
         assert!(is_jewel_file("Data/TimelessJewelData/LethalPride.zip"));
-        assert!(is_jewel_file(
-            "Data/TimelessJewelData/GloriousVanity.zip.part0"
-        ));
-        assert!(is_jewel_file(
-            "Data/TimelessJewelData/AbyssKurgal.zip.part12"
-        ));
+        assert!(is_jewel_file("Data/TimelessJewelData/GloriousVanity.zip.part0"));
+        assert!(is_jewel_file("Data/TimelessJewelData/AbyssKurgal.zip.part12"));
         assert!(!is_jewel_file("Data/TimelessJewelData/../../Launch.lua"));
         assert!(!is_jewel_file("Data/TimelessJewelData/x.zip.part"));
         assert!(!is_jewel_file("Data/TimelessJewelData/.zip"));
