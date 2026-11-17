@@ -1180,7 +1180,12 @@ test("League page: tree links open in New with their point counts", () => {
       /<a class="t" href="([^"]+)"[^>]*>([^<]+)<\/a>.*?(\d+) points/g,
     ),
   ];
-  assert.equal(cards.length, 3);
+  // Cards added later have no poeatlasplanner original; the first ones replaced theirs.
+  assert.equal(
+    cards.length,
+    (section.match(/class="farm card"/g) ?? []).length,
+  );
+  assert.ok(cards.length >= plannerLinks.length);
   cards.forEach(([, href, title, points], i) => {
     const url = atlasTreeUrl(href);
     assert.ok(url, title);
@@ -1190,6 +1195,7 @@ test("League page: tree links open in New with their point counts", () => {
     assert.equal(plan.allocated.length, Number(points), title);
     assert.equal(plan.allocated.length, link.plan.allocated.length, title);
     // The same tree as the poeatlasplanner link it replaced: nodes, choices, budget.
+    if (i >= plannerLinks.length) return;
     const before = parseLink(plannerLinks[i]);
     assert.ok(before.ok);
     assert.deepEqual(plan, normalise(graph, data, before.plan), title);
