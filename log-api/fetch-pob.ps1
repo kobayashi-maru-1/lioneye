@@ -21,8 +21,8 @@ $out = Join-Path $PSScriptRoot 'pob'
 $zip = Join-Path $out 'pob.zip'
 $versionFile = Join-Path $out 'version.txt'
 # Release plus this number, recorded in bundle.txt. Raise the number when the files picked
-# below change, so an existing bundle of the same release is rebuilt.
-$format = 2
+# or how they're rewritten below change, so an existing bundle of the same release is rebuilt.
+$format = 3
 $bundleFile = Join-Path $out 'bundle.txt'
 
 function Invoke-Git {
@@ -88,6 +88,33 @@ try {
   Copy-Item -Recurse (Join-Path $work 'src\*') $stage
   Copy-Item -Recurse (Join-Path $work 'runtime\lua') (Join-Path $stage 'lua')
   Copy-Item (Join-Path $work 'manifest.xml'), (Join-Path $work 'LICENSE.md') $stage
+
+  # PoB's own LuaJIT takes compound assignment ("count += 1", from PoB 2.68); the LuaJIT the
+  # exe embeds doesn't. Rewrite each one-statement line to "count = count + (1)". Lines with
+  # a comment, a second statement or a call in the target are left alone: the exe's
+  # bundled_lua_compiles test then fails the build instead of shipping code that can't load.
+  $compound = [regex]'(?m)^(?<indent>[ \t]*)(?<target>[A-Za-z_]\w*(?:\.[A-Za-z_]\w*|\[[^\]\r\n()]+\])*)[ \t]*(?<op>\.\.|[-+*/%^])=[ \t]*(?<value>[^;\r\n]*?)[ \t]*(?<eol>\r?)$'
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
+  foreach ($file in Get-ChildItem $stage -Recurse -Filter '*.lua') {
+    $bytes = [IO.File]::ReadAllBytes($file.FullName)
+    $bom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+    $text = $utf8.GetString($bytes, $(if ($bom) { 3 } else { 0 }), $bytes.Length - $(if ($bom) { 3 } else { 0 }))
+    $count = 0
+    $new = $compound.Replace($text, {
+      param($m)
+      $value = $m.Groups['value'].Value
+      if (-not $value -or $value.Contains('--')) { return $m.Value }
+      $script:count++
+      $target = $m.Groups['target'].Value
+      "$($m.Groups['indent'].Value)$target = $target $($m.Groups['op'].Value) ($value)$($m.Groups['eol'].Value)"
+    })
+    if ($count -gt 0) {
+      $fileBytes = $utf8.GetBytes($new)
+      if ($bom) { $fileBytes = [byte[]](@(0xEF, 0xBB, 0xBF) + $fileBytes) }
+      [IO.File]::WriteAllBytes($file.FullName, $fileBytes)
+      Write-Host "Rewrote $count compound assignment(s) in $($file.FullName.Substring($stage.Length + 1))"
+    }
+  }
 
   New-Item -ItemType Directory -Force $out | Out-Null
   Remove-Item $zip -ErrorAction SilentlyContinue

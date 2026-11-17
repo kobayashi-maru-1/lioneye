@@ -691,6 +691,12 @@ release (code and game data only, about 5 MB) for the Stats tab; `log-api\fetch-
 downloads it and skips the download when that release is already there. An exe keeps the
 PoB it was built with: build again after a PoB release to pick it up.
 
+PoB's own LuaJIT takes compound assignment (`count += 1`, from PoB 2.68); the exe's
+doesn't, so `fetch-pob.ps1` rewrites those lines when it bundles PoB. The
+`bundled_lua_compiles` test (part of `cargo test`, so CI runs it before the release
+build) compiles every bundled Lua file with the exe's LuaJIT and fails on anything else
+PoB adds that it can't load.
+
 PoB loads on the first stats request and stays loaded while a guide is open, so loadout
 switches stay quick; it's unloaded (freeing about 500 MB) 10-20 minutes after the last
 guide closes. Each calculation is logged ("PoB stats for … in 0.8s", with "PoB loaded
