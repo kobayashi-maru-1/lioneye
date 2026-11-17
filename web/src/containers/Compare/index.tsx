@@ -1,8 +1,8 @@
 import { BuildTitle } from "../../components/BuildHeader/headline";
 import { URL_REWRITERS } from "../../components/BuildImportForm";
 import {
-  GapsSection,
   ItemsSection,
+  PathSection,
   SkillsSection,
   StatsSection,
   SummarySection,
@@ -43,13 +43,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 /**
  * Compare: two builds side by side, each your live character, a loadout of the imported
  * build, a character from a PoE account on poe.ninja or a pasted build. PoB calculates
- * both (Build 2 on Build 1's config, so the difference is the builds), picks the stats
- * that matter for them, and measures each gap: Build 1 with one piece of Build 2.
+ * both, matches Build 1 to Build 2's setup (its config, custom mods, skill parts and
+ * stand-in skills, so the difference is the builds), picks the stats that matter for them,
+ * and finds the path from Build 1 to Build 2: the changes in order, each on top of the last.
  */
 
 const SECTIONS = [
   { id: "compare-summary", label: "Summary" },
-  { id: "compare-gaps", label: "Gaps" },
+  { id: "compare-path", label: "Path" },
   { id: "compare-stats", label: "Stats" },
   { id: "compare-skills", label: "Skills" },
   { id: "compare-items", label: "Items" },
@@ -159,11 +160,18 @@ export default function CompareContainer() {
     );
   };
 
+  // Setup fixes undone, for the current pair (a new pair starts with none).
+  const pair = one.state === "ready" && two.state === "ready" ? cacheKey(one.input, two.input) : null;
+  const [undone, setUndone] = useState<{ pair: string | null; ids: string[] }>({ pair: null, ids: [] });
+  const off = undone.pair === pair ? undone.ids : [];
+  const toggleFix = (id: string) =>
+    setUndone({ pair, ids: off.includes(id) ? off.filter((x) => x !== id) : [...off, id] });
+
   // The comparison, for the current pair; the run stops when either side changes.
   const [run, setRun] = useState<{ key: string; result?: Result; error?: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const key =
-    one.state === "ready" && two.state === "ready" ? cacheKey(one.input, two.input) : null;
+    one.state === "ready" && two.state === "ready" ? cacheKey(one.input, two.input, off) : null;
   useEffect(() => {
     if (key === null || one.state !== "ready" || two.state !== "ready") {
       setRun(null);
@@ -174,6 +182,7 @@ export default function CompareContainer() {
     compare(
       one.input,
       two.input,
+      off,
       (result) => !controller.signal.aborted && setRun({ key, result }),
       controller.signal,
     ).catch((error: unknown) => {
@@ -195,14 +204,12 @@ export default function CompareContainer() {
   if (result && one.state === "ready" && two.state === "ready") {
     const keep = (xml: string, stats: Result["one"]["stats"]) =>
       stats && loadouts.current.set(xml, { list: stats.loadouts, current: stats.loadout });
-    keep(one.input.xml, result.one.stats);
-    keep(two.input.xml, result.twoOwn.stats);
+    keep(one.input.xml, result.oneOwn.stats);
+    keep(two.input.xml, result.two.stats);
   }
   const loadoutsOf = (resolved: Resolved) =>
     resolved.state === "ready" ? loadouts.current.get(resolved.input.xml) : undefined;
 
-  const [sortKey, setSortKey] = useState("dps");
-  const jump = useJumpToSection();
   const showGap = useShowGap();
   const setLiveRefresh = useSetAtom(liveRefreshAtom);
   const refreshSide = (index: 0 | 1) => {
@@ -210,7 +217,7 @@ export default function CompareContainer() {
     else setRefresh((now) => (index === 0 ? [now[0] + 1, now[1]] : [now[0], now[1] + 1]));
   };
 
-  const skill = result?.one.stats?.headline?.skill;
+  const skill = result?.oneOwn.stats?.headline?.skill;
   const minionSkill = result?.one.extra.minionMain ? result.one.extra.minionSkill : undefined;
   const status = error
     ? null
@@ -231,7 +238,7 @@ export default function CompareContainer() {
               side={sides[0]}
               resolved={one}
               loadouts={loadoutsOf(one)}
-              headline={result?.one.stats?.headline ?? null}
+              headline={result?.oneOwn.stats?.headline ?? null}
               onChange={(side) => setSide(0, side)}
               onRemoveAccount={removeAccount}
               onRefresh={() => refreshSide(0)}
@@ -250,7 +257,7 @@ export default function CompareContainer() {
               side={sides[1]}
               resolved={two}
               loadouts={loadoutsOf(two)}
-              headline={result?.twoOwn.stats?.headline ?? null}
+              headline={result?.two.stats?.headline ?? null}
               onChange={(side) => setSide(1, side)}
               onRemoveAccount={removeAccount}
               onRefresh={() => refreshSide(1)}
@@ -270,7 +277,7 @@ export default function CompareContainer() {
             )}
             <span>
               <span className={classNames(styles.key)}>Config</span>
-              <span className={classNames(styles.chip)}>Build 1</span>
+              <span className={classNames(styles.chip)}>Build 2</span>
             </span>
             {status && <span className={classNames(styles.chip)}>{status}</span>}
             {error && (
@@ -289,15 +296,8 @@ export default function CompareContainer() {
         </section>
         {result && (
           <>
-            <SummarySection
-              result={result}
-              onShow={showGap}
-              onAll={(metric) => {
-                setSortKey(metric);
-                jump("compare-gaps");
-              }}
-            />
-            <GapsSection result={result} sortKey={sortKey} setSortKey={setSortKey} onShow={showGap} />
+            <SummarySection result={result} onShow={showGap} />
+            <PathSection result={result} onShow={showGap} onToggle={toggleFix} />
             <StatsSection result={result} />
             <SkillsSection result={result} />
             <ItemsSection result={result} />

@@ -805,3 +805,48 @@ button.tugRow:hover,
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Path: Build 1's share of Build 2 (imported, set up, after the path), the setup fixes and
+   the steps. */
+.reach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--size-2) var(--size-5);
+  margin-bottom: var(--size-3);
+}
+
+.reachItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--size-2);
+}
+
+.reachItem .key {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.reachItem b {
+  color: var(--strong);
+  font-size: 1.25rem;
+  font-weight: var(--font-heavy);
+}
+
+.pathTable + .pathTable,
+.scroll + .scroll {
+  margin-top: var(--size-3);
+}
+
+.pathTable tr.undone td {
+  opacity: 0.55;
+}
+
+.pathTable tr.small td {
+  color: var(--muted);
+}
+
+.pathTable td:last-child,
+.pathTable td:nth-last-child(2) {
+  white-space: normal;
+}

@@ -19,8 +19,9 @@ import {
   type WhyRow,
   calcBlocks,
   calcLines,
+  mainCooldown,
 } from "./metrics";
-import type { Gap, Result } from "./run";
+import type { Fix, Gap, Place, Result, Step } from "./run";
 import styles from "./styles.module.css";
 import classNames from "classnames";
 import { Fragment, type ReactNode, useMemo, useState } from "react";
@@ -96,15 +97,7 @@ export function BuildName({ which }: { which: 1 | 2 }) {
 
 const SECTION_ORDER: Metric["section"][] = ["Offence", "Defence", "Misc"];
 
-export function SummarySection({
-  result,
-  onAll,
-  onShow,
-}: {
-  result: Result;
-  onAll: (key: string) => void;
-  onShow: (gap: Gap) => void;
-}) {
+export function SummarySection({ result, onShow }: { result: Result; onShow: (place: Place) => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const metrics = [...result.metrics].sort(
     (a, b) => SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section),
@@ -154,7 +147,7 @@ export function SummarySection({
                   {lead > 0 ? "Build 1 ahead" : lead < 0 ? "Build 2 ahead" : "Even"}
                 </span>
               </button>
-              {isOpen && <SummaryDrawer result={result} metric={metric} onAll={onAll} onShow={onShow} />}
+              {isOpen && <SummaryDrawer result={result} metric={metric} onShow={onShow} />}
             </div>
           );
         })}
@@ -166,13 +159,11 @@ export function SummarySection({
 function SummaryDrawer({
   result,
   metric,
-  onAll,
   onShow,
 }: {
   result: Result;
   metric: Metric;
-  onAll: (key: string) => void;
-  onShow: (gap: Gap) => void;
+  onShow: (place: Place) => void;
 }) {
   const why = metric.why ? result.why[metric.why] : undefined;
   const top = result.gaps
@@ -186,15 +177,10 @@ function SummaryDrawer({
         <div className={classNames(styles.gapList)}>
           <div className={classNames(styles.gapHead, styles.b1)}>Top gains</div>
           <GapTable result={result} gaps={top} sortKey={metric.key} onShow={onShow} />
-          <div>
-            <button type="button" className={classNames(styles.button)} onClick={() => onAll(metric.key)}>
-              Show all
-            </button>
-          </div>
         </div>
       )}
       {!why && top.length === 0 && (
-        <div className={classNames(styles.empty)}>{result.pending > 0 ? "Calculating" : "No gains"}</div>
+        <div className={classNames(styles.empty)}>{result.tried < result.total ? "Calculating" : "No gains"}</div>
       )}
     </div>
   );
@@ -229,16 +215,14 @@ function ChangeCell({ metric, value }: { metric: Metric; value: number | null | 
   );
 }
 
-/** Show (and Trade, for one gear slot) for a gap. */
-function GapActions({ gap, result, onShow }: { gap: Gap; result: Result; onShow: (gap: Gap) => void }) {
+/** Show (and Trade, for one gear slot) for a change. */
+function GapActions({ gap, result, onShow }: { gap: Place; result: Result; onShow: (place: Place) => void }) {
   const trade = useTradeData();
   const index = useMemo(() => (trade ? tradeIndex(trade.stats, trade.items) : null), [trade]);
   const { league } = useTradeLeague();
   const [options] = useTradeOptions();
   const item =
-    gap.kind === "Gear" && gap.slot && gap.id !== "gear-all" && gap.id !== "gear-flasks"
-      ? itemIn(result.two.stats, gap.slot)
-      : undefined;
+    gap.kind === "Gear" && gap.slot && gap.id !== "gear-flasks" ? itemIn(result.two.stats, gap.slot) : undefined;
   return (
     <span className={classNames(styles.row)}>
       {(gap.target === "items" || gap.target === "skills") && (
@@ -261,8 +245,8 @@ function GapActions({ gap, result, onShow }: { gap: Gap; result: Result; onShow:
 }
 
 /**
- * Gaps as a table: a row per piece of Build 2 tried on Build 1, a column per stat, each
- * cell the change to Build 1. Sorted by one stat's change, biggest gain first.
+ * Changes tried once as a table: a row per piece of Build 2 tried on Build 1, a column per
+ * stat, each cell the change to Build 1. Sorted by one stat's change, biggest gain first.
  */
 function GapTable({
   result,
@@ -275,7 +259,7 @@ function GapTable({
   gaps: Gap[];
   sortKey: string;
   setSortKey?: (key: string) => void;
-  onShow: (gap: Gap) => void;
+  onShow: (place: Place) => void;
 }) {
   const rows = [...gaps].sort(
     (a, b) => (b.d[sortKey] ?? 0) - (a.d[sortKey] ?? 0) || a.title.localeCompare(b.title),
@@ -336,45 +320,201 @@ function GapTable({
   );
 }
 
-export function GapsSection({
+// Path --------------------------------------------------------------------------------
+
+/** Build 1's DPS as a share of Build 2's: "40%". */
+function share(dps: number | null, target: number) {
+  return dps === null || !(target > 0) ? "—" : `${n((dps / target) * 100)}%`;
+}
+
+/** A DPS change as a fraction: ▲ +28% in Build 1's color, ▼ in Build 2's. */
+function GainCell({ gain }: { gain: number | null }) {
+  if (gain === null || Math.abs(gain) < 0.001)
+    return (
+      <span className={styles.muted}>
+        <span aria-hidden>·</span>
+        <span className={classNames(styles.sr)}>No change</span>
+      </span>
+    );
+  const pct = gain * 100;
+  return (
+    <span className={sideClass(side(gain))}>
+      <span aria-hidden>{gain > 0 ? "▲ " : "▼ "}</span>
+      {gain > 0 ? "+" : MINUS}
+      {n(Math.abs(pct), Math.abs(pct) < 10 ? 1 : 0)}%
+    </span>
+  );
+}
+
+function ChangeName({ row }: { row: { kind: string; title: string; detail: string } }) {
+  return (
+    <>
+      <span className={classNames(styles.kind)}>{row.kind}</span>{" "}
+      <b className={classNames(styles.swapTitle)}>{row.title}</b>
+      <div className={classNames(styles.detail)}>{row.detail}</div>
+    </>
+  );
+}
+
+/** What a change breaks, or ✓. */
+function Fits({ issues }: { issues: string[] }) {
+  return issues.length ? (
+    <span className={classNames(styles.b2)}>{issues.join(" · ")}</span>
+  ) : (
+    <span className={styles.muted}>
+      <span aria-hidden>✓</span>
+      <span className={classNames(styles.sr)}>Fits</span>
+    </span>
+  );
+}
+
+function SetupTable({ fixes, onToggle }: { fixes: Fix[]; onToggle: (id: string) => void }) {
+  return (
+    <div className={classNames(styles.scroll)}>
+      <table className={classNames(styles.table, styles.gapTable, styles.pathTable)}>
+        <thead>
+          <tr>
+            <th className={classNames(styles.swapCell)}>Setup</th>
+            <th className={classNames(styles.right)}>DPS</th>
+            <th>
+              <span className={classNames(styles.sr)}>Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {fixes.map((fix) => (
+            <tr key={fix.id} className={fix.on ? undefined : styles.undone}>
+              <td className={classNames(styles.swapCell)}>
+                <ChangeName row={fix} />
+              </td>
+              <td className={classNames(styles.right)}>
+                {fix.on ? <GainCell gain={fix.gain} /> : <span className={styles.muted}>Undone</span>}
+              </td>
+              <td>
+                <button type="button" className={classNames(styles.button)} onClick={() => onToggle(fix.id)}>
+                  {fix.on ? "Undo" : "Apply"}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StepTable({ result, onShow }: { result: Result; onShow: (place: Place) => void }) {
+  const target = result.dps.target;
+  const row = (step: Step, number: number | null, cdBefore: number | null) => (
+    <tr key={step.id} className={number === null ? styles.small : undefined}>
+      <td className={classNames(styles.right, styles.muted)}>{number ?? <span aria-hidden>–</span>}</td>
+      <td className={classNames(styles.swapCell)}>
+        <ChangeName row={step} />
+      </td>
+      <td className={classNames(styles.right)}>
+        <GainCell gain={step.gain} />
+      </td>
+      <td className={classNames(styles.right)}>{share(step.dps, target)}</td>
+      {result.cooldown && (
+        <td
+          className={classNames(
+            styles.right,
+            step.cd !== null && cdBefore !== null && step.cd < cdBefore - 1e-6 && number !== null
+              ? styles.b1
+              : undefined,
+          )}
+        >
+          {step.cd === null ? "—" : `${step.cd.toFixed(3)}s`}
+        </td>
+      )}
+      <td>
+        <Fits issues={step.issues} />
+      </td>
+      <td>
+        <GapActions gap={step} result={result} onShow={onShow} />
+      </td>
+    </tr>
+  );
+  const start = mainCooldown(result.one.extra);
+  return (
+    <div className={classNames(styles.scroll)}>
+      <table className={classNames(styles.table, styles.gapTable, styles.pathTable)}>
+        <thead>
+          <tr>
+            <th className={classNames(styles.right)}>#</th>
+            <th className={classNames(styles.swapCell)}>Change</th>
+            <th className={classNames(styles.right)}>DPS</th>
+            <th className={classNames(styles.right)}>Build 2 %</th>
+            {result.cooldown && <th className={classNames(styles.right)}>Cooldown</th>}
+            <th>Fits</th>
+            <th>
+              <span className={classNames(styles.sr)}>Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {result.steps.map((step, i) => row(step, i + 1, i === 0 ? start : result.steps[i - 1].cd))}
+          {result.small.length > 0 && (
+            <tr className={styles.groupRow}>
+              <td colSpan={result.cooldown ? 7 : 6}>{result.small.some((s) => s.gain >= 0.01) ? "More" : "Under 1%"}</td>
+            </tr>
+          )}
+          {result.small.map((step) => row(step, null, null))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * The way to Build 2: Build 1's DPS as imported, on Build 2's setup and after the path;
+ * the setup fixes (each with Undo); and the path, each change stacked on the ones above.
+ */
+export function PathSection({
   result,
-  sortKey,
-  setSortKey,
   onShow,
+  onToggle,
 }: {
   result: Result;
-  sortKey: string;
-  setSortKey: (key: string) => void;
-  onShow: (gap: Gap) => void;
+  onShow: (place: Place) => void;
+  onToggle: (id: string) => void;
 }) {
-  const key = result.metrics.some((m) => m.key === sortKey) ? sortKey : (result.metrics[0]?.key ?? "dps");
-  // Gaps that change something worth showing.
-  const gaps = result.gaps.filter((gap) =>
-    result.metrics.some((m) => Math.abs(gap.d[m.key] ?? 0) >= m.thresh),
-  );
-  const total = result.gaps.length + result.pending + result.failed;
+  const { dps } = result;
+  const last = result.steps.at(-1)?.dps ?? dps.matched;
+  const progress = result.done
+    ? null
+    : result.tried < result.total
+      ? `${result.tried} / ${result.total}`
+      : `Step ${result.steps.length + 1}`;
   return (
     <PageSection
-      id="compare-gaps"
-      title="Gaps"
+      id="compare-path"
+      title="Path"
       actions={
         <>
-          {result.pending > 0 && (
-            <span className={classNames(styles.chip)}>
-              {total - result.pending} / {total}
-            </span>
-          )}
+          {progress && <span className={classNames(styles.chip)}>{progress}</span>}
           {result.failed > 0 && <span className={classNames(styles.chip)}>{result.failed} failed</span>}
-          <span className={classNames(styles.chip)} aria-label="Build 2 on Build 1">
-            Build 2 → Build 1
-          </span>
         </>
       }
     >
-      {gaps.length > 0 ? (
-        <GapTable result={result} gaps={gaps} sortKey={key} setSortKey={setSortKey} onShow={onShow} />
+      <div className={classNames(styles.reach)}>
+        {[
+          ["Imported", dps.imported],
+          ["Setup", dps.matched],
+          ["Path", last],
+        ].map(([label, value]) => (
+          <div key={label as string} className={classNames(styles.reachItem)}>
+            <span className={classNames(styles.key)}>{label}</span>
+            <b>{share(value as number, dps.target)}</b>
+          </div>
+        ))}
+        <span className={classNames(styles.detail)}>Build 1 DPS as % of Build 2</span>
+      </div>
+      {result.fixes.length > 0 && <SetupTable fixes={result.fixes} onToggle={onToggle} />}
+      {result.steps.length + result.small.length > 0 ? (
+        <StepTable result={result} onShow={onShow} />
       ) : (
-        <div className={classNames(styles.empty)}>{result.pending > 0 ? "Calculating" : "No gaps"}</div>
+        <div className={classNames(styles.empty)}>{result.done ? "No gains" : "Calculating"}</div>
       )}
     </PageSection>
   );
@@ -1154,10 +1294,10 @@ export function ItemsSection({ result }: { result: Result }) {
   );
 }
 
-/** Opens a gap's place: its item's row, or its section. */
+/** Opens a change's place: its item's row, or its section. */
 export function useShowGap() {
   const jump = useJumpToSection();
-  return (gap: Gap) => {
+  return (gap: Pick<Place, "target" | "slot">) => {
     if (gap.target !== "items" || !gap.slot) {
       if (gap.target === "skills" || gap.target === "items") jump(`compare-${gap.target}`);
       return;

@@ -121,6 +121,13 @@ const AILMENT_DPS: Record<string, (a: Record<string, number>) => number> = {
   Ignite: (a) => a.TotalIgniteDPS ?? a.IgniteDPS ?? 0,
 };
 const dpsOf = (x: Extra) => actor(x).CombinedDPS ?? actor(x).TotalDPS ?? 0;
+/** The main skill's DPS (its minion's, for a minion skill), as the summary's DPS row. */
+export const mainDps = dpsOf;
+/** The main skill's cooldown (its minion's skill's), when it has one. */
+export const mainCooldown = (x: Extra): number | null => {
+  const cd = actor(x).Cooldown;
+  return cd !== undefined && cd > 0 ? cd : null;
+};
 
 function rules(minion: boolean): Rule[] {
   const list: Rule[] = [

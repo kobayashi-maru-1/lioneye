@@ -326,7 +326,8 @@ settings; otherwise it leaves it alone and says so.
 
 The build card's **Compare** opens its own page (back with **Guide** in the top bar): two
 builds side by side, calculated by the bundled PoB, in pinned panels with a section bar
-(Summary, Gaps, Stats, Skills, Items).
+(Summary, Path, Stats, Skills, Items). It answers "how does Build 1 get to Build 2": put
+yourself in Build 1 and the guide or character you're chasing in Build 2.
 
 - **Builds**: each side's dropdown picks what it is: **Live** (your live character),
   **Loadout** (the imported build), **Account** (a character on a PoE account's public
@@ -337,10 +338,20 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
   account character again. An account's character is read when it's picked and on Refresh
   only, and is as new as poe.ninja's last read of it. The first side carried over the old
   Compare's pasted code.
-- **Same footing**: Build 2 is calculated on Build 1's config and party (the party members' buffs), so the difference is the
-  builds, not their setups (**Config: Build 1**). Main skill: Build 1's own (for a Loadout,
-  the skill you picked in the guide), and Build 2 uses the same skill gem when it has it
-  (**Same**; else **Different**, and each uses its own).
+- **Setup**: Build 1 is calculated on Build 2's PoB setup, so the difference is the builds,
+  not how each PoB file is set up (**Config: Build 2**). In order, each kept on top of the
+  last and listed in Path's **Setup** table with its DPS change: Build 2's config and party
+  (the party members' buffs; Build 1's own custom mods kept), Build 2's custom mods (the
+  lines Build 1 hasn't, e.g. a guide's "Curse Enemies with Temporal Chains on Hit" for an
+  Animate Guardian's gloves), Build 2's skill part or stages for gems both use outside the
+  main group (Lancing Steel's "All projectiles"), Build 2's stand-in groups (unsocketed,
+  with a gem Build 1 hasn't, e.g. a Temporal Chains group standing in for the guardian's
+  curse), and, tried one at a time, Build 1's skills Build 2 hasn't switched off: one is
+  left out when that raises Build 1's DPS by 1% or more (PoB can count a skill against the
+  main one, e.g. Shield Charge as Holy Relic's trigger). **Undo** takes one out and
+  recalculates; **Apply** puts it back. Main skill: Build 1's own (for a Loadout, the skill
+  you picked in the guide), and Build 2 uses the same skill gem when it has it (**Same**;
+  else **Different**, and each uses its own).
 - **Colors**: Build 1 is blue and Build 2 orange, and nothing else is colored: whatever
   is in a build's color is where that build is ahead (costs count lower as better).
 - **Summary**: the stats that matter for these two builds, picked by rules over PoB's
@@ -348,10 +359,11 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
   ailment is at least a tenth of the damage; crit from 20%; hit chance for attacks under
   99.5%; life or ES by which is the pool (not life under Chaos Inoculation); armour or
   evasion by which the build uses; block and suppression from 25%; resistances below cap.
-  Grouped as PoB's Calcs tab (Offence, Defence, Misc), each row has a bar from the center
-  toward the build that's ahead. Click a row for PoB's breakdown of both (life, ES,
-  armour, evasion, suppression, resistances, ailment chances, where PoB's numbers add up)
-  and its top gains. DPS breaks down as PoB adds it up: hit damage × hit chance × hits per
+  Build 1 shows as set up (see Setup). Grouped as PoB's Calcs tab (Offence, Defence, Misc),
+  each row has a bar from the center toward the build that's ahead. Click a row for PoB's
+  breakdown of both (life, ES, armour, evasion, suppression, resistances, ailment chances,
+  where PoB's numbers add up) and its top gains (each change tried once on Build 1 as set
+  up). DPS breaks down as PoB adds it up: hit damage × hit chance × hits per
   second × a multiplier (projectiles, count) is the hit DPS, then poison, bleed, ignite,
   other damage over time, impale and cull; the multiplying factor with the widest ratio
   is marked **Biggest**. A factor opens (▸) into the parts PoB multiplies for it, each
@@ -365,15 +377,30 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
   factor. A part opens into its sources (gear slot, tree node, gem, party): base damage
   is the skill's own (a minion's from its level, an attack's from the weapon) plus added
   damage after effectiveness; more mods multiply.
-- **Gaps**: a table, a row per piece of Build 2 tried on Build 1 and recalculated by PoB
-  (Build 2's config, each gear slot that differs (weapons as a pair around a two-hander,
-  flasks as a set), all gear at once (one-slot swaps don't add up: Mageblood needs its
-  flasks), the whole tree with its jewels, the main links, a support that's unlinked in
-  the main skill's item, a support Build 2 links that fits, gems Build 2 has at a higher
-  level), a column per summary stat. Each cell is the change to Build 1: ▲ in blue a gain,
-  ▼ in orange a loss, · too small to show (under a point, or 1% of Build 1's value).
-  Click a stat's header to sort by it. **Show** opens the item or skills; **Trade**
-  searches for Build 2's item.
+- **Path**: the way from Build 1 to Build 2, by DPS. At the top, Build 1's DPS as a share
+  of Build 2's: **Imported** (Build 1 on its own config), **Setup** (on Build 2's setup)
+  and **Path** (after the changes below). Then the **Setup** table (see Setup), then the
+  changes in order, each recalculated by PoB on top of the ones above it, so they add up
+  (Empower in a red socket and a level 21 Relic each give more with the other). The
+  changes come from diffing the two builds: each gear slot that differs (weapons as a pair
+  around a two-hander, flasks as a set), the whole tree with its jewels, a gem of Build 2's
+  in place of one of Build 1's in a group they share (the main skill's, and each other
+  group with the group of Build 2's it shares two gems with, or one in the same slot:
+  Malevolence for Summon Skitterbots, Empower for Added Chaos Damage, a support for a
+  support), a gem Build 2 links that Build 1's group has room for, Build 1's gems moved
+  to the socket colors Build 2 uses (when both items give gems something by color, as
+  Dialla's Malefaction does; a gem swapped or added into such an item also goes to its
+  color), a support unlinked in the main skill's item, and gems Build 2 has at a higher
+  level. Every change is first tried once on Build 1 as set up; then each round the three
+  biggest are tried again on top of the changes kept so far (the rest keep their last
+  gain) and the biggest gain is kept; the path stops under 1% or at 15 steps. A row shows its DPS change, Build 1's DPS after it as a share of
+  Build 2's (**Build 2 %**), the main skill's cooldown (when it has one; blue where a step
+  reaches a shorter one, a breakpoint), and **Fits**: ✓, or what it breaks (unreserved
+  mana or life below 0, an attribute below what the gear and gems need, a resistance
+  dropping below cap, or life down 5% or more), e.g. "Mana −40". **Under 1%** lists the
+  rest that still add something (each at its last try; **More** when the path stopped at
+  15 steps with bigger ones left). **Show** opens the item or
+  skills; **Trade** searches for Build 2's item.
 - **Stats** is PoB's Calcs tab for both builds: the same sections, rows and labels PoB-C
   shows for each build's main skill (search by row or section; **Show same** adds equal
   rows). With a minion main skill, **Player**/**Minion** switches between you and the
@@ -384,11 +411,12 @@ builds side by side, calculated by the bundled PoB, in pinned panels with a sect
   resist apart from resist; more mods multiply). Gems show by name. A comparison PoB sent
   no Calcs tab for shows the sidebar stats instead. **Skills** and **Items** list what
   differs.
-- PoB calculates both builds in full, then each gap (15-30 builds, 1-2 seconds each), one
-  at a time on the same PoB the guide uses: the guide's own requests wait for one at most.
-  The Gaps header counts them. Leaving the page stops the rest; finished results are kept until the
-  app restarts. Each side is first cut down to its loadout's sets, so every gap edits
-  "the" item, skill and config set. The exe's `/api/pob/compare` (host_compare in
+- PoB calculates both builds in full, then the setup (a build per fix), then each change
+  once (15-30 builds, 1-2 seconds each), then about three more per step, one at a time on
+  the same PoB the guide uses: the guide's own requests wait for one at most. The Path
+  header counts the first pass, then the step being found. Leaving the page stops the rest;
+  finished results are kept until the app restarts. Each side is first cut down to its
+  loadout's sets, so every change edits "the" item, skill and config set. The exe's `/api/pob/compare` (host_compare in
   `log-api/src/pob-host.lua`) answers with every number PoB has, and for the two builds
   also PoB's source tables.
 
@@ -561,8 +589,8 @@ The **New** planner in the Atlas tab (plans/atlas-planner.md), also a standalone
 
 ### Compare concept (demo)
 
-The design the app's [Compare](#compare) page was built from (the app's runs Build 2 on
-Build 1's config; the demo shows Build 2's config or each build's own). A static mock in
+The design the app's [Compare](#compare) page was built from (the app's runs Build 1 on
+Build 2's setup; the demo shows Build 2's config or each build's own). A static mock in
 the guide's layout (foldable panels, jump bar):
 the live character against the shown loadout (HRoC Early Maps), on the guide's config, with
 per-stat sources, ranked gaps (each one PoB recalculating your build with one guide piece
