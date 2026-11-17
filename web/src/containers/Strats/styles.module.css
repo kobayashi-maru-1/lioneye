@@ -10,16 +10,23 @@
 
 /* The sheet's sections: the same jump bar as Settings' (containers/Build), without its
    underline, since the sheet doesn't say which section is in view. */
-.sections {
+.bar {
   display: flex;
   flex: none;
-  gap: var(--size-2);
-  overflow-x: auto;
-  scrollbar-width: none;
   height: var(--settings-jump-height);
   padding: 0 var(--size-3);
   background-color: var(--primary);
   border-bottom: var(--border-width) solid var(--panel-border);
+}
+
+/* The section buttons scroll sideways when they don't fit; Reload stays in view. */
+.sections {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: var(--size-2);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .section {
@@ -38,6 +45,12 @@
 
 .section:hover {
   color: #c99550;
+}
+
+/* Reload sits apart from the sections, at the bar's right end. */
+.reload {
+  margin-left: var(--size-3);
+  border-left: var(--border-width) solid var(--panel-border);
 }
 
 .frame {

@@ -464,7 +464,9 @@ yourself in Build 1 and the guide or character you're chasing in Build 2.
   with **Retry**. Links in the page open in your default browser, like the guide's.
 - The page is `strats/index.html` in this repo. A push to `main` that changes `strats/`
   publishes it (workflow **Strats page**, `.github/workflows/strats.yml`), and the app shows
-  the new version without a release (GitHub caches it for up to 10 minutes). Each
+  the new version without a release. GitHub lets the page be cached for 10 minutes, so
+  from v0.4.73 the app adds `?v=<time>` to the frame's URL each time the tab opens, and
+  **Reload** (right end of the section bar) loads it fresh without leaving the tab. Each
   `<section>` needs an `id` and a `data-jump` label for its bar button; keep the script at
   the end of the file. This is the only thing published to GitHub Pages: upstream's website
   build stays out.

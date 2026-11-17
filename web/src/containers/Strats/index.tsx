@@ -31,6 +31,19 @@ export default function StratsContainer() {
   const [listed, setListed] = useState(false);
   const [missing, setMissing] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // When the frame's page was asked for, on its URL: GitHub Pages lets a page be cached
+  // for 10 minutes, so without it an update could take that long to show.
+  const [loaded, setLoaded] = useState(() => Date.now());
+  const retry = () => {
+    setAttempt((n) => n + 1);
+    setLoaded(Date.now());
+  };
+  // Loads the page again in place (no reachability check, no Loading screen). The bar keeps
+  // its buttons until the page lists its sections again; if it doesn't, it counts as missing.
+  const reload = () => {
+    setListed(false);
+    setLoaded(Date.now());
+  };
   const reachable = useReachable(STRATS_URL, attempt);
   const status: Status = missing ? "missing" : reachable;
   const navigate = useNavigate();
@@ -54,7 +67,8 @@ export default function StratsContainer() {
     if (status !== "online" || listed) return;
     const timer = setTimeout(() => setMissing(true), LIST_WAIT_MS);
     return () => clearTimeout(timer);
-  }, [status, listed]);
+    // loaded: a Reload before the page listed its sections gets the full wait again.
+  }, [status, listed, loaded]);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -97,10 +111,7 @@ export default function StratsContainer() {
             ? "Not loaded. Check your connection."
             : "Not loaded. Retry later."}
         </span>
-        <button
-          className={classNames(styles.retry)}
-          onClick={() => setAttempt((n) => n + 1)}
-        >
+        <button className={classNames(styles.retry)} onClick={retry}>
           Retry
         </button>
       </div>
@@ -111,22 +122,30 @@ export default function StratsContainer() {
 
   return (
     <div className={classNames(styles.page)}>
-      <nav className={classNames(styles.sections)} aria-label="League">
-        {sections.map((section) => (
-          <button
-            key={section.id}
-            className={classNames(styles.section)}
-            onClick={() => jumpTo(section.id)}
-          >
-            {section.label}
-          </button>
-        ))}
-      </nav>
+      <div className={classNames(styles.bar)}>
+        <nav className={classNames(styles.sections)} aria-label="League">
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              className={classNames(styles.section)}
+              onClick={() => jumpTo(section.id)}
+            >
+              {section.label}
+            </button>
+          ))}
+        </nav>
+        <button
+          className={classNames(styles.section, styles.reload)}
+          onClick={reload}
+        >
+          Reload
+        </button>
+      </div>
       <iframe
         ref={frame}
         className={classNames(styles.frame)}
         title="League"
-        src={STRATS_URL}
+        src={`${STRATS_URL}?v=${loaded}`}
         // allow-same-origin keeps the frame's real origin, which the message checks need.
         // No allow-top-navigation: the sheet can't move the app window elsewhere.
         sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
