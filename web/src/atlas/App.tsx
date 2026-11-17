@@ -542,12 +542,7 @@ export function App({ data }: { data: AtlasData }) {
     tree.current?.focus(next.allocated);
     say(`Opened · ${next.allocated.length} points`);
   };
-  const openText = (text: string) => {
-    const link = parseLink(text);
-    if (!link.ok) return false;
-    openPlan.current(fix(link.plan));
-    return true;
-  };
+
   const importText = async (file: File) => {
     if (file.size > IMPORT_MAX_BYTES) {
       say("File too large. Pick an Export file.");
@@ -932,7 +927,7 @@ export function App({ data }: { data: AtlasData }) {
       <ShareDialog links={shareLinks} onClose={() => setShareLinks(null)} />
       <OpenDialog
         isOpen={openLink}
-        onOpen={openText}
+        onOpen={(next) => openPlan.current(fix(next))}
         onClose={() => setOpenLink(false)}
       />
       <ConfirmDialog

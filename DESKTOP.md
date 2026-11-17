@@ -519,8 +519,14 @@ The **New** planner in the Atlas tab (plans/atlas-planner.md), also a standalone
   Undo and Redo and a **More** menu, and phones put Undo and Redo in More too. **Share** gives our
   link (`#t=`: nodes, choices, budget) and the official pathofexile.com link (nodes only);
   **Open** takes our links, poeatlasplanner.com links (`#p=`, so trees from Old and older
-  League page links open) and official links. An official link carries no choices, so its choice nodes open
-  **Unset** (a dashed ring, listed first in Bonuses) until one is picked.
+  League page links open), official links and maxroll.gg planner links
+  (`https://maxroll.gg/poe/farming-strategy-planner/<id>`, `#N` for its Nth variant). A maxroll link holds only an id:
+  Open fetches that one profile from maxroll's planners API when it's pasted (no cookies,
+  nothing in the background; Cancel stops it), shows **Loading**, and opens that variant (else the
+  active one) at its active atlas step, with its picks; "Not loaded. Check the link and retry." when it can't be fetched,
+  "No atlas tree in that plan. Try another link." when the profile has none. An official link carries no
+  choices, so its choice nodes open **Unset** (a dashed ring, listed first in Bonuses) until
+  one is picked; so do choice nodes a maxroll author never picked.
 - **Bonuses** files a travel node's lines under the mechanic they name ("Maps found" →
   Maps), else **Other**; a picked choice shows once, under its mechanic; gateways add
   nothing.

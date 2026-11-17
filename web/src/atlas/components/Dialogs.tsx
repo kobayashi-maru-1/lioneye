@@ -1,10 +1,11 @@
-import type { AtlasNode } from "../lib/types.ts";
+import type { AtlasNode, Plan } from "../lib/types.ts";
+import { readLink } from "../lib/links.ts";
 import { Modal } from "../../components/Modal";
 import { formStyles } from "../../styles";
 import styles from "../atlas.module.css";
 import classNames from "classnames";
 import { flat } from "../lib/text.ts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** Picks a choice node's option: before allocating it, or to change or refund it. */
 export function ChoiceDialog({
@@ -177,29 +178,64 @@ export function ShareDialog({
   );
 }
 
-/** Paste a tree link to open: ours, poeatlasplanner.com's or the official one. */
+const OPEN_ERRORS = {
+  invalid: "Not a tree link. Check and paste again.",
+  failed: "Not loaded. Check the link and retry.",
+  empty: "No atlas tree in that plan. Try another link.",
+};
+
+/**
+ * Paste a tree link to open: ours, poeatlasplanner.com's, the official one or a maxroll
+ * planner link (fetched, so Open waits for it; Cancel, closing or an edit stops the fetch
+ * and drops its answer).
+ */
 export function OpenDialog({
   isOpen,
   onOpen,
   onClose,
 }: {
   isOpen: boolean;
-  /** Returns false when the text isn't a tree link. */
-  onOpen: (text: string) => boolean;
+  onOpen: (plan: Plan) => void;
   onClose: () => void;
 }) {
   const [text, setText] = useState("");
-  const [error, setError] = useState(false);
+  const [state, setState] = useState<
+    "idle" | "loading" | keyof typeof OPEN_ERRORS
+  >("idle");
+  // The read under way: an answer counts only while it's still this one.
+  const pending = useRef<AbortController | null>(null);
+  const drop = () => {
+    pending.current?.abort();
+    pending.current = null;
+  };
   useEffect(() => {
+    drop();
     if (isOpen) {
       setText("");
-      setError(false);
+      setState("idle");
     }
   }, [isOpen]);
+  useEffect(() => drop, []);
   if (!isOpen) return null;
-  const open = () => {
-    if (onOpen(text)) onClose();
-    else setError(true);
+  const open = async () => {
+    drop();
+    const mine = new AbortController();
+    pending.current = mine;
+    setState("loading");
+    let result: Awaited<ReturnType<typeof readLink>>;
+    try {
+      result = await readLink(text, mine.signal);
+    } catch {
+      // Never stuck on Loading.
+      result = { ok: false, reason: "failed" };
+    }
+    if (pending.current !== mine) return;
+    pending.current = null;
+    if (result.ok) {
+      setState("idle");
+      onOpen(result.plan);
+      onClose();
+    } else setState("reason" in result ? result.reason : "invalid");
   };
   return (
     <Modal
@@ -218,17 +254,23 @@ export function OpenDialog({
           spellCheck={false}
           autoFocus
           onChange={(e) => {
+            drop();
             setText(e.target.value);
-            setError(false);
+            setState("idle");
           }}
         />
         <div className={formStyles.groupRight}>
-          {error && (
+          {state === "loading" && (
+            <span className={styles.status} role="status">
+              Loading
+            </span>
+          )}
+          {state !== "idle" && state !== "loading" && (
             <span
               className={classNames(styles.status, styles.error)}
               role="alert"
             >
-              Not a tree link. Check and paste again.
+              {OPEN_ERRORS[state]}
             </span>
           )}
           <button className={formStyles.formButton} onClick={onClose}>
@@ -236,8 +278,8 @@ export function OpenDialog({
           </button>
           <button
             className={formStyles.formButton}
-            disabled={!text.trim()}
-            onClick={open}
+            disabled={!text.trim() || state === "loading"}
+            onClick={() => void open()}
           >
             Open
           </button>

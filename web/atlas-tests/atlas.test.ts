@@ -24,9 +24,13 @@ import {
   unsetRadius,
 } from "../src/atlas/lib/geometry.ts";
 import {
+  decodeMaxroll,
   encodeOfficial,
   encodeShare,
+  fetchMaxroll,
+  maxrollLink,
   parseLink,
+  readLink,
 } from "../src/atlas/lib/links.ts";
 import {
   mechanicColours,
@@ -445,6 +449,188 @@ test("poeatlasplanner links open with their point counts", () => {
     return normalise(graph, data, r.plan).allocated.length;
   });
   assert.deepEqual(points, [64, 150, 109]);
+});
+
+// A maxroll farming strategy planner profile (its atlas ids and picks only), as the
+// planners API returns it.
+const maxrollProfile = JSON.parse(
+  readFileSync(new URL("./maxroll-profile.json", import.meta.url), "utf8"),
+) as { id: string; game: string; data: string };
+
+test("maxroll links: the profile id and #N variant, nothing else", () => {
+  for (const [link, id, variant] of [
+    [
+      "https://maxroll.gg/poe/farming-strategy-planner/mo2kfq07",
+      "mo2kfq07",
+      null,
+    ],
+    [
+      "https://maxroll.gg/poe/farming-strategy-planner/mo2kfq07/",
+      "mo2kfq07",
+      null,
+    ],
+    ["  https://www.maxroll.gg/poe/planner/ab12CD#2 ", "ab12CD", 2],
+    ["https://maxroll.gg/poe/atlas-planner/xyz123?x=1", "xyz123", null],
+    ["https://maxroll.gg/poe/atlas-planner/xyz123?x=1#12", "xyz123", 12],
+    ["https://maxroll.gg/poe/planner/xyz123#0", "xyz123", null],
+    ["https://maxroll.gg/poe/planner/xyz123#abc", "xyz123", null],
+    ["https://maxroll.gg/poe/planner/xyz123#100", "xyz123", null],
+  ] as const)
+    assert.deepEqual(maxrollLink(link), { id, variant }, link);
+  for (const link of [
+    "http://maxroll.gg/poe/farming-strategy-planner/mo2kfq07",
+    "https://maxroll.gg/d4/planner/mo2kfq07",
+    "https://maxroll.gg/poe/build-guides/mo2kfq07",
+    "https://maxroll.gg.evil.com/poe/planner/mo2kfq07",
+    "https://evil.com/maxroll.gg/poe/planner/mo2kfq07",
+    "https://maxroll.gg/poe/planner/../x",
+    "https://maxroll.gg/poe/planner/ab",
+    "mo2kfq07",
+  ])
+    assert.equal(maxrollLink(link), null, link);
+});
+
+test("a maxroll profile opens as its tree, with its picks", () => {
+  const r = decodeMaxroll(maxrollProfile);
+  assert.ok(r.ok && r.kind === "maxroll");
+  const plan = normalise(graph, data, r.plan);
+  assert.equal(plan.allocated.length, 142);
+  assert.deepEqual(plan.choices, { 712: 8618, 12887: 20818, 28477: 49076 });
+  assert.equal(connected(graph, new Set(plan.allocated)).size, 142);
+});
+
+test("a maxroll profile with no tree, or not PoE's, opens nothing", () => {
+  const inner = JSON.parse(maxrollProfile.data);
+  const withSteps = (steps: unknown) =>
+    JSON.stringify({ ...inner, profiles: [{ atlas: { variants: steps } }] });
+  for (const bad of [
+    null,
+    "x",
+    { ...maxrollProfile, game: "d4" },
+    { ...maxrollProfile, data: "{not json" },
+    { ...maxrollProfile, data: JSON.stringify({}) },
+    { ...maxrollProfile, data: withSteps([]) },
+    { ...maxrollProfile, data: withSteps([{ history: [] }]) },
+    { ...maxrollProfile, data: withSteps([{ history: [{}] }]) },
+  ])
+    assert.equal(decodeMaxroll(bad).ok, false, JSON.stringify(bad));
+});
+
+test("a maxroll profile opens its active variant and step", () => {
+  const inner = JSON.parse(maxrollProfile.data);
+  const first = { history: [8132], masteries: {} };
+  const second = { history: [8132, 47222], masteries: { 1: 2, 3: "x" } };
+  const two = (active: unknown) => ({
+    ...maxrollProfile,
+    data: JSON.stringify({
+      ...inner,
+      activeProfile: 1,
+      profiles: [
+        inner.profiles[0],
+        { atlas: { variants: [first, second], active } },
+      ],
+    }),
+  });
+  const r = decodeMaxroll(two(1));
+  assert.ok(r.ok);
+  assert.deepEqual(r.plan.allocated, ["8132", "47222"]);
+  assert.deepEqual(r.plan.choices, { 1: 2 });
+  for (const active of [undefined, 7, -1, "1"]) {
+    const s = decodeMaxroll(two(active));
+    assert.ok(s.ok);
+    assert.deepEqual(s.plan.allocated, ["8132"], String(active));
+  }
+  // A link's #N picks the Nth variant over the active one; past the end, the active one.
+  const one = decodeMaxroll(two(1), 1);
+  assert.ok(one.ok && one.plan.allocated.length === 142);
+  const back = decodeMaxroll(two(1), 3);
+  assert.ok(back.ok && back.plan.allocated.length === 2);
+});
+
+test("Open fetches a maxroll link once, without cookies; failures say so", async () => {
+  const real = globalThis.fetch;
+  const calls: { url: string; init?: RequestInit }[] = [];
+  let reply: () => Promise<Response> = async () =>
+    new Response(JSON.stringify(maxrollProfile));
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    calls.push({ url, init });
+    return reply();
+  }) as typeof fetch;
+  try {
+    const link = "https://maxroll.gg/poe/farming-strategy-planner/mo2kfq07";
+    const ok = await readLink(link);
+    assert.ok(ok.ok && ok.kind === "maxroll");
+    assert.equal(calls.length, 1);
+    assert.equal(
+      calls[0].url,
+      "https://planners.maxroll.gg/profiles/poe/mo2kfq07",
+    );
+    assert.equal(calls[0].init?.credentials, "omit");
+    assert.equal(calls[0].init?.referrerPolicy, "no-referrer");
+    assert.ok(calls[0].init?.signal);
+
+    reply = async () => new Response("{}", { status: 404 });
+    assert.deepEqual(await readLink(link), { ok: false, reason: "failed" });
+    reply = async () => {
+      throw new TypeError("network");
+    };
+    assert.deepEqual(await readLink(link), { ok: false, reason: "failed" });
+    reply = async () => new Response("<html>");
+    assert.deepEqual(await readLink(link), { ok: false, reason: "empty" });
+    reply = async () =>
+      new Response(JSON.stringify({ game: "poe", data: "{}" }));
+    assert.deepEqual(await readLink(link), { ok: false, reason: "empty" });
+    // Past 2 MB: not loaded, even when the body is a valid profile.
+    const big = JSON.stringify(maxrollProfile) + " ".repeat(2_000_001);
+    reply = async () => new Response(big);
+    assert.equal(
+      await fetchMaxroll({ id: "mo2kfq07", variant: null }),
+      "failed",
+    );
+    reply = async () =>
+      new Response(JSON.stringify(maxrollProfile), {
+        headers: { "content-length": "2000001" },
+      });
+    assert.equal(
+      await fetchMaxroll({ id: "mo2kfq07", variant: null }),
+      "failed",
+    );
+    // Just under it still opens.
+    reply = async () =>
+      new Response(JSON.stringify(maxrollProfile) + " ".repeat(1_000_000));
+    assert.ok((await readLink(link)).ok);
+
+    // An abort (Cancel) reaches the request.
+    let seen: AbortSignal | undefined;
+    reply = async () => {
+      throw new DOMException("aborted", "AbortError");
+    };
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      seen = init?.signal ?? undefined;
+      return reply();
+    }) as typeof fetch;
+    const stop = new AbortController();
+    stop.abort();
+    assert.deepEqual(await readLink(link, stop.signal), {
+      ok: false,
+      reason: "failed",
+    });
+    assert.ok(seen?.aborted);
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return reply();
+    }) as typeof fetch;
+
+    // Other links never fetch.
+    calls.length = 0;
+    assert.equal((await readLink("hello")).ok, false);
+    assert.ok(
+      (await readLink(`#${encodeShare(emptyPlan(), data.version)}`)).ok,
+    );
+    assert.equal(calls.length, 0);
+  } finally {
+    globalThis.fetch = real;
+  }
 });
 
 test("other text is not a link", () => {

@@ -243,6 +243,18 @@ tooltip already showed the cost.
     (u32 version 6, class, ascendancy, node count, u16 ids, then two count bytes).
     **Check:** the trailing section may hold choices as (effect, node) pairs like passive
     masteries; test with a link made with a choice picked before relying on it.
+  - maxroll.gg planner links `https://maxroll.gg/poe/<…planner>/<id>` (its farming
+    strategy planner's share links). The link is only an id, so Open fetches
+    `https://planners.maxroll.gg/profiles/poe/<id>` (it allows cross-site reads) once, when
+    pasted: no cookies, no referrer, 10 s timeout, 2 MB cap (read as a stream), aborted on
+    Cancel, close or an edit. The profile's `data` is a JSON string;
+    `profiles[#N - 1 or activeProfile].atlas.variants[atlas.active]` has `history` (allocated
+    ids, our ids) and `masteries` (`{node: effect}`, our choice effects). Choice nodes with
+    no entry open Unset. maxroll's robots.txt bars automated retrieval without permission;
+    the user chose to allow this one user-triggered request per paste (Nov 2026). Never
+    fetch in bulk or in the background, and if maxroll blocks it, the error stands. Errors:
+    "Not loaded. Check the link and retry." (network, HTTP, over 2 MB) and "No atlas tree in
+    that plan. Try another link." (no PoE atlas step in the profile).
 
   Anything else gets a one-line error. Unknown ids are dropped, then the refund rule runs,
   so the result is always a connected tree.
