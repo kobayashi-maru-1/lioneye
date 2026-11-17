@@ -91,6 +91,21 @@ function valueOf(text: string): { value: number; template: string } | null {
   return null;
 }
 
+/**
+ * Bonuses' search: a test that the texts, together, hold every word of the query (any
+ * case, any order). null for an empty query: nothing is dimmed.
+ */
+export function bonusSearch(
+  query: string,
+): ((...texts: string[]) => boolean) | null {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return null;
+  return (...texts) => {
+    const text = texts.map(flat).join(" ").toLowerCase();
+    return words.every((w) => text.includes(w));
+  };
+}
+
 /** A node's stat lines in the plan: a choice node's are its picked option's. */
 export function nodeStats(data: AtlasData, plan: Plan, id: string): string[] {
   const node = data.nodes[id];

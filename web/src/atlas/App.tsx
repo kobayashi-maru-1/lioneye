@@ -465,6 +465,8 @@ export function App({ data }: { data: AtlasData }) {
   // View.
   const tree = useRef<TreeHandle>(null);
   const [tab, setTab] = useState<Tab>("explore");
+  // Bonuses' search: kept across tab switches, like Explore's.
+  const [bonusQuery, setBonusQuery] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   /** A search result: centred, and its card open (the keyboard way to allocate). */
   const locate = (id: string) => {
@@ -653,6 +655,8 @@ export function App({ data }: { data: AtlasData }) {
                 setPanelOpen(false);
                 setChoiceFor(id);
               }}
+              query={bonusQuery}
+              onQuery={setBonusQuery}
             />
           )}
           {tab === "saved" && (

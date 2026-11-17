@@ -146,6 +146,22 @@
   min-width: 0;
 }
 
+/* Explore's and Bonuses' search stay at the top while the tab scrolls: over the tab's top
+   padding too, so no line shows above it; above dimmed lines (their opacity layers them). */
+.stickySearch {
+  position: sticky;
+  top: calc(-1 * var(--size-3));
+  z-index: 1;
+  margin-top: calc(-1 * var(--size-3));
+  padding: var(--size-3) 0 var(--size-2);
+  background-color: var(--panel);
+}
+
+/* Keyboard focus scrolls a line in below the bar, never under it. */
+.tabBody:has(> .stickySearch) {
+  scroll-padding-top: calc(var(--size-3) + 3rem);
+}
+
 .iconButton {
   display: flex;
   align-items: center;
@@ -291,6 +307,11 @@
 .bonusOn {
   background-color: var(--navy);
   color: var(--on-secondary);
+}
+
+/* Bonuses' search: lines that don't match stay, darkened. */
+.bonusDim {
+  opacity: 0.35;
 }
 
 .fileRow {

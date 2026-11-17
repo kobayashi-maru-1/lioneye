@@ -3,7 +3,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { bonuses, combine, mechanicInText } from "../src/atlas/lib/bonuses.ts";
+import {
+  bonusSearch,
+  bonuses,
+  combine,
+  mechanicInText,
+} from "../src/atlas/lib/bonuses.ts";
 import { ATLAS_NEW_URL, atlasTreeUrl } from "../src/state/atlas.ts";
 import {
   buildGraph,
@@ -1200,6 +1205,21 @@ test("League page: tree links open in New with their point counts", () => {
     assert.ok(before.ok);
     assert.deepEqual(plan, normalise(graph, data, before.plan), title);
   });
+});
+
+test("Bonuses search: every word, any case or order, across the texts given", () => {
+  assert.equal(bonusSearch(""), null);
+  assert.equal(bonusSearch("   "), null);
+  const t = bonusSearch("  map BOSS ")!;
+  assert.ok(t("Final Map Boss in each Map has +3% chance"));
+  assert.ok(t("Bosses in your Maps", "")); // "map" in "Maps", "boss" in "Bosses"
+  assert.ok(!t("Monsters in your Maps")); // no "boss"
+  // A mechanic's name counts with its line.
+  const m = bonusSearch("mercenaries gold")!;
+  assert.ok(m("20% increased stack size of Gold", "Mercenaries"));
+  assert.ok(!m("20% increased stack size of Gold", "Settlers of Kalguur"));
+  // Lines GGG breaks in two still match across the break.
+  assert.ok(bonusSearch("found in")!("Divination Cards found\nin your Maps"));
 });
 
 test("take: a whole mechanic, cheapest, one step; again refunds it", () => {

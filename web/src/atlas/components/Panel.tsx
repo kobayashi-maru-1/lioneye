@@ -1,5 +1,5 @@
 import { mechanicOf, type AtlasData, type Plan } from "../lib/types.ts";
-import { bonuses } from "../lib/bonuses.ts";
+import { bonusSearch, bonuses } from "../lib/bonuses.ts";
 import { HEADINGS, headingOf } from "../lib/mechanics.ts";
 import type { SavedPlan } from "../store.ts";
 import { formStyles } from "../../styles";
@@ -104,7 +104,7 @@ export function Explore({
   const search = useRef<HTMLInputElement>(null);
   return (
     <>
-      <div className={styles.searchRow}>
+      <div className={classNames(styles.searchRow, styles.stickySearch)}>
         <input
           ref={search}
           type="search"
@@ -227,7 +227,7 @@ export function Explore({
   );
 }
 
-/** The plan's combined effects. */
+/** The plan's combined effects; Search dims the lines that don't match. */
 export function Bonuses({
   data,
   plan,
@@ -237,6 +237,8 @@ export function Bonuses({
   lit,
   onLight,
   onChoose,
+  query,
+  onQuery,
 }: {
   data: AtlasData;
   plan: Plan;
@@ -248,10 +250,21 @@ export function Bonuses({
   onLight: (key: string | null, nodes: string[]) => void;
   /** An unset choice node: opens its picker. */
   onChoose: (id: string) => void;
+  query: string;
+  onQuery: (q: string) => void;
 }) {
   const result = useMemo(() => bonuses(data, plan), [data, plan]);
   const used = plan.allocated.length;
   if (used === 0) return <div className={styles.empty}>No points</div>;
+  const test = bonusSearch(query);
+  // A line matches with its mechanic's name, so "Mercenaries" keeps that whole group.
+  const hits = (mechanic: number, text: string) =>
+    !test || test(text, mechanic >= 0 ? data.mechanics[mechanic] : "");
+  const anyHit =
+    !test ||
+    result.unset.some((u) => test(u.name)) ||
+    result.keystones.some((k) => test(k.name)) ||
+    result.groups.some((g) => g.lines.some((l) => hits(g.mechanic, l.text)));
   const byHeading = HEADINGS.map((h) => ({
     name: h.name,
     groups: result.groups.filter(
@@ -260,10 +273,19 @@ export function Bonuses({
     ),
   }));
   const other = result.groups.find((g) => g.mechanic < 0);
-  const line = (key: string, text: string, count: number, nodes: string[]) => (
+  const line = (
+    key: string,
+    text: string,
+    count: number,
+    nodes: string[],
+    hit: boolean,
+  ) => (
     <button
       key={key}
-      className={classNames(styles.bonus, { [styles.bonusOn]: lit === key })}
+      className={classNames(styles.bonus, {
+        [styles.bonusOn]: lit === key,
+        [styles.bonusDim]: !hit,
+      })}
       aria-pressed={lit === key}
       onClick={() => onLight(lit === key ? null : key, nodes)}
     >
@@ -273,9 +295,20 @@ export function Bonuses({
   );
   return (
     <>
+      <div className={classNames(styles.searchRow, styles.stickySearch)}>
+        <input
+          type="search"
+          className={classNames(formStyles.formInput, styles.search)}
+          placeholder="Search"
+          aria-label="Search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+        />
+      </div>
       <div className={styles.pointsLine}>
         {used} / {budget}
       </div>
+      {!anyHit && <div className={styles.empty}>No matches</div>}
       {result.unset.length > 0 && (
         <section className={styles.section}>
           <h3 className={classNames(styles.heading, styles.unsetHeading)}>
@@ -284,7 +317,9 @@ export function Bonuses({
           {result.unset.map((u) => (
             <button
               key={u.id}
-              className={styles.bonus}
+              className={classNames(styles.bonus, {
+                [styles.bonusDim]: test !== null && !test(u.name),
+              })}
               onClick={() => onChoose(u.id)}
             >
               {u.name}
@@ -296,7 +331,9 @@ export function Bonuses({
       {result.keystones.length > 0 && (
         <section className={styles.section}>
           <h3 className={styles.heading}>Keystones</h3>
-          {result.keystones.map((k) => line(`k${k.id}`, k.name, 1, [k.id]))}
+          {result.keystones.map((k) =>
+            line(`k${k.id}`, k.name, 1, [k.id], !test || test(k.name)),
+          )}
         </section>
       )}
       {byHeading.map(
@@ -306,7 +343,13 @@ export function Bonuses({
               <h3 className={styles.heading}>{h.name}</h3>
               {h.groups.map((g) => (
                 <div key={g.mechanic} className={styles.bonusGroup}>
-                  <div className={styles.bonusMechanic}>
+                  <div
+                    className={classNames(styles.bonusMechanic, {
+                      [styles.bonusDim]: !g.lines.some((l) =>
+                        hits(g.mechanic, l.text),
+                      ),
+                    })}
+                  >
                     <Swatch
                       colour={colours[g.mechanic]}
                       letter={letters[g.mechanic]}
@@ -315,7 +358,13 @@ export function Bonuses({
                     <span className={styles.count}>{g.nodes}</span>
                   </div>
                   {g.lines.map((l, i) =>
-                    line(`${g.mechanic}:${i}`, flat(l.text), l.count, l.nodes),
+                    line(
+                      `${g.mechanic}:${i}`,
+                      flat(l.text),
+                      l.count,
+                      l.nodes,
+                      hits(g.mechanic, l.text),
+                    ),
                   )}
                 </div>
               ))}
@@ -327,7 +376,7 @@ export function Bonuses({
           <h3 className={styles.heading}>Other</h3>
           <div className={styles.bonusGroup}>
             {other.lines.map((l, i) =>
-              line(`o:${i}`, flat(l.text), l.count, l.nodes),
+              line(`o:${i}`, flat(l.text), l.count, l.nodes, hits(-1, l.text)),
             )}
           </div>
         </section>

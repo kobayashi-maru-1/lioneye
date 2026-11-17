@@ -210,7 +210,12 @@ tooltip already showed the cost.
    (review round 1, 2026-11-15); gateways add no line ("Connects to …", round 3); identical lines summed (eight "2%
    increased Maps found in your Maps" → one "16% …"); a line with one percentage among
    other numbers sums that percentage; other lines with no or several numbers are listed
-   once with a count; clicking a line highlights its nodes.
+   once with a count; clicking a line highlights its nodes. **Search** at the top dims
+   (doesn't hide) lines missing any typed word, any case or order; a line matches with
+   its mechanic's name, so "Mercenaries" keeps that group; "No matches" when none do;
+   the query survives tab switches (2026-11-17). Explore's and Bonuses' search rows stay
+   at the top while the tab scrolls, with scroll padding so keyboard focus never lands
+   under them.
 3. **Saved:** named plans: load (undoable), rename, delete; the open one marked. No
    bundled presets.
 
