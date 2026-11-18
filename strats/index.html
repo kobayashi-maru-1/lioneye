@@ -126,6 +126,10 @@
   .tag { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; color: var(--ash); }
   .farm ul { margin: 0; padding-left: 16px; font-size: 14.5px; color: var(--bone); }
   .farm li::marker { color: var(--gilt); }
+  .farm code { font-size: 13.5px; color: #f3efe6; overflow-wrap: anywhere; }
+  /* A regex wraps only after "|" (<wbr>), never inside a part with a space. */
+  .farm code .nw { white-space: nowrap; }
+  .farms + h3 { margin-top: 12px; }
   .key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ash); margin-bottom: 10px; }
   .key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
 
@@ -333,6 +337,17 @@
         <li><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"type":"Perfect Guardian Turtle"},"sort":{"price":"asc"}}'>Perfect Guardian Turtle</a> · Determination</li>
         <li><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query='{"query":{"status":{"option":"securable"},"type":"Perfect Pain Artist"},"sort":{"price":"asc"}}'>Perfect Pain Artist</a> · Zealotry</li>
         <li>Best first</li>
+      </ul></div>
+    </div>
+    <!-- Beast regex for the in-game Bestiary and stash search. One part per beast, each
+         matching only that beast among capturable ones (poewiki Bestiary list); the 9 are
+         poe.ninja's top Covens beasts on 18 Nov 2026, minus the four "First of" spirits.
+         Quoted because "d he" and the like have spaces. -->
+    <h3>Beasts</h3>
+    <div class="farms">
+      <div class="farm card"><div class="top"><span class="t">Valuable beasts</span><button class="copy" type="button" data-text='"atro|croa|d he|rrig|plag|cyst|bram|d wa|d vu"' aria-label="Copy regex" title="Copy regex"></button></div><ul>
+        <li><code>"atro|<wbr>croa|<wbr><span class="nw">d he</span>|<wbr>rrig|<wbr>plag|<wbr>cyst|<wbr>bram|<wbr><span class="nw">d wa</span>|<wbr><span class="nw">d vu</span>"</code></li>
+        <li>Wild Bristle Matron, Fenumal Plagued Arachnid, Craicic Croaker, Wild Hellion Alpha, Black Mórrigan, Primal Cystcaller, Wild Brambleback, Vivid Watcher, Vivid Vulture</li>
       </ul></div>
     </div>
   </section>
@@ -683,8 +698,9 @@
     });
     Array.prototype.forEach.call(document.querySelectorAll(".league-name"), function (el) { el.textContent = league; });
 
-    // Copy buttons: a build's PoB code (data-code, a file in builds/) or the trade link
-    // next to the button. Codes are fetched up front so the copy happens on the click itself.
+    // Copy buttons: a build's PoB code (data-code, a file in builds/), fixed text (data-text,
+    // e.g. a search regex) or the link next to the button. Codes are fetched up front so the
+    // copy happens on the click itself.
     var COPY_ICON = '<svg viewBox="0 0 384 512" aria-hidden="true"><path d="M336 64h-80c0-35.3-28.7-64-64-64s-64 28.7-64 64H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h288c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48zM192 40c13.3 0 24 10.7 24 24s-10.7 24-24 24-24-10.7-24-24 10.7-24 24-24zm144 418c0 3.3-2.7 6-6 6H54c-3.3 0-6-2.7-6-6V118c0-3.3 2.7-6 6-6h42v36c0 6.6 5.4 12 12 12h168c6.6 0 12-5.4 12-12v-36h42c3.3 0 6 2.7 6 6z"></path></svg>';
     // Icon: Font Awesome Free 5.15.4 "clipboard" (regular), CC BY 4.0, as in the app.
     var codes = {};
@@ -740,11 +756,13 @@
       button.innerHTML = COPY_ICON;
       button.appendChild(state);
       var file = button.getAttribute("data-code");
+      var fixed = button.getAttribute("data-text");
       if (file) loadCode(file);
       var timer = null;
       button.addEventListener("click", function () {
         var job;
         if (file) job = copyCode(file);
+        else if (fixed !== null) job = writeText(fixed);
         else {
           var link = button.closest(".top") && button.closest(".top").querySelector("a[href]");
           job = link ? writeText(link.href) : Promise.reject(new Error("no link"));
