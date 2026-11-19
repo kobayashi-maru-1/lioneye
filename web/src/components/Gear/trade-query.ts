@@ -95,6 +95,15 @@ const ABYSSAL = /Abyssal Socket/;
 const DRAWBACK =
   /(reduced Amount Recovered|less Duration|reduced Duration|more Cost|reduced Recovery rate)/;
 
+// Downsides ("Adds 4 to 12 Cold Damage to Attacks against you"): left out of the search.
+const DOWNSIDE = /\bagainst you\b/;
+
+// Key mods a listing must always have, whatever Min mods says: gem levels, and the item's
+// main damage mod: "Minions deal N% increased Damage" when it has one, otherwise its biggest
+// plain "N% increased … Damage" (not conditional ones: "Exerted Attacks deal …").
+const GEM_LEVEL = /^\+\d+ to Level of .+ Gems$/;
+const DAMAGE = /^(Minions deal )?(\d+)% increased (?:[A-Za-z]+ )*Damage$/;
+
 const NUM = /[+-]?\d+(?:\.\d+)?/g;
 const NOTABLE = /^1 Added Passive Skill is /;
 
@@ -131,6 +140,8 @@ function statFilter(
     template,
     signedTemplate,
     template.replace(/# Charges\b/, "# Charge"),
+    // PoB: "Grants Level 20 Aspect of the Spider Skill"; the trade site mostly drops "Skill".
+    template.replace(/ Skill$/, ""),
   ]))
     tries.push([t, 1]);
   if (/\breduced\b/.test(template))
@@ -326,9 +337,13 @@ export function tradeSearch(
     if (category) typeFilters.category = { option: category };
     else if (base) query.type = base;
     query.filters = { type_filters: { filters: typeFilters } };
-    const mods: { id: string; value?: StatFilter["value"] }[][] = [];
+    type Mod = { id: string; value?: StatFilter["value"] }[];
+    const mods: Mod[] = [];
+    const key = new Set<Mod>();
+    let topDamage: { mod: Mod; minion: boolean; value: number } | null = null;
     const seen = new Set<string>();
     for (const line of item.explicit) {
+      if (DOWNSIDE.test(line.text)) continue;
       total++;
       const filter = statFilter(
         index,
@@ -341,27 +356,56 @@ export function tradeSearch(
       if (!filter || seen.has(filter.ids[0])) continue;
       seen.add(filter.ids[0]);
       matched++;
-      mods.push(
-        filter.ids.map((id) =>
-          filter.value ? { id, value: filter.value } : { id },
-        ),
+      const mod = filter.ids.map((id) =>
+        filter.value ? { id, value: filter.value } : { id },
       );
+      mods.push(mod);
+      if (GEM_LEVEL.test(line.text)) key.add(mod);
+      const damage = line.text.match(DAMAGE);
+      if (damage) {
+        const candidate = {
+          mod,
+          minion: !!damage[1],
+          value: Number(damage[2]),
+        };
+        if (
+          !topDamage ||
+          (candidate.minion && !topDamage.minion) ||
+          (candidate.minion === topDamage.minion &&
+            candidate.value > topDamage.value)
+        )
+          topDamage = candidate;
+      }
     }
+    if (topDamage) key.add(topDamage.mod);
     const stats: unknown[] = [];
-    // A share of the mods is enough ("min % of total mods"); all of them at 100%.
-    const need = Math.max(1, Math.ceil(mods.length * options.modShare));
-    if (mods.length && need < mods.length) {
-      // Every id of every mod in one count; a mod's ids (same text) rarely occur together.
-      stats.push({ type: "count", value: { min: need }, filters: mods.flat() });
-    } else if (mods.length) {
-      const single = mods
+    // Every mod of `list` as its own filter; `disabled` puts them on the search unticked.
+    const require = (list: Mod[], disabled = false) => {
+      const off = disabled ? { disabled: true } : {};
+      const single = list
         .filter((ids) => ids.length === 1)
-        .map((ids) => ids[0]);
+        .map((ids) => ({ ...ids[0], ...off }));
       if (single.length) stats.push({ type: "and", filters: single });
       // Same text under several ids: any one of them counts.
-      for (const ids of mods.filter((ids) => ids.length > 1))
-        stats.push({ type: "count", value: { min: 1 }, filters: ids });
-    }
+      for (const ids of list.filter((ids) => ids.length > 1))
+        stats.push({ type: "count", value: { min: 1 }, filters: ids, ...off });
+    };
+    // A share of the mods is enough ("min % of total mods"); all of them at 100%. Key mods
+    // always count among them; the rest make up what's left of the share.
+    const need = Math.max(1, Math.ceil(mods.length * options.modShare));
+    const rest = mods.filter((mod) => !key.has(mod));
+    const restNeed = need - (mods.length - rest.length);
+    require(mods.filter((mod) => key.has(mod)));
+    if (rest.length && restNeed > 0 && restNeed < rest.length) {
+      // Every id of every mod in one count; a mod's ids (same text) rarely occur together.
+      stats.push({
+        type: "count",
+        value: { min: restNeed },
+        filters: rest.flat(),
+      });
+    } else if (rest.length && restNeed >= rest.length) require(rest);
+    // The key mods already fill Min mods: the rest come unticked, to tick on the trade site.
+    else if (rest.length) require(rest, true);
     if (stats.length) query.stats = stats;
   }
   return { url: searchUrl(league, query), matched, total };

@@ -1,6 +1,6 @@
 [package]
 name = "exile-leveling-local"
-version = "0.4.73"
+version = "0.4.74"
 edition = "2024"
 
 [[bin]]

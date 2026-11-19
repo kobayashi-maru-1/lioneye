@@ -297,6 +297,14 @@ settings; otherwise it leaves it alone and says so.
   **In Person**, **Any**), **Min mods** (the share of a rare's mods a listing must have)
   and **Min values** (each mod's minimum, as a share of yours). The settings apply to the
   tooltip Trade buttons too.
+- An item's key mods are always required, whatever **Min mods** says: gem levels ("+1 to
+  Level of all Minion Skill Gems") and its main damage mod ("Minions deal N% increased
+  Damage" if it has one, otherwise its biggest plain "N% increased … Damage"; conditional
+  ones like "Exerted Attacks deal …" don't count). They count toward **Min mods**; the other
+  mods make up the rest, or come unticked when the key mods already fill it (from v0.4.74).
+  Downsides ("… against you", like "Adds 4 to 12 Cold Damage to Attacks against you")
+  aren't searched or counted. A granted skill ("Grants Level 20 Aspect of Lunaris Skill")
+  also matches a trade site stat that leaves out "Skill".
 - Cluster jewel searches (from v0.4.66) require the base, the exact passive count, the small
   passives' enchant and the jewel's item level or higher. Every explicit mod, notables too,
   is on the search unticked, to tick on the trade site; **Min mods** doesn't apply.
