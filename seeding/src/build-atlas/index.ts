@@ -3,14 +3,15 @@ import fetch from "cross-fetch";
 
 /**
  * The Atlas passive tree for the standalone Atlas planner (web/atlas.html): GGG's official
- * export, pinned by commit (the 3.30.0 tag is a pre-release and could move). Only the data
- * is read; the export's sprites and assets are never used.
+ * export, pinned by commit (tags can move). 3.30.0c: same tree version as 3.30.0, with two
+ * new notables (27261, 53484) and the Legion cluster placed where the game draws it.
+ * Only the data is read; the export's sprites and assets are never used.
  */
 const ATLAS_TREE_JSON = {
   "3_30": {
     version: "3.30.0",
     source:
-      "https://raw.githubusercontent.com/grindinggear/atlastree-export/d225501d7a3e52c991309116473908c284075e89/data.json",
+      "https://raw.githubusercontent.com/grindinggear/atlastree-export/24bd611b33fb727c0d1264185599fdd973d02d2d/data.json",
   },
 };
 

@@ -46,7 +46,9 @@ import {
 import { kept, recalc } from "../src/atlas/lib/recalc.ts";
 import {
   SHARE_CHOICES_3_30,
+  SHARE_CHOICES_3_30_ADDED,
   SHARE_NODES_3_30,
+  SHARE_NODES_3_30_ADDED,
 } from "../src/atlas/lib/share-nodes.ts";
 import {
   clusterNodes as takeClusterNodes,
@@ -79,11 +81,11 @@ const none = new Set<string>();
 
 test("data counts", () => {
   const nodes = Object.values(data.nodes);
-  assert.equal(nodes.length, 967); // 966 allocatable + the start (masteries are labels)
-  assert.equal(graph.allocatable.size, 966);
-  assert.equal(nodes.filter((n) => n.kind === "notable").length, 213);
+  assert.equal(nodes.length, 969); // 968 allocatable + the start (masteries are labels)
+  assert.equal(graph.allocatable.size, 968);
+  assert.equal(nodes.filter((n) => n.kind === "notable").length, 215);
   assert.equal(nodes.filter((n) => n.kind === "keystone").length, 18);
-  assert.equal(nodes.filter((n) => n.choices).length, 31);
+  assert.equal(nodes.filter((n) => n.choices).length, 33);
   // 149 masteries, less group 7: The Searing Exarch's mastery with no passives.
   assert.equal(data.labels.length, 148);
   assert.equal(
@@ -93,10 +95,10 @@ test("data counts", () => {
   );
   const groups = new Set(Object.values(data.nodes).map((n) => n.g));
   assert.ok(data.labels.every((l) => groups.has(l.g)));
-  assert.equal(data.edges.length, 1050);
-  assert.equal(data.edges.filter((e) => !e.hidden).length, 1048);
+  assert.equal(data.edges.length, 1052);
+  assert.equal(data.edges.filter((e) => !e.hidden).length, 1050);
   assert.equal(data.mechanics.length, 38);
-  assert.equal(nodes.filter((n) => n.m < 0 && n.kind !== "start").length, 173);
+  assert.equal(nodes.filter((n) => n.m < 0 && n.kind !== "start").length, 174);
   assert.equal(data.start, "29045");
   assert.equal(data.totalPoints, 150);
 });
@@ -130,7 +132,7 @@ test("mechanic node counts", () => {
     Shrines: 30,
     Legion: 29,
     Incursion: 28,
-    Torment: 27,
+    Torment: 28, // 3.30.0c put Fated Meeting (55213) in the Torment cluster
     Bestiary: 26,
     Threads: 25,
     Betrayal: 24,
@@ -314,19 +316,71 @@ test("share link round-trips nodes, choices and budget", () => {
 
 test("compact share links: frozen lists are the 3.30 tree's, in id order", () => {
   assert.equal(data.version, "3.30.0");
+  // The 3.30.0 lists are in id order; nodes added since follow in their own list.
+  const byId = (a: number, b: number) => a - b;
+  assert.deepEqual([...SHARE_NODES_3_30], [...SHARE_NODES_3_30].sort(byId));
+  assert.equal(SHARE_NODES_3_30.length, 967);
+  assert.deepEqual([...SHARE_NODES_3_30_ADDED], [27261, 53484]);
   assert.deepEqual(
-    [...SHARE_NODES_3_30],
-    Object.keys(data.nodes)
-      .map(Number)
-      .sort((a, b) => a - b),
+    [...SHARE_NODES_3_30, ...SHARE_NODES_3_30_ADDED].sort(byId),
+    Object.keys(data.nodes).map(Number).sort(byId),
   );
+  const added = new Set(SHARE_NODES_3_30_ADDED);
+  const listed = (ids: number[]) =>
+    ids.map((id) => [id, data.nodes[String(id)].choices?.map((c) => c.effect)]);
+  const choiceIds = Object.entries(data.nodes)
+    .filter(([, n]) => n.choices)
+    .map(([id]) => Number(id))
+    .sort(byId);
   assert.deepEqual(
     SHARE_CHOICES_3_30.map(([node, effects]) => [node, [...effects]]),
-    Object.entries(data.nodes)
-      .filter(([, n]) => n.choices)
-      .map(([id, n]) => [Number(id), n.choices!.map((c) => c.effect)])
-      .sort((a, b) => (a[0] as number) - (b[0] as number)),
+    listed(choiceIds.filter((id) => !added.has(id))),
   );
+  assert.deepEqual(
+    SHARE_CHOICES_3_30_ADDED.map(([node, effects]) => [node, [...effects]]),
+    listed(SHARE_NODES_3_30_ADDED.filter((id) => choiceIds.includes(id))),
+  );
+});
+
+test("compact share links: nodes added since 3.30.0 use format 3", () => {
+  // Celestial Presence (27261, off Map Modifier Effect) with its third option.
+  const allocated = route(graph, none, "27261")!;
+  const plan: Plan = { allocated, choices: { "27261": 24486 }, budget: 150 };
+  const fragment = encodeShare(plan, data.version);
+  const bytes = Buffer.from(fragment.slice(2), "base64url");
+  assert.equal(bytes[0], 3);
+  const head = 2 + Math.ceil(969 / 8);
+  assert.equal(bytes.length, head + 1); // one allocated choice node
+  const back = parseLink(
+    `https://kobayashi-maru-1.github.io/lioneye/atlas/#${fragment}`,
+  );
+  assert.ok(back.ok && back.kind === "share");
+  assert.deepEqual(
+    normalise(graph, data, back.plan),
+    normalise(graph, data, plan),
+  );
+  assert.deepEqual(back.plan.choices, { "27261": 24486 });
+  // Without the new node the same plan is still a format 2 link.
+  const older = allocated.filter((id) => id !== "27261");
+  const two = Buffer.from(
+    encodeShare(
+      { allocated: older, choices: {}, budget: 150 },
+      data.version,
+    ).slice(2),
+    "base64url",
+  );
+  assert.equal(two[0], 2);
+  // Format 3 is checked byte for byte like format 2.
+  const read = (b: Uint8Array) =>
+    parseLink(`#t=${Buffer.from(b).toString("base64url")}`).ok;
+  assert.equal(read(bytes.subarray(0, bytes.length - 1)), false);
+  assert.equal(read(Buffer.concat([bytes, Buffer.from([0])])), false);
+  const pastEnd = Buffer.from(bytes);
+  pastEnd[head - 1] |= 1 << (969 & 7); // bit 969: the first past the 969 nodes
+  assert.equal(read(pastEnd), false);
+  const badPick = Buffer.from(bytes);
+  badPick[head] = 4; // Celestial Presence has 3 options
+  assert.equal(read(badPick), false);
 });
 
 const destructiveJson = () =>
@@ -393,17 +447,16 @@ test("compact share links: worst case stays short, every node and pick back", ()
   // Every node, and every choice node on its last option.
   const all = Object.keys(data.nodes);
   const choices = Object.fromEntries(
-    SHARE_CHOICES_3_30.map(([node, effects]) => [
-      String(node),
-      effects[effects.length - 1],
-    ]),
+    [...SHARE_CHOICES_3_30, ...SHARE_CHOICES_3_30_ADDED].map(
+      ([node, effects]) => [String(node), effects[effects.length - 1]],
+    ),
   );
   const fragment = encodeShare(
     { allocated: all, choices, budget: 150 },
     data.version,
   );
   const link = `https://kobayashi-maru-1.github.io/lioneye/atlas/#${fragment}`;
-  assert.ok(link.length <= 260, `${link.length}`);
+  assert.ok(link.length <= 265, `${link.length}`); // format 3: 969 bits, 33 picks
   const back = parseLink(link);
   assert.ok(back.ok);
   assert.deepEqual([...back.plan.allocated].sort(), [...all].sort());
@@ -437,7 +490,7 @@ test("compact share links: a byte off is refused", () => {
   assert.equal(read(Buffer.concat([bytes, Buffer.from([0])])), false); // extra byte
   assert.equal(read(bytes.subarray(0, head - 1)), false); // too short
   const format = Buffer.from(bytes);
-  format[0] = 3;
+  format[0] = 4; // no such format
   assert.equal(read(format), false);
   const pastEnd = Buffer.from(bytes);
   pastEnd[head - 1] |= 0x80; // bit 967: the first past the 967 nodes
@@ -963,14 +1016,15 @@ test("colours: neighbouring clusters differ; letters are unique", () => {
         );
       }
   assert.ok(pairs > 100);
-  // Every cluster's nearest other cluster is well inside the reach.
+  // Every cluster's nearest other cluster is well inside the reach (the farthest, Atlas
+  // Memories at the top, is about 1550 away).
   for (const p of data.labels) {
     const nearest = Math.min(
       ...data.labels
         .filter((q) => q.m !== p.m)
         .map((q) => Math.hypot(p.x - q.x, p.y - q.y)),
     );
-    assert.ok(nearest < NEIGHBOUR_REACH / 2);
+    assert.ok(nearest < NEIGHBOUR_REACH * 0.55);
   }
   assert.ok(new Set(colours).size <= PALETTE.length);
   const letters = mechanicLetters(data.mechanics);

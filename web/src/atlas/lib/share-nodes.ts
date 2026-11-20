@@ -1,8 +1,8 @@
 /**
  * Compact share links (format 2) mark nodes by their place in this list: every node of the
- * 3.30 atlas tree, in id order. Frozen: a link made with it must keep meaning the same nodes
- * whatever later tree data says, so it's never regenerated. A new tree gets a new list and
- * format number (links.ts). A test checks it against common/data/atlas/3_30.json.
+ * 3.30.0 atlas tree, in id order. Frozen: a link made with it must keep meaning the same nodes
+ * whatever later tree data says, so it's never regenerated. Nodes added later go in
+ * SHARE_NODES_3_30_ADDED (format 3). A test checks both against common/data/atlas/3_30.json.
  */
 export const SHARE_NODES_3_30: readonly number[] = [
   31, 34, 85, 121, 128, 206, 302, 469, 565, 601, 712, 723, 777, 866, 875, 929,
@@ -94,6 +94,13 @@ export const SHARE_NODES_3_30: readonly number[] = [
 ];
 
 /**
+ * Nodes GGG added after 3.30.0, in the order they arrived (3.30.0c: Celestial Presence,
+ * Runic Distortion). Format 3 links append their bits after SHARE_NODES_3_30's, so every
+ * older node keeps its place. Frozen: only ever appended to.
+ */
+export const SHARE_NODES_3_30_ADDED: readonly number[] = [27261, 53484];
+
+/**
  * Compact share links' picks: every 3.30 choice node, in id order, with its options in the
  * tree data's order. A link stores a pick as its place in that node's list. Frozen like the
  * node list; the same test checks it.
@@ -133,4 +140,16 @@ export const SHARE_CHOICES_3_30: readonly (readonly [
   [61698, [9590, 60065, 50909, 11679]],
   [63533, [57043, 42022]],
   [64980, [53700, 44382, 48744, 43149, 8451]],
+];
+
+/**
+ * Picks on SHARE_NODES_3_30_ADDED's choice nodes, in that list's order; format 3 links store
+ * them after SHARE_CHOICES_3_30's. Frozen like the lists above.
+ */
+export const SHARE_CHOICES_3_30_ADDED: readonly (readonly [
+  number,
+  readonly number[],
+])[] = [
+  [27261, [15113, 62580, 24486]],
+  [53484, [33191, 39546]],
 ];

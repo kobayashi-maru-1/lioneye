@@ -1,4 +1,9 @@
-import { SHARE_CHOICES_3_30, SHARE_NODES_3_30 } from "./share-nodes.ts";
+import {
+  SHARE_CHOICES_3_30,
+  SHARE_CHOICES_3_30_ADDED,
+  SHARE_NODES_3_30,
+  SHARE_NODES_3_30_ADDED,
+} from "./share-nodes.ts";
 import { MAX_BUDGET, type Plan } from "./types.ts";
 
 /**
@@ -10,13 +15,43 @@ import { MAX_BUDGET, type Plan } from "./types.ts";
 
 /** Share links before compact ones: base64url of a JSON array (still read). */
 const SHARE_FORMAT = 1;
-/** Compact share links: binary, one bit per 3.30 node (SHARE_NODES_3_30). */
-const COMPACT_FORMAT = 2;
 const COMPACT_TREE = "3.30.0";
-const COMPACT_BITS = Math.ceil(SHARE_NODES_3_30.length / 8);
-/** Format, budget, then the node bits; one pick byte per allocated choice node follows. */
-const COMPACT_HEAD = 2 + COMPACT_BITS;
-const compactIndex = new Map(SHARE_NODES_3_30.map((id, i) => [id, i]));
+
+type ChoiceList = readonly (readonly [number, readonly number[]])[];
+
+/** A compact link layout: its format byte, node list (one bit each) and choice list. */
+interface Compact {
+  format: number;
+  nodes: readonly number[];
+  choices: ChoiceList;
+  /** Format, budget, then the node bits; one pick byte per allocated choice node follows. */
+  head: number;
+  index: Map<number, number>;
+}
+
+function compact(
+  format: number,
+  nodes: readonly number[],
+  choices: ChoiceList,
+): Compact {
+  return {
+    format,
+    nodes,
+    choices,
+    head: 2 + Math.ceil(nodes.length / 8),
+    index: new Map(nodes.map((id, i) => [id, i])),
+  };
+}
+
+/** Compact share links, format 2: one bit per 3.30.0 node (SHARE_NODES_3_30). */
+const COMPACT_2 = compact(2, SHARE_NODES_3_30, SHARE_CHOICES_3_30);
+/** Format 3: format 2's nodes and picks, then those added since (3.30.0c). */
+const COMPACT_3 = compact(
+  3,
+  [...SHARE_NODES_3_30, ...SHARE_NODES_3_30_ADDED],
+  [...SHARE_CHOICES_3_30, ...SHARE_CHOICES_3_30_ADDED],
+);
+const ADDED = new Set(SHARE_NODES_3_30_ADDED);
 
 function toBase64Url(bytes: Uint8Array, padded: boolean) {
   let binary = "";
@@ -57,6 +92,10 @@ const isSet = (bytes: Uint8Array, i: number) =>
  * that list + 1]. That's 123 bytes plus one per allocated choice node: on the live site
  * about 220 characters for a plan with three, 258 at most. Ids outside the list (none in
  * a normalised plan) and picks on nodes not allocated are left out.
+ * A plan with a node added since 3.30.0 (SHARE_NODES_3_30_ADDED) uses format 3: the same
+ * layout over both lists, format 2's bits and picks first (124 bytes plus picks; 262
+ * characters at most). Any other plan stays format 2, so its link is the same as before
+ * those nodes existed.
  * Other trees: the JSON form, [1, treeVersion, budget, ids, choices].
  */
 export function encodeShare(plan: Plan, treeVersion: string) {
@@ -66,21 +105,23 @@ export function encodeShare(plan: Plan, treeVersion: string) {
       .sort((a, b) => a[0] - b[0]);
     return `t=${encodeJson([SHARE_FORMAT, treeVersion, plan.budget, sortedIds(plan.allocated), choices])}`;
   }
-  const head = new Uint8Array(COMPACT_HEAD);
-  head[0] = COMPACT_FORMAT;
+  const ids = sortedIds(plan.allocated);
+  const c = ids.some((id) => ADDED.has(id)) ? COMPACT_3 : COMPACT_2;
+  const head = new Uint8Array(c.head);
+  head[0] = c.format;
   head[1] = Math.max(1, Math.min(255, Math.round(plan.budget)));
-  for (const id of sortedIds(plan.allocated)) {
-    const i = compactIndex.get(id);
+  for (const id of ids) {
+    const i = c.index.get(id);
     if (i !== undefined) head[2 + (i >> 3)] |= 1 << (i & 7);
   }
   const picks: number[] = [];
-  for (const [node, effects] of SHARE_CHOICES_3_30) {
-    if (!isSet(head, compactIndex.get(node)!)) continue;
+  for (const [node, effects] of c.choices) {
+    if (!isSet(head, c.index.get(node)!)) continue;
     picks.push(effects.indexOf(plan.choices[String(node)]) + 1);
   }
-  const bytes = new Uint8Array(COMPACT_HEAD + picks.length);
+  const bytes = new Uint8Array(c.head + picks.length);
   bytes.set(head);
-  bytes.set(picks, COMPACT_HEAD);
+  bytes.set(picks, c.head);
   return `t=${toBase64Url(bytes, false)}`;
 }
 
@@ -128,19 +169,18 @@ function budgetOf(v: unknown) {
 }
 
 /** A compact share link's bytes (see encodeShare); anything off by a byte is refused. */
-function decodeCompact(bytes: Uint8Array): LinkResult {
-  if (bytes.length < COMPACT_HEAD || bytes[0] !== COMPACT_FORMAT)
-    return { ok: false };
+function decodeCompact(bytes: Uint8Array, c: Compact): LinkResult {
+  if (bytes.length < c.head || bytes[0] !== c.format) return { ok: false };
   const allocated: string[] = [];
-  for (let i = 0; i < SHARE_NODES_3_30.length; i++)
-    if (isSet(bytes, i)) allocated.push(String(SHARE_NODES_3_30[i]));
+  for (let i = 0; i < c.nodes.length; i++)
+    if (isSet(bytes, i)) allocated.push(String(c.nodes[i]));
   // Bits past the list's end are never set by encodeShare.
-  for (let i = SHARE_NODES_3_30.length; i < COMPACT_BITS * 8; i++)
+  for (let i = c.nodes.length; i < (c.head - 2) * 8; i++)
     if (isSet(bytes, i)) return { ok: false };
   const choices: Record<string, number> = {};
-  let at = COMPACT_HEAD;
-  for (const [node, effects] of SHARE_CHOICES_3_30) {
-    if (!isSet(bytes, compactIndex.get(node)!)) continue;
+  let at = c.head;
+  for (const [node, effects] of c.choices) {
+    if (!isSet(bytes, c.index.get(node)!)) continue;
     if (at >= bytes.length) return { ok: false };
     const pick = bytes[at++];
     if (pick > effects.length) return { ok: false };
@@ -158,7 +198,8 @@ function decodeCompact(bytes: Uint8Array): LinkResult {
 function decodeShare(text: string): LinkResult {
   const bytes = fromBase64Url(text);
   // A JSON link starts with "[", a compact one with its format byte.
-  if (bytes[0] === COMPACT_FORMAT) return decodeCompact(bytes);
+  if (bytes[0] === COMPACT_2.format) return decodeCompact(bytes, COMPACT_2);
+  if (bytes[0] === COMPACT_3.format) return decodeCompact(bytes, COMPACT_3);
   const value: unknown = JSON.parse(new TextDecoder().decode(bytes));
   if (!Array.isArray(value) || value[0] !== SHARE_FORMAT || !isIdList(value[3]))
     return { ok: false };
