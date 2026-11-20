@@ -1330,6 +1330,14 @@ test("League page: tree links open in New with their point counts", () => {
     (section.match(/class="farm card"/g) ?? []).length,
   );
   assert.ok(cards.length >= plannerLinks.length);
+  // Every card inside the one cards grid (nothing before or after it).
+  const grid = section.indexOf('<div class="farms">');
+  const gridEnd = section.indexOf("\n    </div>", grid);
+  assert.ok(grid >= 0 && gridEnd > grid);
+  assert.equal(
+    (section.slice(grid, gridEnd).match(/class="farm card"/g) ?? []).length,
+    cards.length,
+  );
   cards.forEach(([, href, title, points], i) => {
     const url = atlasTreeUrl(href);
     assert.ok(url, title);

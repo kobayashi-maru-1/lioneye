@@ -140,9 +140,14 @@
   .quads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   @media (max-width: 720px) { .quads { grid-template-columns: 1fr; } }
   .quad { background: var(--shroud-2); border: 1px solid rgba(93,70,48,0.55); border-radius: var(--r); padding: 10px 12px; }
+  .quad.wide { grid-column: 1 / -1; }
   .quad .qn { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.08em; color: var(--gilt); font-size: 14px; margin-bottom: 6px; }
-  .quad .ql { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin: 8px 0 3px; }
+  .quad .ql { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin: 8px 0 3px; font-variant-numeric: lining-nums; }
   .quad .ql b { color: var(--spectral); font-weight: 700; }
+  /* An inline list: names stay whole, a dot after each but the last (silent for screen readers where supported). */
+  .quad ul.names { list-style: none; margin: 0; padding: 0; font-size: 14.5px; }
+  .quad ul.names li { display: inline; white-space: nowrap; }
+  .quad ul.names li:not(:last-child)::after { content: "\00a0\00b7"; content: "\00a0\00b7" / ""; }
   .quad dl { margin: 0; display: grid; grid-template-columns: minmax(0, 150px) 1fr; gap: 2px 10px; font-size: 14.5px; }
   .quad dt { font-weight: 700; color: #f3efe6; }
   .quad dd { margin: 0; color: var(--bone); }
@@ -489,8 +494,20 @@
         <div class="ql"><b>Arkhon's Vault</b> · Maven, Sirus</div>
         <p>Guardian / Conqueror / Synthesised / Nightmare maps · Uber Elder fragments · Valdo's Puzzle Box · rare: Greater Spell Cascade, Cooldown Recovery</p>
       </div>
+      <!-- Court of Chaos sacrifice picks: every unique whose latest tier is 0 on the PoE Wiki's
+           "Guide:Analysis of unique item tiers" (global drops only; checked 20 Nov 2026). The
+           wiki's Court of Chaos page: a T0 sacrifice always opens all 6 Wealth of Chaos vaults (troves).
+           Reefbane is left out (its own fishing tier, not T0 in 3.30); The Burden of Shadows too
+           (boss drop, T0 only during 3.24). Jiquani's Potential: T3 in 3.27, the wiki notes
+           "T0 from 3.28". Ephemeral Edge: T0 only in 3.27 Ultimatum data (T2 in 3.26).
+           Varunastra: T0 in 3.25-3.27 Ultimatum data, T2 from Dust and older leagues. -->
+      <div class="quad wide">
+        <div class="qn">The Court of Chaos</div>
+        <div class="ql">Tier 0 uniques · <b>6 troves</b></div>
+        <ul class="names"><li>Bino's Kitchen Knife</li> <li>Bloodseeker</li> <li>Defiance of Destiny</li> <li>Divinarius</li> <li>Ephemeral Edge</li> <li>Essentia Sanguis</li> <li>Headhunter</li> <li>Jiquani's Potential</li> <li>Kalandra's Touch</li> <li>Lioneye's Glare</li> <li>Mageblood</li> <li>Marohi Erqi</li> <li>Rakiata's Dance</li> <li>Soul Taker</li> <li>The Squire</li> <li>Varunastra</li> <li>Voltaxic Rift</li></ul>
+      </div>
     </div>
-    <p class="note">Anomalies need a voidstone in that quadrant and stay until you enter them. Vaults only spawn from boss kills in the boss's own arena, not Maven invitations or Valdo maps. Lists are from the PoE Wiki's 3.29 data; the Arkhon's Vault scarab reward is presumably Threads now.</p>
+    <p class="note">Anomalies need a voidstone in that quadrant and stay until you enter them. Vaults only spawn from boss kills in the boss's own arena, not Maven invitations or Valdo maps. Lists are from the PoE Wiki's 3.29 data, tier 0 uniques from its tier guide; the Arkhon's Vault scarab reward is presumably Threads now.</p>
   </section>
 
   <section class="panel" id="gems" data-jump="Gems" aria-labelledby="h-gems">
