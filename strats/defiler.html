@@ -106,7 +106,7 @@
   .row:has(> input:checked) .name, .row:has(> input:checked) .price { text-decoration: line-through; }
   /* bought rows fold away unless "Show bought" is on */
   .hide-bought .row:has(> input:checked) { display: none; }
-  .alldone { color: var(--ash); font-size: 14px; margin: 2px 0 0; }
+  .hide-bought .panel.allbought { display: none; }
   .showbought { font: inherit; font-size: 13.5px; color: var(--gilt); background: transparent; border: 1px solid var(--bark);
                 border-radius: 4px; padding: 3px 10px; min-height: 32px; cursor: pointer; margin-left: auto; align-self: center; }
   .showbought:hover { border-color: var(--gilt); }
@@ -269,18 +269,11 @@
       toggle.hidden = bought === 0;
       toggle.textContent = "Show bought (" + bought + ")";
       toggle.setAttribute("aria-pressed", showBought ? "true" : "false");
+      // A section whose rows are all bought folds away too.
       Array.prototype.forEach.call(document.querySelectorAll(".panel .rows"), function (list) {
         var all = list.querySelectorAll(".row").length;
         var done = list.querySelectorAll(".row > input[type=checkbox]:checked").length;
-        var note = list.querySelector(".alldone");
-        var show = !showBought && all > 0 && done === all;
-        if (show && !note) {
-          note = document.createElement("p");
-          note.className = "alldone";
-          note.textContent = "All bought";
-          list.appendChild(note);
-        }
-        if (note) note.hidden = !show;
+        list.closest(".panel").classList.toggle("allbought", all > 0 && done === all);
       });
     }
     toggle.addEventListener("click", function () {
