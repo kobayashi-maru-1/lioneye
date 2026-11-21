@@ -104,6 +104,15 @@
   .row .price .l { display: block; color: var(--ash); font-size: 12.5px; }
   .row:has(> input:checked) { border-left-color: var(--bark); opacity: 0.7; }
   .row:has(> input:checked) .name, .row:has(> input:checked) .price { text-decoration: line-through; }
+  /* bought rows fold away unless "Show bought" is on */
+  .hide-bought .row:has(> input:checked) { display: none; }
+  .alldone { color: var(--ash); font-size: 14px; margin: 2px 0 0; }
+  .showbought { font: inherit; font-size: 13.5px; color: var(--gilt); background: transparent; border: 1px solid var(--bark);
+                border-radius: 4px; padding: 3px 10px; min-height: 32px; cursor: pointer; margin-left: auto; align-self: center; }
+  .showbought:hover { border-color: var(--gilt); }
+  .showbought:focus-visible { outline: 2px solid var(--spectral); outline-offset: 2px; }
+  .showbought[aria-pressed="true"] { background: rgba(201,162,74,0.25); border-color: var(--gilt); color: #fff; }
+  @media (max-width: 560px) { html { scroll-padding-top: 110px; } }
   .opts { border: 0; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .opt { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 14.5px; padding: 4px 8px 4px 30px; border-radius: 4px; border: 1px solid transparent; }
   .opt:has(input:checked) { background: rgba(201,162,74,0.12); border-color: rgba(201,162,74,0.45); }
@@ -133,7 +142,7 @@
     <a class="back" href="./#builds">League page</a>
   </header>
 
-  <div class="left" role="status" aria-live="polite"><span class="k">Left to buy</span><span class="v" id="left">0 div</span></div>
+  <div class="left"><span class="k">Left to buy</span><span class="v" id="left" role="status" aria-live="polite">0 div</span><button type="button" class="showbought" id="showbought" aria-pressed="false" hidden>Show bought</button></div>
 
   <section class="panel" id="core" aria-labelledby="h-core">
     <div class="ph"><h2 id="h-core">Core</h2></div>
@@ -235,6 +244,47 @@
 
     var rows = Array.prototype.slice.call(document.querySelectorAll(".row"));
     function picked(row) { return row.querySelector(".opts input:checked"); }
+    function boxOf(row) { return row.querySelector(":scope > input[type=checkbox]"); }
+
+    // Bought rows fold away; "Show bought" brings them back (kept per browser).
+    var main = document.querySelector("main");
+    var toggle = document.getElementById("showbought");
+    var showBought = load("show-bought") === "1";
+    function applyBought() {
+      var bought = rows.filter(function (row) { return boxOf(row).checked; }).length;
+      main.classList.toggle("hide-bought", !showBought);
+      toggle.hidden = bought === 0;
+      toggle.textContent = "Show bought (" + bought + ")";
+      toggle.setAttribute("aria-pressed", showBought ? "true" : "false");
+      Array.prototype.forEach.call(document.querySelectorAll(".panel .rows"), function (list) {
+        var all = list.querySelectorAll(".row").length;
+        var done = list.querySelectorAll(".row > input[type=checkbox]:checked").length;
+        var note = list.querySelector(".alldone");
+        var show = !showBought && all > 0 && done === all;
+        if (show && !note) {
+          note = document.createElement("p");
+          note.className = "alldone";
+          note.textContent = "All bought";
+          list.appendChild(note);
+        }
+        if (note) note.hidden = !show;
+      });
+    }
+    toggle.addEventListener("click", function () {
+      showBought = !showBought;
+      save("show-bought", showBought ? "1" : "0");
+      applyBought();
+    });
+    function focusAfter(row) {
+      // The ticked row just disappeared: move focus to the next row still listed.
+      var i = rows.indexOf(row);
+      var order = rows.slice(i + 1).concat(rows.slice(0, i).reverse());
+      for (var k = 0; k < order.length; k++) {
+        if (!boxOf(order[k]).checked) { boxOf(order[k]).focus({ preventScroll: true }); return; }
+      }
+      toggle.focus({ preventScroll: true });
+    }
+
     function total() {
       var chaos = 0, items = 0;
       rows.forEach(function (row) {
@@ -244,7 +294,7 @@
         if (!box.checked && c > 0) { chaos += c; items++; }
       });
       var div = chaos / DIV;
-      document.getElementById("left").innerHTML = (div >= 10 ? Math.round(div) : div.toFixed(1)) +
+      document.getElementById("left").innerHTML = '<span class="vh">Left to buy: </span>' + (div >= 10 ? Math.round(div) : div.toFixed(1)) +
         " div <small>· " + items + (items === 1 ? " item" : " items") + "</small>";
     }
     function showPick(row) {
@@ -258,7 +308,12 @@
       var id = row.getAttribute("data-id");
       var box = row.querySelector(":scope > input[type=checkbox]");
       box.checked = load(id) === "1";
-      box.addEventListener("change", function () { save(id, box.checked ? "1" : "0"); total(); });
+      box.addEventListener("change", function () {
+        save(id, box.checked ? "1" : "0");
+        total();
+        applyBought();
+        if (box.checked && !showBought) focusAfter(row);
+      });
       var radios = row.querySelectorAll(".opts input[type=radio]");
       var stored = load("pick-" + id);
       Array.prototype.forEach.call(radios, function (radio) {
@@ -268,6 +323,7 @@
       showPick(row);
     });
     total();
+    applyBought();
   })();
 </script>
 </body>
