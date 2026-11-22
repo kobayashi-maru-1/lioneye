@@ -9,7 +9,7 @@
   Spectre Defilers gear list (Lioneye's GitHub Pages site, beside the League page). Gear from
   the Spectre Defilers {d1} loadout in the Holy Relic builds (builds/hroc-necro-*.txt). Each
   search carries only the mods that move DPS or EHP in PoB 3.30; effects are PoB runs against
-  that loadout. Prices: trade site, 20–21 Nov 2026, 225c per divine. Trade links are built from
+  that loadout. Prices: trade site, 20–22 Nov 2026, 225c per divine. Trade links are built from
   data-query and <main data-league>, buyout only, as on the League page. Ticks and picked
   options are kept in this browser (localStorage, keys starting "lioneye-defiler-").
 -->
@@ -138,7 +138,7 @@
   <header>
     <div class="eyebrow">Covens · Necromancer</div>
     <h1>Defiler Gear</h1>
-    <p class="sub">Spectre Defilers loadout · Holy Relic PoB · Covens prices 20–21 Nov</p>
+    <p class="sub">Spectre Defilers loadout · Holy Relic PoB · Covens prices 20–22 Nov</p>
     <a class="back" href="./#builds">League page</a>
   </header>
 
@@ -228,9 +228,17 @@
     </div>
   </section>
 
+  <section class="panel" id="optional" aria-labelledby="h-optional" data-nototal>
+    <div class="ph"><h2 id="h-optional">Optional</h2><span class="sub">Not in total</span></div>
+    <div class="rows">
+      <div class="row" data-id="monarch"><input type="checkbox" id="c-monarch" aria-label="Bought: The Dark Monarch" data-chaos="5"><div class="main"><div class="name"><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query="{&quot;query&quot;:{&quot;status&quot;:{&quot;option&quot;:&quot;securable&quot;},&quot;filters&quot;:{&quot;type_filters&quot;:{&quot;filters&quot;:{&quot;rarity&quot;:{&quot;option&quot;:&quot;unique&quot;}}},&quot;misc_filters&quot;:{&quot;filters&quot;:{&quot;mutated&quot;:{&quot;option&quot;:&quot;false&quot;}}}},&quot;stats&quot;:[],&quot;type&quot;:&quot;Lich&#x27;s Circlet&quot;,&quot;name&quot;:&quot;The Dark Monarch&quot;},&quot;sort&quot;:{&quot;price&quot;:&quot;asc&quot;}}">The Dark Monarch</a><span class="mods">Not Foulborn</span></div><div class="rnote">Replaces Wraithlord + eyes: +18% EHP</div></div><div class="price"><span class="p">5c</span><span class="l">5214 listed</span></div></div>
+      <div class="row" data-id="aegis"><input type="checkbox" id="c-aegis" aria-label="Bought: Aegis Aurora" data-chaos="15"><div class="main"><div class="name"><a href="https://www.pathofexile.com/trade" target="_blank" rel="noopener" data-query="{&quot;query&quot;:{&quot;status&quot;:{&quot;option&quot;:&quot;securable&quot;},&quot;filters&quot;:{&quot;type_filters&quot;:{&quot;filters&quot;:{&quot;rarity&quot;:{&quot;option&quot;:&quot;unique&quot;}}},&quot;misc_filters&quot;:{&quot;filters&quot;:{&quot;mutated&quot;:{&quot;option&quot;:&quot;false&quot;}}}},&quot;stats&quot;:[],&quot;type&quot;:&quot;Champion Kite Shield&quot;,&quot;name&quot;:&quot;Aegis Aurora&quot;},&quot;sort&quot;:{&quot;price&quot;:&quot;asc&quot;}}">Aegis Aurora</a><span class="mods">Not Foulborn</span></div><div class="rnote">Replaces off-hand wand: −20% DPS, 2× EHP</div></div><div class="price"><span class="p">15c</span><span class="l">3200 listed</span></div></div>
+    </div>
+  </section>
+
   <details class="sources">
     <summary>Notes</summary>
-    <p>PoB 3.30 · DPS and EHP mods only · Effects vs the loadout's gear · Trade 20–21 Nov 2026, 225c/div · Total: listed price of each pick</p>
+    <p>PoB 3.30 · DPS and EHP mods only · Effects vs the loadout's gear · Trade 20–22 Nov 2026, 225c/div · Total: listed price of each pick</p>
   </details>
 </main>
 <script>
@@ -295,6 +303,7 @@
     function total() {
       var chaos = 0, items = 0;
       rows.forEach(function (row) {
+        if (row.closest("[data-nototal]")) return;
         var box = row.querySelector(":scope > input[type=checkbox]");
         var opt = picked(row);
         var c = Number((opt || box).getAttribute("data-chaos")) || 0;
