@@ -29,8 +29,37 @@ Status: phases 1–4 built 2026-11-24; phase 5 (prices and popularity) next.
 | 3 | Worker pool and eval API (full load, calculator deltas, in-memory gem changes) | Done |
 | 4 | Optimizers: gem links, tree pathing, gear (synthesized rares), jewels | Done |
 | 5 | poe.ninja prices and popularity; novelty score | Next |
-| 6 | Design workflow in the skill: interview, concepts, checkpoints, report | |
+| 6 | Design workflow in the skill: interview, concepts, checkpoints, report; the lab notebook (below) | |
 | 7 | Back-test on known strong builds | |
+
+## Lab notebook (phase 6): what the designer learns and remembers
+
+Every run records what it found; later runs read it before searching. Decided with Andy 2026-11-24.
+
+**What it holds:**
+- tried concepts (numbers, cost, verdict);
+- discovered interactions;
+- PoB blind spots (e.g. generous trigger supports, jewel-socket probes);
+- Andy's feedback after playing a build;
+- Andy's preferences.
+
+Every entry carries the patch, PoB version, evidence and date. Entries from an older patch are re-checked before
+they're trusted. Findings that keep holding up gain weight in which concepts get proposed first; ones a patch or
+a playthrough contradicts lose it.
+
+**Storage, all in the Lioneye repo, no artifact:**
+- `build-lab/notebook/`: JSONL per kind, plus markdown for longer lessons. This is the source of truth;
+  SQLite is only a throwaway query index rebuilt from it.
+- Findings and concepts are committed (public). Preferences and feedback on Andy's own characters go to a
+  git-ignored local file on his PC.
+
+**Writing:**
+- Claude Code (VS Code or the Desktop app) writes directly.
+- Claude Desktop chats write through a small local MCP server, `build-lab/notebook-mcp`, registered in Claude
+  Desktop's config. Its tools read, add and sync (pull, commit, push). It uses the PC's existing git login for
+  kobayashi-maru-1, so there's no token in the skill.
+- Web and phone chats read from GitHub and hand back new entries for the next Desktop session to commit.
+- Notebook entries commit and push automatically (no confirmation), like League page updates.
 
 ## Phase 1 results (PoB 2.68.1, tree 3_30, this PC: 20 threads, 64 GB)
 
