@@ -77,6 +77,55 @@ end
 -- FullDPS: the calculator leaves these out when no group counts in Full DPS, the main calc says 0. Report 0.
 local zeroWhenMissing = { FullDPS = true, FullDotDPS = true }
 
+-- PoB's own build warnings for an output (BuildDisplayStats warnFunc rules, as the Calcs panel shows them),
+-- leaving out the informational "DPS exceeds in game limit" ones, plus a main-skill cost check. These are the
+-- hard rules an optimizer must not break: attribute requirements, unreserved life/mana, Precise Technique
+-- accuracy, the main skill's cost.
+-- PoB's own cost warnings (ManaCostWarningList, ...) are built only in the main calc, for every skill, so the
+-- calculator's probes never have them. Both paths are judged by the same check instead: the main skill's cost
+-- (LifeCost / ManaCost / RageCost / ESCost) against the pool it's paid from, as PoB's check does it.
+local displayStatsModule
+local function violations(out)
+  if displayStatsModule == nil then
+    local ok, m = pcall(LoadModule, "Modules/BuildDisplayStats")
+    displayStatsModule = ok and type(m) == "table" and m or false
+  end
+  local list = { }
+  local function scan(stats, o)
+    for _, sd in ipairs(stats or { }) do
+      if sd.stat and sd.warnFunc then
+        local v = o[sd.stat]
+        if sd.childStat then v = type(v) == "table" and v[sd.childStat] or nil end
+        if v ~= nil then
+          local okc, cond = true, true
+          if sd.condFunc then okc, cond = pcall(sd.condFunc, v, o) end
+          if okc and cond then
+            local okw, w = pcall(sd.warnFunc, v, o)
+            if okw and w and not tostring(w):find("exceeds in game limit") then list[#list + 1] = tostring(w) end
+          end
+        end
+      end
+    end
+  end
+  if displayStatsModule then
+    scan(displayStatsModule.displayStats, out)
+    if out.Minion then scan(displayStatsModule.minionDisplayStats, out.Minion) end
+  end
+  local esProtectsMana = false
+  pcall(function() esProtectsMana = B().calcsTab.mainEnv.modDB:Flag(nil, "EnergyShieldProtectsMana") end)
+  for _, c in ipairs({ { "Life", "LifeUnreserved", "LifeCost" }, { "Mana", "ManaUnreserved", "ManaCost" },
+                       { "Rage", "Rage", "RageCost" }, { "Energy Shield", "EnergyShield", "ESCost" } }) do
+    local cost = num(out[c[3]])
+    if cost and cost > 0 then
+      local pool = (num(out[c[2]]) or 0)
+        + ((esProtectsMana and c[3] == "ManaCost") and (num(out.EnergyShield) or 0) or 0)
+      if pool < cost then list[#list + 1] = "Not enough " .. c[1] .. " for the main skill's cost" end
+    end
+  end
+  table.sort(list)
+  return list
+end
+
 local function pick(out, keys, minionKeys)
   local res = { player = { } }
   for _, k in ipairs(keys) do
@@ -87,6 +136,7 @@ local function pick(out, keys, minionKeys)
     res.minion = { }
     for _, k in ipairs(minionKeys) do res.minion[k] = num(out.Minion[k]) end
   end
+  res.violations = violations(out)
   return res
 end
 
@@ -409,6 +459,29 @@ ops["gem-enable"] = function(op)
   inst.enabled = op.enabled ~= false
 end
 
+-- Start the passive tree over: only the class start (and the ascendancy start) allocated, masteries cleared.
+-- class: name or id; ascendancy: name (default: keep the current one when the class doesn't change; none
+-- otherwise). Jewels stay in the item set but their sockets are no longer allocated.
+ops["tree-reset"] = function(op)
+  local spec = B().spec
+  local classId
+  for id, c in pairs(spec.tree.classes) do
+    if c.name == op.class or id == tonumber(op.class) then classId = id end
+  end
+  if not classId then fail("no class '" .. tostring(op.class) .. "'") end
+  local keepAsc = (classId == spec.curClassId) and spec.curAscendClassName or nil
+  local ascName = op.ascendancy or keepAsc
+  spec:ResetNodes()
+  spec:SelectClass(classId)
+  if ascName and ascName ~= "None" then
+    local ascId
+    for id, a in pairs(spec.curClass.classes) do if a.name == ascName then ascId = id end end
+    if not ascId then fail("class " .. spec.curClassName .. " has no ascendancy '" .. tostring(ascName) .. "'") end
+    spec:SelectAscendClass(ascId)
+  end
+  spec:BuildAllDependsAndPaths()
+end
+
 -- A Config tab option, by its variable name (as in the build XML's <Input name="...">).
 function ops.config(op)
   local ct = B().configTab
@@ -466,8 +539,8 @@ end
 -- ---------- support trials ----------
 
 -- Supports PoB allows on the main skill as it is now (its current skill types, which include types added by
--- the supports already in the group).
-function ev_compatible_supports()
+-- the supports already in the group), not already in the group.
+local function compatibleSupports()
   local b = B()
   local skill = b.calcsTab.mainEnv.player.mainSkill
   if not skill then fail("no main skill") end
@@ -479,10 +552,27 @@ function ev_compatible_supports()
     local ge = gem.grantedEffect
     if ge and ge.support and not ge.unsupported and not have[id] then
       local ok, yes = pcall(calcLib.canGrantedEffectSupportActiveSkill, ge, skill)
-      if ok and yes then out[#out + 1] = gem.name end
+      if ok and yes then out[#out + 1] = gem end
     end
   end
-  table.sort(out)
+  table.sort(out, function(a, b) return a.name < b.name end)
+  return out
+end
+
+function ev_compatible_supports()
+  local out = { }
+  for _, gem in ipairs(compatibleSupports()) do out[#out + 1] = gem.name end
+  return dkjson.encode(out)
+end
+
+-- The same, with what a budget filter needs: awakened (a "plus version" of another support) and exceptional
+-- (Empower, Enlighten, Enhance and the like).
+function ev_compatible_supports_info()
+  local out = { }
+  for _, gem in ipairs(compatibleSupports()) do
+    out[#out + 1] = { name = gem.name, awakened = gem.grantedEffect.plusVersionOf ~= nil,
+                      exceptional = gem.tags and gem.tags.exceptional == true, maxLevel = gem.naturalMaxLevel }
+  end
   return dkjson.encode(out)
 end
 
@@ -551,20 +641,132 @@ function ev_groups()
   return dkjson.encode(out)
 end
 
--- Unallocated nodes reachable from the tree, for node-power style searches. Skips ascendancy, mastery and
--- class-start nodes, and nodes farther than maxDist points.
-function ev_reachable_nodes(maxDist)
+-- Unallocated nodes reachable from the tree, for node-power style searches. Skips mastery and class-start
+-- nodes, and nodes farther than maxDist points. ascendancy = true lists the current ascendancy's nodes instead
+-- of the main tree's (multiple-choice options left out).
+function ev_reachable_nodes(maxDist, ascendancyJson)
   maxDist = tonumber(maxDist)
+  local asc = ascendancyJson and decode(ascendancyJson, "ascendancy flag") == true
+  local spec = B().spec
   local out = { }
-  for id, n in pairs(B().spec.nodes) do
+  for id, n in pairs(spec.nodes) do
     local path = pathOf(n)
-    if not n.alloc and path and not n.ascendancyName and n.type ~= "Mastery" and n.type ~= "ClassStart"
-       and n.type ~= "AscendClassStart" and not n.isProxy and (not maxDist or #path <= maxDist) then
+    local inAsc = n.ascendancyName ~= nil
+    if not n.alloc and path and n.type ~= "Mastery" and n.type ~= "ClassStart" and n.type ~= "AscendClassStart"
+       and not n.isProxy and (not maxDist or #path <= maxDist)
+       and ((not asc and not inAsc) or (asc and inAsc and n.ascendancyName == spec.curAscendClassName
+                                         and not n.isMultipleChoiceOption)) then
       out[#out + 1] = { id = id, name = n.dn, type = n.type, dist = #path }
     end
   end
   table.sort(out, function(a, b) return a.id < b.id end)
   return dkjson.encode(out)
+end
+
+-- Passive points in use: {used (main tree, masteries included), ascendancy, class, ascendancyName}.
+function ev_points()
+  local spec = B().spec
+  local used, asc = spec:CountAllocNodes()
+  return dkjson.encode({ used = used, ascendancy = asc, class = spec.curClassName,
+                         ascendancyName = spec.curAscendClassName })
+end
+
+-- Gear and jewel slots as they are now: [{slot, socket, nodeId?, cluster?, item = {name, rarity, base, type,
+-- enchants, implicits}?}]. Sockets are listed only when allocated; swap, abyssal and graft slots are left out.
+function ev_slots()
+  local b = B()
+  local it, spec = b.itemsTab, b.spec
+  local out = { }
+  for _, slot in ipairs(it.orderedSlots) do
+    local name = slot.slotName
+    local socket = slot.nodeId ~= nil
+    local shown
+    if socket then
+      shown = spec.allocNodes[slot.nodeId] ~= nil
+    else
+      local ok, s = pcall(function() return not slot.IsShown or slot:IsShown() end)
+      shown = ok and s
+    end
+    if shown and not name:find("Swap") and not name:find("Abyssal") and not name:find("^Graft")
+       and not name:find("Wickerman") then
+      local e = { slot = name, socket = socket, nodeId = slot.nodeId }
+      if socket then
+        local n = spec.nodes[slot.nodeId]
+        e.cluster = n and n.expansionJewel ~= nil or false
+      end
+      local item = it.items[slot.selItemId]
+      if item then
+        local enchants, implicits = { }, { }
+        for _, ml in ipairs(item.enchantModLines or { }) do enchants[#enchants + 1] = ml.line end
+        for _, ml in ipairs(item.implicitModLines or { }) do implicits[#implicits + 1] = ml.line end
+        e.item = { name = item.name, rarity = item.rarity, base = item.baseName, type = item.type,
+                   cluster = item.clusterJewel ~= nil, enchants = enchants, implicits = implicits,
+                   text = item:BuildRaw() }
+      end
+      out[#out + 1] = e
+    end
+  end
+  return dkjson.encode(out)
+end
+
+-- Explicit affixes a rare of base `base` can roll at item level `ilvl` (PoB's spawn weights: the first of the
+-- mod's weight keys the base has decides), one per mod group at tier `tier` (T1 = highest level; groups with
+-- fewer tiers give their lowest), rolled at `roll` (0-1, default 0.5). bench = true adds the best crafting-bench
+-- mod per group for the base's item type. Also returns the base's implicit lines at the same roll.
+-- args (JSON): {base, ilvl?, tier?, roll?, domain? ("Explicit", "Jewel", ...), bench?}
+function ev_affix_pool(argsJson)
+  local a = decode(argsJson, "affix pool args")
+  local base = data.itemBases[a.base]
+  if not base then fail("no item base '" .. tostring(a.base) .. "'") end
+  local ilvl, tier, roll = tonumber(a.ilvl) or 84, tonumber(a.tier) or 2, tonumber(a.roll) or 0.5
+  local mods = data.itemMods[a.domain or "Explicit"]
+  if not mods then fail("no mod domain '" .. tostring(a.domain) .. "'") end
+  local function rolled(mod)
+    local lines = { }
+    for _, line in ipairs(mod) do lines[#lines + 1] = itemLib.applyRange(line, roll) end
+    return lines
+  end
+  local groups = { }
+  for id, mod in pairs(mods) do
+    if (mod.type == "Prefix" or mod.type == "Suffix") and (mod.level or 1) <= ilvl and mod.group then
+      local weight = 0
+      for i, key in ipairs(mod.weightKey or { }) do
+        if base.tags[key] then weight = (mod.weightVal or { })[i] or 0; break end
+      end
+      if weight > 0 then
+        groups[mod.group] = groups[mod.group] or { }
+        table.insert(groups[mod.group], { id = id, mod = mod })
+      end
+    end
+  end
+  local out = { }
+  for groupName, list in pairs(groups) do
+    table.sort(list, function(x, y) return (x.mod.level or 0) > (y.mod.level or 0) end)
+    local t = math.min(tier, #list)
+    local p = list[t]
+    out[#out + 1] = { id = tostring(p.id), type = p.mod.type, group = groupName, tier = t, tiers = #list,
+                      level = p.mod.level, lines = rolled(p.mod), crafted = false }
+  end
+  if a.bench then
+    local best = { }
+    for i, mod in ipairs(data.masterMods or { }) do
+      -- meta-crafts ("Can have up to 3 Crafted Modifiers", "Prefixes Cannot Be Changed") do nothing in a calc
+      local first = mod[1] or ""
+      local meta = first:find("^Can have up to") or first:find("Cannot Be Changed") or first:find("^Cannot roll")
+      if not meta and mod.types and mod.types[base.type] and (mod.type == "Prefix" or mod.type == "Suffix") and mod.group
+         and (mod.level or 1) <= ilvl and (not best[mod.group] or (mod.level or 0) > (best[mod.group].mod.level or 0)) then
+        best[mod.group] = { id = "Bench" .. i, mod = mod }
+      end
+    end
+    for groupName, p in pairs(best) do
+      out[#out + 1] = { id = p.id, type = p.mod.type, group = groupName, tier = 1, tiers = 1, level = p.mod.level,
+                        lines = rolled(p.mod), crafted = true }
+    end
+  end
+  table.sort(out, function(x, y) return x.id < y.id end)
+  local implicits = { }
+  for line in (base.implicit or ""):gmatch("[^\n]+") do implicits[#implicits + 1] = itemLib.applyRange(line, roll) end
+  return dkjson.encode({ base = a.base, type = base.type, implicits = implicits, affixes = out })
 end
 
 -- Unallocated masteries reachable from the tree, with the effects each still offers (effects taken by another
@@ -591,6 +793,20 @@ function ev_node_path(id)
   local n = node(decode(id, "node id"))
   local out = { }
   for _, p in ipairs((not n.alloc and pathOf(n)) or { }) do out[#out + 1] = p.id end
+  return dkjson.encode(out)
+end
+
+-- Allocated nodes the path to node `id` attaches to (neighbours of the path's last node), or [] when it's
+-- allocated or unreachable. A path whose anchors are all being removed would float.
+function ev_node_anchors(id)
+  local n = node(decode(id, "node id"))
+  local path = not n.alloc and pathOf(n)
+  local out = { }
+  if path and #path > 0 then
+    for _, other in ipairs(path[#path].linked or { }) do
+      if other.alloc then out[#out + 1] = other.id end
+    end
+  end
   return dkjson.encode(out)
 end
 

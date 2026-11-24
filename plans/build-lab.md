@@ -4,7 +4,7 @@ Andy asks Claude (Claude Code or a claude.ai chat) to design a build. Claude ask
 defences, proposes concepts from a game database, completes them with optimizers that run headless Path of
 Building, and returns 2–3 finished options with PoB codes, numbers, cost and blind spots.
 
-Status: phases 1–3 built 2026-11-24; phase 4 (optimizers) next.
+Status: phases 1–4 built 2026-11-24; phase 5 (prices and popularity) next.
 
 ## Decisions
 
@@ -27,8 +27,8 @@ Status: phases 1–3 built 2026-11-24; phase 4 (optimizers) next.
 | 1 | Benchmark eval speed; prove PoB's in-memory calculator works headless | Done |
 | 2 | Game database: builder, checks, client, daily release workflow | Done (first release pending the workflow's first run) |
 | 3 | Worker pool and eval API (full load, calculator deltas, in-memory gem changes) | Done |
-| 4 | Optimizers: gem links, tree pathing, gear (synthesized rares), jewels | Next |
-| 5 | poe.ninja prices and popularity; novelty score | |
+| 4 | Optimizers: gem links, tree pathing, gear (synthesized rares), jewels | Done |
+| 5 | poe.ninja prices and popularity; novelty score | Next |
 | 6 | Design workflow in the skill: interview, concepts, checkpoints, report | |
 | 7 | Back-test on known strong builds | |
 
@@ -163,6 +163,63 @@ answer is that Congregation doesn't change those builds' FullDPS.
 
 **Not done:** a persistent local server, so separate tool calls don't each pay ~5 s of worker start-up. Phase 4
 optimizers run in one process, so they don't need it. Revisit if interactive what-ifs feel slow.
+
+## Phase 4 results
+
+`build-lab/opt`: objective.py (rules), gems.py, tree.py, gear.py (gear and jewels), the `opt.py` CLI and
+`test-opt.py`.
+
+**Decisions (Andy, 2026-11-24):**
+- **Tree:** improve existing trees and grow trees from a class start.
+- **Default rules:** capped resists, chaos at 0% or better, requirements and mana met, EHP not below the start.
+- **Crafted rares:** real affixes, tiers T1–T3, 3 prefixes and 3 suffixes including one bench craft, mid rolls.
+
+**Rules as built:**
+- **Resists:** an element is exempt only when all its hits are taken as another type. This is what makes
+  Coven's "cold and lightning taken as fire" build pass.
+- **PoB's warnings:** they count as hard rules. The main skill's cost is checked the same way for probes and
+  the main calc.
+- **Rules broken at the start:** they may not get worse, rule by rule, and fixing them earns nothing unless
+  `--fix-start-breaks` is set.
+- **`tree-build`:** repairs every rule as far as it can.
+
+**Results on three builds (the metric's change; no rule made worse, EHP kept):**
+
+| Build | gems | tree | gear | jewels |
+|---|---|---|---|---|
+| EK (CombinedDPS) | +19% | +56% | +15% | +19% |
+| Wretched Defiler (FullDPS) | +40% | +4% | +6% | +4% |
+| Coven (FullDPS) | +138% | +23% | +22% | +1% |
+
+**Growing EK's tree from the Marauder start (Chieftain):**
+- 7.05M CombinedDPS, against 3.13M for SpicySushi's hand-made tree.
+- EHP 32.9k, at or above the original's 32.2k.
+- No rule broken, 123/8 points, about 110 s.
+
+**Checks:**
+- `test-opt.py`: 45/45 on three builds, none skipped. That's 12 rule unit tests, plus never-worse, saved-XML
+  fidelity, budgets and the no-pricey-gems check per optimizer.
+- `test-eval.py` still passes.
+
+**Fixed after verification and review:**
+- **Resist rule:** the first version passed an element when the enemy dealt none of that damage, or when armour
+  or suppression cut the hits.
+- **Rules broken at the start:** a full fix used to outrank any DPS loss (EK's gems lost 20% to fix mana).
+  This is now opt-in, and broken rules can no longer trade against each other.
+- **Swap search:** the conflict check never fired, so some probes counted floating paths.
+- **Jewels:** nearly every socket was skipped.
+- **Gear:**
+  - changes weren't verified with a real recalc;
+  - made-up items dropped implicits, sockets and quality;
+  - relic uniques weren't protected.
+- **Tree-build:** it ignored the build's own point budget.
+
+**Known limits:**
+- **Recovery:** PoB's EHP doesn't count recovery such as leech and regen. Keystones are kept by default for
+  that reason, but small recovery nodes can still be traded away.
+- **Trigger supports:** "Cast when Stunned" and the like may be modelled generously by PoB.
+- **Gear bases:** gear keeps each slot's base, and influenced or eldritch affixes aren't in the pool.
+- **Prices:** none yet (phase 5), so "good crafted" is a tier choice, not a budget.
 
 ## Open checks
 

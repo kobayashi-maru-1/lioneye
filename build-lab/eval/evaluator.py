@@ -44,6 +44,12 @@ OPS_LUA = os.path.join(HERE, "eval-ops.lua")
 
 _ph = None
 
+EXTRA_KEYS = ("ReqStr", "ReqDex", "ReqInt", "ReqOmni", "Omni", "ChaosResist", "LifeUnreserved", "ManaUnreserved",
+              "FireTakenHitMult", "ColdTakenHitMult", "LightningTakenHitMult", "ChaosTakenHitMult",
+              "FireEnemyDamage", "ColdEnemyDamage", "LightningEnemyDamage", "ChaosEnemyDamage",
+              "FireTakenDamage", "ColdTakenDamage", "LightningTakenDamage", "ChaosTakenDamage",
+              "ManaCost", "LifeCost", "ESCost", "RageCost")
+
 
 def ph():
     """The pob-headless module (file name has a hyphen, so it's loaded by path)."""
@@ -105,7 +111,8 @@ class Evaluator:
         self.pob = self.ph.Pob(pob_dir)
         with open(OPS_LUA, "rb") as f:
             self.pob.L.execute(f.read())
-        self.keys = list(self.ph.PLAYER_KEYS)
+        # pob-headless's headline stats, plus what the optimizers' rules read (attribute requirements).
+        self.keys = list(self.ph.PLAYER_KEYS) + [k for k in EXTRA_KEYS if k not in self.ph.PLAYER_KEYS]
         self.minion_keys = list(self.ph.MINION_KEYS)
 
     def _call(self, fn, *args):
@@ -159,11 +166,24 @@ class Evaluator:
     def groups(self):
         return self._call("ev_groups")
 
-    def reachable_nodes(self, max_dist=None):
-        return self._call("ev_reachable_nodes", max_dist)
+    def reachable_nodes(self, max_dist=None, ascendancy=False):
+        return self._call("ev_reachable_nodes", max_dist, bool(ascendancy))
 
     def allocated_nodes(self):
         return self._call("ev_allocated_nodes")
+
+    def points(self):
+        return self._call("ev_points")
+
+    def slots(self):
+        return self._call("ev_slots")
+
+    def affix_pool(self, base, ilvl=84, tier=2, roll=0.5, domain="Explicit", bench=False):
+        return self._call("ev_affix_pool", {"base": base, "ilvl": ilvl, "tier": tier, "roll": roll,
+                                            "domain": domain, "bench": bool(bench)})
+
+    def compatible_supports_info(self):
+        return self._call("ev_compatible_supports_info")
 
     def reachable_masteries(self, max_dist=None):
         return self._call("ev_reachable_masteries", max_dist)
@@ -173,6 +193,9 @@ class Evaluator:
 
     def node_depends(self, node_id):
         return self._call("ev_node_depends", node_id)
+
+    def node_anchors(self, node_id):
+        return self._call("ev_node_anchors", node_id)
 
     def gem_info(self, name):
         return self._call("ev_gem_info", name)
@@ -386,11 +409,23 @@ class EvalPool:
     def compatible_supports(self):
         return self._one("compatible_supports")
 
-    def reachable_nodes(self, max_dist=None):
-        return self._one("reachable_nodes", max_dist)
+    def reachable_nodes(self, max_dist=None, ascendancy=False):
+        return self._one("reachable_nodes", max_dist, ascendancy)
 
     def reachable_masteries(self, max_dist=None):
         return self._one("reachable_masteries", max_dist)
+
+    def points(self):
+        return self._one("points")
+
+    def slots(self):
+        return self._one("slots")
+
+    def affix_pool(self, base, ilvl=84, tier=2, roll=0.5, domain="Explicit", bench=False):
+        return self._one("affix_pool", base, ilvl, tier, roll, domain, bench)
+
+    def compatible_supports_info(self):
+        return self._one("compatible_supports_info")
 
     def allocated_nodes(self):
         return self._one("allocated_nodes")
@@ -400,6 +435,9 @@ class EvalPool:
 
     def node_depends(self, node_id):
         return self._one("node_depends", node_id)
+
+    def node_anchors(self, node_id):
+        return self._one("node_anchors", node_id)
 
     def gem_info(self, name):
         return self._one("gem_info", name)
