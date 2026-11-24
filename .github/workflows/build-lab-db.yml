@@ -1,0 +1,181 @@
+# Daily: when Path of Building has a release with no complete game database yet, build one (build-lab/db) from
+# PoB's source and publish it as release db-<PoB version>.
+#
+# Database releases never touch the app updater:
+# - they're prereleases with make_latest false (GitHub's releases/latest, which the updater reads, skips
+#   prereleases), with db- tags, and
+# - the guard job fails the run if releases/latest is ever anything but an app release (v*).
+#
+# The build job runs downloaded code (PoB's Lua, the lupa wheel) and holds only a read token, and not in the
+# build step. Only the publish job can write, and it runs no downloaded code.
+name: Build-lab database
+
+on:
+  schedule:
+    - cron: "41 7 * * *" # daily
+  workflow_dispatch:
+    inputs:
+      rebuild:
+        description: Rebuild and replace the files of an existing db release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-lab-db
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash # -eo pipefail: a failing command in a pipe fails the step
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      build: ${{ steps.version.outputs.build }}
+    env:
+      REPO: ${{ github.repository }}
+      POB_SOURCE: github
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Python with lupa
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet --require-hashes -r build-lab/db/requirements-ci.txt
+          echo "PY=$RUNNER_TEMP/venv/bin/python" >> "$GITHUB_ENV"
+
+      - id: pob
+        name: Latest PoB release
+        run: |
+          version="$("$PY" build-lab/db/build-game-db.py --print-latest-version)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unexpected PoB version: '$version'"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - id: version
+        name: Whether its database is published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REBUILD: ${{ inputs.rebuild }}
+          version: ${{ steps.pob.outputs.version }}
+        run: |
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::bad version '$version'"; exit 1; }
+          tag="db-$version"
+          # Complete = a published (non-draft) release with both files. Drafts aren't visible to this read
+          # token, so a draft left by a cancelled run counts as missing; the publish job replaces it.
+          complete="$(gh release view "$tag" -R "$REPO" --json isDraft,assets \
+            --jq "[.assets[].name] as \$n | (.isDraft | not) and (\$n | index(\"game-$version.sqlite.gz\")) != null and (\$n | index(\"game-$version.json\")) != null" \
+            2>/dev/null || echo false)"
+          build=true
+          if [ "$complete" = true ] && [ "$REBUILD" != true ]; then build=false; fi
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "build=$build"
+          } >> "$GITHUB_OUTPUT"
+          echo "PoB $version; release $tag complete: $complete; build: $build" >> "$GITHUB_STEP_SUMMARY"
+
+      - if: steps.version.outputs.build == 'true'
+        name: Build
+        run: |
+          "$PY" build-lab/db/build-game-db.py --out "$RUNNER_TEMP/db" --require-wiki
+          ls -l "$RUNNER_TEMP/db"
+
+      - if: steps.version.outputs.build == 'true'
+        name: Check
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          "$PY" build-lab/db/check-game-db.py "$RUNNER_TEMP/db/game-$VERSION.sqlite" --pob-version "$VERSION" \
+            | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - if: steps.version.outputs.build == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: game-db
+          path: |
+            ${{ runner.temp }}/db/game-${{ steps.version.outputs.version }}.sqlite.gz
+            ${{ runner.temp }}/db/game-${{ steps.version.outputs.version }}.json
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: build
+    if: needs.build.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      REPO: ${{ github.repository }}
+      VERSION: ${{ needs.build.outputs.version }}
+      TAG: ${{ needs.build.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: game-db
+          path: db
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::bad version '$VERSION'"; exit 1; }
+          files=("db/game-$VERSION.sqlite.gz" "db/game-$VERSION.json")
+          draft="$(gh release view "$TAG" -R "$REPO" --json isDraft --jq .isDraft 2>/dev/null || echo none)"
+          if [ "$draft" = true ]; then
+            echo "Removing draft $TAG left by an earlier run"
+            gh release delete "$TAG" -R "$REPO" --yes
+            draft=none
+          fi
+          if [ "$draft" = none ]; then
+            gh release create "$TAG" "${files[@]}" -R "$REPO" --target main \
+              --prerelease --latest=false \
+              --title "Game database for PoB $VERSION" \
+              --notes "Build-lab game database built from Path of Building $VERSION. Data only, not an app release."
+          else
+            gh release upload "$TAG" "${files[@]}" -R "$REPO" --clobber
+            gh release edit "$TAG" -R "$REPO" --prerelease --latest=false
+          fi
+          echo "Published $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  guard:
+    needs: [build, publish]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: App updater still sees an app release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if latest="$(gh api "repos/$REPO/releases/latest" --jq .tag_name 2>"$RUNNER_TEMP/err")"; then
+            case "$latest" in
+              v*) echo "releases/latest is $latest" ;;
+              *) echo "::error::releases/latest is '$latest', not an app release. Mark the newest v* release as Latest."; exit 1 ;;
+            esac
+          elif grep -q "HTTP 404" "$RUNNER_TEMP/err"; then
+            echo "No latest release yet"
+          else
+            cat "$RUNNER_TEMP/err"; echo "::error::Couldn't read releases/latest"; exit 1
+          fi

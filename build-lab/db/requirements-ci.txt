@@ -1,0 +1,5 @@
+# The database workflow installs this with --require-hashes (ubuntu-24.04, Python 3.12).
+# To update: pick the new lupa version's cp312 manylinux and musllinux wheel hashes from https://pypi.org/pypi/lupa/<version>/json
+lupa==2.8 \
+    --hash=sha256:8cf4f064a0e5531afce2d7d750120c10c10f9529139af6ca6150d13151034398 \
+    --hash=sha256:4f81a02806e7c7ad26d8c6fa222c8bef1b0c1b124347c879be880b41339d41e4
