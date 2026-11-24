@@ -4,7 +4,7 @@ Andy asks Claude (Claude Code or a claude.ai chat) to design a build. Claude ask
 defences, proposes concepts from a game database, completes them with optimizers that run headless Path of
 Building, and returns 2–3 finished options with PoB codes, numbers, cost and blind spots.
 
-Status: phases 1–2 built 2026-11-24; checkpoint with Andy before phase 3.
+Status: phases 1–3 built 2026-11-24; phase 4 (optimizers) next.
 
 ## Decisions
 
@@ -26,8 +26,8 @@ Status: phases 1–2 built 2026-11-24; checkpoint with Andy before phase 3.
 |---|---|---|
 | 1 | Benchmark eval speed; prove PoB's in-memory calculator works headless | Done |
 | 2 | Game database: builder, checks, client, daily release workflow | Done (first release pending the workflow's first run) |
-| 3 | Worker pool and eval API (full load, calculator deltas, in-memory gem changes) | Next |
-| 4 | Optimizers: gem links, tree pathing, gear (synthesized rares), jewels | |
+| 3 | Worker pool and eval API (full load, calculator deltas, in-memory gem changes) | Done |
+| 4 | Optimizers: gem links, tree pathing, gear (synthesized rares), jewels | Next |
 | 5 | poe.ninja prices and popularity; novelty score | |
 | 6 | Design workflow in the skill: interview, concepts, checkpoints, report | |
 | 7 | Back-test on known strong builds | |
@@ -111,6 +111,59 @@ passive lines joined.
   and records which one it used in meta.
 - The snapshot is refreshed from a PC (`--save-wiki-snapshot`) each league.
 
+## Phase 3 results
+
+`build-lab/eval`: `evaluator.py` (`Evaluator`, `EvalPool`), `eval-ops.lua`, the `eval.py` CLI, and `test-eval.py`.
+
+**Speeds (independent verifier's measurements):**
+
+| Operation | Time |
+|---|---|
+| Probes through PoB's calculator | 5 ms on EK, 14–16 ms on the spectre builds |
+| In-memory changes, including the ~20 ms rollback snapshot | 130–270 ms |
+| Support trials | 110–180 ms each |
+
+**Equivalence tests (99/99 pass on 3 builds, none skipped):** every fast path gives the same numbers as editing
+the XML and reloading it, and every tested change has to move a number. Covered:
+- passive allocate, including path, and deallocate, including dependents;
+- mastery with a chosen effect, and refusal of an effect already taken;
+- item swap and flask on/off, matching the XML and surviving a save;
+- gem disable and gem replace at an explicit level, plus support trials;
+- config input;
+- rollback after a bad op, a calc error, or a main-skill change;
+- a 3-worker pool against a single process, for probes, apply and support trials.
+
+**First tools on top, times on this PC with 12 workers including start-up:**
+
+| Command | Work | Time |
+|---|---|---|
+| `node-power` | every reachable passive ranked by gain per point, ~1,500 | 7–11 s |
+| `supports` | each support in the main group swapped for every compatible support | 16–34 s (610–855 trials) |
+
+**Fixed after verification and review:**
+- PoB calc errors were silently swallowed; `apply` wasn't atomic; the main skill could change unnoticed.
+- Masteries applied every option at once; gem swaps lost the requested level.
+- Flask active state wasn't saved; slots weren't validated.
+- A dead worker left the pool out of sync.
+
+**Found by the stronger tests:** the calculator doesn't match a real deallocation when the removed nodes include
+a socket holding a jewel (cluster subgraphs). Such probes are now refused, and `apply` handles them exactly.
+
+**Second review fixes:**
+- A mastery effect already taken on the tree was accepted and inflated numbers; it's now refused, as in PoB.
+- A calc error while choosing the main skill on load was swallowed.
+- A failed rollback was silent; it now raises `BuildLost`, which breaks the pool.
+- Mixed results across workers now break the pool, and so does use after close.
+- Numeric fields are validated, and PoB's error text is trimmed.
+
+Compatibility comes from PoB's own check against the live main skill, not the database.
+
+**Resolved:** spectre Congregation toggle. Disabling it in memory equals disabling it in the XML. PoB's own
+answer is that Congregation doesn't change those builds' FullDPS.
+
+**Not done:** a persistent local server, so separate tool calls don't each pay ~5 s of worker start-up. Phase 4
+optimizers run in one process, so they don't need it. Revisit if interactive what-ifs feel slow.
+
 ## Open checks
 
 - **Wiki snapshot freshness.** New uniques get no acquisition data until the snapshot is refreshed.
@@ -120,7 +173,5 @@ passive lines joined.
   branch served through `raw.githubusercontent.com`. Test: run `game-db.py path` in a chat.
 - **Skill's pob-headless.py.** It has the CRLF checksum bug fixed here, so the skill's GitHub-source mode (chat
   sandbox) fails on a fresh cache. Fix the skill and re-upload it.
-- **Spectre gem toggle.** On both spectre builds, Congregation off didn't change FullDPS. EK showed the toggle
-  works in general. Check in phase 3 whether that's real or the toggle missing that gem.
 - **pob-headless.py copies.** `build-lab/pob/pob-headless.py` is a copy of the skill's script. Phase 6 decides
   which copy is the source.

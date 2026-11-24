@@ -55,6 +55,43 @@ These are data releases, kept away from the app updater:
 - Their tags start with `db-`, never `v`.
 - The workflow's guard job fails if `releases/latest` is ever not a `v*` app release.
 
+## Evaluator
+
+Fast what-ifs on a loaded build, using worker processes that each run their own PoB.
+- Library: [eval/evaluator.py](eval/evaluator.py) (`Evaluator`, `EvalPool`).
+- Lua side: [eval/eval-ops.lua](eval/eval-ops.lua).
+
+```powershell
+& $py build-lab\eval\eval.py stats BUILD.xml --main-skill "Ethereal Knives"
+& $py build-lab\eval\eval.py groups BUILD.xml                       # group and gem indexes for ops
+& $py build-lab\eval\eval.py probe BUILD.xml --specs specs.json      # calculator probes, with deltas
+& $py build-lab\eval\eval.py apply BUILD.xml --ops ops.json --save out.xml
+& $py build-lab\eval\eval.py node-power BUILD.xml --main-skill X [--metric M] [--max-dist 10] [--top 25]
+& $py build-lab\eval\eval.py supports BUILD.xml --main-skill X [--slots 2,3] [--top 10]
+& $py build-lab\eval\test-eval.py BUILD.xml::MAIN_SKILL [...]       # equivalence tests against XML reloads
+```
+
+| Call | What it does | Cost |
+|---|---|---|
+| `probe` | PoB's misc calculator: allocate or deallocate nodes, swap one item, conditions. No state change | 5–20 ms |
+| `apply` | Edits the build in memory as PoB's UI does: passives, equip, gems, config. Then recalculates. All-or-nothing | 130–270 ms |
+| `support_trials` | Each candidate support in a slot, one recalculation each; the group is restored after | 110–180 ms each |
+
+Spec, op and trial formats are in the `evaluator.py` docstring.
+
+Rules a caller needs to know:
+- **Masteries need an effect.** A mastery (named directly or on a path) needs its effect in `masteries`.
+- **Socketed jewels.** A probe that would remove a socket holding a jewel is refused, because the calculator
+  doesn't match PoB there. Use `apply`.
+- **Failures leave the build untouched.** A failed `apply` restores the build, whether the cause is a bad op,
+  a calc error, or a changed main skill (unless `allow_main_change` / `--allow-main-change`).
+- **Dead workers.** A dead worker closes the pool (`PoolBroken`).
+
+Other flags: `node-power --defence STAT`, `supports --quality N`.
+
+`test-eval.py` checks every fast path against editing the XML and reloading it, and requires each change to
+move a number.
+
 ## Benchmarks
 
 ```powershell
