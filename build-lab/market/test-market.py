@@ -30,14 +30,37 @@ class FakePrices:
     league = "Test"
     divine = 200.0
 
-    def gem(self, name, level, quality):
+    def gem(self, name, level, quality, self_level=False):
         return {"Spell Echo": {"divine": 0.5, "chaos": 100}}.get(name)
 
     def to_divine(self, chaos):
         return chaos / self.divine
 
 
+def gem_rows(add):
+    """Self-levelled pricing on hand-made poe.ninja rows: price-fixed 20/20 listings lose to a level 1 copy."""
+    from ninja import Prices
+    p = Prices(league="Test")
+    line = lambda lvl, q, chaos, n, corr=False: {"name": "Fireball", "gemLevel": lvl, "gemQuality": q,
+                                                 "chaosValue": chaos, "divineValue": chaos / 200,
+                                                 "listingCount": n, "corrupted": corr}
+    p._stash["SkillGem"] = [line(1, None, 1, 400), line(1, 20, 2, 100), line(20, 20, 2000, 3),
+                            line(21, 20, 20, 80, True)]
+    add("gem: listed 20/20 without self-levelling", p.gem("Fireball", 20, 20)["chaos"] == 2000)
+    r = p.gem("Fireball", 20, 20, self_level=True)
+    add("gem: level 1 at quality when self-levelled", r["chaos"] == 2 and r["level"] == 1 and "levelled" in r["relaxed"])
+    p._stash["SkillGem"] = [line(1, None, 1, 400), line(20, 20, 2000, 3)]
+    r = p.gem("Fireball", 20, 20, self_level=True)
+    add("gem: level 1 any quality as the fallback", r["chaos"] == 1 and "any quality" in r["relaxed"])
+    p._stash["SkillGem"] = [line(20, 20, 0.5, 50), line(1, 20, 2, 100)]
+    add("gem: a cheaper max-level listing still wins", p.gem("Fireball", 20, 20, self_level=True)["chaos"] == 0.5)
+    from ninja import is_rare_gem
+    add("gem: awakened and exceptional are rare", is_rare_gem("Awakened Spell Echo Support") and is_rare_gem("Empower")
+        and not is_rare_gem("Spell Echo"))
+
+
 def unit(add):
+    gem_rows(add)
     b = Budget(1.0, FakePrices())
     add("budget: listed gem priced", b.gem_cost("Spell Echo", 20) == 0.5)
     add("budget: unlisted ordinary gem is a vendor gem", b.gem_cost("Faster Casting", 20) == VENDOR)

@@ -2,3 +2,6 @@
 *.gray binary
 *.rgba binary
 *.woff2 binary
+
+# Build lab notebook: append-only JSON lines; concurrent appends merge by keeping both sides.
+build-lab/notebook/*.jsonl merge=union text eol=lf

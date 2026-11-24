@@ -4,7 +4,7 @@ Andy asks Claude (Claude Code or a claude.ai chat) to design a build. Claude ask
 defences, proposes concepts from a game database, completes them with optimizers that run headless Path of
 Building, and returns 2–3 finished options with PoB codes, numbers, cost and blind spots.
 
-Status: phases 1–5 built 2026-11-24; phase 6 (design workflow and lab notebook) next.
+Status: phases 1–6 built 2026-11-24; phase 7 (back-test) next.
 
 ## Decisions
 
@@ -29,8 +29,8 @@ Status: phases 1–5 built 2026-11-24; phase 6 (design workflow and lab notebook
 | 3 | Worker pool and eval API (full load, calculator deltas, in-memory gem changes) | Done |
 | 4 | Optimizers: gem links, tree pathing, gear (synthesized rares), jewels | Done |
 | 5 | poe.ninja prices and popularity; novelty score | Done |
-| 6 | Design workflow in the skill: interview, concepts, checkpoints, report; the lab notebook (below) | Next |
-| 7 | Back-test on known strong builds | |
+| 6 | Design workflow in the skill: interview, concepts, checkpoints, report; the lab notebook (below) | Done |
+| 7 | Back-test on known strong builds | Next |
 
 ## Lab notebook (phase 6): what the designer learns and remembers
 
@@ -308,6 +308,82 @@ their report.
 - The popularity sample is 75–80 characters, so small shares are noisy.
 - Novelty covers the archetype (ascendancy plus main skill), not item or tree choices.
 
+## Phase 6 results
+
+**Built:**
+- `build-lab/design/concept.py`: a short spec becomes a finished build (skeleton, uniques, tree, supports,
+  crafted rares, jewels), with numbers, cost, novelty and a PoB code. `test-design.py`.
+- `build-lab/notebook/notebook.py`: the lab notebook (JSONL in the repo, private kinds in a git-ignored folder,
+  weights from checks, SQLite index). `test-notebook.py` runs against a throwaway remote.
+- `build-lab/notebook-mcp/`: the notebook as a local MCP server for Claude Desktop, with an install script.
+  `test-server.py`.
+- `build-lab/manifest.txt` and `make-manifest.py`: the files a chat sandbox downloads.
+- The skill (new zip): `references/design-workflow.md` (notebook, interview, concepts from the game database,
+  screening, checkpoint, finishing, report, recording) and `scripts/build-lab-fetch.py`.
+- The notebook starts with six blind spots from phases 3–6, each with its evidence.
+
+**Decisions:**
+- **Notebook writes:** git plumbing straight onto `origin/main`, so a push never touches the clone's working tree
+  or branch, whatever else is uncommitted there.
+- **pob-headless.py:** the repo copy is the source; the skill gets a copy when it's repackaged.
+- **Chat sandboxes:** they download the engine from raw.githubusercontent.com using the manifest.
+
+**Found while testing, and fixed:**
+- **Price-fixed gem listings:** Fireball 20/20 was priced at 11.4 divine from three price-fixed listings.
+  Ordinary gems now cost the cheaper of a max-level listing and a level 1 copy levelled by the player.
+- **Trigger supports:** PoB counts Cast when Stunned as firing at its cooldown (no stun rate), so the gem
+  optimizer chose it over Spell Echo. It now never picks Cast when Stunned, Cast when Damage Taken or Cast on
+  Death.
+- **Tree points on resists:** a tree grown under the resist rules spent its points on resists. Cyclone screened
+  at 121k DPS that way, 513k without. The tree now grows without those rules, and gear caps resists.
+- **Drop-only bases:** the base picker chose level-84 drop-only bases; it now skips them.
+- **Budget:** starting gems are now charged too, since a concept owns nothing.
+
+**Fixed after review:**
+- **Notebook data loss:**
+  - A failed read of a notebook file on main could have pushed a rewritten file holding only the new lines.
+  - Git failures other than "offline" (a timeout, a missing `origin/main`, a temp-file error) dropped public
+    entries.
+  - `sync` could delete an entry queued while it pushed.
+  - Public entries now go to the queue before the push and leave it only once pushed.
+  - Git runs without prompts.
+  - Local files are written under a lock.
+- **Notebook privacy:** public entries could carry any field (a character name in `build`) and point at
+  private entries. Now each public kind has a fixed field list, refs must be public, and check ids no longer
+  repeat a private entry's title.
+- **Chat fetch:** run from the repo root, it would have deleted the clone's `build-lab`. It now refuses folders
+  inside a git clone and folders it didn't make, and swaps the new copy in with renames.
+- **Manifest:** it listed untracked files, which GitHub wouldn't have. It now lists tracked files only.
+- **Self-levelled gem prices:** ignored the listing minimum and treated a missing price as free.
+- **Concepts:**
+  - `--xml --budget` charged a loaded build for gems it owns.
+  - A unique or item-text weapon got no default shield.
+  - A `"none"` flask crashed.
+- **MCP server:** it now negotiates the protocol version, and bad argument types come back as tool errors.
+
+**Concept runs (Covens, PoB 2.68.1, level 95, 10 divine):**
+
+| Concept | Mode | DPS | EHP | Spent |
+|---|---|---|---|---|
+| Fireball Elementalist | full | 1.05M | 7.1k | 9.28 |
+| Fireball Elementalist, EHP floor 15k | full | 1.29M | 15.9k | 10.00 |
+| Cyclone Slayer, EHP floor 15k | full | 2.75M | 15.2k | 9.99 |
+| Absolution Necromancer | quick | 239k | 7.7k | 3.24 |
+
+**Timing:** a full run takes 1.5–2.5 minutes, a quick screen about 1.5.
+
+**Results:**
+- Resists were capped and no rule was broken in the full runs.
+- The Fireball runs bought Spell Echo, Invert the Rules, Arcane Surge and Controlled Destruction.
+- The run with the floor ended with more damage than the one without. The search is greedy, so its result
+  depends on the path it takes. Phase 7 should run several orders or seeds before trusting one result.
+
+**Known limits:**
+- No anoint optimizer: PoB warns about the empty amulet anoint.
+- Flasks are plain bases.
+- The concept spec has no cluster jewels, spectres or minion choices.
+- Interview answers map to an EHP floor by hand.
+
 ## Open checks
 
 - **Wiki snapshot freshness.** New uniques get no acquisition data until the snapshot is refreshed.
@@ -315,7 +391,6 @@ their report.
 - **Chat sandbox download.** Can a claude.ai chat download the release asset? GitHub redirects
   `releases/download` to `release-assets.githubusercontent.com`. If it's blocked, the fallback is a data-only
   branch served through `raw.githubusercontent.com`. Test: run `game-db.py path` in a chat.
-- **Skill's pob-headless.py.** It has the CRLF checksum bug fixed here, so the skill's GitHub-source mode (chat
-  sandbox) fails on a fresh cache. Fix the skill and re-upload it.
-- **pob-headless.py copies.** `build-lab/pob/pob-headless.py` is a copy of the skill's script. Phase 6 decides
-  which copy is the source.
+- **Claude Desktop notebook tools.** Run `install-notebook-mcp.ps1`, restart Desktop, and check a chat lists
+  the `notebook_*` tools and that a search answers.
+- **Chat fetch.** In a claude.ai chat, run `scripts/build-lab-fetch.py`, then `concept.py new` on a spec.

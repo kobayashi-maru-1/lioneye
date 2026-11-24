@@ -1,0 +1,27 @@
+# build-lab files for scripts/build-lab-fetch.py (written by make-manifest.py)
+db/build-game-db.py
+db/check-game-db.py
+db/extract.lua
+db/game-db.py
+db/mechanic-rules.json
+db/requirements-ci.txt
+db/schema.sql
+design/concept.py
+eval/eval-ops.lua
+eval/eval.py
+eval/evaluator.py
+market/budget.py
+market/buildcost.py
+market/market.py
+market/net.py
+market/ninja.py
+market/popularity.py
+market/rarecost.py
+market/trade.py
+notebook/notebook.py
+opt/gear.py
+opt/gems.py
+opt/objective.py
+opt/opt.py
+opt/tree.py
+pob/pob-headless.py

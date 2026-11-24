@@ -1,6 +1,7 @@
 """A spending budget, in divines, for the optimizers: what they may buy (support gems, crafted rares) and a ledger
 of what they did buy. Gems are priced on poe.ninja at the level and quality the optimizer would use (the gem's
-natural maximum, quality 20); a gem poe.ninja doesn't list is taken as a vendor gem (VENDOR). Rares use the
+natural maximum, quality 20), or as a level 1 copy at that quality levelled by the player when that's cheaper
+(not for awakened or exceptional gems); a gem poe.ninja doesn't list is taken as a vendor gem (VENDOR). Rares use the
 rarecost estimate. Things the build already owns cost nothing.
 """
 import rarecost
@@ -46,7 +47,7 @@ class Budget:
         this league's economy (e.g. most awakened gems in Covens), so it can't be bought."""
         key = (name, level, quality, rare)
         if key not in self._gem_cache:
-            p = self.prices.gem(name, level, quality)
+            p = self.prices.gem(name, level, quality, self_level=not rare)
             if p and p.get("divine") is not None:
                 cost = p["divine"]
             elif p and p.get("chaos") is not None:

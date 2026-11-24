@@ -2,8 +2,9 @@
 
 - Uniques: poe.ninja (ninja.Prices.unique), with the item's link count for linked armour/weapons. Foil uniques
   (PoB rarity RELIC) are priced as the normal unique and flagged as a floor.
-- Gems: poe.ninja at the gem's level and quality (enabled, socketed gems; groups PoB makes for item-, tree- or
-  config-granted skills are skipped). A gem poe.ninja doesn't list goes to "unpriced".
+- Gems: poe.ninja at the gem's level and quality, or a level 1 copy at that quality levelled by the player when
+  that's cheaper (not for awakened or exceptional gems). Enabled, socketed gems only; groups PoB makes for item-,
+  tree- or config-granted skills are skipped. A gem poe.ninja doesn't list goes to "unpriced".
 - Rare/magic gear and rare jewels: the trade site when trade checks are on (trade.Trade), else unpriced. Local mods
   on weapons and armour are matched to the trade site's "(Local)" stats. A price from listings that lack some of
   the item's mods is marked as a floor; one where too few mods could be matched is left unpriced. Cluster jewels
@@ -11,6 +12,8 @@
 Anything that can't be priced is listed under "unpriced", never guessed.
 """
 import re
+
+from ninja import is_rare_gem
 
 GEAR = ("Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Ring 3",
         "Belt", "Flask 1", "Flask 2", "Flask 3", "Flask 4", "Flask 5")
@@ -116,7 +119,8 @@ def price_build(pool, prices, trade=None):
         for gem in g["gems"]:
             if not gem["enabled"] or not gem["name"]:
                 continue
-            p = prices.gem(gem["name"], gem.get("level") or 1, gem.get("quality") or 0)
+            p = prices.gem(gem["name"], gem.get("level") or 1, gem.get("quality") or 0,
+                           self_level=not is_rare_gem(gem["name"]))
             if p and p.get("divine") is not None:
                 gems.append({"gem": gem["name"], "level": gem.get("level"), "quality": gem.get("quality"),
                              "divine": p["divine"], **({"relaxed": p["relaxed"]} if p.get("relaxed") else {})})

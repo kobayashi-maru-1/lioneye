@@ -200,6 +200,13 @@ class Evaluator:
     def gem_info(self, name):
         return self._call("ev_gem_info", name)
 
+    def unique_text(self, name, base=None):
+        """PoB's item text for a unique (its current variant), for an equip op: {name, base, text, variants}."""
+        res = self._call("ev_unique_text", {"name": name, **({"base": base} if base else {})})
+        if "error" in res:
+            raise ValueError(res["error"])
+        return res
+
     def save_xml(self):
         return self.pob.save_xml()
 
@@ -441,6 +448,9 @@ class EvalPool:
 
     def gem_info(self, name):
         return self._one("gem_info", name)
+
+    def unique_text(self, name, base=None):
+        return self._one("unique_text", name, base)
 
     def main_skill(self):
         return self._one("main_skill")

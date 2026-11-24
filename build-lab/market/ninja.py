@@ -23,6 +23,14 @@ MAX_AGE = 3 * 3600
 UNIQUE_TYPES = ("UniqueWeapon", "UniqueArmour", "UniqueAccessory", "UniqueFlask", "UniqueJewel", "UniqueRelic",
                 "UniqueTincture")
 MIN_LISTINGS = 3  # fewer listings than this is a price nobody can rely on
+EXCEPTIONAL = ("Empower", "Enlighten", "Enhance")
+
+
+def is_rare_gem(name):
+    """Awakened and exceptional gems: no vendor sells them and levelling them takes far longer, so they're priced
+    as listed, never as a level 1 copy levelled by the player."""
+    base = re.sub(r" Support$", "", name or "")
+    return base.startswith("Awakened ") or base in EXCEPTIONAL
 
 
 class Prices:
@@ -116,12 +124,35 @@ class Prices:
         best = max(rows, key=lambda r: (r["listings"], -(r["chaos"] or 0)))
         return {**best, "variants": len(rows)}
 
-    def gem(self, name, level=1, quality=0, corrupted=False):
+    def gem(self, name, level=1, quality=0, corrupted=False, self_level=False):
         """Cheapest listing of a gem at or above level and quality. Accepts "Spell Echo" or "Spell Echo Support".
         Falls back, in order, to: any quality (quality is cheap to add), then corrupted copies (levels above a
-        gem's natural maximum only exist corrupted). The result says which fallback was used ("relaxed")."""
+        gem's natural maximum only exist corrupted). The result says which fallback was used ("relaxed").
+        self_level: the player can level the gem, so a level 1 copy at the quality (or any quality) counts too,
+        whichever is cheaper. That's how ordinary gems are got, and it keeps a few price-fixed high-level
+        listings (Fireball 20/20 at 2,000 chaos beside 1 chaos at 1/20) from pricing a cheap gem."""
         names = {name, name + " Support", re.sub(r" Support$", "", name)}
         rows = [self._row(line, "SkillGem") for line in self.stash("SkillGem") if line.get("name") in names]
+        listed = self._gem_listed(rows, level, quality, corrupted)
+        if not self_level or level <= 1:
+            return listed
+        # Same trust rules as listed prices: a real price, enough listings when any row has them.
+        low = [r for r in rows if (r["level"] or 1) == 1 and not r["corrupted"] and r["chaos"] is not None]
+        own = None
+        for q, relaxed in ((quality, "level 1, levelled yourself"), (0, "level 1 any quality, levelled yourself")):
+            for min_listings in (MIN_LISTINGS, 1):
+                ok = [r for r in low if (r["quality"] or 0) >= q and r["listings"] >= min_listings]
+                if ok:
+                    own = {**min(ok, key=lambda r: r["chaos"]), "relaxed": relaxed}
+                    break
+            if own:
+                break
+        if own and (listed is None or listed["chaos"] is None or own["chaos"] < listed["chaos"]):
+            return own
+        return listed
+
+    @staticmethod
+    def _gem_listed(rows, level, quality, corrupted):
 
         def pick(q, corr, min_listings):
             ok = [r for r in rows if (r["level"] or 1) >= level and (r["quality"] or 0) >= q

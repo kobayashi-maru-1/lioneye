@@ -10,13 +10,20 @@ allowed. With a budget (market/budget.py), every support costs its poe.ninja pri
 optimizer uses (natural maximum, quality 20): only those that fit what's left are tried, and each one put in is
 charged. awakened/exceptional are then allowed by default, since the budget already limits them.
 """
+import re
 
 QUALITY = 20
+# Trigger supports whose trigger condition PoB takes as always met (being stunned, taking a set amount of damage,
+# dying), so it credits them with damage a real character rarely sees. Never picked; one the build already has
+# stays where it is.
+UNRELIABLE_TRIGGERS = frozenset({"Cast when Stunned", "Cast when Damage Taken", "Cast on Death"})
 
 
 def _candidates(pool, allow_awakened, allow_exceptional, budget=None, key=None):
     out = []
     for s in pool.compatible_supports_info():
+        if re.sub(r" Support$", "", s["name"]) in UNRELIABLE_TRIGGERS:
+            continue
         if not allow_awakened and s["awakened"]:
             continue
         if not allow_exceptional and s["exceptional"]:
@@ -64,13 +71,16 @@ def _buy(budget, info, log_entry, key, owned=()):
 
 
 def optimize_gems(pool, rules, links=None, allow_awakened=None, allow_exceptional=None, rounds=4, budget=None,
-                  log=None):
+                  log=None, owned=None):
+    """owned: gem names that cost nothing (default: every gem in the build at the start). A concept built from
+    nothing passes an empty set, since its starting gems are bought too."""
     log = log if log is not None else []
     # Default: off without a budget, on with one (the budget prices them).
     allow_awakened = (budget is not None) if allow_awakened is None else allow_awakened
     allow_exceptional = (budget is not None) if allow_exceptional is None else allow_exceptional
     group = _main_group(pool)
-    owned = {g["name"] for grp in pool.groups() for g in grp["gems"] if g.get("name")}
+    if owned is None:
+        owned = {g["name"] for grp in pool.groups() for g in grp["gems"] if g.get("name")}
     if links:
         while len(group["gems"]) < links:
             base = pool.stats()

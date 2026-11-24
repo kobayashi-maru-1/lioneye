@@ -669,8 +669,13 @@ end
 function ev_points()
   local spec = B().spec
   local used, asc = spec:CountAllocNodes()
+  -- What the character level allows, as PoB counts it (Build.lua: level - 1 + 23 quest points + extras such
+  -- as the bandit reward).
+  local out = B().calcsTab.mainOutput or { }
+  local level = tonumber(B().characterLevel) or 1
   return dkjson.encode({ used = used, ascendancy = asc, class = spec.curClassName,
-                         ascendancyName = spec.curAscendClassName })
+                         ascendancyName = spec.curAscendClassName,
+                         available = level - 1 + 23 + (tonumber(out.ExtraPoints) or 0), ascendancyAvailable = 8 })
 end
 
 -- Gear and jewel slots as they are now: [{slot, socket, nodeId?, cluster?, item = {name, rarity, base, type,
@@ -826,6 +831,40 @@ function ev_gem_info(name)
   if not gem then return dkjson.encode({ error = "no gem" }) end
   return dkjson.encode({ gemId = gem.gameId, variantId = gem.variantId, skillId = gem.grantedEffectId,
                          name = gem.name, maxLevel = gem.naturalMaxLevel })
+end
+
+-- A unique's item text from PoB's own unique data, ready for an equip op: {name, base, text, variants} or
+-- {error}. args (JSON): {name, base?}. name is the unique's title ("Mageblood"); base picks one when a title
+-- exists on several bases. PoB equips its default (current) variant.
+function ev_unique_text(argsJson)
+  local a = decode(argsJson, "unique args")
+  if type(a.name) ~= "string" then fail("unique name must be a string") end
+  local want, wantBase = a.name:lower(), type(a.base) == "string" and a.base:lower() or nil
+  local found = { }
+  for _, typeList in pairs(data.uniques) do
+    for _, raw in pairs(typeList) do
+      local title, base = raw:match("^%s*([^\r\n]+)\r?\n%s*([^\r\n]+)")
+      if title and title:lower() == want and (not wantBase or base:lower() == wantBase) then
+        found[#found + 1] = { title = title, base = base, raw = raw }
+      end
+    end
+  end
+  if #found == 0 then return dkjson.encode({ error = "PoB has no unique '" .. a.name .. "'" }) end
+  -- The same title and base listed twice (e.g. in two of PoB's unique lists) is one unique: take the first.
+  local bases, seen = { }, { }
+  for _, f in ipairs(found) do
+    if not seen[f.base] then seen[f.base] = true; bases[#bases + 1] = f.base end
+  end
+  if #bases > 1 then
+    return dkjson.encode({ error = "'" .. a.name .. "' exists on several bases; give one of: "
+                           .. table.concat(bases, ", ") })
+  end
+  local f = found[1]
+  local text = "Rarity: UNIQUE\n" .. f.raw
+  local item = parseItem(text)
+  local variants = { }
+  for _, v in ipairs(item.variantList or { }) do variants[#variants + 1] = v end
+  return dkjson.encode({ name = f.title, base = item.baseName, text = text, variants = variants })
 end
 
 -- Allocated nodes (for removal searches), with how many points removing each frees (itself + dependents).

@@ -1,8 +1,14 @@
 # Build lab
 
-Tools for designing Path of Exile 1 builds with Claude: a game database built from Path of Building's own
-data, and (later phases) a fast evaluator and optimizers on top of headless PoB. Plan and status:
-[plans/build-lab.md](../plans/build-lab.md).
+Tools for designing Path of Exile 1 builds with Claude:
+- a game database built from Path of Building's own data;
+- a fast evaluator and optimizers on top of headless PoB;
+- market prices;
+- a concept builder;
+- a notebook of what earlier sessions learned.
+
+Plan and status: [plans/build-lab.md](../plans/build-lab.md). The design workflow Claude follows lives in the
+poe-build-expert skill (`references/design-workflow.md`).
 
 Nothing here is part of the Lioneye app or its build. It's Python, run on its own.
 
@@ -165,6 +171,133 @@ build-lab's requests (poe.ninja, GGG, poewiki, its own releases) send the User-A
 with no contact. The vendored `pob/pob-headless.py` keeps the skill's `poe-build-expert/1.0` for PoB downloads
 from GitHub, so it stays identical to the skill's copy.
 
+## Concepts: a build from a short spec
+
+[design/concept.py](design/concept.py) turns a concept into a finished build. A concept is a class, a skill, a
+weapon, a defence type, optional uniques and gem groups, a budget and an EHP floor; the spec format is in its
+docstring.
+
+```powershell
+& $py build-lab\design\concept.py new SPEC.json                         # skeleton only
+& $py build-lab\design\concept.py complete SPEC.json --quick --budget 10 # screen: tree and supports (~1.5 min)
+& $py build-lab\design\concept.py complete SPEC.json --budget 10 [--ehp-floor 15000] [--trade-check] --report R.json
+& $py build-lab\design\test-design.py [--run]
+```
+
+**What `complete` does:**
+1. **Skeleton:** builds the starting XML from the spec.
+   - Gems come from the game database, transfigured gems included.
+   - Each armour slot gets the base with the most defence of the spec's type, usable at the level.
+   - Drop-only bases are left out.
+   - One-handed weapons get a shield, bows a quiver.
+   - Five plain flasks.
+2. **Uniques:** equipped from PoB's own data.
+3. **Budget:** a concept owns nothing, so the uniques and every starting gem are charged first.
+4. **Tree:** grown from the class start without the resist rules, so points go to damage and life.
+5. **Supports:** chosen for the main group, up to `links`.
+6. **Gear:** crafted rares with base implicits on every other slot. This caps the resists.
+7. **Jewels.**
+8. **Again:** supports and tree once more.
+
+**The report:**
+- numbers, and the rules still broken;
+- PoB's warnings;
+- `cost` (market prices of uniques and gems) and `spend` (the budget ledger, with rare estimates);
+- novelty;
+- a PoB import code.
+
+**Gem pricing:** an ordinary gem costs the cheaper of a max-level listing and a level 1 copy at the quality,
+levelled by the player. A few price-fixed 20/20 listings could otherwise make a cheap gem cost divines.
+Awakened and exceptional gems stay at listed prices.
+
+**Supports never picked:** Cast when Stunned, Cast when Damage Taken and Cast on Death. PoB counts their
+condition as always met (see the notebook's blind spots).
+
+## Notebook
+
+[notebook/notebook.py](notebook/notebook.py): what designing builds has taught, read before every new design.
+
+```powershell
+& $py build-lab\notebook\notebook.py search "minion crit" [--kind concept]
+& $py build-lab\notebook\notebook.py add --kind interaction --title T --body B --evidence E [--tags a,b]
+& $py build-lab\notebook\notebook.py add --json entries.json
+& $py build-lab\notebook\notebook.py check ID --result holds|contradicted --evidence E
+& $py build-lab\notebook\notebook.py recheck | import FILE | sync | index | sql "SELECT ..."
+& $py build-lab\notebook\test-notebook.py
+```
+
+| Kind | Where | Holds |
+|---|---|---|
+| `concept`, `interaction`, `blind-spot` | `notebook/<kind>s.jsonl`, public | Tried builds with verdicts; interactions and blind spots with evidence |
+| `check` | `notebook/checks.jsonl` (or local, for local entries) | A re-test: holds or contradicted |
+| `preference`, `feedback` | `notebook/local/`, git-ignored | Andy's play preferences and how his builds felt |
+
+**Each entry records:**
+- the patch (the passive tree version);
+- the PoB version;
+- the league;
+- the date.
+
+**Weight:** 1 + held checks − 2 × contradicting checks, halved until it's confirmed on the current patch. Search
+ranks by weight.
+
+**Long lessons:** in markdown under `notebook/`, committed normally, with a short entry pointing to it.
+
+**Writes never touch the working tree:**
+- An entry is appended to the file as it is on `origin/main`.
+- It's committed with git plumbing on a private index and pushed to `main`, retrying if `main` moved.
+- So it doesn't matter what else is uncommitted in the clone. The clone's own `main` falls behind, so pull
+  before your next push.
+- Reads come from `origin/main` too, so an entry is searchable once it's pushed.
+
+**Nothing is lost:**
+- A batch is checked in full before anything is written.
+- Public entries go into `local/pending.jsonl` first and leave it only once pushed. If GitHub can't be reached,
+  or git fails or times out, they stay there for `sync`.
+- Git never prompts for a login: it fails fast and the entry waits.
+- A file on main that can't be read is never rewritten.
+- Local files are written under a lock, because the CLI and the MCP server can write at once.
+
+**Privacy:**
+- A public entry may carry only its kind's fields. `build`, or anything else naming a character, is refused, as
+  is a `refs` pointing at a private entry.
+- An account name (`Name#1234`) or an email address anywhere in a public entry is refused.
+- A check's id never repeats its entry's title.
+
+**Without a clone** (a chat sandbox), search reads GitHub and public writes are refused. The chat hands entries
+back as JSON lines for `import`.
+
+`*.jsonl` merge with the union driver ([.gitattributes](../.gitattributes)), so concurrent appends keep both
+sides. Notebook pushes trigger no workflow: none watch `build-lab/`.
+
+### notebook-mcp: the notebook in Claude Desktop
+
+[notebook-mcp/server.py](notebook-mcp/server.py) is a local MCP server (stdio, standard library only).
+
+**Tools:**
+- `notebook_search`
+- `notebook_show`
+- `notebook_add`
+- `notebook_check`
+- `notebook_recheck`
+- `notebook_sync`
+
+It runs on the PC with the PC's git login.
+
+```powershell
+.\build-lab\notebook-mcp\install-notebook-mcp.ps1          # add it to claude_desktop_config.json (backup in Downloads)
+.\build-lab\notebook-mcp\install-notebook-mcp.ps1 -Remove
+& $py build-lab\notebook-mcp\test-server.py
+```
+
+Restart Claude Desktop after installing.
+
+## Chat sandboxes
+
+[manifest.txt](manifest.txt) lists the engine files. The skill's `scripts/build-lab-fetch.py` downloads them
+from raw.githubusercontent.com when there's no clone. After adding or removing build-lab files, run
+`make-manifest.py`; `make-manifest.py --check` fails while it's stale.
+
 ## Benchmarks
 
 ```powershell
@@ -174,6 +307,5 @@ from GitHub, so it stays identical to the skill's copy.
 
 ## pob/pob-headless.py
 
-A copy of the poe-build-expert skill's `scripts/pob-headless.py` (v2), so the workflow can run PoB without the
-skill. It has one fix the skill's copy lacks: the GitHub-source checksum accepts CRLF or LF. Keep the two in
-sync.
+The source of the poe-build-expert skill's `scripts/pob-headless.py`. The engine and its tests run this copy.
+When the skill is repackaged, copy this file into it; don't edit the skill's copy.

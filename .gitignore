@@ -30,3 +30,6 @@ dist-atlas
 # Desktop build output
 /exile-leveling.exe
 /tools/sign-release/target/
+
+# Build lab notebook: private entries (preferences, feedback), the offline queue and fetch stamp
+/build-lab/notebook/local/
