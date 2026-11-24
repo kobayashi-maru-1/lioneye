@@ -37,6 +37,17 @@ The **Build-lab database** workflow runs daily. When PoB has a release with no c
 
 lupa is installed hash-pinned from [db/requirements-ci.txt](db/requirements-ci.txt).
 
+poewiki refuses GitHub's runners (403), so the workflow uses the committed snapshot
+[db/wiki-uniques.json](db/wiki-uniques.json). Refresh it from a PC each league, or when new uniques appear,
+and commit it:
+
+```powershell
+& $py build-lab\db\build-game-db.py --save-wiki-snapshot
+```
+
+The data is poewiki's, licensed CC BY-NC-SA 3.0. The snapshot, each database's meta and the release notes
+all carry the attribution.
+
 These are data releases, kept away from the app updater:
 
 - They're published as prereleases with `--latest=false`. The updater reads `releases/latest`, which never

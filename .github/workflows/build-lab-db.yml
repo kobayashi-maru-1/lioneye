@@ -145,11 +145,15 @@ jobs:
             gh release delete "$TAG" -R "$REPO" --yes
             draft=none
           fi
+          wiki="$(jq -r '.wiki // "no"' "db/game-$VERSION.json")"
+          notes="Build-lab game database built from Path of Building $VERSION. Data only, not an app release.
+
+          Unique acquisition data (poewiki: $wiki) is from poewiki.net, licensed CC BY-NC-SA 3.0: https://www.poewiki.net/wiki/Path_of_Exile_Wiki:Copyrights"
           if [ "$draft" = none ]; then
             gh release create "$TAG" "${files[@]}" -R "$REPO" --target main \
               --prerelease --latest=false \
               --title "Game database for PoB $VERSION" \
-              --notes "Build-lab game database built from Path of Building $VERSION. Data only, not an app release."
+              --notes "$notes"
           else
             gh release upload "$TAG" "${files[@]}" -R "$REPO" --clobber
             gh release edit "$TAG" -R "$REPO" --prerelease --latest=false

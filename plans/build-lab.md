@@ -104,7 +104,16 @@ passive lines joined.
 - RePoE isn't used. PoB already has the affix pools, tiers and spawn weights.
 - poewiki supplies only unique acquisition data: drop enabled, drop restricted, removal version.
 
+**First workflow run (2026-11-24):**
+- poewiki answered GitHub's runners with 403. `--require-wiki` stopped the build and nothing was published.
+  The guard confirmed `releases/latest` is still v0.4.75.
+- Fix: the builder tries the live wiki, then falls back to the committed snapshot `build-lab/db/wiki-uniques.json`,
+  and records which one it used in meta.
+- The snapshot is refreshed from a PC (`--save-wiki-snapshot`) each league.
+
 ## Open checks
+
+- **Wiki snapshot freshness.** New uniques get no acquisition data until the snapshot is refreshed.
 
 - **Chat sandbox download.** Can a claude.ai chat download the release asset? GitHub redirects
   `releases/download` to `release-assets.githubusercontent.com`. If it's blocked, the fallback is a data-only

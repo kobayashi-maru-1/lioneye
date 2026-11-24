@@ -71,8 +71,14 @@ def _wiki_rank(row, name):
             0 if str(row.get("drop_enabled")) == "1" else 1)
 
 
-def fetch_wiki_uniques():
-    """{(name, base) or (name, None): best row} for every unique on poewiki. Raises on network failure."""
+WIKI_SNAPSHOT = os.path.join(HERE, "wiki-uniques.json")
+WIKI_LICENSE = ("Unique item acquisition data from poewiki.net (Cargo table 'items'), licensed CC BY-NC-SA 3.0: "
+                "https://www.poewiki.net/wiki/Path_of_Exile_Wiki:Copyrights")
+
+
+def fetch_wiki_rows():
+    """Every unique's acquisition row from poewiki's Cargo API. Raises on network failure (poewiki refuses
+    datacenter IPs such as GitHub's runners with 403; the workflow uses the snapshot then)."""
     rows, offset = [], 0
     fields = ("items._pageName=page,items.name=name,items.base_item=base,items.drop_enabled=drop_enabled,"
               "items.is_drop_restricted=drop_restricted,items.drop_text=drop_text,"
@@ -92,6 +98,28 @@ def fetch_wiki_uniques():
             break
         offset += 500
         time.sleep(1)  # be polite
+    return rows
+
+
+def save_wiki_snapshot(rows, path=WIKI_SNAPSHOT):
+    snap = {"about": WIKI_LICENSE, "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "rows": rows}
+    tmp = path + ".part"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(snap, f, ensure_ascii=False, indent=0, sort_keys=True)
+        f.write("\n")
+    os.replace(tmp, path)
+    return snap["fetched_at"]
+
+
+def load_wiki_snapshot(path=WIKI_SNAPSHOT):
+    with open(path, encoding="utf-8") as f:
+        snap = json.load(f)
+    return snap["rows"], snap["fetched_at"]
+
+
+def index_wiki_rows(rows):
+    """{(name, base) or (name, None): best row}."""
     index = {}
     for r in rows:
         name = _unescape(r.get("name"))
@@ -101,7 +129,7 @@ def fetch_wiki_uniques():
             have = index.get(key)
             if have is None or _wiki_rank(r, name) < _wiki_rank(have, name):
                 index[key] = r
-    return index, len(rows)
+    return index
 
 
 def _unescape(s):
@@ -183,7 +211,7 @@ class Writer:
             self.counts["tags"] += len(tags)
 
 
-def write_db(path, data, wiki, pob_version, schema_sql, tagger):
+def write_db(path, data, wiki, wiki_source, pob_version, schema_sql, tagger):
     if os.path.exists(path):
         os.remove(path)
     db = sqlite3.connect(path)
@@ -278,7 +306,8 @@ def write_db(path, data, wiki, pob_version, schema_sql, tagger):
     meta = {
         "schema_version": SCHEMA_VERSION, "pob_version": pob_version,
         "tree_version": data["meta"].get("treeVersion"), "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "wiki": "yes" if wiki else "no", "wiki_unique_matches": matched, "duplicate_uniques": duplicates,
+        "wiki": wiki_source, "wiki_unique_matches": matched, "duplicate_uniques": duplicates,
+        **({"wiki_license": WIKI_LICENSE} if wiki else {}),
         # Extraction losses from extract.lua (all should be 0 or near it; check-game-db.py checks them).
         **{f"extract_{k}": v for k, v in (data.get("stats") or {}).items()},
     }
@@ -308,11 +337,18 @@ def main():
     ap.add_argument("--out", default=default_out())
     ap.add_argument("--no-wiki", action="store_true", help="skip poewiki acquisition data")
     ap.add_argument("--require-wiki", action="store_true",
-                    help="fail instead of building without poewiki data (CI: a published database must have it)")
+                    help="fail instead of building without poewiki data, live or snapshot (CI)")
+    ap.add_argument("--wiki-from-snapshot", action="store_true", help="use db/wiki-uniques.json, skip the live wiki")
+    ap.add_argument("--save-wiki-snapshot", action="store_true",
+                    help="fetch poewiki live and save db/wiki-uniques.json (run on a PC; commit the file), then exit")
     ap.add_argument("--print-latest-version", action="store_true",
                     help="print the latest PoB release (what a GitHub-source build would use) and exit")
     args = ap.parse_args()
 
+    if args.save_wiki_snapshot:
+        rows = fetch_wiki_rows()
+        print(f"saved {len(rows)} poewiki rows to {WIKI_SNAPSHOT} ({save_wiki_snapshot(rows)})")
+        return
     ph = load_pob_lib()
     if args.print_latest_version:
         print(ph.latest_version())
@@ -323,21 +359,31 @@ def main():
     print(f"PoB {version} ({pob.info()['mode']}), extracting...", file=sys.stderr)
     data = extract(pob)
 
-    wiki, wiki_rows = None, 0
+    # poewiki: live, else the committed snapshot, else (unless --require-wiki) none.
+    wiki, wiki_source = None, "no"
     if not args.no_wiki:
         try:
-            wiki, wiki_rows = fetch_wiki_uniques()
-            print(f"  poewiki: {wiki_rows} uniques", file=sys.stderr)
-        except Exception as e:  # noqa: BLE001 - the database is still useful without it
-            if args.require_wiki:
-                raise RuntimeError(f"poewiki unavailable ({e}) and --require-wiki is set") from None
-            print(f"  poewiki unavailable ({e}); building without acquisition data", file=sys.stderr)
+            if args.wiki_from_snapshot:
+                raise RuntimeError("--wiki-from-snapshot")
+            rows = fetch_wiki_rows()
+            wiki, wiki_source = index_wiki_rows(rows), "live"
+            print(f"  poewiki: {len(rows)} uniques (live)", file=sys.stderr)
+        except Exception as e:  # noqa: BLE001 - fall back to the snapshot
+            try:
+                rows, fetched = load_wiki_snapshot()
+                wiki, wiki_source = index_wiki_rows(rows), f"snapshot {fetched}"
+                print(f"  poewiki unavailable ({e}); using snapshot from {fetched}", file=sys.stderr)
+            except (OSError, ValueError, KeyError) as e2:
+                if args.require_wiki:
+                    raise RuntimeError(f"poewiki unavailable ({e}) and no snapshot ({e2})") from None
+                print(f"  poewiki unavailable ({e}), no snapshot; building without acquisition data",
+                      file=sys.stderr)
 
     os.makedirs(args.out, exist_ok=True)
     base = os.path.join(args.out, f"game-{version}")
     with open(os.path.join(HERE, "schema.sql"), encoding="utf-8") as f:
         schema_sql = f.read()
-    meta, counts = write_db(base + ".sqlite", data, wiki, version, schema_sql,
+    meta, counts = write_db(base + ".sqlite", data, wiki, wiki_source, version, schema_sql,
                             Tagger(os.path.join(HERE, "mechanic-rules.json")))
     with open(base + ".sqlite", "rb") as src, gzip.open(base + ".sqlite.gz", "wb", compresslevel=9) as dst:
         shutil.copyfileobj(src, dst)

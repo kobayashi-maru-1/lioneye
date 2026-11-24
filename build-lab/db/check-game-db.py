@@ -67,7 +67,7 @@ def main():
     check("uniques without a PoB base <= 5", losses.get("extract_uniquesWithoutBase", 99) <= 5,
           losses.get("extract_uniquesWithoutBase"))
     check("duplicate uniques <= 10", int(meta.get("duplicate_uniques", 99)) <= 10, meta.get("duplicate_uniques"))
-    if meta.get("wiki") == "yes":
+    if meta.get("wiki", "no") != "no":
         matched, uniques = int(meta.get("wiki_unique_matches", 0)), one("SELECT COUNT(*) FROM uniques")
         check("wiki matches >= 95% of uniques", matched >= 0.95 * uniques, f"{matched}/{uniques}")
 
