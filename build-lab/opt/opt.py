@@ -14,9 +14,14 @@ PoB's own warnings (attribute requirements, unreserved life/mana, the main skill
 Rules the loaded build already breaks may not get worse; fixing them earns nothing unless --fix-start-breaks
 (then a full fix outranks the metric). tree-build repairs every rule as far as it can, since a bare tree breaks
 most. tree-build's point budgets default to the loaded build's.
-Common: [--loadout TITLE] [--config TITLE] [--metric M] [--workers N] [--out OUT.xml]
-Output: JSON report (before, after, rules, every change); the optimized build is saved to --out (default:
-Downloads\\<build>-<command>.xml). Needs the poe-build-expert venv (lupa); re-runs itself there when needed.
+Market (build-lab/market): --budget N (divines) limits what gems, gear and jewels may buy: support gems at their
+poe.ninja price, crafted rares at the rarecost estimate; with a budget, awakened/exceptional gems are allowed when
+affordable. --trade-check prices the new rares on the trade site afterwards (slow; a check, nothing is undone).
+The report includes the build's novelty when popularity data is cached (market.py popularity).
+Common: [--loadout TITLE] [--config TITLE] [--metric M] [--workers N] [--out OUT.xml] [--league L]
+Output: JSON report (before, after, rules, every change, spend, novelty); the optimized build is saved to --out
+(default: Downloads\\<build>-<command>.xml). Needs the poe-build-expert venv (lupa); re-runs itself there when
+needed.
 """
 import argparse
 import json
@@ -29,6 +34,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "eval"))
+sys.path.insert(0, os.path.join(HERE, "..", "market"))
 
 
 def default_out(build_path, cmd):
@@ -71,13 +77,22 @@ def main():
         p.add_argument("--no-chaos", action="store_true")
         p.add_argument("--ehp-floor", default=None,
                        help="start (default: the loaded build's EHP, for tree-build too), none, or a number")
+        p.add_argument("--league", help="economy league (default: poe.ninja's current challenge league)")
+        if name in ("gems", "gear", "jewels", "all"):
+            p.add_argument("--budget", type=float, help="divines the optimizer may spend")
+        if name in ("gear", "jewels", "all"):
+            p.add_argument("--trade-check", action="store_true", help="price the new rares on the trade site")
         if name != "tree-build":
             p.add_argument("--fix-start-breaks", action="store_true",
                            help="let a complete fix of a rule the build already breaks outrank the metric")
         if name in ("gems", "all"):
             p.add_argument("--links", type=int)
-            p.add_argument("--allow-awakened", action="store_true")
-            p.add_argument("--allow-exceptional", action="store_true")
+            p.add_argument("--allow-awakened", action="store_true", default=None)
+            p.add_argument("--allow-exceptional", action="store_true", default=None)
+            p.add_argument("--no-awakened", dest="allow_awakened", action="store_false",
+                           help="never buy awakened gems (with --budget they're allowed when affordable)")
+            p.add_argument("--no-exceptional", dest="allow_exceptional", action="store_false",
+                           help="never buy exceptional gems (Empower, Enlighten, Enhance, ...)")
         if name in ("tree", "tree-build", "all"):
             p.add_argument("--points", type=int)
             p.add_argument("--max-dist", type=int, default=10 if name == "tree-build" else 6)
@@ -120,10 +135,18 @@ def main():
         main_skill = args.main_skill
         start_points = pool.points()
         slots = [s.strip() for s in args.slots.split(",")] if getattr(args, "slots", None) else None
+        budget_div = getattr(args, "budget", None)
+        prices = budget = None
+        if budget_div is not None or getattr(args, "trade_check", False):
+            from ninja import Prices
+            prices = Prices(args.league)
+        if budget_div is not None:
+            from budget import Budget
+            budget = Budget(budget_div, prices)
 
         def gems():
             G.optimize_gems(pool, rules, links=args.links, allow_awakened=args.allow_awakened,
-                            allow_exceptional=args.allow_exceptional, log=log)
+                            allow_exceptional=args.allow_exceptional, budget=budget, log=log)
 
         def tree():
             T.improve(pool, rules, budget=args.points, max_dist=args.max_dist, max_iters=args.iters,
@@ -131,10 +154,12 @@ def main():
 
         def gear():
             R.optimize_gear(pool, rules, tier=args.tier, ilvl=args.ilvl, replace_uniques=args.replace_uniques,
-                            slots=slots, keep_implicits=not args.base_implicits, main_skill=main_skill, log=log)
+                            slots=slots, keep_implicits=not args.base_implicits, main_skill=main_skill,
+                            budget=budget, log=log)
 
         def jewels():
-            R.optimize_jewels(pool, rules, tier=args.tier, ilvl=args.ilvl, main_skill=main_skill, log=log)
+            R.optimize_jewels(pool, rules, tier=args.tier, ilvl=args.ilvl, main_skill=main_skill, budget=budget,
+                              log=log)
 
         if args.cmd == "gems":
             gems()
@@ -171,7 +196,64 @@ def main():
         }
         if start.get("issues"):
             report["loadIssues"] = start["issues"]
+        if budget is not None:
+            report["spend"] = budget.report()
+        if getattr(args, "trade_check", False):
+            report["tradeChecks"] = trade_checks(prices, log)
+        report["novelty"] = novelty(pool, args.league, start["mainSkill"])
     print(json.dumps(report, indent=1, ensure_ascii=False))
+
+
+TRADE_CHECK_CAP = 12  # trade searches are rate-limited per IP: one search + one fetch per slot, at most this many
+
+
+def trade_checks(prices, log):
+    """Trade-site prices for the rares the run put in (only the last item per slot counts)."""
+    from trade import Trade
+    t = Trade(prices)
+    last = {}
+    for c in log:
+        if c.get("affixes") and c.get("base"):
+            last[c["change"].split(":")[0]] = c
+    out = []
+    for i, (slot, c) in enumerate(last.items()):
+        if i >= TRADE_CHECK_CAP:
+            out.append({"slot": slot, "note": f"not checked (at most {TRADE_CHECK_CAP} trade checks per run)"})
+            continue
+        explicit = [l for a in c["affixes"] if not a["crafted"] for l in a["lines"]]
+        local = [("Local" in (a.get("group") or "")) for a in c["affixes"] if not a["crafted"] for _ in a["lines"]]
+        crafted = [l for a in c["affixes"] if a["crafted"] for l in a["lines"]]
+        try:
+            r = t.price(c["base"], explicit, crafted, local)
+        except RuntimeError as e:
+            out.append({"slot": slot, "error": str(e)})
+            continue
+        out.append({"slot": slot, "estimate": c.get("estimate"), "trade": r["divine"], "listings": r["listings"],
+                    "matching": r["need"], "url": r["url"], **({"floor": True} if r.get("floor") else {}),
+                    **({"reason": r["reason"]} if r.get("reason") else {}),
+                    **({"unmatched": r["unmatched"]} if r["unmatched"] else {})})
+    return out
+
+
+def unique_titles(pool):
+    """Titles of the build's uniques and foil uniques (PoB's item name is "Title, Base")."""
+    import buildcost
+    return sorted({buildcost.parse_item(s["item"].get("text"))["name"] or s["item"]["name"].split(", ")[0]
+                   for s in pool.slots() if s.get("item") and s["item"].get("rarity") in ("UNIQUE", "RELIC")})
+
+
+def novelty(pool, league, main_skill):
+    """The build's novelty from cached popularity data, or a note saying how to get it."""
+    try:
+        import popularity as P
+        from ninja import Prices
+        lg = league or Prices().league
+        data = P.load(lg, refresh_if_stale=False)
+    except RuntimeError as e:
+        return {"note": f"no novelty: {e}"}
+    if data is None:
+        return {"note": "no popularity data yet: run market.py popularity (a few minutes)"}
+    return P.novelty(data, pool.points()["ascendancyName"], main_skill, unique_titles(pool))
 
 
 if __name__ == "__main__":

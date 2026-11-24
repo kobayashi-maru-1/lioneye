@@ -109,7 +109,7 @@ and prints a JSON report: before, after, the rules, every change.
 
 | Optimizer | What it does |
 |---|---|
-| `gems` | Fills empty links, then tries every compatible support in each enabled support slot of the main group. Awakened and exceptional gems are off unless allowed |
+| `gems` | Fills empty links, then tries every compatible support in each enabled support slot of the main group. Awakened and exceptional gems are off unless allowed; with `--budget` they're on when affordable |
 | `tree` | Spends spare points, then swaps one refundable node for one addition (masteries with each effect) while the tree gets better. Keystones stay unless allowed |
 | `tree-build` | Starts from the class start: ascendancy points first, then greedy paths by gain per point (up to 10 away), then the same swap search |
 | `gear` | Re-crafts the explicit mods of each non-unique gear item (implicits, enchants, sockets and quality kept): PoB's affix pool, one tier (T2 default), mid rolls, 3 prefixes + 3 suffixes, one bench craft. Two rounds so resists settle where cheapest |
@@ -131,6 +131,39 @@ and prints a JSON report: before, after, the rules, every change.
 `tree-build` repairs every rule as far as it can, because a bare tree breaks most of them. Gear, jewel and tree
 changes are checked with a real recalculation before they're kept. Uniques and relics stay unless
 `--replace-uniques`.
+
+## Market: prices, build cost, popularity
+
+[market/market.py](market/market.py), plus `--budget` / `--trade-check` on the optimizers:
+
+```powershell
+& $py build-lab\market\market.py prices                               # league, divine price, examples
+& $py build-lab\market\market.py cost BUILD.xml --main-skill X [--trade-check]
+& $py build-lab\market\market.py popularity [--refresh]               # ascendancy, skill, unique shares
+& $py build-lab\market\market.py novelty BUILD.xml --main-skill X
+& $py build-lab\opt\opt.py all BUILD.xml --main-skill X --budget 10 --trade-check
+& $py build-lab\market\test-market.py [BUILD.xml::MAIN_SKILL ...] [--offline]
+```
+
+| Piece | Source | Notes |
+|---|---|---|
+| Uniques, gems, currency | poe.ninja economy API (its documented public surface) | Cached 3 h with ETag revalidation. Uniques at their most-listed variant (with links for linked items); gems at the cheapest listing meeting level/quality, falling back to any quality, then corrupted |
+| Crafted rares | [rarecost.py](market/rarecost.py) estimate, then the trade site | The estimate is a tier-based heuristic used during search. `--trade-check` prices the final picks: one search per item: same base, mods at 85%+ (all of them for 3 or fewer, else all but one, marked as a floor), median of the cheapest five; no price when under half the mods match a trade stat |
+| Popularity | GGG's public ladder (top 3,000) and 80 public characters | poe.ninja's builds API is closed to third parties. Counts only, no names; cached a day; a refresh takes about 3 minutes within GGG's rate limits |
+| Novelty | popularity | 1 − archetype share (ascendancy + main skill) ÷ 5%: 0 for an archetype 5%+ of the top ladder plays, 1 for one nobody plays |
+
+**Budget rules:**
+- **Support gems:** priced on poe.ninja. An Awakened or exceptional gem that poe.ninja doesn't list counts as
+  unavailable in that league; most Awakened gems aren't in Covens. Any other unlisted gem is treated as a cheap
+  vendor gem.
+- **Crafted rares:** priced by the estimate.
+- **Re-buying:** buying a slot again refunds the earlier purchase.
+- **Owned items:** what the build already has costs nothing.
+- **Awakened and exceptional gems:** with a budget they're allowed whenever affordable.
+
+build-lab's requests (poe.ninja, GGG, poewiki, its own releases) send the User-Agent `lioneye-build-lab/0.1`,
+with no contact. The vendored `pob/pob-headless.py` keeps the skill's `poe-build-expert/1.0` for PoB downloads
+from GitHub, so it stays identical to the skill's copy.
 
 ## Benchmarks
 

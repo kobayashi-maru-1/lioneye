@@ -4,7 +4,7 @@ Andy asks Claude (Claude Code or a claude.ai chat) to design a build. Claude ask
 defences, proposes concepts from a game database, completes them with optimizers that run headless Path of
 Building, and returns 2–3 finished options with PoB codes, numbers, cost and blind spots.
 
-Status: phases 1–4 built 2026-11-24; phase 5 (prices and popularity) next.
+Status: phases 1–5 built 2026-11-24; phase 6 (design workflow and lab notebook) next.
 
 ## Decisions
 
@@ -28,8 +28,8 @@ Status: phases 1–4 built 2026-11-24; phase 5 (prices and popularity) next.
 | 2 | Game database: builder, checks, client, daily release workflow | Done (first release pending the workflow's first run) |
 | 3 | Worker pool and eval API (full load, calculator deltas, in-memory gem changes) | Done |
 | 4 | Optimizers: gem links, tree pathing, gear (synthesized rares), jewels | Done |
-| 5 | poe.ninja prices and popularity; novelty score | Next |
-| 6 | Design workflow in the skill: interview, concepts, checkpoints, report; the lab notebook (below) | |
+| 5 | poe.ninja prices and popularity; novelty score | Done |
+| 6 | Design workflow in the skill: interview, concepts, checkpoints, report; the lab notebook (below) | Next |
 | 7 | Back-test on known strong builds | |
 
 ## Lab notebook (phase 6): what the designer learns and remembers
@@ -249,6 +249,64 @@ optimizers run in one process, so they don't need it. Revisit if interactive wha
 - **Trigger supports:** "Cast when Stunned" and the like may be modelled generously by PoB.
 - **Gear bases:** gear keeps each slot's base, and influenced or eldritch affixes aren't in the pool.
 - **Prices:** none yet (phase 5), so "good crafted" is a tier choice, not a budget.
+
+## Phase 5 results
+
+`build-lab/market`: net.py, ninja.py, rarecost.py, trade.py, budget.py, buildcost.py, popularity.py, the
+`market.py` CLI and `test-market.py`. The optimizers gain `--budget`, `--trade-check` and a novelty score in
+their report.
+
+**Decisions (Andy, 2026-11-24):**
+- **Popularity:** GGG's public ladder plus a small daily sample of public characters, because poe.ninja's
+  builds API is closed to third parties.
+- **Rare prices:** a tier-based estimate during search, then trade checks for the final picks.
+- **poe.ninja:** fetched directly with a local cache.
+- **User-Agent:** `lioneye-build-lab/0.1`, no contact. The poewiki fetch was changed to match.
+
+**What it found on the live league (Covens):**
+- **Prices:** a divine is 181 chaos. Mageblood (4 flasks) is 240 divine, Headhunter 260, Spell Echo 20/20 0.48.
+- **Awakened gems:** most aren't in the Covens economy; only Empower, Enhance and Enlighten are listed. An
+  unlisted Awakened or exceptional gem counts as unavailable, not cheap.
+- **Build costs (known items only):** EK 782 divine, Coven 75. Coven's Mageblood is saved as a rare in its PoB
+  file, so it isn't priced.
+- **Popularity:** 3,000 ladder characters and 75 public samples, read in about 3 minutes. Elementalist leads,
+  and EK is the most common main skill. Novelty: Necromancer spectres 0.97, Chieftain EK 0.73.
+- **Budget runs:**
+
+  | Build | Gems with 1 divine | Gear with 3 divine |
+  |---|---|---|
+  | EK | +19% for 0.92 | +15% for 0.98 |
+  | Defiler | +40% for 0.31 | nothing affordable helped |
+  | Coven | +138% for 0.50 | +2% for 2.82 |
+
+  Never worse on any of them; every purchase is in the ledger.
+- **Trade checks:** they came in well under the first estimate table (wand 0.16 vs 0.83, belt 0.07 vs 0.37,
+  boots 0.05 vs 1.9). The table was cut to about a third, still above those prices. Re-check it each league.
+
+**Fixed after review:**
+- **GGG throttle:** it could have earned 30–60 minute trade bans. It now reads every listed rule, honours
+  restricted states, waits out whole windows with a margin of two, and stops instead of sleeping past 5 minutes.
+- **`cost --trade-check`:**
+  - local armour and weapon mods matched global stats;
+  - searches fell back silently;
+  - items with no matched mods got a base-item price.
+- **Pricing:**
+  - foil uniques were never priced;
+  - unique shares in novelty were always 0 ("Name, Base" titles).
+- **Other fixes:**
+  - leagues with spaces crashed;
+  - the main-skill guess counted aura and warcry setups;
+  - one character's error lost a whole refresh;
+  - unlisted gems were dropped silently;
+  - item-granted skills were priced;
+  - too many trade searches ran per item;
+  - refunds drifted with rounding.
+
+**Known limits:**
+- The rare-cost estimate is a heuristic.
+- Unique prices use the most-listed variant, not the item's own roll.
+- The popularity sample is 75–80 characters, so small shares are noisy.
+- Novelty covers the archetype (ascendancy plus main skill), not item or tree choices.
 
 ## Open checks
 

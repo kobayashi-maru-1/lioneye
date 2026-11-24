@@ -31,7 +31,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCHEMA_VERSION = 1
 WIKI_API = "https://www.poewiki.net/w/api.php"
-UA = {"User-Agent": "lioneye-build-lab/0.1 (+https://github.com/kobayashi-maru-1/lioneye)"}
+UA = {"User-Agent": "lioneye-build-lab/0.1"}
 
 
 def load_pob_lib():

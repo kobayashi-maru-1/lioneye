@@ -16,7 +16,12 @@ as a rare stays replaceable, whatever its name). Weapons keep their base. Jewel 
 that is empty or holds a rare/magic Cobalt, Crimson or Viridian jewel (cluster and abyss jewels stay); all three
 bases are tried.
 """
+import os
 import re
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "market"))
+import rarecost  # noqa: E402
 
 GEAR_SLOTS = ("Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2",
               "Belt")
@@ -56,20 +61,25 @@ def _fits(a, chosen, max_prefix, max_suffix, max_bench):
 
 
 def synthesize(pool, rules, slot, pool_data, implicits, enchants=(), max_prefix=3, max_suffix=3, max_bench=1,
-               ilvl=84, sockets=None, quality=None):
-    """Greedy affix build for one slot. Returns (text, probe result, affixes)."""
+               ilvl=84, sockets=None, quality=None, budget=None, jewel=False, key=None):
+    """Greedy affix build for one slot. With a budget, an affix is only tried if the item's estimated cost
+    (market/rarecost.py) still fits what's left. Returns (text, probe result, affixes)."""
     base = pool_data["base"]
 
     def text_for(chosen):
         return item_text(slot, base, implicits, enchants, chosen, ilvl, sockets, quality)
 
     chosen = []
+    if budget is not None and not budget.can(budget.rare_cost(chosen, jewel=jewel), key):
+        return None, {"error": "the budget can't cover even a base"}, []
     text = text_for(chosen)
     cur = pool.probe([{"item": {"slot": slot, "text": text}}])[0]
     if "error" in cur:
         return None, cur, []
     while len(chosen) < max_prefix + max_suffix:
         cands = [a for a in pool_data["affixes"] if _fits(a, chosen, max_prefix, max_suffix, max_bench)]
+        if budget is not None:
+            cands = [a for a in cands if budget.can(budget.rare_cost(chosen + [a], jewel=jewel), key)]
         if not cands:
             break
         texts = [text_for(chosen + [a]) for a in cands]
@@ -103,8 +113,19 @@ def _describe(chosen):
     return "; ".join(" / ".join(a["lines"]) + (" (crafted)" if a["crafted"] else "") for a in chosen)
 
 
+def _record(entry, base, chosen, budget, jewel, label):
+    """Add what a trade check and the report need, and charge the budget for the item."""
+    cost = rarecost.estimate(chosen, jewel=jewel)
+    entry.update({"base": base, "estimate": cost,
+                  "affixes": [{"lines": a["lines"], "crafted": a["crafted"], "group": a["group"], "tier": a["tier"]}
+                              for a in chosen]})
+    if budget is not None:
+        budget.charge(cost, label, key=label)
+    return entry
+
+
 def optimize_gear(pool, rules, tier=2, ilvl=84, replace_uniques=False, slots=None, rounds=2, keep_implicits=True,
-                  main_skill=None, log=None):
+                  main_skill=None, budget=None, log=None):
     log = log if log is not None else []
     wanted = slots or GEAR_SLOTS
     for _ in range(rounds):
@@ -124,7 +145,8 @@ def optimize_gear(pool, rules, tier=2, ilvl=84, replace_uniques=False, slots=Non
             quality = _line(item.get("text"), "Quality") or (20 if item.get("type") in QUALITY_TYPES else None)
             base_stats = pool.stats()
             text, res, chosen = synthesize(pool, rules, slot, pool_data, implicits, item.get("enchants") or [],
-                                           ilvl=ilvl, sockets=_line(item.get("text"), "Sockets"), quality=quality)
+                                           ilvl=ilvl, sockets=_line(item.get("text"), "Sockets"), quality=quality,
+                                           budget=budget, key=f"crafted {slot}")
             if not text or not rules.better(res, base_stats):
                 continue
             after = _apply_checked(pool, rules, slot, text, base_stats, main_skill)
@@ -135,7 +157,7 @@ def optimize_gear(pool, rules, tier=2, ilvl=84, replace_uniques=False, slots=Non
                      "value": rules.value(after), "item": text}
             if dropped:
                 entry["droppedImplicits"] = dropped
-            log.append(entry)
+            log.append(_record(entry, item["base"], chosen, budget, False, f"crafted {slot}"))
             changed = True
             current = {s["slot"]: s for s in pool.slots()}
         if not changed:
@@ -157,7 +179,7 @@ def jewel_sockets(pool):
     return out
 
 
-def optimize_jewels(pool, rules, tier=2, ilvl=84, rounds=2, main_skill=None, log=None):
+def optimize_jewels(pool, rules, tier=2, ilvl=84, rounds=2, main_skill=None, budget=None, log=None):
     log = log if log is not None else []
     pools = {b: pool.affix_pool(b, ilvl=ilvl, tier=tier, domain="Jewel") for b in JEWEL_BASES}
     for _ in range(rounds):
@@ -167,7 +189,8 @@ def optimize_jewels(pool, rules, tier=2, ilvl=84, rounds=2, main_skill=None, log
             best = None
             for b in JEWEL_BASES:
                 text, res, chosen = synthesize(pool, rules, s["slot"], pools[b], pools[b]["implicits"],
-                                               max_prefix=2, max_suffix=2, max_bench=0, ilvl=ilvl)
+                                               max_prefix=2, max_suffix=2, max_bench=0, ilvl=ilvl, budget=budget,
+                                               jewel=True, key=f"jewel {s['slot']}")
                 if text and (best is None or rules.better(res, best[1])):
                     best = (text, res, chosen, b)
             if not best or not rules.better(best[1], base_stats):
@@ -176,8 +199,9 @@ def optimize_jewels(pool, rules, tier=2, ilvl=84, rounds=2, main_skill=None, log
             if after is None:
                 log.append({"step": "jewels", "change": f"{s['slot']}: kept the current jewel (the made-up one checked worse)"})
                 continue
-            log.append({"step": "jewels", "change": f"{s['slot']}: {best[3]} with {_describe(best[2])}",
-                        "value": rules.value(after), "item": best[0]})
+            log.append(_record({"step": "jewels", "change": f"{s['slot']}: {best[3]} with {_describe(best[2])}",
+                                "value": rules.value(after), "item": best[0]}, best[3], best[2], budget, True,
+                               f"jewel {s['slot']}"))
             changed = True
         if not changed:
             break

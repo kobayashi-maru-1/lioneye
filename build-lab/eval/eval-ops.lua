@@ -635,8 +635,10 @@ function ev_groups()
                   enabled = inst.enabled ~= false,
                   support = inst.gemData and inst.gemData.grantedEffect.support and true or false }
     end
+    -- source: set for groups PoB makes for skills granted by items, the tree or config (not socketed gems)
     out[i] = { index = i, label = g.label or "", slot = g.slot or "", enabled = g.enabled ~= false,
-               main = (i == b.mainSocketGroup), fullDPS = g.includeInFullDPS and true or false, gems = gems }
+               main = (i == b.mainSocketGroup), fullDPS = g.includeInFullDPS and true or false, gems = gems,
+               source = g.source }
   end
   return dkjson.encode(out)
 end
