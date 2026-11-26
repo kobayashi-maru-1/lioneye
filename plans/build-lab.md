@@ -561,6 +561,8 @@ instead of all counting as 1 divine; probe errors and each losing unique's resul
 
 **Crawl schedule (Andy, 2026-11-25):** characters are read only between 01:00 and 04:00. `market/schedule-crawl.ps1` registers a nightly task (Covens, nights of 26–30 November) that resumes the crawl, reads nothing outside the window even when started by hand, stops a minute before 04:00, does nothing once the crawl is finished, and expires. Progress: `%LOCALAPPDATA%\poe-build-expert\crawl-log.txt`.
 
+Night 1 (26 November) read 176 of 900 characters (148 reference builds) and then stopped at 02:14 on a brief DNS failure: the crawl treated any network error as an outage and quit, losing the rest of the window. Fix: inside a night window an outage (no connection, or 5 HTTP failures in a row) waits `CRAWL_RETRY` (2 minutes) and reads the same character again, until the window ends, then pauses for the next night. Run by hand (no window), an outage still stops the crawl.
+
 **Next:** when the crawl finishes, ask Andy before re-running the budget back-test with crawl uniques.
 
 ## Phase 9 plan: reference builds

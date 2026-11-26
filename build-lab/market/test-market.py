@@ -324,6 +324,68 @@ def crawl_tests(add):
             saved = P.load_crawl(league)
             add("crawl: an outage stops the crawl instead of finishing it", not saved["done"]
                 and saved["next"] == 3 and saved["failed"] == 0, detail=str({k: saved[k] for k in ("next", "failed")}))
+        # In a night window an outage waits and reads the same character again instead of stopping.
+        class Blip(FakeGGG):
+            def __init__(self, down=2, tree_down=0):
+                super().__init__()
+                self.down, self.tree_down = down, tree_down
+
+            def call(self, url):
+                if "get-passive-skills" in url and self.reads == 5 and self.tree_down:
+                    self.tree_down -= 1
+                    raise RuntimeError("can't reach pathofexile.com (getaddrinfo failed)")
+                if "ladders" not in url and "get-passive-skills" not in url and self.reads == 3 and self.down:
+                    self.down -= 1
+                    raise RuntimeError("can't reach pathofexile.com (getaddrinfo failed)")
+                return super().call(url)
+
+        now, slept = [0], []
+
+        def nap(s):
+            slept.append(s)
+            now[0] += s
+        blip = P.crawl(league, sample=10, depth=200, ggg=Blip(down=2, tree_down=1), verbose=False, fresh=True,
+                       until=10 ** 6, clock=lambda: now[0], sleep=nap)
+        add("crawl: a network blip in the window waits and retries, nothing lost",
+            blip["done"] and blip["read"] == 10 and blip["failed"] == 0 and blip.get("builds") == 10
+            and slept == [P.CRAWL_RETRY] * 3, detail=str({k: blip.get(k) for k in ("read", "failed", "builds")}) + str(slept))
+        now[0], slept[:] = 0, []
+        down = P.crawl(league, sample=10, depth=200, ggg=Blip(down=10 ** 6), verbose=False, fresh=True,
+                       until=10 * P.CRAWL_RETRY, clock=lambda: now[0], sleep=nap)
+        add("crawl: still down at the window's end pauses for the night, no error",
+            down.get("paused") and not down["done"] and down["next"] == 3 and down["failed"] == 0
+            and len(slept) == 9, detail=str({k: down.get(k) for k in ("next", "failed", "paused")}) + str(len(slept)))
+        rest = P.crawl(league, sample=10, depth=200, ggg=FakeGGG(), verbose=False)
+        add("crawl: after an outage night the next one finishes", rest["done"] and rest["read"] == 10)
+
+        class Down5xx(FakeGGG):
+            def __init__(self, ladder_down=0, chars_down=0):
+                super().__init__()
+                self.ladder_down, self.chars_down = ladder_down, chars_down
+
+            def call(self, url):
+                if "ladders" in url and self.ladder_down:
+                    self.ladder_down -= 1
+                    raise RuntimeError("HTTP 503 from GGG (ladder)")
+                if "ladders" not in url and "get-passive-skills" not in url and self.reads == 2 and self.chars_down:
+                    self.chars_down -= 1
+                    raise RuntimeError("HTTP 502 from GGG (get-items)")
+                return super().call(url)
+
+        now[0], slept[:] = 0, []
+        five = P.crawl(league, sample=10, depth=200, ggg=Down5xx(ladder_down=2, chars_down=6), verbose=False,
+                       fresh=True, until=10 ** 6, clock=lambda: now[0], sleep=nap)
+        add("crawl: GGG's 5xx (ladder or characters) waits and retries, no character skipped",
+            five["done"] and five["read"] == 10 and five["failed"] == 0 and len(slept) == 8,
+            detail=str({k: five.get(k) for k in ("read", "failed")}) + str(len(slept)))
+        P.crawl(league, sample=10, depth=200, ggg=FakeGGG(stop_after=3), verbose=False, fresh=True,
+                until=10 ** 6, clock=lambda: 0)
+        now[0], slept[:] = 0, []
+        P.crawl(league, sample=10, depth=200, ggg=Down5xx(ladder_down=10 ** 6), verbose=False,
+                until=3 * P.CRAWL_RETRY, clock=lambda: now[0], sleep=nap)
+        saved = P.load_crawl(league)
+        add("crawl: ladder still down at the window's end saves the crawl as paused",
+            saved.get("paused") and saved["next"] == 3 and not saved["done"], detail=str(saved.get("paused")))
         ticks = iter(range(1000))
         # one tick per clock read: the ladder page at 0, then two per character (gear, then tree): characters at
         # 1-8; at 9 less than the margin is left

@@ -214,7 +214,8 @@ SLOT_OF = {"Weapon": "Weapon 1", "Offhand": "Weapon 2", "Helm": "Helmet", "BodyA
 CANDIDATE_SHARE = 0.10
 CANDIDATE_MIN_CHARS = 5
 CRAWL_MARGIN = 60                   # seconds: stop this long before the window ends, so no request lands after it
-CRAWL_MAX_FAILS = 5                 # this many characters in a row failing with HTTP errors: stop, resume later
+CRAWL_MAX_FAILS = 5                 # this many characters in a row failing with HTTP errors: an outage
+CRAWL_RETRY = 120                   # seconds: in a night window, wait this long after an outage and try again
 
 
 def crawl_path(league):
@@ -322,12 +323,14 @@ def save_reference(league, n, items, passives):
 
 
 def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None, verbose=True, until=None,
-          clock=time.time, builds=True):
+          clock=time.time, builds=True, sleep=time.sleep):
     """Read `sample` public ladder characters spread over the top `depth` and count, per main skill, the uniques
     they wear by slot. Resumes an unfinished crawl of the same league unless fresh. Only run it after the user
     agreed: it takes hours. until: a time (epoch seconds) to pause at; the data comes back with "paused" set and
-    the next run resumes it. No rate-limit wait runs past it. builds: also read each counted character's passive
-    tree (a second read) and keep gear + tree as a reference build (save_reference; no names)."""
+    the next run resumes it. No rate-limit wait runs past it. An outage (no connection, or GGG failing character
+    after character) inside the window waits CRAWL_RETRY and tries the same read again, until the window ends;
+    without a window it stops the crawl. builds: also read each counted character's passive tree (a second read)
+    and keep gear + tree as a reference build (save_reference; no names)."""
     ggg = ggg or GGG(verbose, max_sleep=CRAWL_SLEEP)
 
     def time_left():
@@ -341,28 +344,53 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
             ggg.max_sleep = min(CRAWL_SLEEP, left)
         return True
 
+    def outage_wait(err):
+        """In a window with time to spare: wait CRAWL_RETRY so the same read can be tried again (True)."""
+        if until is None or until - clock() - CRAWL_MARGIN <= CRAWL_RETRY:
+            return False
+        if verbose:
+            print(f"crawl: {err}; trying again in {CRAWL_RETRY // 60} min", file=sys.stderr, flush=True)
+        sleep(CRAWL_RETRY)
+        return True
+
+    def is_outage(err):
+        """No connection, or GGG's servers failing (HTTP 5xx): not one character's problem."""
+        text = str(err)
+        return not text.startswith("HTTP ") or text.startswith("HTTP 5")
+
+    def pause_now():
+        if data:
+            data["paused"] = True
+            data["updated"] = time.time()
+            _save(path, data)
+        return data or {"league": league, "paused": True, "done": False, "skills": {}}
+
     path = crawl_path(league)
     data = None if fresh else load_crawl(league)
     if data and data.get("done"):
         data = None  # a finished crawl is replaced, not extended
     entries = []
-    for offset in range(0, depth, 200):
+    offset = 0
+    while offset < depth:
         if not time_left():
-            if data:
-                data["paused"] = True
-                data["updated"] = time.time()
-                _save(path, data)
-            return data or {"league": league, "paused": True, "done": False, "skills": {}}
+            return pause_now()
         try:
             page = ggg.call(LADDER.format(league=urllib.parse.quote(league), offset=offset)) or {}
         except RateLimited:
             if until is None:
                 raise
-            return data or {"league": league, "paused": True, "done": False, "skills": {}}
+            return pause_now()
+        except RuntimeError as err:
+            if is_outage(err) and outage_wait(err):
+                continue  # the same ladder page again
+            if is_outage(err) and until is not None:
+                return pause_now()
+            raise
         got = page.get("entries") or []
         entries.extend(got)
         if len(got) < 200:
             break
+        offset += 200
     if not entries:
         raise RuntimeError(f"GGG's ladder for {league} is empty")
     by_rank = {e.get("rank"): e for e in entries if e.get("public") and e.get("rank") is not None}
@@ -394,10 +422,17 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
                         break
                     raise  # "next" still points here, so a resume reads this character
                 except RuntimeError as err:
-                    # One character's HTTP error is skipped; no connection, a maintenance page or GGG failing
-                    # character after character stops the crawl here, so a resume picks it up.
-                    fails += 1
-                    if not str(err).startswith("HTTP ") or fails >= CRAWL_MAX_FAILS:
+                    # One character's HTTP 4xx is skipped. No connection, a 5xx or GGG failing character after
+                    # character is an outage: in a window, wait and read this character again; otherwise stop
+                    # here, so a resume picks it up.
+                    fails += 0 if is_outage(err) else 1
+                    if is_outage(err) or fails >= CRAWL_MAX_FAILS:
+                        if outage_wait(err):
+                            fails = min(fails, CRAWL_MAX_FAILS - 1)  # still failing after the wait: wait again
+                            continue
+                        if until is not None:
+                            data["paused"] = True  # the window ends before a retry: resume next night
+                            break
                         raise RuntimeError(f"crawl stopped at {data['next']}/{len(ranks)} ({err}); run it again "
                                            "later to resume") from None
                     data["failed"] += 1
@@ -416,7 +451,12 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
                             data["paused"] = True
                             break
                         raise
-                    except RuntimeError:
+                    except RuntimeError as err:
+                        if is_outage(err) and outage_wait(err):
+                            continue  # this character again, gear and tree
+                        if is_outage(err) and until is not None:
+                            data["paused"] = True
+                            break
                         passives = None  # the counts still go in; no reference build for this one
             else:
                 data["skipped"] += 1  # dropped off the ladder or went private since the crawl started
