@@ -18,6 +18,7 @@ budgets and EHP as the floor. Exit code 1 when any check fails. Builds aren't pa
 """
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -51,6 +52,202 @@ def fake(dps=100.0, life=1000, ehp=10000.0, fire=75, cold=75, light=75, chaos=0,
     return {"player": p, "violations": list(violations)}
 
 
+def bundle_tests(add):
+    """Tree bundles on hand-made candidates: several refunds pay for one big addition; overlaps and anchors."""
+    row = lambda c: (1.0, c, {})  # noqa: E731  (rate, candidate, result) as _rank returns them
+    adds = [row({"key": "nFar", "id": 900, "points": 5, "masteries": None, "label": "Far"}),
+            row({"key": "nNear", "id": 901, "points": 1, "masteries": None, "label": "Near"})]
+    rems = [row({"id": 1, "frees": 2, "name": "a"}), row({"id": 2, "frees": 2, "name": "b"}),
+            row({"id": 3, "frees": 1, "name": "c"}), row({"id": 4, "frees": 2, "name": "d"})]
+    deps = {1: {1}, 2: {2, 3}, 3: {3}, 4: {4}}
+    out = T._bundles(adds, rems, {"nFar": {50}, "nNear": {51}}, deps, 0, set())
+    add("tree", "bundle pays for a far addition", len(out) == 1 and out[0][1]["key"] == "nFar"
+        and out[0][0]["frees"] >= 5 and out[0][2]["deallocate"] == [1, 2, 4], detail=str(out and out[0][2]))
+    add("tree", "bundle skips overlapping refunds", out and 3 not in out[0][2]["deallocate"])
+    out = T._bundles(adds, rems, {"nFar": {1, 2, 4}, "nNear": set()}, deps, 0, set())
+    add("tree", "bundle never takes every anchor of the path", all(
+        not ({1, 2, 4} <= set(o[2]["deallocate"]) | {d for i in o[2]["deallocate"] for d in deps[i]}) for o in out))
+    add("tree", "no bundle when one refund covers it",
+        not T._bundles([row({"key": "nX", "id": 7, "points": 2, "masteries": None, "label": "X"})], rems,
+                       {"nX": set()}, deps, 0, set()))
+    r = Rules("CombinedDPS", fake(), floors={"EffectiveSpellSuppressionChance": 100})
+    add("rules", "stat floor broken below it", "floor:EffectiveSpellSuppressionChance" in
+        r.shortfalls(fake(EffectiveSpellSuppressionChance=60)))
+    add("rules", "stat floor met at it", not r.shortfalls(fake(EffectiveSpellSuppressionChance=100)))
+    # weighted floors: weight 2, hard below 70% of a floor
+    sup = "EffectiveSpellSuppressionChance"
+    w = Rules("CombinedDPS", fake(), floors={sup: 100}, ehp_floor=10000, start_breaks="repair",
+              floor_weight=2, floor_hard=0.7)
+    hard_floor = Rules("CombinedDPS", fake(), floors={sup: 100}, ehp_floor=10000, start_breaks="repair")
+    met, short = fake(dps=100, **{sup: 100}), fake(dps=300, **{sup: 80})
+    add("weighted floors", "a big damage gain outweighs a small floor miss", w.better(short, met)
+        and not hard_floor.better(short, met))
+    add("weighted floors", "a small damage gain doesn't", not w.better(fake(dps=120, **{sup: 80}), met))
+    add("weighted floors", "below the hard minimum the floor outranks damage",
+        not w.better(fake(dps=10000, **{sup: 60}), met) and w.better(fake(dps=50, **{sup: 75}), fake(dps=900, **{sup: 60})))
+    add("weighted floors", "a missed floor is still reported", f"floor:{sup}" in w.shortfalls(short))
+    add("weighted floors", "resists stay hard", not w.better(fake(dps=1e6, fire=70, **{sup: 100}), met))
+    add("weighted floors", "the EHP floor is weighted too", w.better(fake(dps=300, ehp=9000, **{sup: 100}), met))
+    rt = w.rate(met, short)
+    add("weighted floors", "rate: same hard score, utility gain ranks the change",
+        rt[0] == 1 and abs(rt[1] - (math.log(3) - 2 * 0.2)) < 1e-9, detail=str(rt))
+    k = Rules("CombinedDPS", fake(**{sup: 80}), floors={sup: 100}, floor_weight=2, floor_hard=0.7)
+    add("weighted floors", "keep: a soft miss at the start isn't a broken rule", not k.start_short)
+    add("weighted floors", "a soft miss at the start is still reported", k.describe()["brokenAtStart"] == [f"floor:{sup}"])
+    nf = Rules("CombinedDPS", fake(), ehp_floor=None, floor_weight=2, floor_hard=0.7)
+    add("weighted floors", "no floors: ranking stays on the metric",
+        nf.floor_weight is None and abs(nf.rate(fake(dps=100), fake(dps=160), 3)[1] - 0.2) < 1e-9)
+    add("weighted floors", "weight 0 means unweighted",
+        Rules("CombinedDPS", fake(), floors={sup: 100}, floor_weight=0).floor_weight is None)
+    add("weighted floors", "no floor_hard given: 70%",
+        Rules("CombinedDPS", fake(), floors={sup: 100}, floor_weight=2).floor_hard == 0.7)
+
+
+class TierPool:
+    """A one-slot stand-in for EvalPool: the helmet's '+N to maximum Life' line is the build's damage."""
+    LIFE = {1: 100, 2: 80, 3: 60}
+
+    def __init__(self, text):
+        self.text = text
+
+    def _stats(self, text):
+        import re
+        m = re.search(r"\+(\d+) to maximum Life", text)
+        return fake(dps=100.0 + (int(m.group(1)) if m else 0))
+
+    def slots(self):
+        return [{"slot": "Helmet", "item": {"name": self.text.split("\n")[1], "base": "Hubris Circlet",
+                                             "implicits": [], "enchants": [], "text": self.text, "rarity": "RARE"}}]
+
+    def affix_pool(self, base, ilvl=84, tier=2, roll=0.5, domain="Explicit", bench=False):
+        t = min(tier, 3)
+        return {"base": base, "implicits": [], "affixes": [
+            {"group": "IncreasedLife", "tier": t, "tiers": 3, "type": "Prefix", "crafted": False,
+             "lines": [f"+{self.LIFE[t]} to maximum Life"]}]}
+
+    def stats(self):
+        return self._stats(self.text)
+
+    def probe(self, specs):
+        return [self._stats(s["item"]["text"]) for s in specs]
+
+    def apply(self, ops):
+        for op in ops:
+            self.text = op["text"]
+        return self.stats()
+
+    def save_xml(self):
+        return self.text
+
+    def load(self, xml, main_skill=None):
+        self.text = xml
+
+
+def upgrade_tests(add):
+    """gear.upgrade_tiers on a stand-in pool: affixes move up a tier while the budget allows."""
+    sys.path.insert(0, os.path.join(HERE, "..", "market"))
+    from budget import Budget
+    affix = {"lines": ["+60 to maximum Life"], "crafted": False, "group": "IncreasedLife", "tier": 3, "type": "Prefix"}
+
+    def setup(limit):
+        pool = TierPool(R.item_text("Helmet", "Hubris Circlet", [], [], [affix]))
+        budget = Budget(limit, None)
+        log = [R._record({"step": "gear", "change": "Helmet: Hubris Circlet with +60 to maximum Life"},
+                         "Hubris Circlet", [affix], budget, False, "crafted Helmet")]
+        return pool, budget, log
+
+    rules = Rules("CombinedDPS", fake())
+    pool, budget, log = setup(10.0)
+    R.upgrade_tiers(pool, rules, budget, log=log)
+    add("gear", "tier upgrade climbs to T1 when the budget allows", "+100 to maximum Life" in pool.text,
+        detail=pool.text)
+    add("gear", "tier upgrade charges the budget for the final item only",
+        abs(budget.spent - R.rarecost.estimate([{**affix, "tier": 1}])) < 1e-9, detail=str(budget.spent))
+    t2 = R.rarecost.estimate([{**affix, "tier": 2}])
+    pool, budget, log = setup(t2 + 1e-6)
+    R.upgrade_tiers(pool, rules, budget, log=log)
+    add("gear", "tier upgrade stops where the budget ends", "+80 to maximum Life" in pool.text, detail=pool.text)
+    pool, budget, log = setup(10.0)
+    pool.text = pool.text.replace("Build-lab Helmet", "Guide Helmet")
+    add("gear", "only the lab's own crafted items are upgraded", not R.crafted_items(pool, log))
+
+
+class AuraPool:
+    """A stand-in pool for drop_side_skills: each aura reserves mana; Herald adds damage; Vitality adds life."""
+    RESERVE = {"Grace": 300, "Herald of Ash": 200, "Vitality": 150}
+
+    def __init__(self, mana=500, groups=None):
+        self.mana = mana
+        self.gl = groups or [
+            {"index": 1, "main": True, "enabled": True, "slot": "Body Armour", "gems": [
+                {"index": 1, "name": "Fireball", "enabled": True, "support": False}]},
+            {"index": 2, "main": False, "enabled": True, "slot": "Helmet", "gems": [
+                {"index": 1, "name": "Grace", "enabled": True, "support": False},
+                {"index": 2, "name": "Enlighten", "enabled": True, "support": True}]},
+            {"index": 3, "main": False, "enabled": True, "slot": "Gloves", "gems": [
+                {"index": 1, "name": "Herald of Ash", "enabled": True, "support": False},
+                {"index": 2, "name": "Vitality", "enabled": True, "support": False}]},
+            {"index": 4, "main": False, "enabled": True, "slot": "Weapon 1 Swap", "gems": [
+                {"index": 1, "name": "Vitality", "enabled": True, "support": False}]}]
+
+    def groups(self):
+        return self.gl
+
+    def _on(self, name):
+        return any(gm["name"] == name and gm["enabled"] for g in self.gl if "Swap" not in g["slot"]
+                   for gm in g["gems"])
+
+    def stats(self):
+        left = self.mana - sum(v for k, v in self.RESERVE.items() if self._on(k))
+        neg = ["Your unreserved Mana is negative"] if left < 0 else []
+        return fake(dps=200 if self._on("Herald of Ash") else 100, life=1150 if self._on("Vitality") else 1000,
+                    violations=neg, Mana=self.mana, ManaUnreserved=left)
+
+    fail = ()  # gem names whose turning off makes PoB fail
+
+    def apply(self, ops):
+        for op in ops:
+            g = next(g for g in self.gl if g["index"] == op["group"])
+            gem = g["gems"][op["index"] - 1]
+            gem["enabled"] = op["enabled"]
+            if not op["enabled"] and gem["name"] in self.fail:
+                raise ValueError("PoB calc failed")
+        return self.stats()
+
+
+def side_skill_tests(add):
+    rules = Rules("CombinedDPS", fake(), start_breaks="repair")
+    pool, log = AuraPool(mana=400), []  # 650 reserved: only turning off Grace fixes it in one step
+    G.drop_side_skills(pool, rules, log=log)
+    off = sorted(gm["name"] for g in pool.gl for gm in g["gems"] if not gm["enabled"])
+    add("gems", "the aura whose loss fixes the overdraw is turned off, and only that one", off == ["Grace"],
+        detail=str(log))
+    add("gems", "the fix is logged", log and log[0]["fixes"] == ["warn:Your unreserved Mana is negative"])
+    pool = AuraPool(mana=1000)
+    add("gems", "nothing is turned off while every rule holds", not G.drop_side_skills(pool, rules))
+    add("gems", "main group, supports and weapon swap are never candidates",
+        [n for _, _, n in G._side_skills(AuraPool())] == ["Grace", "Herald of Ash", "Vitality"])
+    pool = AuraPool(mana=1000)
+    pool.stats = lambda: fake(violations=["You do not meet the Strength requirement"], Str=100, ReqStr=150)
+    add("gems", "an attribute shortfall alone never turns a skill off", not G.drop_side_skills(pool, rules))
+    pool, log = AuraPool(mana=400), []
+    pool.fail = ("Herald of Ash",)
+    G.drop_side_skills(pool, rules, log=log)
+    add("gems", "a failed trial is skipped and put back; the rest are still tried",
+        [e["change"] for e in log] == ["turned off Grace (group 2)"]
+        and all(gm["enabled"] for gm in pool.gl[2]["gems"]), detail=str(log))
+    sys.path.insert(0, os.path.join(HERE, "..", "market"))
+    from budget import Budget
+    budget = Budget(10.0, None)
+    budget.charge(1.0, "gem Grace", "group:2:gem:1")
+    budget.charge(2.0, "gem Enlighten", "group:2:gem:2")
+    budget.charge(0.5, "gem Vitality", "group:3:gem:2")
+    pool, log = AuraPool(mana=400), []
+    G.drop_side_skills(pool, rules, log=log, budget=budget)
+    add("gems", "a turned-off aura and its idle supports are refunded",
+        abs(budget.spent - 0.5) < 1e-9 and log and abs(log[0]["refund"] - 3.0) < 1e-9, detail=str(budget.spent))
+
+
 def rule_tests(add):
     start = fake()
     r = Rules("CombinedDPS", start)
@@ -79,6 +276,20 @@ def rule_tests(add):
     rp = Rules("CombinedDPS", fake(), start_breaks="repair")
     add("rules", "repair: partial progress counts",
         rp.better(fake(dps=50, violations=[cost], ManaUnreserved=45), fake(dps=50, violations=[cost])))
+    neg = "Your unreserved Mana is negative"
+    add("rules", "repair: less mana overdraw counts as progress",
+        rp.better(fake(dps=50, violations=[neg], Mana=1000, ManaUnreserved=-100),
+                  fake(dps=90, violations=[neg], Mana=1000, ManaUnreserved=-400)))
+    over = fake(violations=[neg], Mana=1000, ManaUnreserved=-100)
+    km = Rules("CombinedDPS", over)
+    add("rules", "keep: mana overdraw may not get worse",
+        not km.better(fake(dps=200, violations=[neg], Mana=1000, ManaUnreserved=-300), over))
+    add("rules", "repair: an overdraw past the whole pool still grades progress",
+        rp.better(fake(violations=[neg], Mana=1000, ManaUnreserved=-1500),
+                  fake(violations=[neg], Mana=1000, ManaUnreserved=-2500)))
+    add("rules", "unreserved life below 1: graded by the life pool",
+        abs(rp.shortfalls(fake(violations=["Your unreserved Life is below 1"], LifeUnreserved=-99))
+            ["warn:Your unreserved Life is below 1"] - 0.11) < 1e-9)
 
 
 def main():
@@ -97,6 +308,9 @@ def main():
         report.append({"build": build, "test": test, "ok": True, "skip": why})
 
     rule_tests(add)
+    bundle_tests(add)
+    upgrade_tests(add)
+    side_skill_tests(add)
     if args.builds:
         fresh = E.Evaluator()
         with E.EvalPool(workers=args.workers) as pool:

@@ -7,7 +7,8 @@
   tree- or config-granted skills are skipped. A gem poe.ninja doesn't list goes to "unpriced".
 - Rare/magic gear and rare jewels: the trade site when trade checks are on (trade.Trade), else unpriced. Local mods
   on weapons and armour are matched to the trade site's "(Local)" stats. A price from listings that lack some of
-  the item's mods is marked as a floor; one where too few mods could be matched is left unpriced. Cluster jewels
+  the item's mods is marked as a floor; one where too few mods could be matched, or fewer than 3 are listed, is
+  left unpriced. Cluster jewels
   stay unpriced (their notables don't map to trade stats).
 Anything that can't be priced is listed under "unpriced", never guessed.
 """
@@ -26,6 +27,23 @@ TAG = re.compile(r"\{[^}]*\}")
 # Lines after the mods that describe the item rather than add a mod.
 FLAG_LINE = re.compile(r"^(Corrupted|Mirrored|Split|Unidentified|Foil Unique.*|Fractured Item|Synthesised Item|"
                        r"\w+ Item|Has Alt Variant.*|Selected Variant.*)$")
+
+
+RANGE_TAG = re.compile(r"\{range:([\d.]+)\}")
+RANGE = re.compile(r"\((-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)\)")
+
+
+def resolve_ranges(line):
+    """PoB's text for a rare made in PoB keeps the roll range: '{range:0.5}+(91-105) to maximum Life' ->
+    '{range:0.5}+98 to maximum Life' (the value at that point of the range; 0.5 without a tag)."""
+    m = RANGE_TAG.search(line)
+    r = float(m.group(1)) if m else 0.5
+
+    def val(g):
+        lo, hi = float(g.group(1)), float(g.group(2))
+        v = lo + (hi - lo) * r
+        return str(round(v)) if "." not in g.group(0) else f"{v:.1f}".rstrip("0").rstrip(".")
+    return RANGE.sub(val, line)
 
 
 def parse_item(text):
@@ -52,9 +70,9 @@ def parse_item(text):
             break
     if start is None:
         return out
-    out["implicits"] = [TAG.sub("", l) for l in lines[start:start + n_imp]]
+    out["implicits"] = [TAG.sub("", resolve_ranges(l)) for l in lines[start:start + n_imp]]
     for l in lines[start + n_imp:]:
-        clean = TAG.sub("", l).strip()
+        clean = TAG.sub("", resolve_ranges(l)).strip()
         if not clean or FLAG_LINE.match(clean):
             continue
         (out["crafted"] if "{crafted}" in l else out["explicit"]).append(clean)
@@ -101,6 +119,9 @@ def price_build(pool, prices, trade=None):
                 continue
             if t["divine"] is None:
                 unpriced.append(f"{slot}: {label} ({t.get('reason') or 'nothing comparable listed'})")
+                continue
+            if t.get("thin"):   # one seller's ask, not a price: kept out of the total
+                unpriced.append(f"{slot}: {label} (only {t['listings']} listed, asking {t['divine']} div)")
                 continue
             row.update({"divine": t["divine"], "source": "trade", "listings": t["listings"], "url": t["url"],
                         "matching": t["need"]})

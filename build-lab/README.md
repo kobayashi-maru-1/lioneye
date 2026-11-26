@@ -116,9 +116,9 @@ and prints a JSON report: before, after, the rules, every change.
 | Optimizer | What it does |
 |---|---|
 | `gems` | Fills empty links, then tries every compatible support in each enabled support slot of the main group. Awakened and exceptional gems are off unless allowed; with `--budget` they're on when affordable |
-| `tree` | Spends spare points, then swaps one refundable node for one addition (masteries with each effect) while the tree gets better. Keystones stay unless allowed |
+| `tree` | Spends spare points, then swaps refundable nodes for one addition (masteries with each effect) while the tree gets better: one refund per addition, or several cheap refunds together for a far notable or keystone no single refund pays for. Keystones stay unless allowed |
 | `tree-build` | Starts from the class start: ascendancy points first, then greedy paths by gain per point (up to 10 away), then the same swap search |
-| `gear` | Re-crafts the explicit mods of each non-unique gear item (implicits, enchants, sockets and quality kept): PoB's affix pool, one tier (T2 default), mid rolls, 3 prefixes + 3 suffixes, one bench craft. Two rounds so resists settle where cheapest |
+| `gear` | Re-crafts the explicit mods of each non-unique gear item (implicits, enchants, sockets and quality kept): PoB's affix pool, one tier (T2 default), mid rolls, 3 prefixes + 3 suffixes, one bench craft. Two rounds so resists settle where cheapest. With `--budget`, a tier lower is offered where T2 doesn't fit, and afterwards single affixes move up a tier (to T1) where that buys the most per divine |
 | `jewels` | Rare jewels for allocated sockets that are empty or hold a plain rare/magic jewel: Cobalt, Crimson and Viridian bases, 2 + 2 affixes |
 
 **Rules** ([opt/objective.py](opt/objective.py)) are checked on every result:
@@ -126,13 +126,22 @@ and prints a JSON report: before, after, the rules, every change.
   taken as another type.
 - **Chaos resist:** 0% or better.
 - **EHP:** total EHP not below the loaded build's.
+- **Stat floors** (concepts and the back-test): minimums for other player stats, such as max hits, suppression,
+  block or movement speed.
 - **PoB's own warnings:** attribute requirements, unreserved life and mana, accuracy, and the main skill's cost.
+  Attributes, cost and reservation overdraw are graded by how far short they are, so partial progress counts.
+  Reservation overdraw isn't capped at the pool, so each aura turned off still counts.
 
 **How results rank:**
 1. Rules met at the start must stay met.
 2. Rules broken at the start may not get worse, judged rule by rule. Fixing them earns nothing unless
    `--fix-start-breaks` is set; then a full fix outranks the metric.
 3. Then the metric.
+
+**Weighted floors** (concepts and the back-test): the EHP floor and stat floors don't outrank damage. Down to 70%
+of a floor the miss is a penalty, ranked by `ln(metric) - 2 × shortfall`, so closing 10% of a floor is worth
+about 20% of damage. Below 70% the floor is a hard rule again. Resists, chaos and PoB's warnings stay hard.
+Reports still list every floor a result misses.
 
 `tree-build` repairs every rule as far as it can, because a bare tree breaks most of them. Gear, jewel and tree
 changes are checked with a real recalculation before they're kept. Uniques and relics stay unless
@@ -154,7 +163,7 @@ changes are checked with a real recalculation before they're kept. Uniques and r
 | Piece | Source | Notes |
 |---|---|---|
 | Uniques, gems, currency | poe.ninja economy API (its documented public surface) | Cached 3 h with ETag revalidation. Uniques at their most-listed variant (with links for linked items); gems at the cheapest listing meeting level/quality, falling back to any quality, then corrupted |
-| Crafted rares | [rarecost.py](market/rarecost.py) estimate, then the trade site | The estimate is a tier-based heuristic used during search. `--trade-check` prices the final picks: one search per item: same base, mods at 85%+ (all of them for 3 or fewer, else all but one, marked as a floor), median of the cheapest five; no price when under half the mods match a trade stat |
+| Crafted rares | [rarecost.py](market/rarecost.py) estimate, then the trade site | The estimate prices what buyers want: each mod by tier and demand (life, resists, suppression, gem levels and crit multi count; light radius or thorns don't), and only wanted mods that suit one kind of build (spell, attack, DoT, minion) count toward the "hard to hit together" markup. Six T1 mods nobody wants cost next to nothing. It also reads a finished rare's lines back to tiers, so a guide's rares are priced the same way. `--trade-check` prices the final picks: one search per item: same base, mods at 85%+ (all of them for 3 or fewer, else all but one, marked as a floor), median of the cheapest five (marked thin when under 3 are listed); no price when under half the mods match a trade stat |
 | Popularity | GGG's public ladder (top 3,000) and 80 public characters | poe.ninja's builds API is closed to third parties. Counts only, no names; cached a day; a refresh takes about 3 minutes within GGG's rate limits |
 | Novelty | popularity | 1 − archetype share (ascendancy + main skill) ÷ 5%: 0 for an archetype 5%+ of the top ladder plays, 1 for one nobody plays |
 
@@ -162,7 +171,7 @@ changes are checked with a real recalculation before they're kept. Uniques and r
 - **Support gems:** priced on poe.ninja. An Awakened or exceptional gem that poe.ninja doesn't list counts as
   unavailable in that league; most Awakened gems aren't in Covens. Any other unlisted gem is treated as a cheap
   vendor gem.
-- **Crafted rares:** priced by the estimate.
+- **Crafted rares:** priced by the estimate. The budget, not a tier cap, decides where T1 mods go.
 - **Re-buying:** buying a slot again refunds the earlier purchase.
 - **Owned items:** what the build already has costs nothing.
 - **Awakened and exceptional gems:** with a budget they're allowed whenever affordable.
@@ -193,11 +202,18 @@ docstring.
    - Five plain flasks.
 2. **Uniques:** equipped from PoB's own data.
 3. **Budget:** a concept owns nothing, so the uniques and every starting gem are charged first.
-4. **Tree:** grown from the class start without the resist rules, so points go to damage and life.
+4. **Tree:** grown from the class start without the resist rules or the max-hit floors that stand on resists,
+   so points go to damage and life; gear caps resists later.
 5. **Supports:** chosen for the main group, up to `links`.
 6. **Gear:** crafted rares with base implicits on every other slot. This caps the resists.
 7. **Jewels.**
-8. **Again:** supports and tree once more.
+8. **Tier upgrades** (with a budget): single affixes up a tier, best gain per divine first.
+9. **Side skills:** if mana or life reservation is still overdrawn, auras, heralds and other side skills are
+   turned off one at a time, best fix first, and refunded. The main group and weapon swap are never touched.
+10. **Again:** supports and tree once more.
+
+`keep_supports` in the spec holds supports the gem optimizer never replaces (`Ballista Totem`, `Trap`): the ones
+that decide how the skill is used.
 
 **The report:**
 - numbers, and the rules still broken;
@@ -212,6 +228,29 @@ Awakened and exceptional gems stay at listed prices.
 
 **Supports never picked:** Cast when Stunned, Cast when Damage Taken and Cast on Death. PoB counts their
 condition as always met (see the notebook's blind spots).
+
+## Back-test: the lab against guide builds
+
+[backtest/backtest.py](backtest/backtest.py) rebuilds strong guides ([backtest/builds.json](backtest/builds.json))
+and compares. The guide files aren't in the repo: `--dir` or `POB_BUILDS` points at the PoB Builds folder.
+
+```powershell
+& $py build-lab\backtest\backtest.py run --dir "<PoB Builds folder>" [--only NAME] [--modes uniques-match,uniques-free,budget] [--seeds 2] [--no-trade] [--force]
+& $py build-lab\backtest\backtest.py report
+& $py build-lab\backtest\test-backtest.py
+```
+
+| Mode | The lab gets | It must hold |
+|---|---|---|
+| `uniques-match` | The guide's uniques, cluster jewels, flasks, other gem groups and delivery support (totem, trap, mine, trigger). It rebuilds the tree, supports (as many as the guide's enabled links), rares and jewels, with a budget equal to the guide's rares and supports | The guide's EHP and defence profile (max hits, suppression, block, regen, movement speed) at 95%; the profile alone when PoB gives the guide no EHP |
+| `uniques-free` | The same | Resists and chaos only |
+| `budget` | A spec of the guide (class, ascendancy, skill, weapon base, defence type, gem groups), no uniques, the guide's whole cost | The guide's EHP and profile at 95% |
+
+Rares are priced with one yardstick on both sides (the rarecost model; the guide's lines are read back to tiers).
+The guide's rares and the lab's final ones are also checked on the trade site and shown beside the estimate;
+guide checks are cached for a day. A trade price from fewer than 3 listings is marked thin and left out of the
+report's total. Each uniques run also records the guide's notables and keystones the lab didn't
+take, ranked by what each adds per point. Results: `%LOCALAPPDATA%\poe-build-expert\backtest\`.
 
 ## Notebook
 

@@ -5,7 +5,10 @@ the search (a buyer can craft them) and added at rarecost.BENCH each.
 
     t = Trade(prices)                                    # prices: ninja.Prices (league and currency rates)
     t.price(base, explicit_lines, crafted_lines=(), local=())
-        -> {"divine", "listings", "url", "matched", "unmatched", "need", "floor", "reason"}
+        -> {"divine", "listings", "url", "matched", "unmatched", "need", "floor", "thin", "reason"}
+
+"thin" is set when fewer than ninja.MIN_LISTINGS (3) listings match: one seller's asking price (a 700-divine
+mirror listing, say) says nothing about what the item costs, so callers keep it out of totals.
 
 One search (plus one fetch) per item: all mods required for items with three or fewer, otherwise all but one
 (so the cheapest listings are close relatives, not exact copies; "floor" is then set). Mod lines are matched to
@@ -21,6 +24,7 @@ import urllib.parse
 
 import rarecost
 from net import GGG, cached_json
+from ninja import MIN_LISTINGS
 
 API = "https://www.pathofexile.com/api/trade/"
 NUM = re.compile(r"[+-]?\d+(?:\.\d+)?")
@@ -128,7 +132,8 @@ class Trade:
                     values.append(float(p["amount"]) * chaos / self.prices.divine)
         values.sort()
         divine = round(statistics.median(values[:CHEAPEST]) + rarecost.BENCH * len(crafted_lines), 3) if values else None
-        return {"divine": divine, "listings": res.get("total", 0), "url": url, "matched": matched,
+        listings = res.get("total", 0)
+        return {"divine": divine, "listings": listings, "url": url, "matched": matched,
                 "unmatched": unmatched, "checked": len(values), "need": f"{need} of {n} stats",
-                "floor": need < n or bool(unmatched),
+                "floor": need < n or bool(unmatched), "thin": bool(values) and listings < MIN_LISTINGS,
                 **({} if values else {"reason": "nothing comparable listed"})}

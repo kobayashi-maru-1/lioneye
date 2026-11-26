@@ -4,7 +4,9 @@ improve(): keep the point budget and make the tree better under the rules:
   1. Over budget: refund the node whose removal costs least per point.
   2. Spare points: add the best path (node or mastery+effect) per point, until no spare or nothing helps.
   3. Swap: probe every pair (removable node r, addition a) among the best few of each, where a fits in the
-     points r frees; apply the best pair that beats the current tree. Repeat until no pair helps.
+     points r frees, plus bundles: several refunds, least loss first, paying for one addition no single refund
+     covers (a far notable or keystone). Apply the best swap that beats the current tree. Repeat until none
+     helps.
   Every applied change is checked with a real recalc; a change that turns out worse is undone.
 
 build(): start from the class start (tree-reset), spend ascendancy points greedily, grow the main tree greedily
@@ -87,6 +89,46 @@ def _removals(pool, rules, base, max_frees, keep_keystones=True):
     return rows
 
 
+BUNDLE_ADDS = 12   # additions tried with several refunds at once
+
+
+class _Bundle(dict):
+    """Several refunds that together pay for one addition; shaped like a removal for the swap loop."""
+
+
+def _bundles(adds, rems, anchors, deps, spare, tabu):
+    """Swaps where one addition costs more than any single refund frees (a far notable or keystone): refund the
+    cheapest nodes, least loss per point first, until the addition fits. Refunds may not overlap, and may not
+    take every node the addition's path attaches to. Returns (bundle, addition, probe spec) like the pair swaps."""
+    out = []
+    single = max((r["frees"] for _, r, _ in rems), default=0)
+    for _, a, _ in adds[:BUNDLE_ADDS]:
+        need = a["points"] - spare
+        if need <= single:
+            continue   # a single refund can pay for it: the pair swaps cover it
+        chosen, taken, freed = [], set(), 0
+        for _, r, _ in rems:
+            d = deps[r["id"]] | {r["id"]}
+            if d & taken or (anchors[a["key"]] and anchors[a["key"]] <= taken | d):
+                continue
+            chosen.append(r)
+            taken |= d
+            freed += r["frees"]
+            if freed >= need:
+                break
+        if freed < need:
+            continue
+        ids = [r["id"] for r in chosen]
+        key = (tuple(sorted(ids)), a["key"])
+        if key in tabu:
+            continue
+        b = _Bundle(id=key[0], name=" + ".join(r["name"] for r in chosen), frees=freed, ids=ids)
+        spec = _spec(a)
+        spec["deallocate"] = ids
+        out.append((b, a, spec))
+    return out
+
+
 def _fill(pool, rules, budget, max_dist, main_skill, log, stage):
     """Spend spare points on the best additions, one at a time."""
     tabu = set()
@@ -151,17 +193,18 @@ def improve(pool, rules, budget=None, max_dist=6, k_add=40, k_remove=30, max_fre
                 spec = _spec(a)
                 spec["deallocate"] = [r["id"]]
                 pairs.append((r, a, spec))
+        pairs += _bundles(adds, rems, anchors, deps, spare, tabu)
         if not pairs:
             break
         results = pool.probe([p[2] for p in pairs])
         good = [(r, p) for p, r in zip(pairs, results) if "error" not in r and rules.better(r, base)]
-        # best first: lower (hard, soft) score, then higher metric
-        ranked = sorted(good, key=lambda t: (tuple(-x for x in rules.score(t[0])), rules.value(t[0])), reverse=True)
+        # best first: lower (hard, soft) score, then higher utility (the metric without weighted floors)
+        ranked = sorted(good, key=lambda t: (tuple(-x for x in rules.score(t[0])), rules.rank_value(t[0])), reverse=True)
         if not ranked:
             break
         moved = False
         for res, (r, a, _) in ranked[:8]:  # the probe can differ from a real change when paths shift: verify
-            kept, after = _apply_checked(pool, rules, [{"op": "deallocate", "nodes": [r["id"]]}, _op(a)],
+            kept, after = _apply_checked(pool, rules, [{"op": "deallocate", "nodes": r.get("ids") or [r["id"]]}, _op(a)],
                                          base, budget, main_skill)
             if kept:
                 log.append({"step": stage, "change": f"swap - {r['name']} ({r['frees']} pts) + {a['label']} "
@@ -206,6 +249,30 @@ def build(pool, rules, cls, ascendancy=None, points=123, asc_points=8, max_dist=
             tabu.add(node["id"])
             continue
         log.append({"step": "tree-build", "change": f"+ {node['name']} (ascendancy, {node['dist']} pts)",
+                    "value": rules.value(pool.stats())})
+    # Points left because no node passed the rules (e.g. every one costs a little mana the bare tree lacks): an
+    # unspent ascendancy is never right, so take the best of the rest; later steps repair the rules.
+    tabu = set()
+    while pool.points()["ascendancy"] < asc_points:
+        spare = asc_points - pool.points()["ascendancy"]
+        base = pool.stats()
+        cands = [n for n in pool.reachable_nodes(spare, ascendancy=True) if n["id"] not in tabu]
+        rows = _rank(pool, rules, base, cands, lambda n: {"allocate": [n["id"]]}, lambda n, r: n["dist"])
+        if not rows:
+            break
+        node = rows[0][1]
+        snapshot = pool.save_xml()
+        try:
+            pool.apply([{"op": "allocate", "nodes": [node["id"]]}])
+        except ValueError:
+            tabu.add(node["id"])
+            continue
+        if pool.points()["ascendancy"] > asc_points:
+            pool.load(snapshot, main_skill)
+            tabu.add(node["id"])
+            continue
+        log.append({"step": "tree-build", "change": f"+ {node['name']} (ascendancy, {node['dist']} pts; no node "
+                                                    f"passed the rules, best of the rest)",
                     "value": rules.value(pool.stats())})
     # main tree: greedy by rate per point; when nothing improves the metric, take the best EHP-per-point path
     # so travel through empty areas still happens

@@ -230,6 +230,7 @@ def trade_checks(prices, log):
             continue
         out.append({"slot": slot, "estimate": c.get("estimate"), "trade": r["divine"], "listings": r["listings"],
                     "matching": r["need"], "url": r["url"], **({"floor": True} if r.get("floor") else {}),
+                    **({"thin": True} if r.get("thin") else {}),
                     **({"reason": r["reason"]} if r.get("reason") else {}),
                     **({"unmatched": r["unmatched"]} if r["unmatched"] else {})})
     return out

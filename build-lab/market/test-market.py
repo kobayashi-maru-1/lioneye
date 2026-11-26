@@ -79,6 +79,49 @@ def unit(add):
     add("rarecost: premium group costs more", rarecost.estimate([a(2, "GlobalSpellGemsLevel")]) > rarecost.estimate([a(2)]))
     add("rarecost: bench craft is cheap", rarecost.estimate([a(1, crafted=True)]) < 0.1)
     add("rarecost: jewels cost less", rarecost.estimate([a(1)], jewel=True) < rarecost.estimate([a(1)]))
+    junk = [a(1, g) for g in ("StunRecovery", "LightRadiusAndAccuracyPercent", "AttackerTakesDamageNoRange",
+                              "LocalAttributeRequirements", "ManaGainedFromEnemyDeath", "StunThresholdReduction")]
+    wanted = [a(1, g) for g in ("IncreasedLife", "MovementVelocity", "FireResistance", "ColdResistance",
+                                "LightningResistance", "ChanceToSuppressSpells")]
+    add("rarecost: six T1 mods nobody wants are cheap", rarecost.estimate(junk) < 0.1)
+    add("rarecost: six wanted T1 mods cost far more", rarecost.estimate(wanted) > 20 * rarecost.estimate(junk))
+    spell = [a(1, g) for g in ("WeaponSpellDamage", "SpellAddedFireDamage", "IncreasedCastSpeed")]
+    mixed = [a(1, g) for g in ("WeaponSpellDamage", "LocalPhysicalDamagePercent", "IncreasedCastSpeed")]
+    add("rarecost: mods for different builds don't add up", rarecost.estimate(mixed) < rarecost.estimate(spell))
+    add("rarecost: crit multi suits any offence line", rarecost.demand("CriticalStrikeMultiplier")[1] == "any")
+    add("rarecost: hybrid ES/stun recovery isn't junk", rarecost.demand("LocalEnergyShieldAndStunRecoveryPercent")[0] >= 0.5)
+
+    def tp(tier, rows):
+        return {"affixes": [{"group": g, "tier": t, "lines": [ln], "crafted": False} for g, t, ln in rows]}
+    pools = {1: tp(1, [("IncreasedLife", 1, "+100 to maximum Life"), ("FireResistance", 1, "+46% to Fire Resistance")]),
+             2: tp(2, [("IncreasedLife", 2, "+90 to maximum Life"), ("FireResistance", 2, "+42% to Fire Resistance")]),
+             3: tp(3, [("IncreasedLife", 3, "+80 to maximum Life"), ("FireResistance", 2, "+42% to Fire Resistance")])}
+    got, unmatched = rarecost.match_tiers(["+95 to maximum Life", "+47% to Fire Resistance", "+50 to Strength",
+                                           "+70 to maximum Life"], pools)
+    got = {x["group"]: x["tier"] for x in got}
+    add("match_tiers: a line gets the best tier whose lowest roll it reaches", got.get("IncreasedLife") == 2
+        and got.get("FireResistance") == 1, detail=str(got))
+    add("match_tiers: a line no pool explains is unmatched", unmatched == ["+50 to Strength"], detail=str(unmatched))
+    est, _ = rarecost.estimate_lines(["+95 to maximum Life"], ["+20% to Cold Resistance"], pools)
+    add("estimate_lines: prices matched and crafted lines", est > rarecost.BASE + rarecost.BENCH)
+    hyb = {t: {"affixes": p["affixes"] + [{"group": "LocalBaseArmourAndLife", "tier": t, "crafted": False,
+                                           "lines": ["+%d to Armour" % (60 - 10 * t), "+%d to maximum Life" % (40 - 5 * t)]}]}
+           for t, p in pools.items()}
+    got, _ = rarecost.match_tiers(["+95 to maximum Life"], hyb)
+    add("match_tiers: a lone life line isn't read as the armour-and-life hybrid",
+        [(x["group"], x["tier"]) for x in got] == [("IncreasedLife", 2)], detail=str(got))
+    got, _ = rarecost.match_tiers(["+50 to Armour", "+35 to maximum Life"], hyb)
+    add("match_tiers: both hybrid lines on the item read as the hybrid",
+        [x["group"] for x in got] == ["LocalBaseArmourAndLife"], detail=str(got))
+    add("rarecost: burning damage, poison duration are DoT mods", rarecost.demand("BurnDamagePrefix")[1] == "dot"
+        and rarecost.demand("PoisonDuration")[1] == "dot" and rarecost.demand("ReducedPoisonDuration")[1] is None)
+    add("rarecost: socketed gem levels are wanted, below global ones",
+        rarecost.demand("LocalIncreaseSocketedFireGemLevel")[0] == 2.0
+        and rarecost.demand("LocalIncreaseSocketedMinionGemLevel")[0] < rarecost.demand("MinionGemLevel")[0])
+    add("rarecost: spell crit multi is crit multi", rarecost.demand("SpellCriticalStrikeMultiplier")[0] == 2.0)
+    add("parse_item: PoB roll ranges resolve to a value",
+        buildcost.resolve_ranges("{range:0.5}+(91-105) to maximum Life") == "{range:0.5}+98 to maximum Life"
+        and buildcost.resolve_ranges("Adds (10-12) to (20-24) Fire Damage") == "Adds 11 to 22 Fire Damage")
 
     add("trade: numbers become #", T._norm("+107 to maximum Life") == "+# to maximum Life"
         and T._norm("12.5% increased Attack Speed") == "#% increased Attack Speed")

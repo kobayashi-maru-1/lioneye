@@ -6,7 +6,8 @@
 
 complete: skeleton -> uniques equipped (their poe.ninja price charged to the budget) -> config -> tree grown from
 the class start (tree-build) -> 6-link (or `links`) supports -> crafted rares on every non-unique slot (base
-implicits) -> jewels -> supports and tree again. Every step ranks results in repair mode: rules first (75%
+implicits) -> jewels -> tier upgrades (with a budget) -> side skills turned off while mana or life reservation
+is still overdrawn -> supports and tree again. Every step ranks results in repair mode: rules first (75%
 elemental resists, chaos >= 0, PoB's warnings), then the metric. --quick stops after tree and gems, for screening
 several concepts. The tree grows without the resist rules (gear caps resists more cheaply than passives); gear and
 the later steps hold them.
@@ -21,6 +22,8 @@ Spec (JSON):
   level         character level (default 95)
   main_skill    gem name, transfigured names too ("Frost Blades of Katabasis")
   supports      optional starting supports for the main group (the gem optimizer refines them)
+  keep_supports supports the gem optimizer never replaces: the ones that decide how the skill is used
+                (["Ballista Totem"], ["Trap"]). List them in supports too
   links         main group size (default 6)
   main_slot     where the main group sits (default "Body Armour")
   weapon        base name ("Imbued Wand") or {"unique": "Name", "base"?} or {"text": "<PoB item text>"}
@@ -38,6 +41,8 @@ Spec (JSON):
   budget        divines (a --budget flag wins). A concept owns nothing: uniques and every starting gem are
                 charged before the optimizers spend the rest
   ehp_floor     minimum total EHP (a --ehp-floor flag wins), held like the resist rules
+  floors        minimums for other player stats, held the same way: {"PhysicalMaximumHitTaken": 9000,
+                "EffectiveSpellSuppressionChance": 100, "MovementSpeedMod": 1.3}
   metric        optional: FullDPS, CombinedDPS, minion.CombinedDPS, ...
 """
 import argparse
@@ -67,6 +72,12 @@ JEWELLERY = {"Amulet": "Onyx Amulet", "Ring 1": "Amethyst Ring", "Ring 2": "Amet
 SOCKETS = {"Body Armour": 6, "Helmet": 4, "Gloves": 4, "Boots": 4, "Weapon 1": 3, "Weapon 2": 3}
 TWO_HANDED = ("Bow", "Staff", "Two Handed Sword", "Two Handed Axe", "Two Handed Mace", "Fishing Rod")
 NO_RES_RULE = -1e9      # a resist cap no build falls short of: turns the resist rules off
+# Stat floors that stand on resists (gear caps those), left out while the tree grows
+RESIST_FLOORS = ("FireMaximumHitTaken", "ColdMaximumHitTaken", "LightningMaximumHitTaken", "ChaosMaximumHitTaken")
+# Weighted floors (objective.Rules): closing 10% of a missed EHP or stat floor is worth about 20% of the metric,
+# and no floor may end below 70% of its target. Decided with Andy 2026-11-25.
+FLOOR_WEIGHT = 2.0
+FLOOR_HARD = 0.7
 DEFAULT_LEVEL = 95
 DEFAULT_LINKS = 6
 
@@ -353,22 +364,85 @@ def charge_start_gems(pool, budget, log):
             log.append(entry)
 
 
+def pipeline(pool, start_stats, metric, cls, ascendancy, links, budget=None, log=None, quick=False, tier=2,
+             ehp_floor=None, owned=None, say=None, points=None, asc_points=None, seed=0, chaos_min=0, floors=None,
+             keep_supports=(), floor_weight=FLOOR_WEIGHT, floor_hard=FLOOR_HARD):
+    """The optimizing part of complete(), on a loaded pool: tree grown from the class start (without the resist
+    rules), supports to `links`, then (unless quick) crafted rares, jewels, tier upgrades (with a budget),
+    supports and tree again. Returns the full Rules the result is judged by.
+
+    points / asc_points: the passive budgets (default: what the level allows). seed: 0 is the standard order;
+    other seeds put the supports before the tree on odd seeds and shuffle the order gear slots are crafted in,
+    because each step is greedy and the result depends on the path (phase 7 runs several and keeps the best).
+    floor_weight / floor_hard: weighted floors (objective.py); floor_weight None makes every floor hard again."""
+    import random
+    import gear as R
+    import gems as G
+    import tree as T
+    from objective import Rules
+    say = say or (lambda m: None)
+    log = log if log is not None else []
+    floor = ehp_floor if ehp_floor else "none"
+    weighted = {"floor_weight": floor_weight, "floor_hard": floor_hard}
+    rules = Rules(metric, start_stats, ehp_floor=floor, start_breaks="repair", chaos_min=chaos_min, floors=floors,
+                  **weighted)
+    # The tree grows without the resist rules: crafted gear caps resists far more cheaply than passives, so
+    # points go to damage and life, and a quick screen compares damage fairly. Gear and the later steps hold the
+    # full rules.
+    # The elemental and chaos max-hit floors stand on resists, so they wait for the gear too: chasing them with
+    # passives (or Chaos Inoculation, which clears the chaos one outright) spends the tree on what gear fixes.
+    growth_floors = {k: v for k, v in (floors or {}).items() if k not in RESIST_FLOORS} or None
+    growth = Rules(metric, start_stats, res_cap=NO_RES_RULE, chaos_min=None, ehp_floor=floor, start_breaks="repair",
+                   floors=growth_floors, **weighted)
+    pts = pool.points()
+    points = pts["available"] if points is None else points
+    asc_points = pts["ascendancyAvailable"] if asc_points is None else asc_points
+    slots = list(R.GEAR_SLOTS)
+    if seed:
+        random.Random(seed).shuffle(slots)
+
+    def gems(r):
+        say("gems")
+        G.optimize_gems(pool, r, links=links, budget=budget, log=log, owned=owned, keep=keep_supports)
+
+    if seed % 2:
+        gems(growth)
+    say(f"tree: {cls} {ascendancy or ''}, {points} points")
+    T.build(pool, growth, cls, ascendancy, points=points, asc_points=asc_points, max_dist=10,
+            main_skill=pool.main_skill(), log=log)
+    gems(rules if not quick else growth)
+    if not quick:
+        say("gear")
+        R.optimize_gear(pool, rules, tier=tier, keep_implicits=False, main_skill=pool.main_skill(), budget=budget,
+                        log=log, slots=slots)
+        say("jewels")
+        R.optimize_jewels(pool, rules, tier=tier, main_skill=pool.main_skill(), budget=budget, log=log)
+        if budget is not None:
+            say("tier upgrades")
+            R.upgrade_tiers(pool, rules, budget, main_skill=pool.main_skill(), log=log)
+        say("gems and tree again")
+        G.drop_side_skills(pool, rules, log=log, budget=budget)  # reservation still overdrawn after gear
+        gems(rules)
+        T.improve(pool, rules, main_skill=pool.main_skill(), log=log)
+    return rules
+
+
 def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, budget_div=None, quick=False,
-             trade_check=False, league=None, workers=None, metric=None, tier=2, ehp_floor=None, log_progress=None):
+             trade_check=False, league=None, workers=None, metric=None, tier=2, ehp_floor=None, log_progress=None,
+             config_xml=None, seed=0, links=None, floors=None):
     """Run the pipeline; returns (report, final_xml). ehp_floor: a minimum total EHP the build must reach (a rule
     like the resists); default none."""
     import evaluator as E
-    import gear as R
-    import gems as G
     import opt as O
-    import tree as T
-    from objective import Rules, summary
+    from objective import summary
     say = log_progress or (lambda m: None)
     t0 = time.perf_counter()
     db = GameDB()
     uniques = []
     if spec is not None:
         xml, uniques = skeleton_xml(spec, db)
+        if config_xml:  # another build's config set (a back-test compares on the guide's own config)
+            xml = E.ph().copy_config(xml, config_xml)
         main_skill, cls, ascendancy = spec["main_skill"], spec["class"], spec.get("ascendancy")
         metric = metric or spec.get("metric")
         ehp_floor = ehp_floor or spec.get("ehp_floor")
@@ -408,30 +482,12 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
             charge_start_gems(pool, budget, log)
         start = {**start, "stats": pool.stats()}
         metric = metric or E.main_metric(start["stats"])
-        floor = ehp_floor if ehp_floor else "none"
-        rules = Rules(metric, start["stats"], ehp_floor=floor, start_breaks="repair")
-        # The tree grows without the resist rules: crafted gear caps resists far more cheaply than passives, so
-        # points go to damage and life, and a quick screen compares damage fairly. Gear and the later steps
-        # hold the full rules.
-        growth = Rules(metric, start["stats"], res_cap=NO_RES_RULE, chaos_min=None, ehp_floor=floor,
-                       start_breaks="repair")
-        pts = pool.points()
-        say(f"tree: {cls} {ascendancy or ''}, {pts['available']} points")
-        T.build(pool, growth, cls, ascendancy, points=pts["available"], asc_points=pts["ascendancyAvailable"],
-                max_dist=10, main_skill=pool.main_skill(), log=log)
-        links = (spec or {}).get("links", DEFAULT_LINKS)
-        say("gems")
+        links = links or (spec or {}).get("links", DEFAULT_LINKS)
         owned = set() if spec is not None else None  # a concept buys its gems; a loaded build owns its own
-        G.optimize_gems(pool, rules if not quick else growth, links=links, budget=budget, log=log, owned=owned)
-        if not quick:
-            say("gear")
-            R.optimize_gear(pool, rules, tier=tier, keep_implicits=False, main_skill=pool.main_skill(),
-                            budget=budget, log=log)
-            say("jewels")
-            R.optimize_jewels(pool, rules, tier=tier, main_skill=pool.main_skill(), budget=budget, log=log)
-            say("gems and tree again")
-            G.optimize_gems(pool, rules, links=links, budget=budget, log=log, owned=owned)
-            T.improve(pool, rules, main_skill=pool.main_skill(), log=log)
+        rules = pipeline(pool, start["stats"], metric, cls, ascendancy, links, budget=budget, log=log, quick=quick,
+                         tier=tier, ehp_floor=ehp_floor, owned=owned, say=say, seed=seed,
+                         floors=floors or (spec or {}).get("floors"),
+                         keep_supports=(spec or {}).get("keep_supports") or ())
         final = pool.stats()
         final_xml = pool.save_xml()
         report = {
@@ -439,9 +495,11 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
             "mainSkill": pool.main_skill(), "pobVersion": start["pobVersion"],
             "treeVersion": db.meta.get("tree_version"), "metric": metric, "quick": quick,
             "after": summary(rules, final), "brokenRules": sorted(rules.shortfalls(final)),
+            "hardBroken": sorted(rules.hard_shortfalls(final)),
+            "utility": rules.utility(final),
             **({"note": "quick: no crafted gear yet, so resist rules are left to the full run"} if quick else {}),
             "warnings": final.get("warnings") or [], "points": pool.points(),
-            "gems": [{"slot": g.get("slot"), "gems": [x["name"] for x in g["gems"]]}
+            "gems": [{"slot": g.get("slot"), "gems": [x["name"] for x in g["gems"] if x.get("enabled", True)]}
                      for g in pool.groups() if g["enabled"] and not g.get("source")],
             "changes": len(log),
         }

@@ -4,7 +4,7 @@ Andy asks Claude (Claude Code or a claude.ai chat) to design a build. Claude ask
 defences, proposes concepts from a game database, completes them with optimizers that run headless Path of
 Building, and returns 2–3 finished options with PoB codes, numbers, cost and blind spots.
 
-Status: phases 1–6 built 2026-11-24; phase 7 (back-test) next.
+Status: phases 1–7 built 2026-11-25; redesigns from the back-test await Andy's choice.
 
 ## Decisions
 
@@ -19,6 +19,7 @@ Status: phases 1–6 built 2026-11-24; phase 7 (back-test) next.
 | Prices and popularity | Not in the game database: fetched per session (poe.ninja), phase 5 |
 | Skill | The design workflow becomes a reference in poe-build-expert; the engine stays here. The skill must still work with no Lioneye app running |
 | Checkpoints | After phases 1–2, then per Andy |
+| Defence floors | Weighted, not absolute (2026-11-25): down to 70% of a floor a miss is a penalty, ln(damage) − 2 × shortfall, so 10% of a floor ≈ 20% damage; below 70% it's a hard rule. Resists, chaos and PoB warnings stay hard. In concepts and the back-test |
 
 ## Phases
 
@@ -30,7 +31,7 @@ Status: phases 1–6 built 2026-11-24; phase 7 (back-test) next.
 | 4 | Optimizers: gem links, tree pathing, gear (synthesized rares), jewels | Done |
 | 5 | poe.ninja prices and popularity; novelty score | Done |
 | 6 | Design workflow in the skill: interview, concepts, checkpoints, report; the lab notebook (below) | Done |
-| 7 | Back-test on known strong builds | Next |
+| 7 | Back-test on known strong builds | Done |
 
 ## Lab notebook (phase 6): what the designer learns and remembers
 
@@ -383,6 +384,109 @@ their report.
 - Flasks are plain bases.
 - The concept spec has no cluster jewels, spectres or minion choices.
 - Interview answers map to an EHP floor by hand.
+
+## Phase 7 results: back-test on guide builds
+
+Andy's choices (2026-11-24):
+- **Comparison:** both. Same uniques (tests the optimizers), and same budget designed from a spec (tests whole
+  designs).
+- **Builds:** current patch only (the nine 3.29–3.30 guides in `backtest/builds.json`).
+- **Findings:** fix clear optimizer weaknesses, re-run to show the gain, record findings in the notebook, and
+  list the bigger redesigns.
+
+**Built:** `build-lab/backtest/backtest.py` (`run`, `report`) and `test-backtest.py`. Three modes per guide:
+
+| Mode | The lab gets | It must hold |
+|---|---|---|
+| uniques-match | The guide's uniques and delivery support; it rebuilds the tree, supports, rares and jewels on a budget equal to the guide's rares and supports | The guide's EHP and defence profile at 95% |
+| uniques-free | The same | Resists and chaos only |
+| budget | A spec of the guide, no uniques, the guide's whole cost | The guide's EHP and profile at 95% |
+
+**Rare pricing, changed mid-phase at Andy's correction.** Six T1 mods aren't mirror-tier: price follows what
+buyers want and how the mods combine. `market/rarecost.py` now prices each mod by tier and demand (life,
+resists, suppression, gem levels, crit multi count; light radius or thorns don't). Only wanted mods that suit
+one kind of build earn the "hard to hit together" markup. The T2 cap is gone: crafted rares start at T2, drop a
+tier where the budget is short, and `gear.upgrade_tiers` moves single mods up where it allows. The guide's
+rares are read back to tiers and priced the same way, so both sides use one yardstick. Trade prices are
+reported beside it, not used for the budget: the trade site can't price most strong multi-mod rares.
+
+**Found and fixed:**
+- **Delivery supports:** stripping Ballista Totem left a totem tree with nothing to support; totem, trap,
+  mine and trigger supports now stay with the main skill.
+- **Unspent ascendancy points:** when no node passed the rules, points stayed unspent; the best of the rest is
+  now taken.
+- **Near-miss floors:** 1.89 against 1.91 movement speed counted as broken; floors are now 95% of the guide's.
+- **One guide's error ended the run;** each guide is now caught on its own.
+- **Disabled spare gems counted as links:** the lab put 7 gems in a 6-socket body armour (PoB warns but still
+  counts them). Summon Raging Spirit fell from an overstated 127% to 68%.
+- **Flat mana-reservation warning:** "unreserved Mana is negative" was a flat shortfall, so the optimizers
+  couldn't make progress on it. It's now graded by the overdraw. Holy Relic uniques-free 128% (broken) to 166%
+  (clean); Wretched Defiler uniques-match 8% (one support) to 37% (five).
+- **Thin trade prices:** a 1.8-divine wand came back at 728 divine from one listing. Prices from fewer than 3
+  listings are flagged and left out of totals.
+- **No EHP, no floors:** PoB gave Holy Relic no total EHP, which dropped its whole defence profile. Floors now
+  hold without it: 166% with 2.0k life became 41% with 5.8k life, every rule met.
+
+- **Review fixes (2026-11-25):** delivery supports count only when enabled; a guide's rares are read back to tiers
+  even when two mods share a line; ranges like "(60-80)" in item text resolve before pricing; prices of gem-level
+  mods for minions and sockets were raised; seeds are picked by hard rules first, then utility.
+- **Resist floors chased by the tree:** the tree step grew toward the elemental and chaos max-hit floors with
+  passives (Chaos Inoculation clears the chaos one outright). Those floors now wait for gear, which fixes them more
+  cheaply.
+- **No step could turn an aura off:** Righteous Fire ended 47 mana short and Soulrend's budget design 2,928 short,
+  because every step could only add mana. A new step after gear turns off side skills (auras, heralds, golems)
+  one at a time while reservation is overdrawn, refunds them and any supports left idle, and never touches the
+  main group or weapon swap. The overdraw shortfall is no longer capped at the pool, so each aura turned off counts.
+
+**Final results** (2 seeds, best kept; % of the guide's number; * = a hard rule still broken; ~ = a floor missed
+inside the weighted band):
+
+| Guide | Uniques + floors DPS / EHP | Uniques, no floors DPS / EHP | Budget DPS / EHP |
+|---|---|---|---|
+| Ethereal Knives Ignite | 154%~ / 142% | 409% / 37% | 58%~ / 205% |
+| Holy Relic Necromancer | 69%~ / – | 166% / – | 4%~ / – |
+| Kinetic Fusillade Totems | 6%~ / 67% | 52% / 19% | 0%* / 24% |
+| Penance Brand | 19%~ / 112% | 43% / 8% | 1%~ / 68% |
+| Righteous Fire | 13%~ / 72% | 61% / 20% | 6%~ / 92% |
+| Soulrend Occultist | 162%~ / 95% | 292% / 49% | 5%~ / 95% |
+| Soulrend of the Spiral | 19%~ / 94% | 107% / 7% | 0% / 101% |
+| Summon Raging Spirit | 80%~ / 159% | 158% / 50% | 2% / 428% |
+| Wretched Defiler Spectres | 48%~ / 124% | 82% / 57% | 0%~ / 96% |
+
+Only Kinetic Fusillade's budget design still breaks a hard rule (EHP under 70% of the guide's). Soulrend
+Occultist's budget design fell from 22% to 5%: the 22% kept seven auras it couldn't pay for.
+
+**Weighted floors against hard floors** (uniques + floors, same code otherwise): Spiral 2% to 19%, Kinetic
+Fusillade 1% to 6–8%, Penance 10% to 19%, Ethereal Knives 97% to 154%, Soulrend Occultist 120% to 162%, Defiler
+37% to 48%, Summon Raging Spirit 64% to 80%, Holy Relic 63% to 69%; Righteous Fire about level (15% to 13%). Seven
+of nine runs that broke a hard rule now meet them all.
+
+**What it says:**
+- **Damage alone, the optimizers are strong:** with the guide's uniques and no floors they beat five of nine
+  guides, because they spend everything on damage (EHP 7–57%).
+- **Floors were the weak point; weighted floors fixed most of it.** Under hard floors repair mode minimized the
+  sum of shortfalls and ignored damage, so one keystone that cleared a floor won whatever it cost (Righteous Fire
+  took Chaos Inoculation and kept 3%). Trading floors against damage lifted every guide but Righteous Fire.
+- **Kinetic Fusillade and Righteous Fire stay low** (6%, 13%): both guides use cluster jewels, which the lab
+  keeps but can't tune around, and Righteous Fire's damage scales with life, which the floors also draw on.
+- **Budget mode can't match unique-reliant guides** (0–6% on seven of nine): it can't buy uniques.
+- **Seeds matter:** results vary several-fold by step order (Soulrend of the Spiral 93M vs 539M); run at least
+  two.
+- **The rare model runs high on ordinary rares:** a median 2.8× trade on 61 rares priced from 3+ listings. That
+  sample leaves out the strong rares nothing comparable is listed for.
+
+**Redesigns for Andy to choose from:**
+1. **Weighted floor objective (built 2026-11-25, Andy's pick):** floors are a soft penalty (weight 2) traded
+   against log damage above a hard minimum of 70% of each floor. Results above.
+2. **Unique selection in budget mode:** pick uniques by damage or defence per divine from poe.ninja.
+3. **Budget across slots:** spend by marginal gain per divine across all slots, not greedily slot by slot.
+4. **Rare model calibration** against trade data (needs a way to handle "nothing comparable listed").
+5. **Cluster jewels:** the lab can't build them; the guides' are kept as-is in uniques modes.
+6. **Which auras to drop:** the side-skill step drops the aura that frees the most mana first; when no single
+   one fixes the overdraw, two cheaper drops might cost less damage.
+
+**Notebook:** seven blind-spot entries (floor collapse, disabled spare gems, the mana warning, thin trade
+prices, the rare model's bias, seed spread, no step to turn an aura off).
 
 ## Open checks
 

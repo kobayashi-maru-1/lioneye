@@ -1,0 +1,14 @@
+{
+ "about": "Guide builds for backtest.py (3.29-3.30). Files aren't in the repo: pass --dir (your PoB Builds folder) or set POB_BUILDS. Loadouts are each guide's endgame setup.",
+ "builds": [
+  {"name": "Soulrend Occultist", "file": "Alpha Soulrend Occultist 3.29.xml", "loadout": "Endgame", "main_skill": "Soulrend"},
+  {"name": "Soulrend of the Spiral Assassin", "file": "CI Crit Soulrend of the Spiral Assassin 3.29.xml", "loadout": "Default", "main_skill": "Soulrend of the Spiral"},
+  {"name": "Holy Relic Necromancer", "file": "Holy Relic of Conviction Necromancer 3.29.xml", "loadout": "^3^2^1^4^5End Game Gear", "main_skill": "Summon Holy Relic of Conviction"},
+  {"name": "Kinetic Fusillade Totems Hierophant", "file": "KF Totems Heirophant 3.30.xml", "loadout": "^5LongNeck End Game {e1}", "main_skill": "Kinetic Fusillade"},
+  {"name": "Penance Brand", "file": "Penance Brand 3.29.xml", "loadout": "Default", "main_skill": "Penance Brand"},
+  {"name": "Righteous Fire (Pohx)", "file": "RF Pohx 3.29.xml", "loadout": "Lvl 100 25% Effect Cluster Optimizing Build {9}", "main_skill": "Righteous Fire"},
+  {"name": "Ethereal Knives Ignite", "file": "SpicySushi EK Ignite 3.30.xml", "loadout": "Default", "main_skill": "Ethereal Knives"},
+  {"name": "Summon Raging Spirit Necromancer", "file": "Summon Raging Spirit Necromancer 3.29.xml", "loadout": "^4End-Game Gear WAND", "main_skill": "Summon Raging Spirit"},
+  {"name": "Wretched Defiler Spectres", "file": "Wretched Defiler Builds 3.30.xml", "loadout": "Clone", "main_skill": "Raise Spectre"}
+ ]
+}

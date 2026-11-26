@@ -1,4 +1,5 @@
 # build-lab files for scripts/build-lab-fetch.py (written by make-manifest.py)
+backtest/backtest.py
 db/build-game-db.py
 db/check-game-db.py
 db/extract.lua
