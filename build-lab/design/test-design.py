@@ -131,8 +131,59 @@ def run_check(db):
 C_TRIGGERS = ("Cast when Stunned", "Cast when Damage Taken", "Cast on Death")
 
 
+def refs_checks():
+    """design/refs.py without PoB or the network: codes, links, listing, cache keys, the comparison."""
+    import shutil
+    import urllib.request
+    import refs as RF
+    xml = '<?xml version="1.0"?><PathOfBuilding><Config><Input name="enemyIsBoss" string="Pinnacle"/></Config></PathOfBuilding>'
+    add("refs: a PoB code decodes to its XML", RF.decode_code(C.pob_code(xml)) == xml)
+    seen = []
+
+    class Resp:
+        def __init__(self, body):
+            self.body = body
+
+        def read(self):
+            return self.body.encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+    real = urllib.request.urlopen
+    urllib.request.urlopen = lambda req, timeout=30: (seen.append(req.full_url), Resp(" CODE "))[1]
+    try:
+        got = [RF.fetch_code("https://pobb.in/AbC-12_x"), RF.fetch_code("https://pastebin.com/XyZ123")]
+    finally:
+        urllib.request.urlopen = real
+    add("refs: pobb.in and pastebin links read their raw code",
+        seen == ["https://pobb.in/AbC-12_x/raw", "https://pastebin.com/raw/XyZ123"] and got == ["CODE", "CODE"],
+        seen)
+    league = f"Refs Check {os.getpid()}"
+    try:
+        RF.add(league, C.pob_code(xml), skill="Fireball", title="A guide", url="https://example.invalid/a")
+        add("refs: a web build is listed under its skill", [r["title"] for r in RF.listing(league, "fireball")]
+            == ["A guide"] and not RF.listing(league, "Spark"))
+    finally:
+        shutil.rmtree(RF.refs_dir(league), ignore_errors=True)
+    other = xml.replace("<PathOfBuilding>", "<PathOfBuilding><Build level=\"90\"/>")
+    add("refs: designs with the same config share cached results", RF._config_key(xml) == RF._config_key(other)
+        and RF._config_key(xml) != RF._config_key(xml.replace("Pinnacle", "Uber")))
+    measured = [{"source": "ladder", "value": v, "TotalEHP": e, "cost": {"total": c}, "class": "Witch", "level": 95}
+                for v, e, c in ((100, 10, 5), (200, 20, 10), (300, 30, 20), (400, 40, 40))]
+    measured.append({"source": "web", "error": "PoB couldn't load it"})
+    out = RF.compare({"value": 250, "TotalEHP": 35, "cost": 8}, measured)
+    add("refs: the comparison ranks the design", out["measured"] == 4 and out["failed"] == 1
+        and out["design"]["beatsOnDamage"] == 0.5 and out["design"]["beatsOnEHP"] == 0.75
+        and out["design"]["cheaperThan"] == 0.75 and out["best"][0]["value"] == 400
+        and out["median"]["value"] == 250, out)
+
+
 def main():
     db = C.GameDB()
+    refs_checks()
     with E.EvalPool(workers=0) as pool:
         skeleton_checks(pool, db)
     if "--run" in sys.argv:

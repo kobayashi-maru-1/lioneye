@@ -236,7 +236,23 @@ that decide how the skill is used.
 - PoB's warnings;
 - `cost` (market prices of uniques and gems) and `spend` (the budget ledger, with rare estimates);
 - novelty;
+- `uniques`: which uniques won their slot, which lost and by how much, which were skipped and why;
+- `references`: the design against the reference builds of its main skill (below);
 - a PoB import code.
+
+**Reference builds** ([design/refs.py](design/refs.py)): real builds of the same skill to compare a design with.
+- **Ladder:** the night crawl keeps each counted character's gear and passive tree (no account or character
+  names; local only), loaded through PoB's own character import.
+- **Web:** guides found while designing (maxroll, pobb.in, forums), added as PoB codes.
+- Each is measured with the design's own config (the same boss, charges, buffs) and its main skill: damage, EHP,
+  life / ES, resists, and cost on the back-test's yardstick (uniques and gems from poe.ninja, rares by the rare
+  model). Cached per reference, PoB version and config. Up to 40 per design.
+
+```powershell
+& $py build-lab\design\refs.py list [--skill GEM]
+& $py build-lab\design\refs.py add LINK_OR_FILE --skill GEM --loadout "<endgame loadout>" --title T --url U
+& $py build-lab\design\refs.py measure --skill GEM [--config-from DESIGN.xml]
+```
 
 **Gem pricing:** an ordinary gem costs the cheaper of a max-level listing and a level 1 copy at the quality,
 levelled by the player. A few price-fixed 20/20 listings could otherwise make a cheap gem cost divines.
@@ -252,6 +268,7 @@ and compares. The guide files aren't in the repo: `--dir` or `POB_BUILDS` points
 
 ```powershell
 & $py build-lab\backtest\backtest.py run --dir "<PoB Builds folder>" [--only NAME] [--modes uniques-match,uniques-free,budget] [--seeds 2] [--no-trade] [--force]
+& $py build-lab\backtest\backtest.py run --refs "Righteous Fire" [--top 3] [...]   # the skill's strongest reference builds instead
 & $py build-lab\backtest\backtest.py report
 & $py build-lab\backtest\test-backtest.py
 ```

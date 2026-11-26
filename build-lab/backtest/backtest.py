@@ -106,7 +106,7 @@ def read_guide(pool, b, xml, prices, db=None):
     live = [g for g in main["gems"] if g.get("enabled", True)]   # a disabled gem is a spare, not a link
     nodes = pool.allocated_nodes()
     level = re.search(r'<Build[^>]*\blevel="(\d+)"', xml)
-    guide = {"name": b["name"], "file": b["file"], "loadout": b["loadout"], "mainSkill": start["mainSkill"],
+    guide = {"name": b["name"], "file": b.get("file") or (b.get("reference") or {}).get("file"), "loadout": b["loadout"], "mainSkill": start["mainSkill"],
              "metric": metric, "class": pts["class"], "ascendancy": pts["ascendancyName"],
              "level": int(level.group(1)) if level else 95, "points": pts["used"], "ascPoints": pts["ascendancy"],
              "links": len(live), "mainSlot": main.get("slot"),
@@ -334,12 +334,35 @@ def other_groups(pool):
 
 # ---------------- commands ----------------
 
+def refs_list(skill, top, prices, say):
+    """Back-test entries from the reference builds of `skill` (design/refs.py): the `top` by damage, each with
+    its PoB XML (a ladder character through PoB's import, a web guide's loadout)."""
+    import evaluator as E
+    import refs as RF
+    ev = E.Evaluator()
+    measured = [m for m in RF.measure(prices.league, skill, ev=ev, say=say)
+                if "error" not in m and isinstance(m.get("value"), (int, float))]
+    out = []
+    for i, m in enumerate(sorted(measured, key=lambda m: -m["value"])[:top], 1):
+        xml = RF.ref_xml(prices.league, m["file"], ev)
+        if m.get("loadout"):
+            xml = E.ph().select_loadout(xml, m["loadout"])
+        label = m.get("title") or f"ladder {m.get('class')}"
+        # the content id keeps a new crawl's rank-1 character from reusing an older one's results
+        out.append({"name": f"{skill} ref {i} ({m['source']}: {label}, {m['id'][:6]})", "main_skill": skill,
+                    "loadout": None,
+                    "xml": xml, "reference": {k: m.get(k) for k in ("file", "source", "title", "url")}})
+    if not out:
+        raise ValueError(f"no measured reference builds of {skill} (refs.py list)")
+    return out
+
+
 def run(args):
     import concept as C
     import evaluator as E
     folder = args.dir or os.environ.get("POB_BUILDS")
-    if not folder or not os.path.isdir(folder):
-        raise ValueError("give the PoB Builds folder: --dir or POB_BUILDS")
+    if not args.refs and (not folder or not os.path.isdir(folder)):
+        raise ValueError("give the PoB Builds folder: --dir or POB_BUILDS (or --refs SKILL)")
     modes = [m.strip() for m in args.modes.split(",")]
     for m in modes:
         if m not in MODES:
@@ -348,7 +371,8 @@ def run(args):
     prices = Prices(args.league)
     db = C.GameDB()
     say = lambda m: print(m, file=sys.stderr, flush=True)  # noqa: E731
-    todo = [b for b in builds_list() if not args.only or args.only.lower() in b["name"].lower()]
+    source = refs_list(args.refs, args.top, prices, say) if args.refs else builds_list()
+    todo = [b for b in source if not args.only or args.only.lower() in b["name"].lower()]
     for b in todo:
         path = os.path.join(out_dir(), C.slug(b["name"]) + ".json")
         result = {}
@@ -359,8 +383,12 @@ def run(args):
         if not todo_modes:
             say(f"{b['name']}: done already (--force to redo)")
             continue
-        with open(os.path.join(folder, b["file"]), encoding="utf-8") as f:
-            xml = E.ph().select_loadout(f.read(), b["loadout"])
+        if b.get("xml"):
+            xml = b["xml"]
+            result["reference"] = b["reference"]
+        else:
+            with open(os.path.join(folder, b["file"]), encoding="utf-8") as f:
+                xml = E.ph().select_loadout(f.read(), b["loadout"])
         say(f"== {b['name']}")
         try:
             run_one(args, b, xml, result, todo_modes, prices, db, say)
@@ -407,7 +435,8 @@ def run_one(args, b, xml, result, modes, prices, db, say):
             ehp_floor = (guide["stats"]["EHP"] or 0) * FLOOR_SHARE or None
             rep, lab_xml = C.complete(spec, budget_div=budget, ehp_floor=ehp_floor, metric=guide["metric"],
                                       floors=guide_floors(guide), workers=args.workers, league=args.league,
-                                      config_xml=xml, seed=seed, log_progress=say, trade_check=not args.no_trade)
+                                      config_xml=xml, seed=seed, log_progress=say, trade_check=not args.no_trade,
+                                      references=False)
             stats = {"player": {"TotalEHP": rep["after"]["TotalEHP"], "Life": rep["after"]["Life"],
                                 "EnergyShield": rep["after"]["EnergyShield"], **rep["after"]["res"]}}
             snap = snapshot(stats, guide["metric"])
@@ -520,6 +549,9 @@ def main():
     p.add_argument("--league")
     p.add_argument("--force", action="store_true")
     p.add_argument("--no-trade", action="store_true")
+    p.add_argument("--refs", metavar="SKILL", help="back-test on the skill's reference builds (ladder and web) "
+                   "instead of builds.json")
+    p.add_argument("--top", type=int, default=3, help="with --refs: how many, strongest first")
     sub.add_parser("report")
     args = ap.parse_args()
     if args.cmd == "run":

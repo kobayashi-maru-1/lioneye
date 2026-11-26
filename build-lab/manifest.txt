@@ -8,6 +8,7 @@ db/mechanic-rules.json
 db/requirements-ci.txt
 db/schema.sql
 design/concept.py
+design/refs.py
 eval/eval-ops.lua
 eval/eval.py
 eval/evaluator.py

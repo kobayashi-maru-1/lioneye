@@ -34,6 +34,7 @@ Status: phases 1–7 built 2026-11-25; phase 8 (best item per slot) built 2026-1
 | 6 | Design workflow in the skill: interview, concepts, checkpoints, report; the lab notebook (below) | Done |
 | 7 | Back-test on known strong builds | Done |
 | 8 | Best item per slot: uniques compete with rares; per-skill unique data from a ladder crawl | Built; crawl awaits Andy's go |
+| 9 | Reference builds: ladder characters and web guides of the same skill; every design compared with them | Built; ladder refs arrive with the night crawl |
 
 ## Lab notebook (phase 6): what the designer learns and remembers
 
@@ -558,9 +559,64 @@ instead of all counting as 1 divine; probe errors and each losing unique's resul
 - The side-skill step drops skills only for reservation overdraw, not to fix sustain (a Blood Rage that can't
   be sustained stays and the rule stays broken).
 
-**Crawl schedule (Andy, 2026-11-25):** characters are read only between 01:00 and 04:00. `market/schedule-crawl.ps1` registers a nightly task (Covens, nights of 26–28 November) that resumes the crawl, reads nothing outside the window even when started by hand, stops a minute before 04:00, does nothing once the crawl is finished, and expires. Progress: `%LOCALAPPDATA%\poe-build-expert\crawl-log.txt`.
+**Crawl schedule (Andy, 2026-11-25):** characters are read only between 01:00 and 04:00. `market/schedule-crawl.ps1` registers a nightly task (Covens, nights of 26–30 November) that resumes the crawl, reads nothing outside the window even when started by hand, stops a minute before 04:00, does nothing once the crawl is finished, and expires. Progress: `%LOCALAPPDATA%\poe-build-expert\crawl-log.txt`.
 
 **Next:** when the crawl finishes, ask Andy before re-running the budget back-test with crawl uniques.
+
+## Phase 9 plan: reference builds
+
+Andy (2026-11-25): nine guides are too few. Find similar builds on the ladder and the web, and compare every
+design with them. Choices: **both sources**, compared on **every design**.
+
+**Sources:**
+- **Ladder:** the night crawl also reads each counted character's passive tree and keeps gear + tree as a
+  reference build (local only, no account or character names). Twice the reads, so about four nights of the
+  01:00–04:00 window (the task now runs five).
+- **Web guides:** during a design, Claude searches for guides of the skill (maxroll, pobb.in, forums) and adds
+  their PoB codes with `refs.py add` (a code, or a pobb.in / pastebin link). poe.ninja's builds data stays
+  closed.
+
+**How a design is compared:** each reference of the design's main skill is loaded into PoB with the design's
+own config (same boss, same charges), its main skill set, and measured: damage (the design's metric), EHP, life
+/ ES, resists, cost (uniques from poe.ninja, rares by the rare model). Results are cached per PoB version and
+config. The report gets a `references` section: how many (ladder / web), the median and the best three, and
+where the design ranks on damage, EHP and cost.
+
+**Tasks:**
+1. Crawl keeps reference builds (done, `3b45167`).
+2. `design/refs.py`: list, add (code or link), load (ladder import with a placeholder name, or XML), measure
+   with a given config, cache, compare.
+3. `concept.complete` adds `references` to the report when the skill has any.
+4. Back-test: `--refs` runs the lab against the top reference builds of a skill, not only the nine guides.
+5. Skill workflow: search the web for guides of each finished design's skill, add them, show the comparison.
+6. Tests, review and verify subagents, README, plan results.
+
+## Phase 9 results
+
+**Built:** the crawl keeps reference builds (`3b45167`, privacy fixes `bc62a4e`); `design/refs.py` (`list`,
+`add` from a link, code or file with a loadout, `measure`, `compare`); every `concept.py complete` report gets a
+`references` section; `backtest.py run --refs SKILL --top N`; the skill's workflow searches the web for guides of
+each finished concept's skill and adds them. Reference builds live in `%LOCALAPPDATA%\poe-build-expert\market\refs-<league>`
+(local only, never in the repo).
+
+**First checks (Righteous Fire, the Pohx guide added as a web reference):**
+- A 30-divine design compared with it: 11% of its damage and 6% of its EHP at a quarter of its cost (7 against 29
+  divines; this test spec had no EHP floor).
+- `--refs "Righteous Fire" --top 1`: uniques + floors 10% of the guide's damage, budget 5%: in line with the
+  guide back-test.
+
+**Review fixes:** ladder references load with the main skill counted in Full DPS (else every one measured 0);
+cache keyed by file content, config (with bandit and pantheon) and, when priced, the day; errors aren't cached;
+web guides measured before ladder ones when a skill has more than 40; a second loadout of a guide gets its own
+file; Animate Guardian gear kept; the character's experience dropped and GGG item ids replaced (both could trace
+a reference back to a ladder entry); a new crawl clears the last one's ladder files; back-test reference entries
+carry a content id.
+
+**Known limit:** `--refs` ranks references on their own configs (ladder imports have PoB's defaults, guides their
+own), so "strongest" leans toward guides.
+
+**Next:** ladder references arrive with the crawl (nights of 26–30 November); then compare a few designs with
+them and run `--refs` on two or three popular skills.
 
 ## Open checks
 

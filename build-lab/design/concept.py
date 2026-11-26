@@ -492,11 +492,13 @@ def pipeline(pool, start_stats, metric, cls, ascendancy, links, budget=None, log
 
 def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, budget_div=None, quick=False,
              trade_check=False, league=None, workers=None, metric=None, tier=None, ehp_floor=None, log_progress=None,
-             config_xml=None, seed=0, links=None, floors=None):
+             config_xml=None, seed=0, links=None, floors=None, references=True):
     """Run the pipeline; returns (report, final_xml). ehp_floor: a minimum total EHP the build must reach (a rule
     like the resists); default none. tier: the crafted rares' starting tier; default T2 with a budget (it moves
     them down or up), T1 without one (the strongest items, whatever they cost). A spec concept also tries
-    uniques against its rares (unique_candidates); a loaded build (--xml) keeps its own items."""
+    uniques against its rares (unique_candidates); a loaded build (--xml) keeps its own items. references: compare
+    the result with the reference builds of its main skill (design/refs.py; ladder and web), measured with the
+    design's own config."""
     import evaluator as E
     import opt as O
     from objective import summary
@@ -530,6 +532,7 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
     if spec is not None and prices is not None:
         cands, unique_info = unique_candidates(spec, db, prices.league, main_skill)
     unique_done = {}
+    design_cost = None
     with E.EvalPool(workers=E.default_workers() if workers is None else workers) as pool:
         start = pool.load(xml, main_skill)
         # Uniques: PoB's own item text, equipped on the loaded build; charged at their poe.ninja price.
@@ -589,7 +592,28 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
                     report["overBudget"] = round(-budget.remaining, 2)
             if trade_check:
                 report["tradeChecks"] = O.trade_checks(prices, log)
+            if references:
+                import refs as RF
+                try:
+                    if RF.listing(prices.league, pool.main_skill()):  # priced like the references: rares by the model
+                        design_cost = RF.cost(pool, prices)
+                except Exception as e:  # noqa: BLE001 - never lose a finished design to the comparison
+                    design_cost = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
         report["novelty"] = O.novelty(pool, league, pool.main_skill())
+    if references and prices is not None:
+        import refs as RF
+        try:
+            measured = RF.measure(prices.league, report["mainSkill"], prices=prices, config_xml=final_xml,
+                                  metric=metric, say=say, limit=RF.LIMIT)
+            if measured:
+                report["references"] = RF.compare({"value": report["after"]["value"],
+                                                   "TotalEHP": report["after"]["TotalEHP"],
+                                                   "cost": (design_cost or {}).get("total")}, measured)
+            else:
+                report["references"] = {"references": 0, "note": f"no reference builds of {report['mainSkill']} yet "
+                                        "(the ladder crawl, or web guides added with refs.py add)"}
+        except Exception as e:  # noqa: BLE001 - the comparison must never lose a finished design
+            report["references"] = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
     report["seconds"] = round(time.perf_counter() - t0, 1)
     report["pobCode"] = pob_code(final_xml)
     report["log"] = [{k: v for k, v in c.items() if k != "item"} for c in log]
