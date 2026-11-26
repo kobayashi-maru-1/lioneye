@@ -31,7 +31,7 @@ LADDER = "https://www.pathofexile.com/api/ladders/{league}?limit=200&offset={off
 ITEMS = "https://www.pathofexile.com/character-window/get-items?"
 PASSIVES = "https://www.pathofexile.com/character-window/get-passive-skills?"
 # What a saved reference build keeps of GGG's character block: enough for PoB's import, no names.
-CHARACTER_KEEP = ("class", "classId", "ascendancyClass", "level", "league", "experience")
+CHARACTER_KEEP = ("class", "classId", "ascendancyClass", "level", "league")
 SWAP = ("Weapon2", "Offhand2")
 SKIP = ("MainInventory", "ExpandedMainInventory") + SWAP
 UNIQUE_FRAMES = (3, 9, 10)  # unique, relic (foil) frames
@@ -280,13 +280,40 @@ def refs_dir(league):
     return os.path.join(cache_root(), f"refs-{''.join(c if c.isalnum() else '-' for c in league)}")
 
 
+def _neutral_ids(items, prefix):
+    """Items with GGG's item ids (which public stash data also shows) replaced by local ones. PoB's import
+    matches items by id, so each keeps a distinct one."""
+    out = []
+    for i, it in enumerate(items):
+        it = dict(it)
+        if "id" in it:
+            it["id"] = f"{prefix}-{i}"
+        if it.get("socketedItems"):
+            it["socketedItems"] = _neutral_ids(it["socketedItems"], f"{prefix}-{i}s")
+        out.append(it)
+    return out
+
+
+def clear_references(league):
+    """Remove the ladder reference builds of an earlier crawl (a new crawl numbers its own from 1)."""
+    folder = refs_dir(league)
+    if os.path.isdir(folder):
+        for name in os.listdir(folder):
+            if name.startswith("ladder-") and name.endswith(".json"):
+                os.remove(os.path.join(folder, name))
+
+
 def save_reference(league, n, items, passives):
     """Keep a ladder character as a reference build: its main skill, class and level, gear and passives, with the
     character's and account's names left out. Returns the file path."""
     char = {k: v for k, v in (items.get("character") or {}).items() if k in CHARACTER_KEEP}
+    gear = {"character": char, "items": _neutral_ids(items.get("items") or [], f"r{n}")}
+    if items.get("guardian"):  # Animate Guardian's gear, which PoB's import also reads
+        gear["guardian"] = _neutral_ids(items["guardian"], f"r{n}g")
     ref = {"source": "ladder", "skill": main_skill(items), "class": char.get("class"), "level": char.get("level"),
-           "items": {"character": char, "items": items.get("items") or []},
-           "passives": {k: v for k, v in (passives or {}).items() if k not in ("character", "account")}}
+           "items": gear,
+           "passives": {k: (_neutral_ids(v, f"r{n}j") if k == "items" and isinstance(v, list) else v)
+                        for k, v in (passives or {}).items() if k not in ("character", "account")}}
     folder = refs_dir(league)
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"ladder-{n:04d}.json")
@@ -340,6 +367,8 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
         raise RuntimeError(f"GGG's ladder for {league} is empty")
     by_rank = {e.get("rank"): e for e in entries if e.get("public") and e.get("rank") is not None}
     if data is None:
+        if builds:
+            clear_references(league)
         ranks = sorted(by_rank)
         step = max(1, len(ranks) // max(1, sample))
         data = {"league": league, "started": time.time(), "updated": time.time(), "done": False,

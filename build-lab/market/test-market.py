@@ -250,11 +250,13 @@ def crawl_tests(add):
     league = f"Test Crawl {os.getpid()}"
 
     def char(skill, uniques):
-        return {"character": {"name": "c-name", "class": "Elementalist", "level": 95, "league": "X"}, "items": [{"inventoryId": "BodyArmour", "sockets": [{"group": 0}] * 2,
+        return {"character": {"name": "c-name", "class": "Elementalist", "level": 95, "league": "X",
+                              "experience": 123456}, "items": [{"inventoryId": "BodyArmour", "sockets": [{"group": 0}] * 2,
                            "socketedItems": [{"typeLine": skill, "socket": 0, "support": False,
                                               "properties": [{"name": "Spell"}]},
                                              {"typeLine": "Sup", "socket": 1, "support": True}]}]
-                + [{"inventoryId": slot, "frameType": 3, "name": name} for slot, name in uniques]}
+                + [{"inventoryId": slot, "frameType": 3, "name": name, "id": f"ggg-item-id-{slot}"}
+                   for slot, name in uniques]}
 
     chars = {f"c{i}": char("Fireball", [("Helm", "Crown A")] + ([("Ring2", "Band B")] if i % 3 == 0 else []))
              for i in range(9)}
@@ -297,7 +299,12 @@ def crawl_tests(add):
             detail=str(refs[:3]))
         blob = json.dumps(ref)
         add("crawl: reference builds keep no account or character names",
-            "c-name" not in blob and "c-secret" not in blob and ref["items"]["character"].get("class") == "Elementalist")
+            "c-name" not in blob and "c-secret" not in blob and ref["items"]["character"].get("class") == "Elementalist"
+            and "experience" not in ref["items"]["character"])
+        add("crawl: GGG item ids are replaced by local ones, still distinct",
+            "ggg-item-id" not in blob and len({it.get("id") for it in ref["items"]["items"]}) == len(ref["items"]["items"]))
+        P.crawl(league, sample=4, depth=200, ggg=FakeGGG(), verbose=False, fresh=True)
+        add("crawl: a new crawl clears the last one's ladder builds", len(os.listdir(P.refs_dir(league))) == 4)
         c = P.candidates(data, "Fireball", share=0.5)
         add("candidates: only uniques at or above the share", c["slots"] == {"Helmet": [("Crown A", 1.0)]},
             detail=str(c))
