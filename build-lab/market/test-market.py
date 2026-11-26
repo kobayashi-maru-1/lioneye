@@ -12,6 +12,7 @@ Exit code 1 when any check fails.
 """
 import argparse
 import json
+import time
 import os
 import sys
 
@@ -306,6 +307,33 @@ def crawl_tests(add):
             saved = P.load_crawl(league)
             add("crawl: an outage stops the crawl instead of finishing it", not saved["done"]
                 and saved["next"] == 3 and saved["failed"] == 0, detail=str({k: saved[k] for k in ("next", "failed")}))
+        ticks = iter(range(1000))
+        # one tick per clock read: the ladder page at 0, characters at 1-4; at 5 less than the margin is left
+        paused = P.crawl(league, sample=10, depth=200, ggg=FakeGGG(), verbose=False, fresh=True,
+                         until=5 + P.CRAWL_MARGIN, clock=lambda: next(ticks))
+        add("crawl: pauses at the window's end, not done", paused.get("paused") and not paused["done"]
+            and paused["read"] == 4, detail=str({k: paused.get(k) for k in ("next", "read", "paused")}))
+        rest = P.crawl(league, sample=10, depth=200, ggg=FakeGGG(), verbose=False)
+        add("crawl: the next night resumes and finishes", rest["done"] and not rest.get("paused")
+            and rest["read"] == 10)
+        late = P.crawl(league + " late", sample=10, depth=200, ggg=FakeGGG(), verbose=False, until=0,
+                       clock=lambda: 100)
+        add("crawl: past the window nothing is read, not even the ladder", late.get("paused") and not late["done"]
+            and P.load_crawl(league + " late") is None)
+        stop = P.crawl(league, sample=10, depth=200, ggg=FakeGGG(stop_after=2), verbose=False, fresh=True,
+                       until=10 ** 9, clock=lambda: 0)
+        add("crawl: a long rate-limit wait in the window pauses for the night", stop.get("paused")
+            and stop["read"] == 2 and not stop["done"])
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("market_cli", os.path.join(os.path.dirname(P.__file__), "market.py"))
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        at = lambda h, m: time.mktime((2026, 11, 26, h, m, 0, 0, 0, -1))  # noqa: E731
+        add("crawl window: reads only from --from to --until",
+            cli.window_end("04:00", "01:00", now=at(2, 0)) == at(4, 0)
+            and cli.window_end("04:00", "01:00", now=at(14, 0)) is False
+            and cli.window_end("04:00", "01:00", now=at(0, 59)) is False
+            and cli.window_end("04:00", "01:00", now=at(4, 0)) is False)
         add("crawl: GGG's name markup is stripped",
             P.slot_uniques({"items": [{"inventoryId": "Helm", "frameType": 3,
                                        "name": "<<set:MS>><<set:M>><<set:S>>Crown A"}]}) == {("Helmet", "Crown A")})

@@ -4,7 +4,7 @@ Andy asks Claude (Claude Code or a claude.ai chat) to design a build. Claude ask
 defences, proposes concepts from a game database, completes them with optimizers that run headless Path of
 Building, and returns 2–3 finished options with PoB codes, numbers, cost and blind spots.
 
-Status: phases 1–7 built 2026-11-25; phase 8 (best item per slot) built 2026-11-26, the ladder crawl not yet run.
+Status: phases 1–7 built 2026-11-25; phase 8 (best item per slot) built 2026-11-26; the ladder crawl runs nightly 01:00–04:00.
 
 ## Decisions
 
@@ -558,7 +558,9 @@ instead of all counting as 1 divine; probe errors and each losing unique's resul
 - The side-skill step drops skills only for reservation overdraw, not to fix sustain (a Blood Rage that can't
   be sustained stays and the rule stays broken).
 
-**Next:** Andy's go for the first crawl (about 5 hours); then the budget back-test with crawl uniques.
+**Crawl schedule (Andy, 2026-11-25):** characters are read only between 01:00 and 04:00. `market/schedule-crawl.ps1` registers a nightly task (Covens, nights of 26–28 November) that resumes the crawl, reads nothing outside the window even when started by hand, stops a minute before 04:00, does nothing once the crawl is finished, and expires. Progress: `%LOCALAPPDATA%\poe-build-expert\crawl-log.txt`.
+
+**Next:** when the crawl finishes, ask Andy before re-running the budget back-test with crawl uniques.
 
 ## Open checks
 

@@ -6,6 +6,8 @@
   market.py popularity [--refresh] [--depth 3000] [--sample 80]
   market.py popularity --crawl-status              per-skill unique data: age, progress
   market.py popularity --crawl [--sample 900] [--fresh]   read ladder characters (hours; ask the user first)
+      [--until 04:00] pause at that local time (the next run resumes); [--only-unfinished] do nothing when the
+      league's crawl is finished (a scheduled night run never starts a new one); [--log FILE] progress to a file
   market.py popularity --skill GEM                 the uniques the skill's players wear, by slot
                                                     ascendancy, main-skill and unique shares (refresh: a few minutes)
   market.py novelty BUILD.xml --main-skill GEM      how unusual the build's archetype is (needs popularity data)
@@ -16,6 +18,7 @@ keeps counts only, no account or character names.
 """
 import argparse
 import json
+import time
 import os
 import subprocess
 import sys
@@ -23,6 +26,30 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "eval"))
+
+
+def window_end(until, start=None, now=None):
+    """The epoch time `until` (HH:MM, local) next comes round, or False when `start` (HH:MM) is given and now is
+    outside the start-until window (a crawl started by hand at 14:00 reads nothing, instead of reading until 04:00
+    the next day)."""
+    now = time.time() if now is None else now
+    t = time.localtime(now)
+
+    def at(hhmm, day_offset=0):
+        hh, mm = (int(x) for x in hhmm.split(":"))
+        return time.mktime((t.tm_year, t.tm_mon, t.tm_mday + day_offset, hh, mm, 0, 0, 0, -1))
+    end = at(until)
+    if end <= now:
+        end = at(until, 1)
+    if start is not None:
+        begin = at(start)
+        if begin >= end:
+            begin = at(start, -1)
+        while begin + 24 * 3600 < end:  # the most recent start before this end
+            begin += 24 * 3600
+        if not begin <= now < end:
+            return False
+    return end
 
 
 def main():
@@ -57,6 +84,12 @@ def main():
             p.add_argument("--crawl", action="store_true", help="per-skill unique counts (hours; ask first)")
             p.add_argument("--fresh", action="store_true", help="with --crawl: start over instead of resuming")
             p.add_argument("--crawl-status", action="store_true")
+            p.add_argument("--until", help="with --crawl: pause at this local time (HH:MM)")
+            p.add_argument("--from", dest="window_from",
+                           help="with --crawl --until: the window's start (HH:MM); outside it nothing is read")
+            p.add_argument("--only-unfinished", action="store_true",
+                           help="with --crawl: only resume or start a crawl the league doesn't have finished")
+            p.add_argument("--log", help="append progress and the result to this file")
             p.add_argument("--skill", help="candidate uniques for this main skill, from the crawl")
     args = ap.parse_args()
 
@@ -66,6 +99,10 @@ def main():
             sys.exit(subprocess.call([venv] + sys.argv))
         sys.exit("lupa isn't installed (pip install lupa)")
 
+    if getattr(args, "log", None):  # a scheduled run (pythonw) has no console: send stderr and stdout to the log
+        log = open(args.log, "a", encoding="utf-8", buffering=1)
+        sys.stderr = sys.stdout = log
+        print(f"--- {time.strftime('%Y-%m-%d %H:%M:%S')} {' '.join(sys.argv[1:])}")
     prices = Prices(args.league)
     if args.cmd == "prices":
         out = {"league": prices.league, "divineInChaos": prices.divine,
@@ -73,8 +110,16 @@ def main():
                "example": {"Mageblood": prices.unique("Mageblood", "Heavy Belt"),
                            "Spell Echo 20/20": prices.gem("Spell Echo", 20, 20)}}
     elif args.cmd == "popularity" and args.crawl:
-        data = P.crawl(prices.league, sample=args.sample or P.CRAWL_SAMPLE, fresh=args.fresh)
-        out = {**P.crawl_status(prices.league), "skills": len(data["skills"])}
+        have = P.load_crawl(prices.league)
+        if args.only_unfinished and have and have.get("done"):
+            out = {**P.crawl_status(prices.league), "note": "finished: nothing to do (a new crawl needs a yes)"}
+        else:
+            until = window_end(args.until, args.window_from) if args.until else None
+            if until is False:
+                out = {"note": f"outside the {args.window_from}-{args.until} window: nothing read"}
+            else:
+                data = P.crawl(prices.league, sample=args.sample or P.CRAWL_SAMPLE, fresh=args.fresh, until=until)
+                out = {**P.crawl_status(prices.league), "skills": len(data.get("skills") or {})}
     elif args.cmd == "popularity" and args.crawl_status:
         out = P.crawl_status(prices.league)
     elif args.cmd == "popularity" and args.skill:

@@ -94,7 +94,18 @@ def refresh(league, depth=3000, sample=80, ggg=None, verbose=True):
     ggg = ggg or GGG(verbose)
     entries = []
     for offset in range(0, depth, 200):
-        page = ggg.call(LADDER.format(league=urllib.parse.quote(league), offset=offset)) or {}
+        if not time_left():
+            if data:
+                data["paused"] = True
+                data["updated"] = time.time()
+                _save(path, data)
+            return data or {"league": league, "paused": True, "done": False, "skills": {}}
+        try:
+            page = ggg.call(LADDER.format(league=urllib.parse.quote(league), offset=offset)) or {}
+        except RateLimited:
+            if until is None:
+                raise
+            return data or {"league": league, "paused": True, "done": False, "skills": {}}
         got = page.get("entries") or []
         entries.extend(got)
         if len(got) < 200:
@@ -199,6 +210,7 @@ SLOT_OF = {"Weapon": "Weapon 1", "Offhand": "Weapon 2", "Helm": "Helmet", "BodyA
            "Flask": "Flask"}       # both rings count as "Ring": a unique ring can go in either
 CANDIDATE_SHARE = 0.10
 CANDIDATE_MIN_CHARS = 5
+CRAWL_MARGIN = 60                   # seconds: stop this long before the window ends, so no request lands after it
 CRAWL_MAX_FAILS = 5                 # this many characters in a row failing with HTTP errors: stop, resume later
 
 
@@ -254,23 +266,49 @@ def crawl_status(league, now=None):
                 "note": f"no per-skill unique data for {league}: a crawl reads about {CRAWL_SAMPLE} ladder characters "
                         f"(about {CRAWL_SAMPLE // 180 + 1} hours)"}
     age = (now or time.time()) - (data.get("updated") or 0)
-    return {"league": league, "exists": True, "done": bool(data.get("done")), "read": data.get("read", 0),
+    return {"league": league, "exists": True, "done": bool(data.get("done")), "paused": bool(data.get("paused")),
+            "next": data.get("next", 0), "read": data.get("read", 0),
             "target": data.get("target"), "ageDays": round(age / 86400, 1),
             "stale": not data.get("done") or age > CRAWL_MAX_AGE}
 
 
-def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None, verbose=True):
+def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None, verbose=True, until=None,
+          clock=time.time):
     """Read `sample` public ladder characters spread over the top `depth` and count, per main skill, the uniques
     they wear by slot. Resumes an unfinished crawl of the same league unless fresh. Only run it after the user
-    agreed: it takes hours."""
+    agreed: it takes hours. until: a time (epoch seconds) to pause at; the data comes back with "paused" set and
+    the next run resumes it. No rate-limit wait runs past it."""
     ggg = ggg or GGG(verbose, max_sleep=CRAWL_SLEEP)
+
+    def time_left():
+        """False when the window is over (or would be over before a request finishes); caps GGG's waits to it."""
+        if until is None:
+            return True
+        left = until - clock() - CRAWL_MARGIN
+        if left <= 0:
+            return False
+        if hasattr(ggg, "max_sleep"):
+            ggg.max_sleep = min(CRAWL_SLEEP, left)
+        return True
+
     path = crawl_path(league)
     data = None if fresh else load_crawl(league)
     if data and data.get("done"):
         data = None  # a finished crawl is replaced, not extended
     entries = []
     for offset in range(0, depth, 200):
-        page = ggg.call(LADDER.format(league=urllib.parse.quote(league), offset=offset)) or {}
+        if not time_left():
+            if data:
+                data["paused"] = True
+                data["updated"] = time.time()
+                _save(path, data)
+            return data or {"league": league, "paused": True, "done": False, "skills": {}}
+        try:
+            page = ggg.call(LADDER.format(league=urllib.parse.quote(league), offset=offset)) or {}
+        except RateLimited:
+            if until is None:
+                raise
+            return data or {"league": league, "paused": True, "done": False, "skills": {}}
         got = page.get("entries") or []
         entries.extend(got)
         if len(got) < 200:
@@ -285,9 +323,13 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
                 "ladderDepth": len(entries), "target": min(sample, len(ranks)), "ranks": ranks[::step][:sample],
                 "next": 0, "read": 0, "failed": 0, "skipped": 0, "skills": {}}
     ranks = data["ranks"]
+    data.pop("paused", None)
     fails = 0
     try:
         while data["next"] < len(ranks):
+            if not time_left():
+                data["paused"] = True
+                break
             e = by_rank.get(ranks[data["next"]])
             items = None
             if e:
@@ -295,6 +337,9 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
                 try:
                     items = ggg.call(ITEMS + urllib.parse.urlencode(params))
                 except RateLimited:
+                    if until is not None:
+                        data["paused"] = True  # the wait would run past the window: stop for tonight
+                        break
                     raise  # "next" still points here, so a resume reads this character
                 except RuntimeError as err:
                     # One character's HTTP error is skipped; no connection, a maintenance page or GGG failing
@@ -323,7 +368,9 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
                 if verbose:
                     print(f"crawl: {data['next']}/{len(ranks)} ladder characters ({data['read']} read)",
                           file=sys.stderr, flush=True)
-        data["done"] = True
+        else:
+            data["done"] = True
+            data.pop("paused", None)
     finally:
         data["updated"] = time.time()
         _save(path, data)

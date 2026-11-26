@@ -158,7 +158,9 @@ changes are checked with a real recalculation before they're kept. Uniques and r
 & $py build-lab\market\market.py cost BUILD.xml --main-skill X [--trade-check]
 & $py build-lab\market\market.py popularity [--refresh]               # ascendancy, skill, unique shares
 & $py build-lab\market\market.py popularity --crawl-status           # per-skill unique data: age, progress
-& $py build-lab\market\market.py popularity --crawl [--fresh]        # hours: ask before running it
+& $py build-lab\market\market.py popularity --crawl [--fresh] [--until 04:00]   # hours: ask before running it
+& build-lab\market\schedule-crawl.ps1 -League Covens [-Start 01:00 -Until 04:00 -Nights 3]   # nights only
+& build-lab\market\schedule-crawl.ps1 -Remove
 & $py build-lab\market\market.py popularity --skill "Righteous Fire" # the skill's candidate uniques by slot
 & $py build-lab\market\market.py novelty BUILD.xml --main-skill X
 & $py build-lab\opt\opt.py all BUILD.xml --main-skill X --budget 10 --trade-check
@@ -170,7 +172,7 @@ changes are checked with a real recalculation before they're kept. Uniques and r
 | Uniques, gems, currency | poe.ninja economy API (its documented public surface) | Cached 3 h with ETag revalidation. Uniques at their most-listed variant (with links for linked items); gems at the cheapest listing meeting level/quality, falling back to any quality, then corrupted |
 | Crafted rares | [rarecost.py](market/rarecost.py) estimate, then the trade site | The estimate prices what buyers want: each mod by tier and demand (life, resists, suppression, gem levels and crit multi count; light radius or thorns don't), and only wanted mods that suit one kind of build (spell, attack, DoT, minion) count toward the "hard to hit together" markup. Six T1 mods nobody wants cost next to nothing. It also reads a finished rare's lines back to tiers, so a guide's rares are priced the same way. `--trade-check` prices the final picks: one search per item: same base, mods at 85%+ (all of them for 3 or fewer, else all but one, marked as a floor), median of the cheapest five (marked thin when under 3 are listed); no price when under half the mods match a trade stat |
 | Popularity | GGG's public ladder (top 3,000) and 80 public characters | poe.ninja's builds API is closed to third parties. Counts only, no names; cached a day; a refresh takes about 3 minutes within GGG's rate limits |
-| Uniques by skill | A crawl of about 900 public ladder characters (the top 15,000) | Per main skill, how many characters wear each unique in each slot; a unique worn by 10%+ of the skill's characters (5 or more sampled) is a candidate. GGG allows about 90 character reads per 30 minutes, so it takes about 5 hours: it never starts on its own, and the designer asks before running or refreshing it (stale after a week). Resumable; counts only, progress kept by ladder rank |
+| Uniques by skill | A crawl of about 900 public ladder characters (the top 15,000) | Per main skill, how many characters wear each unique in each slot; a unique worn by 10%+ of the skill's characters (5 or more sampled) is a candidate. GGG allows about 90 character reads per 30 minutes, so it takes about 5 hours: it never starts on its own, and the designer asks before running or refreshing it (stale after a week). Resumable; counts only, progress kept by ladder rank. `schedule-crawl.ps1` runs it in a night window (default 01:00-04:00) as a scheduled task that resumes each night, does nothing once the crawl is finished, and expires after a few nights |
 | Novelty | popularity | 1 − archetype share (ascendancy + main skill) ÷ 5%: 0 for an archetype 5%+ of the top ladder plays, 1 for one nobody plays |
 
 **Budget rules:**
