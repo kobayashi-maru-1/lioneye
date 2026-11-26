@@ -250,7 +250,7 @@ def crawl_tests(add):
     league = f"Test Crawl {os.getpid()}"
 
     def char(skill, uniques):
-        return {"items": [{"inventoryId": "BodyArmour", "sockets": [{"group": 0}] * 2,
+        return {"character": {"name": "c-name", "class": "Elementalist", "level": 95, "league": "X"}, "items": [{"inventoryId": "BodyArmour", "sockets": [{"group": 0}] * 2,
                            "socketedItems": [{"typeLine": skill, "socket": 0, "support": False,
                                               "properties": [{"name": "Spell"}]},
                                              {"typeLine": "Sup", "socket": 1, "support": True}]}]
@@ -269,6 +269,8 @@ def crawl_tests(add):
         def call(self, url):
             if "ladders" in url:
                 return {"entries": ladder if "offset=0" in url else []}
+            if "get-passive-skills" in url:
+                return {"hashes": [1, 2], "items": [], "character": "c-secret"}
             if self.stop_after is not None and self.reads >= self.stop_after:
                 raise RateLimited("window")
             self.reads += 1
@@ -288,6 +290,14 @@ def crawl_tests(add):
         add("crawl: uniques counted by slot, both rings as Ring",
             fb["uniques"]["Helmet"]["Crown A"] == 9 and fb["uniques"]["Ring"]["Band B"] == 3)
         add("crawl: no names kept", "c1" not in json.dumps(data) and "a1" not in json.dumps(data))
+        refs = sorted(os.listdir(P.refs_dir(league)))
+        ref = json.load(open(os.path.join(P.refs_dir(league), refs[0]), encoding="utf-8"))
+        add("crawl: a reference build per counted character, gear and tree", len(refs) == 10
+            and ref["passives"]["hashes"] == [1, 2] and ref["items"]["items"] and ref["skill"] in ("Fireball", "Spark"),
+            detail=str(refs[:3]))
+        blob = json.dumps(ref)
+        add("crawl: reference builds keep no account or character names",
+            "c-name" not in blob and "c-secret" not in blob and ref["items"]["character"].get("class") == "Elementalist")
         c = P.candidates(data, "Fireball", share=0.5)
         add("candidates: only uniques at or above the share", c["slots"] == {"Helmet": [("Crown A", 1.0)]},
             detail=str(c))
@@ -308,9 +318,10 @@ def crawl_tests(add):
             add("crawl: an outage stops the crawl instead of finishing it", not saved["done"]
                 and saved["next"] == 3 and saved["failed"] == 0, detail=str({k: saved[k] for k in ("next", "failed")}))
         ticks = iter(range(1000))
-        # one tick per clock read: the ladder page at 0, characters at 1-4; at 5 less than the margin is left
+        # one tick per clock read: the ladder page at 0, then two per character (gear, then tree): characters at
+        # 1-8; at 9 less than the margin is left
         paused = P.crawl(league, sample=10, depth=200, ggg=FakeGGG(), verbose=False, fresh=True,
-                         until=5 + P.CRAWL_MARGIN, clock=lambda: next(ticks))
+                         until=9 + P.CRAWL_MARGIN, clock=lambda: next(ticks))
         add("crawl: pauses at the window's end, not done", paused.get("paused") and not paused["done"]
             and paused["read"] == 4, detail=str({k: paused.get(k) for k in ("next", "read", "paused")}))
         rest = P.crawl(league, sample=10, depth=200, ggg=FakeGGG(), verbose=False)
@@ -338,10 +349,12 @@ def crawl_tests(add):
             P.slot_uniques({"items": [{"inventoryId": "Helm", "frameType": 3,
                                        "name": "<<set:MS>><<set:M>><<set:S>>Crown A"}]}) == {("Helmet", "Crown A")})
     finally:
+        import shutil
         try:
             os.remove(P.crawl_path(league))
         except OSError:
             pass
+        shutil.rmtree(P.refs_dir(league), ignore_errors=True)
 
 
 def main():

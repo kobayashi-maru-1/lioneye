@@ -29,6 +29,9 @@ from net import GGG, RateLimited, cache_root
 
 LADDER = "https://www.pathofexile.com/api/ladders/{league}?limit=200&offset={offset}"
 ITEMS = "https://www.pathofexile.com/character-window/get-items?"
+PASSIVES = "https://www.pathofexile.com/character-window/get-passive-skills?"
+# What a saved reference build keeps of GGG's character block: enough for PoB's import, no names.
+CHARACTER_KEEP = ("class", "classId", "ascendancyClass", "level", "league", "experience")
 SWAP = ("Weapon2", "Offhand2")
 SKIP = ("MainInventory", "ExpandedMainInventory") + SWAP
 UNIQUE_FRAMES = (3, 9, 10)  # unique, relic (foil) frames
@@ -267,17 +270,37 @@ def crawl_status(league, now=None):
                         f"(about {CRAWL_SAMPLE // 180 + 1} hours)"}
     age = (now or time.time()) - (data.get("updated") or 0)
     return {"league": league, "exists": True, "done": bool(data.get("done")), "paused": bool(data.get("paused")),
-            "next": data.get("next", 0), "read": data.get("read", 0),
+            "next": data.get("next", 0), "read": data.get("read", 0), "builds": data.get("builds", 0),
             "target": data.get("target"), "ageDays": round(age / 86400, 1),
             "stale": not data.get("done") or age > CRAWL_MAX_AGE}
 
 
+def refs_dir(league):
+    """Where the crawl keeps reference builds (one JSON per ladder character: gear and passive tree, no names)."""
+    return os.path.join(cache_root(), f"refs-{''.join(c if c.isalnum() else '-' for c in league)}")
+
+
+def save_reference(league, n, items, passives):
+    """Keep a ladder character as a reference build: its main skill, class and level, gear and passives, with the
+    character's and account's names left out. Returns the file path."""
+    char = {k: v for k, v in (items.get("character") or {}).items() if k in CHARACTER_KEEP}
+    ref = {"source": "ladder", "skill": main_skill(items), "class": char.get("class"), "level": char.get("level"),
+           "items": {"character": char, "items": items.get("items") or []},
+           "passives": {k: v for k, v in (passives or {}).items() if k not in ("character", "account")}}
+    folder = refs_dir(league)
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, f"ladder-{n:04d}.json")
+    _save(path, ref)
+    return path
+
+
 def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None, verbose=True, until=None,
-          clock=time.time):
+          clock=time.time, builds=True):
     """Read `sample` public ladder characters spread over the top `depth` and count, per main skill, the uniques
     they wear by slot. Resumes an unfinished crawl of the same league unless fresh. Only run it after the user
     agreed: it takes hours. until: a time (epoch seconds) to pause at; the data comes back with "paused" set and
-    the next run resumes it. No rate-limit wait runs past it."""
+    the next run resumes it. No rate-limit wait runs past it. builds: also read each counted character's passive
+    tree (a second read) and keep gear + tree as a reference build (save_reference; no names)."""
     ggg = ggg or GGG(verbose, max_sleep=CRAWL_SLEEP)
 
     def time_left():
@@ -352,6 +375,20 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
                     e = None
                 else:
                     fails = 0
+                passives = None
+                if builds and isinstance(items, dict) and items.get("items") and main_skill(items):
+                    if not time_left():
+                        data["paused"] = True  # read again next night, tree and all
+                        break
+                    try:
+                        passives = ggg.call(PASSIVES + urllib.parse.urlencode(params))
+                    except RateLimited:
+                        if until is not None:
+                            data["paused"] = True
+                            break
+                        raise
+                    except RuntimeError:
+                        passives = None  # the counts still go in; no reference build for this one
             else:
                 data["skipped"] += 1  # dropped off the ladder or went private since the crawl started
             data["next"] += 1
@@ -362,6 +399,9 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
                 continue
             data["read"] += 1
             add_character(data, items, (e.get("character") or {}).get("class"))
+            if passives:
+                save_reference(league, data["read"], items, passives)
+                data["builds"] = data.get("builds", 0) + 1
             if data["next"] % CRAWL_SAVE_EVERY == 0:
                 data["updated"] = time.time()
                 _save(path, data)
