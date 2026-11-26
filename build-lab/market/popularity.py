@@ -5,12 +5,14 @@
   public character endpoint (default 80, which stays inside GGG's 90-per-30-minutes rule for that endpoint).
   A character's main skill is the active gem in its largest linked group (weapon swap left out).
 
-Only counts are kept: no account or character names are stored. The result is cached per league for a day
+This sample keeps counts only, no account or character names. The result is cached per league for a day
 (%LOCALAPPDATA%\\poe-build-expert\\market\\popularity-<league>.json); refreshing it takes a few minutes.
 
 Per-skill unique data (crawl, below): about 900 public ladder characters read over about 5 hours, counting per
 main skill the uniques worn in each slot. It never runs on its own: the designer asks the user first, every time.
 crawl_status(league), crawl(league), candidates(data, skill) -> the uniques 10%+ of the skill's players wear.
+Each counted character is also kept as a reference build (gear, passive tree, and the account and character
+names the ladder shows, so its current copy can be read later); crawldata.py shares them through GitHub.
 
 novelty(stats, ascendancy, main_skill, uniques) -> {"novelty": 0..1, parts...}
   archetype share = the sample's share of characters with the same ascendancy and main skill (estimated as
@@ -30,7 +32,8 @@ from net import GGG, RateLimited, cache_root
 LADDER = "https://www.pathofexile.com/api/ladders/{league}?limit=200&offset={offset}"
 ITEMS = "https://www.pathofexile.com/character-window/get-items?"
 PASSIVES = "https://www.pathofexile.com/character-window/get-passive-skills?"
-# What a saved reference build keeps of GGG's character block: enough for PoB's import, no names.
+# What a saved reference build keeps of GGG's character block: enough for PoB's import (the names are kept
+# separately, from the ladder entry).
 CHARACTER_KEEP = ("class", "classId", "ascendancyClass", "level", "league")
 SWAP = ("Weapon2", "Offhand2")
 SKIP = ("MainInventory", "ExpandedMainInventory") + SWAP
@@ -277,7 +280,7 @@ def crawl_status(league, now=None):
 
 
 def refs_dir(league):
-    """Where the crawl keeps reference builds (one JSON per ladder character: gear and passive tree, no names)."""
+    """Where the crawl keeps reference builds (one JSON per ladder character: gear, passive tree, account and character names)."""
     return os.path.join(cache_root(), f"refs-{''.join(c if c.isalnum() else '-' for c in league)}")
 
 
@@ -304,14 +307,18 @@ def clear_references(league):
                 os.remove(os.path.join(folder, name))
 
 
-def save_reference(league, n, items, passives):
-    """Keep a ladder character as a reference build: its main skill, class and level, gear and passives, with the
-    character's and account's names left out. Returns the file path."""
+def save_reference(league, n, items, passives, entry=None):
+    """Keep a ladder character as a reference build: its main skill, class and level, gear and passives, and its
+    ladder entry's account and character names and rank, so its current copy can be read from GGG later (the
+    ladder shows these names publicly). Returns the file path."""
     char = {k: v for k, v in (items.get("character") or {}).items() if k in CHARACTER_KEEP}
     gear = {"character": char, "items": _neutral_ids(items.get("items") or [], f"r{n}")}
     if items.get("guardian"):  # Animate Guardian's gear, which PoB's import also reads
         gear["guardian"] = _neutral_ids(items["guardian"], f"r{n}g")
+    entry = entry or {}
     ref = {"source": "ladder", "skill": main_skill(items), "class": char.get("class"), "level": char.get("level"),
+           "account": (entry.get("account") or {}).get("name"), "character": (entry.get("character") or {}).get("name"),
+           "rank": entry.get("rank"), "read": time.time(),
            "items": gear,
            "passives": {k: (_neutral_ids(v, f"r{n}j") if k == "items" and isinstance(v, list) else v)
                         for k, v in (passives or {}).items() if k not in ("character", "account")}}
@@ -330,7 +337,7 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
     the next run resumes it. No rate-limit wait runs past it. An outage (no connection, or GGG failing character
     after character) inside the window waits CRAWL_RETRY and tries the same read again, until the window ends;
     without a window it stops the crawl. builds: also read each counted character's passive tree (a second read)
-    and keep gear + tree as a reference build (save_reference; no names)."""
+    and keep gear + tree as a reference build (save_reference, with the names the ladder shows)."""
     ggg = ggg or GGG(verbose, max_sleep=CRAWL_SLEEP)
 
     def time_left():
@@ -469,7 +476,7 @@ def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None,
             data["read"] += 1
             add_character(data, items, (e.get("character") or {}).get("class"))
             if passives:
-                save_reference(league, data["read"], items, passives)
+                save_reference(league, data["read"], items, passives, entry=e)
                 data["builds"] = data.get("builds", 0) + 1
             if data["next"] % CRAWL_SAVE_EVERY == 0:
                 data["updated"] = time.time()

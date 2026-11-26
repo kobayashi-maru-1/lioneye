@@ -18,6 +18,7 @@ import sys
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+os.environ["BUILD_LAB_NO_FETCH"] = "1"  # never download the published crawl in tests
 sys.path.insert(0, HERE)
 import concept as C  # noqa: E402
 import evaluator as E  # noqa: E402

@@ -172,7 +172,7 @@ changes are checked with a real recalculation before they're kept. Uniques and r
 | Uniques, gems, currency | poe.ninja economy API (its documented public surface) | Cached 3 h with ETag revalidation. Uniques at their most-listed variant (with links for linked items); gems at the cheapest listing meeting level/quality, falling back to any quality, then corrupted |
 | Crafted rares | [rarecost.py](market/rarecost.py) estimate, then the trade site | The estimate prices what buyers want: each mod by tier and demand (life, resists, suppression, gem levels and crit multi count; light radius or thorns don't), and only wanted mods that suit one kind of build (spell, attack, DoT, minion) count toward the "hard to hit together" markup. Six T1 mods nobody wants cost next to nothing. It also reads a finished rare's lines back to tiers, so a guide's rares are priced the same way. `--trade-check` prices the final picks: one search per item: same base, mods at 85%+ (all of them for 3 or fewer, else all but one, marked as a floor), median of the cheapest five (marked thin when under 3 are listed); no price when under half the mods match a trade stat |
 | Popularity | GGG's public ladder (top 3,000) and 80 public characters | poe.ninja's builds API is closed to third parties. Counts only, no names; cached a day; a refresh takes about 3 minutes within GGG's rate limits |
-| Uniques by skill | A crawl of about 900 public ladder characters (the top 15,000) | Per main skill, how many characters wear each unique in each slot; a unique worn by 10%+ of the skill's characters (5 or more sampled) is a candidate. GGG allows about 90 character reads per 30 minutes, so it takes about 5 hours: it never starts on its own, and the designer asks before running or refreshing it (stale after a week). Resumable; counts only, progress kept by ladder rank. `schedule-crawl.ps1` runs it in a night window (default 01:00-04:00) as a scheduled task that resumes each night, does nothing once the crawl is finished, and expires after a few nights |
+| Uniques by skill | A crawl of about 900 public ladder characters (the top 15,000) | Per main skill, how many characters wear each unique in each slot; a unique worn by 10%+ of the skill's characters (5 or more sampled) is a candidate. GGG allows about 90 character reads per 30 minutes, so it takes about 5 hours: it never starts on its own, and the designer asks before running or refreshing it (stale after a week). Resumable, progress kept by ladder rank; inside the window an outage waits and retries. Each night's result is pushed to the `crawl-data` branch (`--publish`). `schedule-crawl.ps1` runs it in a night window (default 01:00-04:00) as a scheduled task that resumes each night, does nothing once the crawl is finished, and expires after a few nights |
 | Novelty | popularity | 1 − archetype share (ascendancy + main skill) ÷ 5%: 0 for an archetype 5%+ of the top ladder plays, 1 for one nobody plays |
 
 **Budget rules:**
@@ -241,8 +241,11 @@ that decide how the skill is used.
 - a PoB import code.
 
 **Reference builds** ([design/refs.py](design/refs.py)): real builds of the same skill to compare a design with.
-- **Ladder:** the night crawl keeps each counted character's gear and passive tree (no account or character
-  names; local only), loaded through PoB's own character import.
+- **Ladder:** the night crawl keeps each counted character's gear and passive tree, with the account and
+  character names and rank the ladder shows (so the build's current copy can be read later), loaded through PoB's
+  own character import. After each night the crawl is pushed to the repo's `crawl-data` branch (one gzip file
+  per league, replaced each time; [market/crawldata.py](market/crawldata.py)); a chat sandbox without the crawl
+  downloads it on first use.
 - **Web:** guides found while designing (maxroll, pobb.in, forums), added as PoB codes.
 - Each is measured with the design's own config (the same boss, charges, buffs) and its main skill: damage, EHP,
   life / ES, resists, and cost on the back-test's yardstick (uniques and gems from poe.ninja, rares by the rare

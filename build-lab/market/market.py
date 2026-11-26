@@ -7,14 +7,17 @@
   market.py popularity --crawl-status              per-skill unique data: age, progress
   market.py popularity --crawl [--sample 900] [--fresh]   read ladder characters (hours; ask the user first)
       [--until 04:00] pause at that local time (the next run resumes); [--only-unfinished] do nothing when the
-      league's crawl is finished (a scheduled night run never starts a new one); [--log FILE] progress to a file
+      league's crawl is finished (a scheduled night run never starts a new one); [--log FILE] progress to a file;
+      [--publish] push it to the repo's crawl-data branch afterwards (crawldata.py)
+  market.py popularity --publish                   push the crawl and its reference builds to the crawl-data branch
+  market.py popularity --fetch                     download the published crawl (a chat sandbox does it on its own)
   market.py popularity --skill GEM                 the uniques the skill's players wear, by slot
                                                     ascendancy, main-skill and unique shares (refresh: a few minutes)
   market.py novelty BUILD.xml --main-skill GEM      how unusual the build's archetype is (needs popularity data)
 
 Common: [--league L] (default: poe.ninja's current challenge league), [--loadout TITLE] [--config TITLE].
 Output is JSON. Sources: poe.ninja's economy API, GGG's trade site, ladder and public character data. Popularity
-keeps counts only, no account or character names.
+keeps counts only; the crawl's reference builds keep the account and character names the ladder shows.
 """
 import argparse
 import json
@@ -60,6 +63,7 @@ def main():
     except AttributeError:
         pass
     import buildcost
+    import crawldata as CD
     import popularity as P
     from ninja import Prices
     from trade import Trade
@@ -91,6 +95,11 @@ def main():
                            help="with --crawl: only resume or start a crawl the league doesn't have finished")
             p.add_argument("--log", help="append progress and the result to this file")
             p.add_argument("--skill", help="candidate uniques for this main skill, from the crawl")
+            p.add_argument("--publish", action="store_true",
+                           help="push the crawl and its builds to the repo's crawl-data branch (with --crawl: "
+                                "after a run that read something)")
+            p.add_argument("--fetch", action="store_true",
+                           help="download the published crawl (replaces the one on disk)")
     args = ap.parse_args()
 
     if args.cmd in ("cost", "novelty") and ph._lj is None:  # these load the build in PoB: need lupa
@@ -111,15 +120,36 @@ def main():
                            "Spell Echo 20/20": prices.gem("Spell Echo", 20, 20)}}
     elif args.cmd == "popularity" and args.crawl:
         have = P.load_crawl(prices.league)
+        def publish_if_needed():
+            """Push the crawl when it moved on since the last good push (a failed one is tried again)."""
+            if not (args.publish and CD.needs_publish(prices.league)):
+                return None
+            try:
+                return CD.publish(prices.league)
+            except Exception as e:  # noqa: BLE001 - the crawl's result matters more than the push
+                print(f"publish failed: {e}", file=sys.stderr)
+                return {"published": False, "error": str(e)}
+
         if args.only_unfinished and have and have.get("done"):
-            out = {**P.crawl_status(prices.league), "note": "finished: nothing to do (a new crawl needs a yes)"}
+            published = publish_if_needed()  # the night it finished, the push may have failed
+            out = {**P.crawl_status(prices.league), "note": "finished: nothing to do (a new crawl needs a yes)",
+                   **({"publish": published} if published else {})}
         else:
             until = window_end(args.until, args.window_from) if args.until else None
             if until is False:
                 out = {"note": f"outside the {args.window_from}-{args.until} window: nothing read"}
             else:
-                data = P.crawl(prices.league, sample=args.sample or P.CRAWL_SAMPLE, fresh=args.fresh, until=until)
-                out = {**P.crawl_status(prices.league), "skills": len(data.get("skills") or {})}
+                published = None
+                try:
+                    data = P.crawl(prices.league, sample=args.sample or P.CRAWL_SAMPLE, fresh=args.fresh, until=until)
+                finally:
+                    published = publish_if_needed()  # what was read, even when the crawl stopped on an error
+                out = {**P.crawl_status(prices.league), "skills": len(data.get("skills") or {}),
+                       **({"publish": published} if published else {})}
+    elif args.cmd == "popularity" and args.publish:
+        out = CD.publish(prices.league)
+    elif args.cmd == "popularity" and args.fetch:
+        out = CD.fetch(prices.league, force=True)
     elif args.cmd == "popularity" and args.crawl_status:
         out = P.crawl_status(prices.league)
     elif args.cmd == "popularity" and args.skill:

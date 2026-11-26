@@ -9,6 +9,9 @@
   (--only-unfinished: once the league's crawl is finished, the remaining nights do nothing, so it never starts a
   new crawl on its own). Progress goes to %LOCALAPPDATA%\poe-build-expert\crawl-log.txt.
 
+  After each night that read something, the crawl and its reference builds are pushed to the repo's crawl-data
+  branch (--publish; git and this clone's GitHub sign-in), so chats outside Claude Code can use them.
+
   Outside the window nothing is read, even when the task is started by hand (--from/--until), and every request,
   rate-limit wait included, ends a minute before -Until.
 
@@ -53,7 +56,7 @@ $window = $untilAt - $startAt
 if ($window.TotalMinutes -le 0) { $window = $window.Add([timespan]::FromDays(1)) }
 
 $arguments = @(
-    "`"$market`"", "popularity", "--crawl", "--only-unfinished",
+    "`"$market`"", "popularity", "--crawl", "--only-unfinished", "--publish",
     "--from", $Start, "--until", $Until, "--league", "`"$League`"", "--log", "`"$log`""
 ) -join " "
 $action = New-ScheduledTaskAction -Execute $py -Argument $arguments -WorkingDirectory $PSScriptRoot

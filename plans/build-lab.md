@@ -563,6 +563,8 @@ instead of all counting as 1 divine; probe errors and each losing unique's resul
 
 Night 1 (26 November) read 176 of 900 characters (148 reference builds) and then stopped at 02:14 on a brief DNS failure: the crawl treated any network error as an outage and quit, losing the rest of the window. Fix: inside a night window an outage (no connection, or 5 HTTP failures in a row) waits `CRAWL_RETRY` (2 minutes) and reads the same character again, until the window ends, then pauses for the next night. Run by hand (no window), an outage still stops the crawl.
 
+**Crawl data for every chat (Andy, 2026-11-26):** reference builds keep the account and character names and ladder rank (the ladder shows them publicly; they let the lab read a build's current copy later), reversing the earlier name stripping. The night task runs with `--publish`: after a night that read something, `market/crawldata.py` pushes one gzip file per league (crawl counts plus every ladder build) to the repo's `crawl-data` branch, as a single commit that replaces the branch (force-push), so main stays light and old crawls don't pile up. A chat sandbox without the crawl downloads it on first use (the designer's unique candidates and `refs.py`); `market.py popularity --fetch` forces a fresh copy. Night 1's 148 builds were saved before this change and have no names.
+
 **Next:** when the crawl finishes, ask Andy before re-running the budget back-test with crawl uniques.
 
 ## Phase 9 plan: reference builds

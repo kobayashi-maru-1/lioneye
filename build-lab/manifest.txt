@@ -14,6 +14,7 @@ eval/eval.py
 eval/evaluator.py
 market/budget.py
 market/buildcost.py
+market/crawldata.py
 market/market.py
 market/net.py
 market/ninja.py

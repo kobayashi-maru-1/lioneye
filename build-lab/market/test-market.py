@@ -17,6 +17,7 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+os.environ["BUILD_LAB_NO_FETCH"] = "1"  # never download the published crawl in tests
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "eval"))
 sys.path.insert(0, os.path.join(HERE, "..", "opt"))
@@ -298,9 +299,11 @@ def crawl_tests(add):
             and ref["passives"]["hashes"] == [1, 2] and ref["items"]["items"] and ref["skill"] in ("Fireball", "Spark"),
             detail=str(refs[:3]))
         blob = json.dumps(ref)
-        add("crawl: reference builds keep no account or character names",
-            "c-name" not in blob and "c-secret" not in blob and ref["items"]["character"].get("class") == "Elementalist"
-            and "experience" not in ref["items"]["character"])
+        add("crawl: reference builds keep the ladder's account and character names and rank",
+            ref["account"] == "a0" and ref["character"] == "c0" and ref["rank"] == 1
+            and ref["items"]["character"].get("class") == "Elementalist"
+            and "experience" not in ref["items"]["character"], detail=str({k: ref.get(k) for k in
+                                                                         ("account", "character", "rank")}))
         add("crawl: GGG item ids are replaced by local ones, still distinct",
             "ggg-item-id" not in blob and len({it.get("id") for it in ref["items"]["items"]}) == len(ref["items"]["items"]))
         P.crawl(league, sample=4, depth=200, ggg=FakeGGG(), verbose=False, fresh=True)
@@ -414,6 +417,7 @@ def crawl_tests(add):
             and cli.window_end("04:00", "01:00", now=at(14, 0)) is False
             and cli.window_end("04:00", "01:00", now=at(0, 59)) is False
             and cli.window_end("04:00", "01:00", now=at(4, 0)) is False)
+        crawldata_tests(add, league, FakeGGG)
         add("crawl: GGG's name markup is stripped",
             P.slot_uniques({"items": [{"inventoryId": "Helm", "frameType": 3,
                                        "name": "<<set:MS>><<set:M>><<set:S>>Crown A"}]}) == {("Helmet", "Crown A")})
@@ -424,6 +428,96 @@ def crawl_tests(add):
         except OSError:
             pass
         shutil.rmtree(P.refs_dir(league), ignore_errors=True)
+
+
+def crawldata_tests(add, league, FakeGGG):
+    """Publishing to a local bare repo standing in for GitHub, and a sandbox fetching it back."""
+    import shutil
+    import subprocess
+    import tempfile
+    import urllib.error
+    import crawldata as CD
+    P.crawl(league, sample=10, depth=200, ggg=FakeGGG(), verbose=False, fresh=True)
+    other = league + " other"
+    P.crawl(other, sample=4, depth=200, ggg=FakeGGG(), verbose=False, fresh=True)
+    tmp = tempfile.mkdtemp(prefix="crawl-remote-")
+    remote = os.path.join(tmp, "remote.git")
+
+    def git(*a, **kw):
+        return subprocess.run(["git", "--git-dir", remote, *a], capture_output=True, **kw)
+    try:
+        subprocess.run(["git", "init", "-q", "--bare", remote], check=True)
+        say = lambda m: None  # noqa: E731
+        try:
+            CD.publish(league, remote=os.path.join(tmp, "missing.git"), say=say)
+            add("crawl data: an unreachable remote stops the publish", False)
+        except RuntimeError:
+            add("crawl data: an unreachable remote stops the publish", CD.needs_publish(league))
+        first = CD.publish(league, remote=remote, say=say)
+        CD.publish(other, remote=remote, say=say)
+        other_blob = git("show", f"{CD.BRANCH}:{CD.bundle_name(other)}").stdout
+        again = CD.publish(league, remote=remote, say=say)
+        files = git("ls-tree", "--name-only", CD.BRANCH, text=True).stdout.split()
+        commits = git("rev-list", "--count", CD.BRANCH, text=True).stdout.strip()
+        add("crawl data: published per league on one single-commit branch, other leagues kept unchanged",
+            first["published"] and again["builds"] == 10 and commits == "1"
+            and {CD.bundle_name(league), CD.bundle_name(other)} <= set(files)
+            and git("show", f"{CD.BRANCH}:{CD.bundle_name(other)}").stdout == other_blob, detail=f"{files} {commits}")
+        moved = P.load_crawl(league)
+        no_change = CD.needs_publish(league)
+        moved["next"] += 1
+        P._save(P.crawl_path(league), moved)
+        add("crawl data: published again only when the crawl moved on", not no_change and CD.needs_publish(league))
+        blob = git("show", f"{CD.BRANCH}:{CD.bundle_name(league)}").stdout
+        add("crawl data: the PC's own crawl is never replaced by a download",
+            CD.fetch(league, get=lambda url: blob)["fetched"] is False)
+        good = open(P.crawl_path(league), "rb").read()
+        with open(P.crawl_path(league), "w", encoding="utf-8") as f:
+            f.write("{damaged")
+        damaged = CD.fetch(league, get=lambda url: blob)
+        with open(P.crawl_path(league), "wb") as f:
+            f.write(good)
+        add("crawl data: not even when its crawl file can't be read",
+            damaged["fetched"] is False and len([n for n in os.listdir(P.refs_dir(league))
+                                                 if n.startswith("ladder-")]) == 10)
+        local = P.load_crawl(league)
+        os.remove(P.crawl_path(league))
+        P.clear_references(league)  # now a sandbox: no crawl of its own
+        got = CD.fetch(league, get=lambda url: blob)
+        refs = sorted(n for n in os.listdir(P.refs_dir(league)) if n.startswith("ladder-"))
+        ref = json.load(open(os.path.join(P.refs_dir(league), refs[0]), encoding="utf-8"))
+        back = P.load_crawl(league)
+        add("crawl data: a sandbox without the crawl fetches counts and builds, names included",
+            got["fetched"] and len(refs) == 10 and ref.get("account") and back["skills"] == local["skills"]
+            and back["read"] == local["read"], detail=str(got))
+        add("crawl data: a downloaded crawl is never published back", not CD.needs_publish(league)
+            and CD.publish(league, remote=remote, say=say)["published"] is False)
+        recent = CD.fetch(league, get=lambda url: b"not used")
+        back["fetchedAt"] = time.time() - CD.REFETCH_AFTER - 60
+        P._save(P.crawl_path(league), back)
+        stale = CD.fetch(league, get=lambda url: blob)
+        add("crawl data: a download is refreshed after a day, not before",
+            recent["fetched"] is False and stale["fetched"], detail=f"{recent} {stale}")
+
+        def gone(url):
+            raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+        add("crawl data: no published crawl is a note, not an error",
+            CD.fetch(league + " none", get=gone) == {"fetched": False,
+                                                     "note": f"no published crawl for {league} none"})
+        add("crawl data: BUILD_LAB_NO_FETCH turns the download off",
+            CD.ensure(league + " none", get=lambda url: blob)["fetched"] is False)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        for lg in (league, other):
+            try:
+                os.remove(CD._state_path(lg))
+            except OSError:
+                pass
+        try:
+            os.remove(P.crawl_path(other))
+        except OSError:
+            pass
+        shutil.rmtree(P.refs_dir(other), ignore_errors=True)
 
 
 def main():

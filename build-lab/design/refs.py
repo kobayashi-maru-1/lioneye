@@ -10,8 +10,9 @@
                                                             every reference of the skill measured in PoB
 
 Sources:
-- ladder: the night crawl (market/popularity.py) keeps each counted character's gear and passive tree, with no
-  account or character names (refs-<league>/ladder-NNNN.json). They load through PoB's own character import.
+- ladder: the night crawl (market/popularity.py) keeps each counted character's gear and passive tree, with the
+  account and character names and ladder rank (refs-<league>/ladder-NNNN.json). They load through PoB's own
+  character import. A chat sandbox without the crawl downloads the published copy (market/crawldata.py).
 - web: guides Claude finds while designing (maxroll, pobb.in, forums), added as PoB codes (web-<hash>.json).
 
 Measuring loads each reference into PoB with the design's own config (the same boss, charges and buffs; a ladder
@@ -41,7 +42,7 @@ for _sub in ("eval", "opt", "market", "backtest"):
 UA = "lioneye-build-lab/0.1"
 LIMIT = 40   # references measured per design (a popular skill can have many more)
 MEASURED = "measured.json"
-PLACEHOLDER_NAME = "Reference"   # PoB's import prints a character name; the real one is never kept
+PLACEHOLDER_NAME = "Reference"   # PoB's import needs a character name; for builds crawled before names were kept
 
 
 def refs_dir(league):
@@ -107,7 +108,10 @@ def add(league, code_or_link, skill=None, title=None, url=None, ev=None, loadout
 
 
 def listing(league, skill=None):
-    """[{file, source, skill, ...}] of the league's references, optionally one skill's."""
+    """[{file, source, skill, ...}] of the league's references, optionally one skill's. Without a crawl on disk
+    (a chat sandbox), the published one is downloaded first (market/crawldata.py)."""
+    import crawldata
+    crawldata.ensure(league)
     folder = refs_dir(league)
     out = []
     if not os.path.isdir(folder):
@@ -122,18 +126,19 @@ def listing(league, skill=None):
         if skill and (ref.get("skill") or "").lower() != skill.lower():
             continue
         out.append({"file": name, "source": ref.get("source"), "skill": ref.get("skill"),
-                    "class": ref.get("class"), "level": ref.get("level"), "title": ref.get("title"),
+                    "class": ref.get("class"), "level": ref.get("level"), "account": ref.get("account"),
+                    "character": ref.get("character"), "rank": ref.get("rank"), "title": ref.get("title"),
                     "url": ref.get("url"), "loadout": ref.get("loadout")})
     return out
 
 
 def ref_xml(league, name, ev):
-    """The reference as PoB XML: a ladder one through PoB's character import (placeholder name), a web one as is."""
+    """The reference as PoB XML: a ladder one through PoB's character import, a web one as is."""
     ref = _read(os.path.join(refs_dir(league), name))
     if ref.get("source") == "web":
         return ref["xml"]
     items = dict(ref["items"])
-    items["character"] = {**(items.get("character") or {}), "name": PLACEHOLDER_NAME}
+    items["character"] = {**(items.get("character") or {}), "name": ref.get("character") or PLACEHOLDER_NAME}
     ev.pob.import_character(json.dumps(items), json.dumps(ref["passives"]))
     return ev.pob.save_xml()
 

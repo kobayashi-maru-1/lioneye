@@ -216,7 +216,9 @@ def unique_candidates(spec, db, league, main_skill):
             else:
                 unknown.append(n)
         return out, {"source": "spec", "candidates": out, **({"leftOut": unknown} if unknown else {})}
+    import crawldata
     import popularity as P
+    crawldata.ensure(league)  # a chat sandbox downloads the PC's published crawl
     status = P.crawl_status(league)
     c = P.candidates(P.load_crawl(league), main_skill)
     out = {g: [n for n, _ in v] for g, v in c["slots"].items() if g != "Flask"}
