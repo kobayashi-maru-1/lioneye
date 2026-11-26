@@ -418,7 +418,8 @@ def run_one(args, b, xml, result, modes, prices, db, say):
                           **({"utility": rep["utility"]} if "utility" in rep else {}),
                           "spent": (rep.get("spend") or {}).get("spent"),
                           **({"tradeChecks": rep["tradeChecks"]} if rep.get("tradeChecks") else {}),
-                          "supports": next((g["gems"][1:] for g in rep["gems"]), []), "xml": lab_xml})
+                          "supports": next((g["gems"][1:] for g in rep["gems"]), []), "xml": lab_xml,
+                          **({"uniques": rep["uniques"]} if rep.get("uniques") else {})})
         result.setdefault("runs", {})["budget"] = pick(tries, guide)
 
 

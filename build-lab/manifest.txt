@@ -25,4 +25,5 @@ opt/gems.py
 opt/objective.py
 opt/opt.py
 opt/tree.py
+opt/uniques.py
 pob/pob-headless.py

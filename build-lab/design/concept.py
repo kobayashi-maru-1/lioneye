@@ -44,6 +44,9 @@ Spec (JSON):
   floors        minimums for other player stats, held the same way: {"PhysicalMaximumHitTaken": 9000,
                 "EffectiveSpellSuppressionChance": 100, "MovementSpeedMod": 1.3}
   metric        optional: FullDPS, CombinedDPS, minion.CombinedDPS, ...
+  unique_candidates  optional list of unique names to try against the crafted rares (e.g. from poe.ninja's
+                builds page); default: the uniques ladder players of the main skill wear (market.py popularity
+                --crawl). "none" or [] tries no uniques
 """
 import argparse
 import base64
@@ -186,6 +189,47 @@ def _form(v):
     raise ValueError(f"bad item entry {v!r}: give a base name, {{\"unique\": ...}} or {{\"text\": ...}}")
 
 
+UNIQUE_GROUP = {"Helmet": "Helmet", "Body Armour": "Body Armour", "Gloves": "Gloves", "Boots": "Boots",
+                "Belt": "Belt", "Amulet": "Amulet", "Ring": "Ring", "Shield": "Weapon 2", "Quiver": "Weapon 2"}
+WEAPON_TYPES = frozenset({"Bow", "Claw", "Dagger", "Rune Dagger", "Wand", "Sceptre", "Staff", "Warstaff",
+                          "One Handed Sword", "One Handed Axe", "One Handed Mace", "Two Handed Sword",
+                          "Two Handed Axe", "Two Handed Mace", "Fishing Rod"})
+
+
+def unique_candidates(spec, db, league, main_skill):
+    """({slot group: [unique names]}, what the report says about where they came from). The spec's own list
+    wins; otherwise the ladder crawl's uniques for the main skill (popularity.candidates). Flasks aren't compared
+    yet."""
+    names = (spec or {}).get("unique_candidates")
+    if names == "none" or names == []:
+        return {}, {"source": "none"}
+    if names:
+        out, unknown = {}, []
+        for n in names:
+            try:
+                t = db.item_type({"unique": n})
+            except ValueError:
+                t = None
+            group = UNIQUE_GROUP.get(t) or ("Weapon 1" if t in WEAPON_TYPES else None)
+            if group:
+                out.setdefault(group, []).append(n)
+            else:
+                unknown.append(n)
+        return out, {"source": "spec", "candidates": out, **({"leftOut": unknown} if unknown else {})}
+    import popularity as P
+    status = P.crawl_status(league)
+    c = P.candidates(P.load_crawl(league), main_skill)
+    out = {g: [n for n, _ in v] for g, v in c["slots"].items() if g != "Flask"}
+    info = {"source": "ladder crawl", "data": status, "characters": c["characters"], "candidates": c["slots"]}
+    if not status["exists"]:
+        info["note"] = "no ladder crawl yet: no uniques tried (ask the user before running market.py popularity --crawl)"
+    elif c["thin"]:
+        info["note"] = f"only {c['characters']} sampled characters use {main_skill}: no uniques tried"
+    elif status["stale"]:
+        info["note"] = f"ladder crawl is {status['ageDays']} days old (ask the user before refreshing it)"
+    return out, info
+
+
 def check_spec(spec):
     for k in ("name", "class", "main_skill", "weapon"):
         if not spec.get(k):
@@ -202,6 +246,9 @@ def check_spec(spec):
         raise ValueError("links must be 1-6")
     if len(spec.get("flasks") or []) > 5:
         raise ValueError("at most 5 flasks")
+    uc = spec.get("unique_candidates")
+    if uc is not None and uc != "none" and not (isinstance(uc, list) and all(isinstance(x, str) for x in uc)):
+        raise ValueError('unique_candidates must be a list of unique names, or "none"')
 
 
 def plan_items(spec, db):
@@ -366,10 +413,15 @@ def charge_start_gems(pool, budget, log):
 
 def pipeline(pool, start_stats, metric, cls, ascendancy, links, budget=None, log=None, quick=False, tier=2,
              ehp_floor=None, owned=None, say=None, points=None, asc_points=None, seed=0, chaos_min=0, floors=None,
-             keep_supports=(), floor_weight=FLOOR_WEIGHT, floor_hard=FLOOR_HARD):
+             keep_supports=(), floor_weight=FLOOR_WEIGHT, floor_hard=FLOOR_HARD, unique_cands=None, prices=None,
+             fixed_slots=(), item_type=None, unique_report=None):
     """The optimizing part of complete(), on a loaded pool: tree grown from the class start (without the resist
-    rules), supports to `links`, then (unless quick) crafted rares, jewels, tier upgrades (with a budget),
+    rules), supports to `links`, then (unless quick) crafted rares, jewels, uniques competing with those rares
+    (unique_cands, priced by `prices`; rares re-crafted after a swap), tier upgrades (with a budget), side skills,
     supports and tree again. Returns the full Rules the result is judged by.
+
+    unique_cands: {slot group: [unique names]} (opt/uniques.py); fixed_slots: slots holding a unique the spec
+    named, never swapped; unique_report: a dict filled with what the unique step did.
 
     points / asc_points: the passive budgets (default: what the level allows). seed: 0 is the standard order;
     other seeds put the supports before the tree on odd seeds and shuffle the order gear slots are crafted in,
@@ -417,6 +469,17 @@ def pipeline(pool, start_stats, metric, cls, ascendancy, links, budget=None, log
                         log=log, slots=slots)
         say("jewels")
         R.optimize_jewels(pool, rules, tier=tier, main_skill=pool.main_skill(), budget=budget, log=log)
+        if unique_cands and prices is not None:
+            import uniques as U
+            say("uniques against rares")
+            done = U.compete(pool, rules, unique_cands, prices, budget=budget, fixed=fixed_slots,
+                             item_type=item_type, main_skill=pool.main_skill(), log=log)
+            if unique_report is not None:
+                unique_report.update(done)
+            if done["swaps"]:
+                say("gear again")  # resists and attributes moved with the swap
+                R.optimize_gear(pool, rules, tier=tier, keep_implicits=False, main_skill=pool.main_skill(),
+                                budget=budget, log=log, slots=slots)
         if budget is not None:
             say("tier upgrades")
             R.upgrade_tiers(pool, rules, budget, main_skill=pool.main_skill(), log=log)
@@ -428,10 +491,12 @@ def pipeline(pool, start_stats, metric, cls, ascendancy, links, budget=None, log
 
 
 def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, budget_div=None, quick=False,
-             trade_check=False, league=None, workers=None, metric=None, tier=2, ehp_floor=None, log_progress=None,
+             trade_check=False, league=None, workers=None, metric=None, tier=None, ehp_floor=None, log_progress=None,
              config_xml=None, seed=0, links=None, floors=None):
     """Run the pipeline; returns (report, final_xml). ehp_floor: a minimum total EHP the build must reach (a rule
-    like the resists); default none."""
+    like the resists); default none. tier: the crafted rares' starting tier; default T2 with a budget (it moves
+    them down or up), T1 without one (the strongest items, whatever they cost). A spec concept also tries
+    uniques against its rares (unique_candidates); a loaded build (--xml) keeps its own items."""
     import evaluator as E
     import opt as O
     from objective import summary
@@ -460,6 +525,11 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
     if budget_div is not None:
         from budget import Budget
         budget = Budget(budget_div, prices)
+    tier = tier or (2 if budget_div is not None else 1)
+    cands, unique_info = ({}, None)
+    if spec is not None and prices is not None:
+        cands, unique_info = unique_candidates(spec, db, prices.league, main_skill)
+    unique_done = {}
     with E.EvalPool(workers=E.default_workers() if workers is None else workers) as pool:
         start = pool.load(xml, main_skill)
         # Uniques: PoB's own item text, equipped on the loaded build; charged at their poe.ninja price.
@@ -487,7 +557,9 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
         rules = pipeline(pool, start["stats"], metric, cls, ascendancy, links, budget=budget, log=log, quick=quick,
                          tier=tier, ehp_floor=ehp_floor, owned=owned, say=say, seed=seed,
                          floors=floors or (spec or {}).get("floors"),
-                         keep_supports=(spec or {}).get("keep_supports") or ())
+                         keep_supports=(spec or {}).get("keep_supports") or (), unique_cands=cands, prices=prices,
+                         fixed_slots={u["slot"] for u in uniques}, item_type=lambda b: db.base(b)["type"],
+                         unique_report=unique_done)
         final = pool.stats()
         final_xml = pool.save_xml()
         report = {
@@ -503,6 +575,8 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
                      for g in pool.groups() if g["enabled"] and not g.get("source")],
             "changes": len(log),
         }
+        if unique_info is not None:
+            report["uniques"] = {**unique_info, **unique_done}
         if prices is not None:
             import buildcost
             try:
@@ -550,7 +624,7 @@ def main():
     p.add_argument("--trade-check", action="store_true")
     p.add_argument("--league")
     p.add_argument("--metric")
-    p.add_argument("--tier", type=int, default=2)
+    p.add_argument("--tier", type=int, help="crafted rares start tier (default: 2 with a budget, 1 without)")
     p.add_argument("--ehp-floor", type=float, help="minimum total EHP, held like the resist rules")
     p.add_argument("--workers", type=int)
     p.add_argument("--out")

@@ -242,6 +242,80 @@ def builds(add, specs, workers):
                     rules.not_worse(final, start["stats"]) and rules.value(final) >= rules.value(start["stats"]) * (1 - 1e-9))
 
 
+def crawl_tests(add):
+    """The per-skill crawl against a stand-in GGG: counts, resume after a rate-limit stop, candidates."""
+    import urllib.parse as up
+    from net import RateLimited
+    league = f"Test Crawl {os.getpid()}"
+
+    def char(skill, uniques):
+        return {"items": [{"inventoryId": "BodyArmour", "sockets": [{"group": 0}] * 2,
+                           "socketedItems": [{"typeLine": skill, "socket": 0, "support": False,
+                                              "properties": [{"name": "Spell"}]},
+                                             {"typeLine": "Sup", "socket": 1, "support": True}]}]
+                + [{"inventoryId": slot, "frameType": 3, "name": name} for slot, name in uniques]}
+
+    chars = {f"c{i}": char("Fireball", [("Helm", "Crown A")] + ([("Ring2", "Band B")] if i % 3 == 0 else []))
+             for i in range(9)}
+    chars["c9"] = char("Spark", [("Belt", "Belt C")])
+    ladder = [{"rank": i + 1, "public": True, "account": {"name": f"a{i}"},
+               "character": {"name": f"c{i}", "class": "Elementalist"}} for i in range(10)]
+
+    class FakeGGG:
+        def __init__(self, stop_after=None):
+            self.reads, self.stop_after = 0, stop_after
+
+        def call(self, url):
+            if "ladders" in url:
+                return {"entries": ladder if "offset=0" in url else []}
+            if self.stop_after is not None and self.reads >= self.stop_after:
+                raise RateLimited("window")
+            self.reads += 1
+            return chars[up.parse_qs(url.split("?", 1)[1])["character"][0]]
+
+    try:
+        try:
+            P.crawl(league, sample=10, depth=200, ggg=FakeGGG(stop_after=4), verbose=False)
+            add("crawl: a long rate-limit pause stops the crawl", False)
+        except RateLimited:
+            saved = P.load_crawl(league)
+            add("crawl: progress saved when it stops", saved and saved["read"] == 4 and not saved["done"])
+        data = P.crawl(league, sample=10, depth=200, ggg=FakeGGG(), verbose=False)
+        fb = data["skills"]["Fireball"]
+        add("crawl: resumes where it stopped, nobody counted twice", data["done"] and data["read"] == 10
+            and fb["n"] == 9, detail=str(fb))
+        add("crawl: uniques counted by slot, both rings as Ring",
+            fb["uniques"]["Helmet"]["Crown A"] == 9 and fb["uniques"]["Ring"]["Band B"] == 3)
+        add("crawl: no names kept", "c1" not in json.dumps(data) and "a1" not in json.dumps(data))
+        c = P.candidates(data, "Fireball", share=0.5)
+        add("candidates: only uniques at or above the share", c["slots"] == {"Helmet": [("Crown A", 1.0)]},
+            detail=str(c))
+        add("candidates: a skill with too few characters is thin", P.candidates(data, "Spark")["thin"])
+        st = P.crawl_status(league, now=data["updated"] + 8 * 86400)
+        add("crawl status: older than a week is stale", st["stale"] and st["done"])
+
+        class Outage(FakeGGG):
+            def call(self, url):
+                if "ladders" not in url and self.reads >= 3:
+                    raise RuntimeError("can't reach pathofexile.com (timed out)")
+                return super().call(url)
+        try:
+            P.crawl(league, sample=10, depth=200, ggg=Outage(), verbose=False, fresh=True)
+            add("crawl: an outage stops the crawl instead of finishing it", False)
+        except RuntimeError:
+            saved = P.load_crawl(league)
+            add("crawl: an outage stops the crawl instead of finishing it", not saved["done"]
+                and saved["next"] == 3 and saved["failed"] == 0, detail=str({k: saved[k] for k in ("next", "failed")}))
+        add("crawl: GGG's name markup is stripped",
+            P.slot_uniques({"items": [{"inventoryId": "Helm", "frameType": 3,
+                                       "name": "<<set:MS>><<set:M>><<set:S>>Crown A"}]}) == {("Helmet", "Crown A")})
+    finally:
+        try:
+            os.remove(P.crawl_path(league))
+        except OSError:
+            pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("builds", nargs="*")
@@ -254,6 +328,7 @@ def main():
         report.append({"test": test, "ok": bool(ok), **extra})
 
     unit(add)
+    crawl_tests(add)
     if not args.offline:
         live(add)
         if args.builds:

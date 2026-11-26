@@ -13,11 +13,15 @@ Rules (the resist, chaos and EHP rules can be changed or switched off; PoB's war
   block, the biggest hit of each type, recovery.
 - PoB's own hard warnings: attribute requirements, unreserved life/mana, Precise Technique accuracy, plus the
   main skill's cost against its pool.
+- Sustain: a build that damages itself (PoB's TotalBuildDegen: Righteous Fire, Blood Rage, ...) must regenerate
+  at least as much: net life regen and total net regen (life + mana + energy shield) both 0 or more. PoB shows
+  the net figure but doesn't warn, and a design losing 1,370 life a second dies in seconds.
 
 Each rule has a shortfall: (cap - res) / cap per failing element ((chaos_min - chaos) / 75 for chaos),
 (floor - EHP) / floor and the same for each stat floor, 0.01 + the share missing for attribute requirements and the skill cost,
 0.01 + the overdraw as a share of the pool for "unreserved Mana is negative" / "unreserved Life is below 1" (so
-reservation efficiency and more mana count as progress), 1 for any other warning.
+reservation efficiency and more mana count as progress), 0.01 + the net loss as a share of the self-damage for
+sustain, 1 for any other warning.
 
 How results compare: a score tuple, lower is better, then the metric (FullDPS, CombinedDPS or
 minion.CombinedDPS), higher is better.
@@ -64,6 +68,17 @@ def _share(need, have):
     if not isinstance(need, (int, float)) or not isinstance(have, (int, float)) or need <= 0:
         return 1.0
     return min(1.0, max(0.0, (need - have) / need))
+
+
+def _sustain(p):
+    """Shortfall of the sustain rule: 0 without self-damage or when regen covers it, else 0.01 + the net loss as a
+    share of the self-damage."""
+    degen = p.get("TotalBuildDegen")
+    if not isinstance(degen, (int, float)) or degen <= 0:
+        return 0.0
+    nets = [v for v in (p.get("NetLifeRegen"), p.get("TotalNetRegen")) if isinstance(v, (int, float))]
+    worst = min(nets) if nets else 0.0
+    return 0.01 + -worst / degen if worst < -EPS else 0.0
 
 
 def _warning(w, p):
@@ -113,6 +128,7 @@ class Rules:
                 "ehpFloor": round(self.ehp_floor) if self.ehp_floor else None,
                 **({"floors": {k: round(v, 1) for k, v in self.floors.items()}} if self.floors else {}),
                 "pobWarnings": "attribute requirements, unreserved life/mana, accuracy, main skill cost",
+                "sustain": "net regen covers self-damage (Righteous Fire, Blood Rage, ...)",
                 **({"floorWeight": self.floor_weight, "floorHard": self.floor_hard} if self.floor_weight else {}),
                 "startBreaks": self.start_breaks, "brokenAtStart": self.start_missed}
 
@@ -154,6 +170,9 @@ class Rules:
         for w in r.get("violations") or []:
             k, s = _warning(w, p)
             out[k] = max(out.get(k, 0.0), s)
+        s = _sustain(p)
+        if s > 0:
+            out["sustain"] = s
         return out
 
     @staticmethod
@@ -215,6 +234,9 @@ class Rules:
                 out.append(f"TotalEHP {p.get('TotalEHP'):.0f} < {self.ehp_floor:.0f}")
             elif k.startswith("floor:"):
                 out.append(f"{k[6:]} {p.get(k[6:]):.0f} < {self.floors[k[6:]]:.0f}")
+            elif k == "sustain":
+                out.append(f"net life regen {p.get('NetLifeRegen') or 0:.0f}/s against self-damage "
+                           f"{p.get('TotalBuildDegen'):.0f}/s")
         out.extend(r.get("violations") or [])
         return out
 

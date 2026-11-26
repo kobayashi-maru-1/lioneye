@@ -248,6 +248,155 @@ def side_skill_tests(add):
         abs(budget.spent - 0.5) < 1e-9 and log and abs(log[0]["refund"] - 3.0) < 1e-9, detail=str(budget.spent))
 
 
+class UniquePool:
+    """A stand-in pool for uniques.compete: damage is 100 x the multipliers of the named items worn."""
+    MULT = {"Crown Good": 1.5, "Crown Bad": 0.9, "Big Staff": 1.3, "Ring X": 1.05, "Pricey Plate": 2.0,
+            "Good Shield": 1.1, "Long Bow": 1.4, "Swift Quiver": 1.2, "Fast Wand": 1.6}
+    TYPE = {"Crown Good": "Helmet", "Crown Bad": "Helmet", "Big Staff": "Staff", "Ring X": "Ring",
+            "Pricey Plate": "Body Armour", "Unlisted Cap": "Helmet", "Good Shield": "Shield", "Long Bow": "Bow",
+            "Swift Quiver": "Quiver", "Fast Wand": "Wand"}
+
+    def __init__(self):
+        rare = lambda t, sockets=None: {"name": "Build-lab", "rarity": "RARE", "type": t,  # noqa: E731
+                                        "text": "Rarity: RARE\nBuild-lab\nBase" + (f"\nSockets: {sockets}" if sockets else "")}
+        self.items = {"Helmet": rare("Helmet"), "Body Armour": rare("Body Armour", "B-B-B-B-B-B"),
+                      "Weapon 1": rare("Wand"), "Weapon 2": rare("Shield"), "Ring 1": rare("Ring"),
+                      "Ring 2": rare("Ring")}
+        self.applied = []
+
+    def _dps(self, items):
+        d = 100.0
+        for it in items.values():
+            if it:
+                d *= self.MULT.get(it["name"], 1.0)
+        return d
+
+    def stats(self, items=None):
+        return fake(dps=self._dps(self.items if items is None else items))
+
+    def slots(self):
+        return [{"slot": s, "item": it} for s, it in self.items.items()]
+
+    def groups(self):
+        return [{"index": 1, "main": True, "enabled": True, "slot": "Body Armour",
+                 "gems": [{"index": i, "name": f"G{i}", "enabled": True, "support": i > 1} for i in range(1, 7)]}]
+
+    def unique_text(self, name, base=None):
+        if name not in self.TYPE:
+            raise ValueError(f"PoB has no unique '{name}'")
+        return {"name": name, "base": f"{name} Base", "text": f"Rarity: UNIQUE\n{name}\n{name} Base\nSome mod"}
+
+    def _item(self, text):
+        name = text.split("\n")[1]
+        return {"name": name, "rarity": "UNIQUE", "type": self.TYPE[name], "text": text}
+
+    def probe(self, specs):
+        out = []
+        for sp in specs:
+            items = dict(self.items)
+            items[sp["item"]["slot"]] = self._item(sp["item"]["text"])
+            out.append(self.stats(items))
+        return out
+
+    def save_xml(self):
+        return dict(self.items)
+
+    def load(self, snap, main_skill=None):
+        self.items = dict(snap)
+
+    def apply(self, ops):
+        for op in ops:
+            self.applied.append(op)
+            self.items[op["slot"]] = self._item(op["text"]) if op["op"] == "equip" else None
+        return self.stats()
+
+
+class UniquePrices:
+    PRICE = {"Crown Good": 3.0, "Crown Bad": 0.5, "Big Staff": 1.0, "Ring X": 0.2, "Pricey Plate": 50.0,
+             "Good Shield": 0.1, "Long Bow": 1.0, "Swift Quiver": 0.5, "Fast Wand": 1.0}
+
+    def __init__(self):
+        self.links = {}
+
+    def unique(self, name, base=None, links=None):
+        self.links[name] = links
+        return {"divine": self.PRICE[name]} if name in self.PRICE else None
+
+
+def unique_tests(add):
+    import uniques as U
+    sys.path.insert(0, os.path.join(HERE, "..", "market"))
+    from budget import Budget
+    item_type = lambda base: UniquePool.TYPE.get(base.replace(" Base", ""))  # noqa: E731
+    cands = {"Helmet": ["Crown Bad", "Crown Good", "Unlisted Cap"], "Weapon 1": ["Big Staff"], "Ring": ["Ring X"],
+             "Body Armour": ["Pricey Plate"]}
+    rules = Rules("CombinedDPS", fake(), start_breaks="repair")
+    pool, prices, log = UniquePool(), UniquePrices(), []
+    out = U.compete(pool, rules, cands, prices, item_type=item_type, log=log)
+    names = {s: (it or {}).get("name") for s, it in pool.items.items()}
+    add("uniques", "no budget: every unique that beats its rare is kept, the strongest first",
+        [s["name"] for s in out["swaps"]][:1] == ["Pricey Plate"] and names["Helmet"] == "Crown Good"
+        and names["Weapon 1"] == "Big Staff", detail=str(names))
+    add("uniques", "a unique worse than the rare is never kept", "Crown Bad" not in names.values())
+    bad = next((r for r in out["results"] if r["name"] == "Crown Bad"), {})
+    add("uniques", "the report shows how a losing unique did against the build",
+        bad.get("beats") is False and bad.get("gain", 0) < 0 and bad.get("slot") == "Helmet", detail=str(out["results"]))
+    add("uniques", "a two-handed weapon empties the offhand", names["Weapon 2"] is None)
+    add("uniques", "a unique poe.ninja doesn't list is unavailable",
+        "unavailable" in out["skipped"].get("Unlisted Cap", ""), detail=str(out["skipped"]))
+    add("uniques", "the main group's body armour keeps its sockets and is priced 6-linked",
+        "Sockets: B-B-B-B-B-B" in pool.items["Body Armour"]["text"] and prices.links.get("Pricey Plate") == 6)
+    add("uniques", "a unique ring can go in either ring slot", names["Ring 1"] == "Ring X" or names["Ring 2"] == "Ring X")
+
+    budget = Budget(5.0, None)  # 3 spent on rares: 2 left
+    for slot, cost in (("Helmet", 1.0), ("Weapon 1", 0.5), ("Weapon 2", 0.5), ("Body Armour", 1.0)):
+        budget.charge(cost, f"rare {slot}", f"crafted {slot}")
+    pool, prices, log = UniquePool(), UniquePrices(), []
+    out = U.compete(pool, rules, cands, prices, budget=budget, item_type=item_type, log=log)
+    names = {s: (it or {}).get("name") for s, it in pool.items.items()}
+    add("uniques", "budget: a unique that doesn't fit is skipped", names["Body Armour"] != "Pricey Plate"
+        and "budget" in out["skipped"].get("Pricey Plate", ""), detail=str(out["skipped"]))
+    # Big Staff first (+30% for nothing net: the wand and shield are refunded), then Crown Good (+50% for 2 net);
+    # then Ring X no longer fits.
+    add("uniques", "budget: swaps by gain per divine; replaced rares refunded, uniques charged",
+        [s["name"] for s in out["swaps"]] == ["Big Staff", "Crown Good"] and abs(budget.spent - 5.0) < 1e-9,
+        detail=f"{budget.spent} {out['swaps']}")
+    pool = UniquePool()
+    out = U.compete(pool, rules, {"Helmet": ["Crown Good"]}, UniquePrices(), fixed={"Helmet"}, item_type=item_type)
+    add("uniques", "a slot holding a unique the spec named is never swapped", not out["swaps"])
+
+    budget = Budget(10.0, None)
+    budget.charge(0.5, "rare Weapon 1", "crafted Weapon 1")
+    budget.charge(0.5, "rare Weapon 2", "crafted Weapon 2")
+    pool = UniquePool()
+    out = U.compete(pool, rules, {"Weapon 2": ["Good Shield"], "Weapon 1": ["Big Staff"]}, UniquePrices(),
+                    budget=budget, item_type=item_type)
+    add("uniques", "a two-handed weapon refunds a unique offhand swapped in earlier",
+        [x["name"] for x in out["swaps"]] == ["Big Staff"] and abs(budget.spent - 1.0) < 1e-9
+        and pool.items["Weapon 2"] is None, detail=f"{budget.spent} {out['swaps']}")
+    pool = UniquePool()
+    pool.items["Weapon 1"] = {**pool.items["Weapon 1"], "type": "Bow"}
+    pool.items["Weapon 2"] = {**pool.items["Weapon 2"], "type": "Quiver"}
+    out = U.compete(pool, rules, {"Weapon 2": ["Swift Quiver", "Good Shield"], "Weapon 1": ["Long Bow"]},
+                    UniquePrices(), item_type=item_type)
+    names = {s: (it or {}).get("name") for s, it in pool.items.items()}
+    add("uniques", "a bow build tries quivers, never shields; a unique bow keeps the quiver",
+        names["Weapon 2"] == "Swift Quiver" and names["Weapon 1"] == "Long Bow"
+        and "bow takes a quiver" in out["skipped"].get("Good Shield", ""), detail=f"{names} {out['skipped']}")
+    pool = UniquePool()
+    out = U.compete(pool, rules, {"Weapon 2": ["Swift Quiver"]}, UniquePrices(), item_type=item_type)
+    pool = UniquePool()
+    pool.items["Weapon 1"] = {**pool.items["Weapon 1"], "type": "Bow"}
+    pool.items["Weapon 2"] = {**pool.items["Weapon 2"], "type": "Quiver"}
+    out = U.compete(pool, rules, {"Weapon 1": ["Fast Wand"]}, UniquePrices(), item_type=item_type)
+    add("uniques", "a one-handed weapon replacing a bow drops the quiver; the report names what it replaced",
+        pool.items["Weapon 1"]["name"] == "Fast Wand" and pool.items["Weapon 2"] is None
+        and out["swaps"][0]["replaced"] == "rare", detail=str(out["swaps"]))
+    pool = UniquePool()
+    out = U.compete(pool, rules, {"Weapon 2": ["Swift Quiver"]}, UniquePrices(), item_type=item_type)
+    add("uniques", "a quiver needs a bow", not out["swaps"] and "bow" in out["skipped"].get("Swift Quiver", ""))
+
+
 def rule_tests(add):
     start = fake()
     r = Rules("CombinedDPS", start)
@@ -287,6 +436,14 @@ def rule_tests(add):
     add("rules", "repair: an overdraw past the whole pool still grades progress",
         rp.better(fake(violations=[neg], Mana=1000, ManaUnreserved=-1500),
                   fake(violations=[neg], Mana=1000, ManaUnreserved=-2500)))
+    add("rules", "sustain: self-damage outpacing regen breaks a rule",
+        "sustain" in rp.shortfalls(fake(TotalBuildDegen=1600, NetLifeRegen=-1370, TotalNetRegen=-1340)))
+    add("rules", "sustain: regen covering self-damage is fine; no self-damage, no rule",
+        "sustain" not in rp.shortfalls(fake(TotalBuildDegen=900, NetLifeRegen=1036, TotalNetRegen=1050))
+        and "sustain" not in rp.shortfalls(fake(LifeRegenRecovery=0)))
+    add("rules", "sustain: a smaller net loss is progress",
+        rp.better(fake(TotalBuildDegen=1600, NetLifeRegen=-200, TotalNetRegen=-200),
+                  fake(dps=500, TotalBuildDegen=1600, NetLifeRegen=-1300, TotalNetRegen=-1300)))
     add("rules", "unreserved life below 1: graded by the life pool",
         abs(rp.shortfalls(fake(violations=["Your unreserved Life is below 1"], LifeUnreserved=-99))
             ["warn:Your unreserved Life is below 1"] - 0.11) < 1e-9)
@@ -311,6 +468,7 @@ def main():
     bundle_tests(add)
     upgrade_tests(add)
     side_skill_tests(add)
+    unique_tests(add)
     if args.builds:
         fresh = E.Evaluator()
         with E.EvalPool(workers=args.workers) as pool:

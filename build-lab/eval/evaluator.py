@@ -48,7 +48,7 @@ EXTRA_KEYS = ("ReqStr", "ReqDex", "ReqInt", "ReqOmni", "Omni", "ChaosResist", "L
               "FireTakenHitMult", "ColdTakenHitMult", "LightningTakenHitMult", "ChaosTakenHitMult",
               "FireEnemyDamage", "ColdEnemyDamage", "LightningEnemyDamage", "ChaosEnemyDamage",
               "FireTakenDamage", "ColdTakenDamage", "LightningTakenDamage", "ChaosTakenDamage",
-              "ManaCost", "LifeCost", "ESCost", "RageCost")
+              "ManaCost", "LifeCost", "ESCost", "RageCost", "TotalBuildDegen", "NetLifeRegen", "TotalNetRegen")
 
 
 def ph():

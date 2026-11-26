@@ -114,17 +114,19 @@ def needed_wait(headers, margin=MARGIN):
 
 class GGG:
     """pathofexile.com JSON calls, paced by GGG's X-Rate-Limit-* headers (see needed_wait), waiting out 429s.
-    A pause longer than MAX_SLEEP raises RateLimited instead of sleeping (or risking a 30-60 minute ban)."""
+    A pause longer than max_sleep (default MAX_SLEEP) raises RateLimited instead of sleeping (or risking a 30-60
+    minute ban). A long background job (the popularity crawl) passes a longer max_sleep to wait out whole windows."""
 
-    def __init__(self, verbose=True):
+    def __init__(self, verbose=True, max_sleep=MAX_SLEEP):
         self.verbose = verbose
+        self.max_sleep = max_sleep
 
     def _say(self, msg):
         if self.verbose:
             print(msg, file=sys.stderr)
 
     def _pause(self, wait, why):
-        if wait > MAX_SLEEP:
+        if wait > self.max_sleep:
             raise RateLimited(f"GGG's rate limit needs a {wait // 60 + 1} minute pause ({why}); try again later")
         self._say(f"GGG rate limit near ({why}), waiting {wait}s")
         time.sleep(wait)

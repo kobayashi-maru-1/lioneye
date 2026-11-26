@@ -131,6 +131,8 @@ and prints a JSON report: before, after, the rules, every change.
 - **PoB's own warnings:** attribute requirements, unreserved life and mana, accuracy, and the main skill's cost.
   Attributes, cost and reservation overdraw are graded by how far short they are, so partial progress counts.
   Reservation overdraw isn't capped at the pool, so each aura turned off still counts.
+- **Sustain:** a build that damages itself (Righteous Fire, Blood Rage) must regenerate at least as much. PoB
+  shows net regen but doesn't warn about it.
 
 **How results rank:**
 1. Rules met at the start must stay met.
@@ -155,6 +157,9 @@ changes are checked with a real recalculation before they're kept. Uniques and r
 & $py build-lab\market\market.py prices                               # league, divine price, examples
 & $py build-lab\market\market.py cost BUILD.xml --main-skill X [--trade-check]
 & $py build-lab\market\market.py popularity [--refresh]               # ascendancy, skill, unique shares
+& $py build-lab\market\market.py popularity --crawl-status           # per-skill unique data: age, progress
+& $py build-lab\market\market.py popularity --crawl [--fresh]        # hours: ask before running it
+& $py build-lab\market\market.py popularity --skill "Righteous Fire" # the skill's candidate uniques by slot
 & $py build-lab\market\market.py novelty BUILD.xml --main-skill X
 & $py build-lab\opt\opt.py all BUILD.xml --main-skill X --budget 10 --trade-check
 & $py build-lab\market\test-market.py [BUILD.xml::MAIN_SKILL ...] [--offline]
@@ -165,6 +170,7 @@ changes are checked with a real recalculation before they're kept. Uniques and r
 | Uniques, gems, currency | poe.ninja economy API (its documented public surface) | Cached 3 h with ETag revalidation. Uniques at their most-listed variant (with links for linked items); gems at the cheapest listing meeting level/quality, falling back to any quality, then corrupted |
 | Crafted rares | [rarecost.py](market/rarecost.py) estimate, then the trade site | The estimate prices what buyers want: each mod by tier and demand (life, resists, suppression, gem levels and crit multi count; light radius or thorns don't), and only wanted mods that suit one kind of build (spell, attack, DoT, minion) count toward the "hard to hit together" markup. Six T1 mods nobody wants cost next to nothing. It also reads a finished rare's lines back to tiers, so a guide's rares are priced the same way. `--trade-check` prices the final picks: one search per item: same base, mods at 85%+ (all of them for 3 or fewer, else all but one, marked as a floor), median of the cheapest five (marked thin when under 3 are listed); no price when under half the mods match a trade stat |
 | Popularity | GGG's public ladder (top 3,000) and 80 public characters | poe.ninja's builds API is closed to third parties. Counts only, no names; cached a day; a refresh takes about 3 minutes within GGG's rate limits |
+| Uniques by skill | A crawl of about 900 public ladder characters (the top 15,000) | Per main skill, how many characters wear each unique in each slot; a unique worn by 10%+ of the skill's characters (5 or more sampled) is a candidate. GGG allows about 90 character reads per 30 minutes, so it takes about 5 hours: it never starts on its own, and the designer asks before running or refreshing it (stale after a week). Resumable; counts only, progress kept by ladder rank |
 | Novelty | popularity | 1 − archetype share (ascendancy + main skill) ÷ 5%: 0 for an archetype 5%+ of the top ladder plays, 1 for one nobody plays |
 
 **Budget rules:**
@@ -205,12 +211,20 @@ docstring.
 4. **Tree:** grown from the class start without the resist rules or the max-hit floors that stand on resists,
    so points go to damage and life; gear caps resists later.
 5. **Supports:** chosen for the main group, up to `links`.
-6. **Gear:** crafted rares with base implicits on every other slot. This caps the resists.
+6. **Gear:** crafted rares with base implicits on every other slot. This caps the resists. They start at T2
+   with a budget and T1 without one (no budget means the strongest items, whatever they cost).
 7. **Jewels.**
-8. **Tier upgrades** (with a budget): single affixes up a tier, best gain per divine first.
-9. **Side skills:** if mana or life reservation is still overdrawn, auras, heralds and other side skills are
+8. **Uniques against rares:** each candidate unique is tried in place of the slot's crafted rare and kept only
+   when the build is better with it. With a budget, swaps go by gain per divine across slots, the rare refunded;
+   without one, the strongest wins. A two-handed weapon empties the offhand (a bow keeps its quiver; quivers are
+   tried only with a bow); a body armour holding the main
+   skill keeps its sockets and is priced with its links. Uniques the spec names are never swapped. After a swap
+   the remaining rares are crafted again. Candidates: the spec's `unique_candidates`, else the uniques ladder
+   players of the main skill wear (the ladder crawl below). Flasks aren't compared yet.
+9. **Tier upgrades** (with a budget): single affixes up a tier, best gain per divine first.
+10. **Side skills:** if mana or life reservation is still overdrawn, auras, heralds and other side skills are
    turned off one at a time, best fix first, and refunded. The main group and weapon swap are never touched.
-10. **Again:** supports and tree once more.
+11. **Again:** supports and tree once more.
 
 `keep_supports` in the spec holds supports the gem optimizer never replaces (`Ballista Totem`, `Trap`): the ones
 that decide how the skill is used.

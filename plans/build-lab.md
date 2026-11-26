@@ -4,7 +4,7 @@ Andy asks Claude (Claude Code or a claude.ai chat) to design a build. Claude ask
 defences, proposes concepts from a game database, completes them with optimizers that run headless Path of
 Building, and returns 2–3 finished options with PoB codes, numbers, cost and blind spots.
 
-Status: phases 1–7 built 2026-11-25; redesigns from the back-test await Andy's choice.
+Status: phases 1–7 built 2026-11-25; phase 8 (best item per slot) built 2026-11-26, the ladder crawl not yet run.
 
 ## Decisions
 
@@ -20,6 +20,7 @@ Status: phases 1–7 built 2026-11-25; redesigns from the back-test await Andy's
 | Skill | The design workflow becomes a reference in poe-build-expert; the engine stays here. The skill must still work with no Lioneye app running |
 | Checkpoints | After phases 1–2, then per Andy |
 | Defence floors | Weighted, not absolute (2026-11-25): down to 70% of a floor a miss is a penalty, ln(damage) − 2 × shortfall, so 10% of a floor ≈ 20% damage; below 70% it's a hard rule. Resists, chaos and PoB warnings stay hard. In concepts and the back-test |
+| Uniques vs rares | Per slot, a unique wins only when it beats the best rare the lab can craft for that slot (2026-11-26). Candidates are the uniques ladder players of the skill use; with no budget the lab aims for the strongest items whatever they cost |
 
 ## Phases
 
@@ -32,6 +33,7 @@ Status: phases 1–7 built 2026-11-25; redesigns from the back-test await Andy's
 | 5 | poe.ninja prices and popularity; novelty score | Done |
 | 6 | Design workflow in the skill: interview, concepts, checkpoints, report; the lab notebook (below) | Done |
 | 7 | Back-test on known strong builds | Done |
+| 8 | Best item per slot: uniques compete with rares; per-skill unique data from a ladder crawl | Built; crawl awaits Andy's go |
 
 ## Lab notebook (phase 6): what the designer learns and remembers
 
@@ -487,6 +489,76 @@ of nine runs that broke a hard rule now meet them all.
 
 **Notebook:** seven blind-spot entries (floor collapse, disabled spare gems, the mana warning, thin trade
 prices, the rare model's bias, seed spread, no step to turn an aura off).
+
+## Phase 8 plan: best item per slot
+
+Andy's goal (2026-11-26): every design uses the best items for that build. Some builds need an enabling unique;
+others are best with rares rolled for the right mods. The designer must not prefer uniques unless they're the
+right choice for that build.
+
+**Andy's choices:**
+- **Candidates:** uniques that ladder players of the skill use (not every unique).
+- **No budget:** aim for the strongest items whatever they cost (T1 rares, any unique); the report gives the cost.
+- **Unique data:** poe.ninja's builds API is closed to outside tools (its API docs), so a crawl of GGG's ladder
+  builds per-skill counts. It takes hours (GGG allows about 90 character reads per 30 minutes), so it **never
+  starts without asking Andy first**, every time.
+
+**How it works:**
+1. **Crawl** (`popularity.py crawl`): read about 900 public ladder characters (about 5 hours), resumable, and
+   keep only counts: per main skill (and ascendancy), how many characters use each unique in each slot. Cached per
+   league; the designer warns when it's over a week old or missing and asks before refreshing.
+2. **Candidates** per slot: uniques used by at least 10% of the skill's sampled characters (minimum 5
+   characters). A skill with fewer goes without unique candidates (or Andy pastes a list) and the report says so.
+3. **Rares first:** the gear step crafts the best rare for every open slot as today (T1 with no budget).
+4. **Uniques compete:** each candidate is equipped in place of that slot's rare and measured under the rules. With
+   a budget, swaps are taken by gain per divine across all slots (the rare's cost refunded); without one, the
+   best result wins. Two-handed weapons free the offhand; rings try both slots; a body armour unique is priced
+   with the links the main skill needs.
+5. **Rebalance:** after a swap the remaining rares are re-crafted (resists and attributes shift), then gems and
+   tree again.
+6. **Spec uniques stay:** a unique named in the spec is the user's choice and is never swapped out.
+
+**Tasks:**
+1. Crawl and per-skill counts in `popularity.py` (+ `market.py popularity --crawl`), checkpointed; tests on a
+   saved character fixture (no network).
+2. Candidate lists by slot from the counts, with the thin-sample rule and a pasted-list override.
+3. Unique-vs-rare step in `gear.py` (gain per divine across slots with a budget, best result without), wired
+   into `concept.pipeline` after jewels; T1 rares when there's no budget.
+4. Report: chosen items per slot, the rare each unique beat (and by how much), uniques tried, data age.
+5. Unit tests with a stand-in pool; design test `--run` still passes.
+6. Ask Andy before the crawl; then re-run the budget back-test and compare the uniques chosen with the guides'.
+7. Verify subagent, review subagent; README, plan results, notebook.
+
+## Phase 8 results
+
+**Built:** `market/popularity.py` crawl (`crawl`, `crawl_status`, `candidates`; `market.py popularity --crawl /
+--crawl-status / --skill`), `opt/uniques.py` (`compete`), wired into `concept.pipeline` after jewels, with a
+`uniques` section in the report; `unique_candidates` in the spec; T1 rares without a budget. Tests: optimizer
+61, market 57 offline, design 30 with a full run.
+
+**Found on the way:**
+- **Self-damage wasn't a rule.** The lab's Righteous Fire design (budget, no floors) lost 1,370 life a second
+  net (Righteous Fire burned 1,626, regen 256): dead in seconds. PoB shows net regen but doesn't warn. New hard
+  rule, `sustain`: with self-damage (TotalBuildDegen), net life regen and total net regen must be 0 or more,
+  graded by the net loss. All nine guides meet it; only Righteous Fire and Ethereal Knives burn themselves.
+- **With the rule, the lab picks the guide's uniques.** The Righteous Fire spec at 30 divines, with four of the
+  guide's uniques as candidates: before the rule none beat the crafted rares (684k damage, unsustainable); with
+  it Cloak of Flame and Immortal Flesh win their slots (175k, sustained, no rule broken), the two the guide
+  wears for the same reason. Annihilation's Approach and Kalandra's Touch still lose to rares.
+
+**Review fixes:** a two-handed swap now refunds a unique offhand bought earlier; bows keep their quiver and
+quivers are tried only with a bow; the crawl stops (and resumes later) on an outage instead of racing to "done";
+GGG's `<<set:...>>` name markup is stripped; cheap uniques rank by gain per divine with a 0.05-divine floor
+instead of all counting as 1 divine; probe errors and each losing unique's result are reported.
+
+**Known limits:**
+- Flasks and unique jewels aren't compared yet.
+- A crawl resume counts by ladder rank; when the ladder moves between sessions a character can be counted twice
+  or missed.
+- The side-skill step drops skills only for reservation overdraw, not to fix sustain (a Blood Rage that can't
+  be sustained stays and the rule stays broken).
+
+**Next:** Andy's go for the first crawl (about 5 hours); then the budget back-test with crawl uniques.
 
 ## Open checks
 

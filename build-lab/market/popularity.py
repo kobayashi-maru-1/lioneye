@@ -8,6 +8,10 @@
 Only counts are kept: no account or character names are stored. The result is cached per league for a day
 (%LOCALAPPDATA%\\poe-build-expert\\market\\popularity-<league>.json); refreshing it takes a few minutes.
 
+Per-skill unique data (crawl, below): about 900 public ladder characters read over about 5 hours, counting per
+main skill the uniques worn in each slot. It never runs on its own: the designer asks the user first, every time.
+crawl_status(league), crawl(league), candidates(data, skill) -> the uniques 10%+ of the skill's players wear.
+
 novelty(stats, ascendancy, main_skill, uniques) -> {"novelty": 0..1, parts...}
   archetype share = the sample's share of characters with the same ascendancy and main skill (estimated as
   ascendancy share x skill share when the sample has none); novelty = 1 - min(1, archetype share / 5%), so an
@@ -16,6 +20,7 @@ novelty(stats, ascendancy, main_skill, uniques) -> {"novelty": 0..1, parts...}
 """
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -75,8 +80,13 @@ def main_skill(items):
     return best[1] if best else None
 
 
+def clean_name(name):
+    """An item name as PoB writes it: GGG's API can prefix names with markup like <<set:MS>><<set:M>><<set:S>>."""
+    return re.sub(r"<<[^>]*>>", "", name or "").strip()
+
+
 def uniques(items):
-    return sorted({it.get("name") for it in items.get("items") or []
+    return sorted({clean_name(it.get("name")) for it in items.get("items") or []
                    if it.get("frameType") in UNIQUE_FRAMES and it.get("name") and it.get("inventoryId") not in SKIP})
 
 
@@ -171,3 +181,166 @@ def novelty(data, ascendancy, skill, uniques_used=()):
             "uniques": {u: round(_share(data.get("uniques", {}), u, n) or 0.0, 4) for u in uniques_used},
             "basis": f"top {depth} ladder characters; skills and uniques from {n} public ones",
             "fetched": time.strftime("%Y-%m-%d %H:%M", time.localtime(data.get("fetched", 0)))}
+
+
+# -- per-skill unique counts: the crawl ------------------------------------------------------------------------
+# poe.ninja's builds API is closed to outside tools (poe.ninja/docs/api), so which uniques a skill's players use
+# comes from reading GGG's public ladder characters. GGG allows about 90 character reads per 30 minutes, so a
+# 900-character crawl takes about 5 hours. It never starts on its own: the designer reports the data's age and
+# asks the user before running it. Only counts are kept; progress is saved by ladder rank, never by name.
+
+CRAWL_DEPTH = 15000                 # the whole public ladder GGG lists
+CRAWL_SAMPLE = 900
+CRAWL_MAX_AGE = 7 * 24 * 3600       # older than a week: the designer says so and offers a refresh
+CRAWL_SLEEP = 31 * 60               # wait out a whole character-read window instead of stopping
+CRAWL_SAVE_EVERY = 10
+SLOT_OF = {"Weapon": "Weapon 1", "Offhand": "Weapon 2", "Helm": "Helmet", "BodyArmour": "Body Armour",
+           "Gloves": "Gloves", "Boots": "Boots", "Belt": "Belt", "Amulet": "Amulet", "Ring": "Ring", "Ring2": "Ring",
+           "Flask": "Flask"}       # both rings count as "Ring": a unique ring can go in either
+CANDIDATE_SHARE = 0.10
+CANDIDATE_MIN_CHARS = 5
+CRAWL_MAX_FAILS = 5                 # this many characters in a row failing with HTTP errors: stop, resume later
+
+
+def crawl_path(league):
+    return os.path.join(cache_root(), f"popularity-crawl-{''.join(c if c.isalnum() else '-' for c in league)}.json")
+
+
+def slot_uniques(items):
+    """{(slot, unique name)} a character wears, slots as SLOT_OF names (weapon swap and inventory left out)."""
+    out = set()
+    for it in items.get("items") or []:
+        slot = SLOT_OF.get(it.get("inventoryId"))
+        if slot and it.get("frameType") in UNIQUE_FRAMES and clean_name(it.get("name")):
+            out.add((slot, clean_name(it["name"])))
+    return out
+
+
+def add_character(data, items, ascendancy):
+    """Count one character into the crawl data. False when it has no main skill to count it under."""
+    skill = main_skill(items)
+    if not skill:
+        return False
+    s = data["skills"].setdefault(skill, {"n": 0, "asc": {}, "uniques": {}})
+    s["n"] += 1
+    if ascendancy:
+        s["asc"][ascendancy] = s["asc"].get(ascendancy, 0) + 1
+    for slot, name in slot_uniques(items):
+        u = s["uniques"].setdefault(slot, {})
+        u[name] = u.get(name, 0) + 1
+    return True
+
+
+def _save(path, data):
+    tmp = f"{path}.{os.getpid()}.part"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    os.replace(tmp, path)
+
+
+def load_crawl(league):
+    try:
+        with open(crawl_path(league), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def crawl_status(league, now=None):
+    """What the designer tells the user before asking to crawl: exists, done, read/target, age, stale."""
+    data = load_crawl(league)
+    if not data:
+        return {"league": league, "exists": False, "stale": True,
+                "note": f"no per-skill unique data for {league}: a crawl reads about {CRAWL_SAMPLE} ladder characters "
+                        f"(about {CRAWL_SAMPLE // 180 + 1} hours)"}
+    age = (now or time.time()) - (data.get("updated") or 0)
+    return {"league": league, "exists": True, "done": bool(data.get("done")), "read": data.get("read", 0),
+            "target": data.get("target"), "ageDays": round(age / 86400, 1),
+            "stale": not data.get("done") or age > CRAWL_MAX_AGE}
+
+
+def crawl(league, sample=CRAWL_SAMPLE, depth=CRAWL_DEPTH, fresh=False, ggg=None, verbose=True):
+    """Read `sample` public ladder characters spread over the top `depth` and count, per main skill, the uniques
+    they wear by slot. Resumes an unfinished crawl of the same league unless fresh. Only run it after the user
+    agreed: it takes hours."""
+    ggg = ggg or GGG(verbose, max_sleep=CRAWL_SLEEP)
+    path = crawl_path(league)
+    data = None if fresh else load_crawl(league)
+    if data and data.get("done"):
+        data = None  # a finished crawl is replaced, not extended
+    entries = []
+    for offset in range(0, depth, 200):
+        page = ggg.call(LADDER.format(league=urllib.parse.quote(league), offset=offset)) or {}
+        got = page.get("entries") or []
+        entries.extend(got)
+        if len(got) < 200:
+            break
+    if not entries:
+        raise RuntimeError(f"GGG's ladder for {league} is empty")
+    by_rank = {e.get("rank"): e for e in entries if e.get("public") and e.get("rank") is not None}
+    if data is None:
+        ranks = sorted(by_rank)
+        step = max(1, len(ranks) // max(1, sample))
+        data = {"league": league, "started": time.time(), "updated": time.time(), "done": False,
+                "ladderDepth": len(entries), "target": min(sample, len(ranks)), "ranks": ranks[::step][:sample],
+                "next": 0, "read": 0, "failed": 0, "skipped": 0, "skills": {}}
+    ranks = data["ranks"]
+    fails = 0
+    try:
+        while data["next"] < len(ranks):
+            e = by_rank.get(ranks[data["next"]])
+            items = None
+            if e:
+                params = {"accountName": e["account"]["name"], "character": e["character"]["name"], "realm": "pc"}
+                try:
+                    items = ggg.call(ITEMS + urllib.parse.urlencode(params))
+                except RateLimited:
+                    raise  # "next" still points here, so a resume reads this character
+                except RuntimeError as err:
+                    # One character's HTTP error is skipped; no connection, a maintenance page or GGG failing
+                    # character after character stops the crawl here, so a resume picks it up.
+                    fails += 1
+                    if not str(err).startswith("HTTP ") or fails >= CRAWL_MAX_FAILS:
+                        raise RuntimeError(f"crawl stopped at {data['next']}/{len(ranks)} ({err}); run it again "
+                                           "later to resume") from None
+                    data["failed"] += 1
+                    e = None
+                else:
+                    fails = 0
+            else:
+                data["skipped"] += 1  # dropped off the ladder or went private since the crawl started
+            data["next"] += 1
+            if not e:
+                continue
+            if not isinstance(items, dict) or not items.get("items"):
+                data["skipped"] += 1  # private or empty now
+                continue
+            data["read"] += 1
+            add_character(data, items, (e.get("character") or {}).get("class"))
+            if data["next"] % CRAWL_SAVE_EVERY == 0:
+                data["updated"] = time.time()
+                _save(path, data)
+                if verbose:
+                    print(f"crawl: {data['next']}/{len(ranks)} ladder characters ({data['read']} read)",
+                          file=sys.stderr, flush=True)
+        data["done"] = True
+    finally:
+        data["updated"] = time.time()
+        _save(path, data)
+    return data
+
+
+def candidates(data, skill, share=CANDIDATE_SHARE, min_chars=CANDIDATE_MIN_CHARS):
+    """{"skill", "characters", "thin", "slots": {slot: [(unique, share), ...]}}: the uniques at least `share` of the
+    skill's sampled characters wear, by slot (most used first). thin: fewer than min_chars characters, so no
+    candidates (the report says so)."""
+    s = ((data or {}).get("skills") or {}).get(skill) or {}
+    n = s.get("n", 0)
+    out = {"skill": skill, "characters": n, "thin": n < min_chars, "slots": {}}
+    if out["thin"]:
+        return out
+    for slot, counts in (s.get("uniques") or {}).items():
+        picks = sorted(((u, c / n) for u, c in counts.items() if c / n >= share - 1e-9), key=lambda x: (-x[1], x[0]))
+        if picks:
+            out["slots"][slot] = [(u, round(x, 3)) for u, x in picks]
+    return out

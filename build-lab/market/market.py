@@ -4,6 +4,9 @@
   market.py cost BUILD.xml --main-skill GEM [--trade-check]
                                                     what the build costs (uniques, gems; rares with --trade-check)
   market.py popularity [--refresh] [--depth 3000] [--sample 80]
+  market.py popularity --crawl-status              per-skill unique data: age, progress
+  market.py popularity --crawl [--sample 900] [--fresh]   read ladder characters (hours; ask the user first)
+  market.py popularity --skill GEM                 the uniques the skill's players wear, by slot
                                                     ascendancy, main-skill and unique shares (refresh: a few minutes)
   market.py novelty BUILD.xml --main-skill GEM      how unusual the build's archetype is (needs popularity data)
 
@@ -50,7 +53,11 @@ def main():
         if name == "popularity":
             p.add_argument("--refresh", action="store_true")
             p.add_argument("--depth", type=int, default=3000)
-            p.add_argument("--sample", type=int, default=80)
+            p.add_argument("--sample", type=int, default=None)
+            p.add_argument("--crawl", action="store_true", help="per-skill unique counts (hours; ask first)")
+            p.add_argument("--fresh", action="store_true", help="with --crawl: start over instead of resuming")
+            p.add_argument("--crawl-status", action="store_true")
+            p.add_argument("--skill", help="candidate uniques for this main skill, from the crawl")
     args = ap.parse_args()
 
     if args.cmd in ("cost", "novelty") and ph._lj is None:  # these load the build in PoB: need lupa
@@ -65,7 +72,15 @@ def main():
                "exaltedInChaos": prices.currency_chaos("exalted"),
                "example": {"Mageblood": prices.unique("Mageblood", "Heavy Belt"),
                            "Spell Echo 20/20": prices.gem("Spell Echo", 20, 20)}}
+    elif args.cmd == "popularity" and args.crawl:
+        data = P.crawl(prices.league, sample=args.sample or P.CRAWL_SAMPLE, fresh=args.fresh)
+        out = {**P.crawl_status(prices.league), "skills": len(data["skills"])}
+    elif args.cmd == "popularity" and args.crawl_status:
+        out = P.crawl_status(prices.league)
+    elif args.cmd == "popularity" and args.skill:
+        out = {**P.candidates(P.load_crawl(prices.league), args.skill), "data": P.crawl_status(prices.league)}
     elif args.cmd == "popularity":
+        args.sample = args.sample or 80
         data = (P.refresh(prices.league, depth=args.depth, sample=args.sample) if args.refresh
                 else P.load(prices.league, depth=args.depth, sample=args.sample))
         n, depth = data["sample"], data["ladderDepth"]
