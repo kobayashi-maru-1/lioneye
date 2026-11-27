@@ -13,7 +13,9 @@ Sources:
 - ladder: the night crawl (market/popularity.py) keeps each counted character's gear and passive tree, with the
   account and character names and ladder rank (refs-<league>/ladder-NNNN.json). They load through PoB's own
   character import. A chat sandbox without the crawl downloads the published copy (market/crawldata.py).
-- web: guides Claude finds while designing (maxroll, pobb.in, forums), added as PoB codes (web-<hash>.json).
+- web: guides Claude finds while designing (maxroll, pobb.in, forums), added as PoB codes (web-<hash>.json), and
+  poe.ninja characters read in Andy's browser (the skill's design step 1a): their export saved to a file, never
+  fetched. These count as web references; one can also be a crawled ladder character.
 
 Measuring loads each reference into PoB with the design's own config (the same boss, charges and buffs; a ladder
 import has none of its own) and its main skill set, then reads damage (the design's metric), EHP, life / ES,
@@ -57,8 +59,16 @@ def decode_code(code):
     return zlib.decompress(raw).decode("utf-8")
 
 
+# Sites whose pages are rendered in the browser and that refuse automated fetches (poe.ninja closes its builds
+# data to third parties): copy the export in the browser and pass it as a file instead.
+BROWSER_ONLY = re.compile(r"https?://(?:[\w-]+\.)*(?:poe\.ninja|pob\.codes)(?:[/:?#]|$)", re.I)
+
+
 def fetch_code(link):
     """The PoB code behind a pobb.in or pastebin link (or any page whose whole body is a code)."""
+    if BROWSER_ONLY.match(link):
+        raise ValueError("poe.ninja and pob.codes pages aren't fetched: copy the build's PoB export in the browser, "
+                         "save it to a file and pass the file (the page goes in --url)")
     m = re.match(r"https?://pobb\.in/(?:u/[^/]+/)?([A-Za-z0-9_-]+)", link)
     if m:
         link = f"https://pobb.in/{m.group(1)}/raw"

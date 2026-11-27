@@ -47,6 +47,8 @@ Spec (JSON):
   unique_candidates  optional list of unique names to try against the crafted rares (e.g. from poe.ninja's
                 builds page); default: the uniques ladder players of the main skill wear (market.py popularity
                 --crawl). "none" or [] tries no uniques
+  unique_source optional, with unique_candidates: where the list came from, shown in the report, e.g.
+                "poe.ninja builds, Covens, Penance Brand Inquisitor, 1,204 characters, 2026-11-27"
 """
 import argparse
 import base64
@@ -215,7 +217,9 @@ def unique_candidates(spec, db, league, main_skill):
                 out.setdefault(group, []).append(n)
             else:
                 unknown.append(n)
-        return out, {"source": "spec", "candidates": out, **({"leftOut": unknown} if unknown else {})}
+        src = (spec or {}).get("unique_source")
+        return out, {"source": "spec", **({"from": src} if src else {}), "candidates": out,
+                     **({"leftOut": unknown} if unknown else {})}
     import crawldata
     import popularity as P
     crawldata.ensure(league)  # a chat sandbox downloads the PC's published crawl
@@ -251,6 +255,11 @@ def check_spec(spec):
     uc = spec.get("unique_candidates")
     if uc is not None and uc != "none" and not (isinstance(uc, list) and all(isinstance(x, str) for x in uc)):
         raise ValueError('unique_candidates must be a list of unique names, or "none"')
+    us = spec.get("unique_source")
+    if us is not None and not isinstance(us, str):
+        raise ValueError("unique_source must be text (where the unique_candidates came from)")
+    if us and not (isinstance(uc, list) and uc):
+        raise ValueError("unique_source needs a unique_candidates list to describe (without one the crawl is used)")
 
 
 def plan_items(spec, db):

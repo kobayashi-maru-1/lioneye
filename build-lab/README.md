@@ -221,8 +221,9 @@ docstring.
    without one, the strongest wins. A two-handed weapon empties the offhand (a bow keeps its quiver; quivers are
    tried only with a bow); a body armour holding the main
    skill keeps its sockets and is priced with its links. Uniques the spec names are never swapped. After a swap
-   the remaining rares are crafted again. Candidates: the spec's `unique_candidates`, else the uniques ladder
-   players of the main skill wear (the ladder crawl below). Flasks aren't compared yet.
+   the remaining rares are crafted again. Candidates: the spec's `unique_candidates` (with `unique_source`, where
+   they came from: the designer reads them off poe.ninja's builds pages in Andy's browser, or he pastes them),
+   else the uniques ladder players of the main skill wear (the ladder crawl below). Flasks aren't compared yet.
 9. **Tier upgrades** (with a budget): single affixes up a tier, best gain per divine first.
 10. **Side skills:** if mana or life reservation is still overdrawn, auras, heralds and other side skills are
    turned off one at a time, best fix first, and refunded. The main group and weapon swap are never touched.

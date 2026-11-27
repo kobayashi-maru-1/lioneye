@@ -104,6 +104,18 @@ def skeleton_checks(pool, db):
     add("unknown gem refused", refused({**BASE, "supports": ["Not A Gem"]}, db, "gem"))
     add("bad defence refused", refused({**BASE, "defence": "ward"}, db, "defence"))
     add("too many flasks refused", refused({**BASE, "flasks": ["Divine Life Flask"] * 6}, db, "flasks"))
+    add("unique_source that isn't text refused", refused({**BASE, "unique_source": ["poe.ninja"]}, db, "unique_source"))
+    add("unique_source without a unique_candidates list refused",
+        refused({**BASE, "unique_source": "poe.ninja"}, db, "unique_candidates")
+        and refused({**BASE, "unique_source": "poe.ninja", "unique_candidates": "none"}, db, "unique_candidates"))
+    src = "poe.ninja builds, test league, 120 characters"
+    cands, info = C.unique_candidates({"unique_candidates": ["Shaper's Touch", "Not A Real Unique"],
+                                       "unique_source": src}, db, "test league", "Fireball")
+    add("listed uniques grouped by slot, with where they came from",
+        cands == {"Gloves": ["Shaper's Touch"]} and info["source"] == "spec" and info["from"] == src
+        and info["leftOut"] == ["Not A Real Unique"], info)
+    _, plain = C.unique_candidates({"unique_candidates": ["Shaper's Touch"]}, db, "test league", "Fireball")
+    add("no unique_source, no 'from'", "from" not in plain, plain)
     code = C.pob_code(xml)
     add("PoB code decodes to the XML", zlib.decompress(base64.urlsafe_b64decode(code)).decode("utf-8") == xml)
 
@@ -162,6 +174,19 @@ def refs_checks():
     add("refs: pobb.in and pastebin links read their raw code",
         seen == ["https://pobb.in/AbC-12_x/raw", "https://pastebin.com/raw/XyZ123"] and got == ["CODE", "CODE"],
         seen)
+    urllib.request.urlopen = lambda *a, **k: seen.append("fetched") or (_ for _ in ()).throw(AssertionError())
+    blocked = []
+    try:
+        for link in ("https://poe.ninja/poe1/builds/covens/character/A-1/B", "http://www.poe.ninja/x",
+                     "https://pob.codes/abc"):
+            try:
+                RF.fetch_code(link)
+            except ValueError:
+                blocked.append(link)
+    finally:
+        urllib.request.urlopen = real
+    add("refs: poe.ninja and pob.codes links are refused, never fetched", len(blocked) == 3 and "fetched" not in seen,
+        blocked)
     league = f"Refs Check {os.getpid()}"
     try:
         RF.add(league, C.pob_code(xml), skill="Fireball", title="A guide", url="https://example.invalid/a")

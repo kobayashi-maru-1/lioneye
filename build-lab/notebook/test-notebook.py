@@ -131,6 +131,9 @@ def run(tmp):
     add("concept needs a verdict", refused(lambda: nb_a.add([{"kind": "concept", "title": "t", "body": "b"}])))
     add("account name refused in public", refused(lambda: nb_a.add(
         [{"kind": "interaction", "title": "seen on Someone#1234", "body": "b", "evidence": "e"}])))
+    add("poe.ninja character link refused in public", refused(lambda: nb_a.add(
+        [{"kind": "concept", "title": "t", "body": "like poe.ninja/poe1/builds/covens/character/Some-1234/Char",
+          "verdict": "weak"}])))
     add("email refused in public", refused(lambda: nb_a.add(
         [{"kind": "concept", "title": "t", "body": "mail me a@b.com", "verdict": "weak"}])))
     add("check needs a known entry", refused(lambda: nb_a.add([{"kind": "check", "ref": "nope", "result": "holds"}])))

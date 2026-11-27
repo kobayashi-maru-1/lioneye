@@ -68,8 +68,11 @@ PREFIX = {"concept": "c","interaction": "i", "blind-spot": "b", "preference": "p
 FETCH_EVERY = 300          # seconds between git fetches for reads
 PUSH_TRIES = 4
 MAX_TEXT = 4000            # characters in a body
-# Personal details that must never reach the public files: GGG account names (Name#1234) and email addresses.
+# Personal details that must never reach the public files: GGG account names (Name#1234), character links that
+# carry account and character names (poe.ninja's character pages, GGG's profile pages) and email addresses.
 PRIVATE = [(re.compile(r"\b[\w-]{3,}#\d{4}\b"), "an account name (Name#1234)"),
+           (re.compile(r"poe\.ninja/\S*/character/", re.I), "a poe.ninja character link (account and character names)"),
+           (re.compile(r"pathofexile\.com/account/view-profile/", re.I), "a GGG profile link (an account name)"),
            (re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+"), "an email address")]
 
 

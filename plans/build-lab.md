@@ -567,7 +567,18 @@ Night 1 (26 November) read 176 of 900 characters (148 reference builds) and then
 
 **Crawl ended at 376 (Andy, 2026-11-27):** "300 builds are enough." Night 2 took the crawl to 376 of 900 characters (337 read, 301 reference builds; two 30-minute waits on GGG's item-read limit held it to about 200 a night). The Covens crawl was marked finished there (`endedEarly` in its file), the night task removed and the result published. The sample is spread over the ladder by rank, so stopping early covers roughly the top 6,000 of 15,000, not the whole ladder. Future crawls default to 300 characters (`CRAWL_SAMPLE`), about two nights.
 
-**Next:** ask Andy before re-running the budget back-test with crawl uniques, then the "learn from similar builds" phase.
+**poe.ninja in Andy's browser (Andy, 2026-11-27):** the crawl is a sample, and six of the nine back-test guide
+skills had fewer than 5 crawled characters (Soulrend, Soulrend of the Spiral and Penance Brand had none), so the lab
+tried no uniques for them. poe.ninja covers every character, but its builds API is closed to third parties
+(poe.ninja/docs/api) and it refuses automated fetches (403). Andy chose "build it, capped": the skill's design
+workflow (step 1a) reads poe.ninja's rendered builds pages in his own browser (Claude in Chrome or the Desktop
+app's built-in browser), only with his yes at the screening checkpoint, at most 10 page views per design, never its
+API or any other fetch (`refs.py add` refuses poe.ninja and pob.codes links), and opens characters only from
+poe.ninja's own list. The notebook refuses poe.ninja character links in public entries (they carry names). Per finished concept it reads the
+uniques 10%+ of the skill's characters wear (into `unique_candidates`, with the new `unique_source` naming where
+they came from) and 2-3 similar characters' PoB exports (into `refs.py add`). Without a browser, Andy pastes them.
+
+**Next:** the budget back-test with crawl uniques (running), then the "learn from similar builds" phase.
 
 ## Phase 9 plan: reference builds
 
