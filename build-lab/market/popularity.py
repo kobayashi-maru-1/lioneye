@@ -8,7 +8,7 @@
 This sample keeps counts only, no account or character names. The result is cached per league for a day
 (%LOCALAPPDATA%\\poe-build-expert\\market\\popularity-<league>.json); refreshing it takes a few minutes.
 
-Per-skill unique data (crawl, below): about 900 public ladder characters read over about 5 hours, counting per
+Per-skill unique data (crawl, below): about 300 public ladder characters read over about 3 hours, counting per
 main skill the uniques worn in each slot. It never runs on its own: the designer asks the user first, every time.
 crawl_status(league), crawl(league), candidates(data, skill) -> the uniques 10%+ of the skill's players wear.
 Each counted character is also kept as a reference build (gear, passive tree, and the account and character
@@ -202,12 +202,13 @@ def novelty(data, ascendancy, skill, uniques_used=()):
 
 # -- per-skill unique counts: the crawl ------------------------------------------------------------------------
 # poe.ninja's builds API is closed to outside tools (poe.ninja/docs/api), so which uniques a skill's players use
-# comes from reading GGG's public ladder characters. GGG allows about 90 character reads per 30 minutes, so a
-# 900-character crawl takes about 5 hours. It never starts on its own: the designer reports the data's age and
-# asks the user before running it. Only counts are kept; progress is saved by ladder rank, never by name.
+# comes from reading GGG's public ladder characters. GGG's rate limits (two reads per build: gear and tree, and a
+# 30-minute item-read window) allow about 200 characters a night window, so a 300-character crawl takes about 3
+# hours, two nights. It never starts on its own: the designer reports the data's age and asks the user before
+# running it. Progress is saved by ladder rank.
 
 CRAWL_DEPTH = 15000                 # the whole public ladder GGG lists
-CRAWL_SAMPLE = 900
+CRAWL_SAMPLE = 300                  # Andy, 2026-11-27: 300 builds are enough (was 900)
 CRAWL_MAX_AGE = 7 * 24 * 3600       # older than a week: the designer says so and offers a refresh
 CRAWL_SLEEP = 31 * 60               # wait out a whole character-read window instead of stopping
 CRAWL_SAVE_EVERY = 10

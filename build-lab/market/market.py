@@ -5,7 +5,7 @@
                                                     what the build costs (uniques, gems; rares with --trade-check)
   market.py popularity [--refresh] [--depth 3000] [--sample 80]
   market.py popularity --crawl-status              per-skill unique data: age, progress
-  market.py popularity --crawl [--sample 900] [--fresh]   read ladder characters (hours; ask the user first)
+  market.py popularity --crawl [--sample 300] [--fresh]   read ladder characters (hours; ask the user first)
       [--until 04:00] pause at that local time (the next run resumes); [--only-unfinished] do nothing when the
       league's crawl is finished (a scheduled night run never starts a new one); [--log FILE] progress to a file;
       [--publish] push it to the repo's crawl-data branch afterwards (crawldata.py)

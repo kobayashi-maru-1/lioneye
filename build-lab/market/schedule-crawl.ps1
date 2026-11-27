@@ -3,8 +3,8 @@
   Runs the build lab's ladder crawl at night only: a scheduled task that resumes it each night in a time window.
 
 .DESCRIPTION
-  The crawl (market.py popularity --crawl) reads about 900 public ladder characters; GGG's rate limit makes that
-  about 5 hours. This registers a Windows scheduled task that runs it from -Start to -Until each night for
+  The crawl (market.py popularity --crawl) reads about 300 public ladder characters; GGG's rate limit makes that
+  about 3 hours, two night windows. This registers a Windows scheduled task that runs it from -Start to -Until each night for
   -Nights nights, then expires and deletes itself. Each night resumes where the last one stopped
   (--only-unfinished: once the league's crawl is finished, the remaining nights do nothing, so it never starts a
   new crawl on its own). Progress goes to %LOCALAPPDATA%\poe-build-expert\crawl-log.txt.
@@ -19,8 +19,8 @@
   asleep or signed out is skipped.
 
 .EXAMPLE
-  .\schedule-crawl.ps1 -League Covens                 # 01:00-04:00 for 3 nights
-  .\schedule-crawl.ps1 -League Covens -Nights 2 -Start 00:30 -Until 03:30
+  .\schedule-crawl.ps1 -League Covens                 # 01:00-04:00 for 3 nights (one spare)
+  .\schedule-crawl.ps1 -League Covens -Nights 4 -Start 00:30 -Until 03:30
   .\schedule-crawl.ps1 -Remove
 #>
 param(

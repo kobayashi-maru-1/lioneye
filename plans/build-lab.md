@@ -4,7 +4,7 @@ Andy asks Claude (Claude Code or a claude.ai chat) to design a build. Claude ask
 defences, proposes concepts from a game database, completes them with optimizers that run headless Path of
 Building, and returns 2–3 finished options with PoB codes, numbers, cost and blind spots.
 
-Status: phases 1–7 built 2026-11-25; phase 8 (best item per slot) built 2026-11-26; the ladder crawl runs nightly 01:00–04:00.
+Status: phases 1–7 built 2026-11-25; phases 8–9 built 2026-11-26; the Covens ladder crawl ended 2026-11-27 with 301 reference builds.
 
 ## Decisions
 
@@ -33,8 +33,8 @@ Status: phases 1–7 built 2026-11-25; phase 8 (best item per slot) built 2026-1
 | 5 | poe.ninja prices and popularity; novelty score | Done |
 | 6 | Design workflow in the skill: interview, concepts, checkpoints, report; the lab notebook (below) | Done |
 | 7 | Back-test on known strong builds | Done |
-| 8 | Best item per slot: uniques compete with rares; per-skill unique data from a ladder crawl | Built; crawl awaits Andy's go |
-| 9 | Reference builds: ladder characters and web guides of the same skill; every design compared with them | Built; ladder refs arrive with the night crawl |
+| 8 | Best item per slot: uniques compete with rares; per-skill unique data from a ladder crawl | Done; Covens crawl finished (337 characters) |
+| 9 | Reference builds: ladder characters and web guides of the same skill; every design compared with them | Done; 301 ladder builds |
 
 ## Lab notebook (phase 6): what the designer learns and remembers
 
@@ -505,7 +505,7 @@ right choice for that build.
   starts without asking Andy first**, every time.
 
 **How it works:**
-1. **Crawl** (`popularity.py crawl`): read about 900 public ladder characters (about 5 hours), resumable, and
+1. **Crawl** (`popularity.py crawl`): read about 300 public ladder characters (about 3 hours; 900 until 2026-11-27), resumable, and
    keep only counts: per main skill (and ascendancy), how many characters use each unique in each slot. Cached per
    league; the designer warns when it's over a week old or missing and asks before refreshing.
 2. **Candidates** per slot: uniques used by at least 10% of the skill's sampled characters (minimum 5
@@ -565,7 +565,9 @@ Night 1 (26 November) read 176 of 900 characters (148 reference builds) and then
 
 **Crawl data for every chat (Andy, 2026-11-26):** reference builds keep the account and character names and ladder rank (the ladder shows them publicly; they let the lab read a build's current copy later), reversing the earlier name stripping. The night task runs with `--publish`: after a night that read something, `market/crawldata.py` pushes one gzip file per league (crawl counts plus every ladder build) to the repo's `crawl-data` branch, as a single commit that replaces the branch (force-push), so main stays light and old crawls don't pile up. A chat sandbox without the crawl downloads it on first use (the designer's unique candidates and `refs.py`); `market.py popularity --fetch` forces a fresh copy. Night 1's 148 builds were saved before this change and have no names.
 
-**Next:** when the crawl finishes, ask Andy before re-running the budget back-test with crawl uniques.
+**Crawl ended at 376 (Andy, 2026-11-27):** "300 builds are enough." Night 2 took the crawl to 376 of 900 characters (337 read, 301 reference builds; two 30-minute waits on GGG's item-read limit held it to about 200 a night). The Covens crawl was marked finished there (`endedEarly` in its file), the night task removed and the result published. The sample is spread over the ladder by rank, so stopping early covers roughly the top 6,000 of 15,000, not the whole ladder. Future crawls default to 300 characters (`CRAWL_SAMPLE`), about two nights.
+
+**Next:** ask Andy before re-running the budget back-test with crawl uniques, then the "learn from similar builds" phase.
 
 ## Phase 9 plan: reference builds
 
