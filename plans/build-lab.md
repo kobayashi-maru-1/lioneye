@@ -578,7 +578,22 @@ poe.ninja's own list. The notebook refuses poe.ninja character links in public e
 uniques 10%+ of the skill's characters wear (into `unique_candidates`, with the new `unique_source` naming where
 they came from) and 2-3 similar characters' PoB exports (into `refs.py add`). Without a browser, Andy pastes them.
 
-**Next:** the budget back-test with crawl uniques (running), then the "learn from similar builds" phase.
+**Budget back-test with crawl uniques (2026-11-27, 2 seeds, no trade checks):** little changed. Only three of
+the nine guide skills had 5+ crawled characters (Righteous Fire 5, Ethereal Knives 22, Raise Spectre 13); the
+other six tried no uniques and match their earlier runs.
+- **Ethereal Knives:** 10 uniques tried, none beat the crafted rares (Blunderbore +10% damage but fails its
+  strength requirement). Damage 52% → 67% of the guide is seed spread (the two seeds: 2.4M and 1.2M), not uniques.
+- **Righteous Fire:** 10 tried; Kalandra's Touch (12.4 div) won Ring 2 on floors at −0.2% damage. Cloak of Flame,
+  which won phase 8's 30-divine test, lost here (−3.5%, floors still short). 6% → 5% damage, 92% → 75% EHP.
+- **Wretched Defiler:** 8 tried, every gain 0: the budget design's spectres do almost no damage (0%), so no item
+  shows a gain. A budget-mode weakness from phase 7, not a crawl one.
+- **Skipped:** Mageblood and Headhunter (over budget, correct); Foulborn Xoph's Heart (PoB has no Foulborn uniques).
+- **Report gap:** a swap's `gain` is the damage change, even when it won on floors; it should say why it won.
+
+Budget mode's limits (phase 7) and thin per-skill coverage decide these results, not the crawl. The poe.ninja
+browser step covers coverage for real designs; the back-test can't use it.
+
+**Next:** the "learn from similar builds" phase.
 
 ## Phase 9 plan: reference builds
 
