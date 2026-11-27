@@ -301,7 +301,13 @@ def _fix_source(src):
             return m.group(0)
         t = m.group("t")
         return m.group("i") + t + b" = " + t + b" " + m.group("op") + b" (" + v + b")" + m.group("eol")
-    return _COMPOUND.sub(sub, bytes(src))
+    src = _COMPOUND.sub(sub, bytes(src))
+    # PoB 2.69+ also uses safe navigation ("x?.y", "x?.:f()"), again PoB's LuaJIT only.
+    # Plain access is close enough headless (one UI trade-name helper uses it as of 2.69).
+    return _SAFE_NAV.sub(b".", src.replace(b"?.:", b":"))
+
+
+_SAFE_NAV = re.compile(rb"\?\.(?=[A-Za-z_])")
 
 
 def _inflate(data):
