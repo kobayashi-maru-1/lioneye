@@ -91,6 +91,41 @@ def bundle_tests(add):
     rt = w.rate(met, short)
     add("weighted floors", "rate: same hard score, utility gain ranks the change",
         rt[0] == 1 and abs(rt[1] - (math.log(3) - 2 * 0.2)) < 1e-9, detail=str(rt))
+    y = w.why(fake(dps=100, **{sup: 80}), fake(dps=99.8, **{sup: 100}))
+    add("why", "a floor closed at a small damage cost: decided by floors, the floor named",
+        y["decidedBy"] == "floors" and y["damage"] == -0.002
+        and y.get("moved") == [f"{sup} 80 to 100 (floor 100)"], detail=str(y))
+    y = w.why(met, short)
+    add("why", "a big damage gain over a small floor miss: decided by damage", y["decidedBy"] == "damage"
+        and y["damage"] == 2.0 and y.get("moved") == [f"{sup} 100 to 80 (floor 100)"], detail=str(y))
+    y = hard_floor.why(met, short)
+    add("why", "unweighted floors: a floor miss is a rule", y["decidedBy"] == "rules", detail=str(y))
+    y = w.why(met, fake(dps=100, ehp=11000, **{sup: 100}))
+    add("why", "nothing to choose: same, EHP still reported", y["decidedBy"] == "same" and y["ehp"] == 0.1
+        and "moved" not in y, detail=str(y))
+    plain = Rules("CombinedDPS", fake(), start_breaks="repair")
+    y = plain.why(fake(chaos=-20, violations=["You do not meet the Strength requirement"]),
+                  fake(dps=90, chaos=10))
+    add("why", "a rule fixed: decided by rules; resist and PoB warning named", y["decidedBy"] == "rules"
+        and y.get("moved") == ["Strength requirement: fixed", "ChaosResist -20 to 10 (min 0)"], detail=str(y))
+    add("why", "no floors: the metric decides", plain.why(fake(), fake(dps=120))["decidedBy"] == "damage")
+    y = plain.why(fake(TotalBuildDegen=500, NetLifeRegen=50, TotalNetRegen=-100),
+                  fake(TotalBuildDegen=500, NetLifeRegen=50, TotalNetRegen=-300))
+    add("why", "sustain shows the net regen the rule measures", y.get("moved") == [
+        "net regen -100/s to -300/s (self-damage 500/s)"], detail=str(y))
+    y = plain.why(fake(fire=60, FireTakenDamage=0.0), fake(fire=60))
+    add("why", "a resist that lost its exemption says so", y.get("moved") == [
+        "FireResist 60 (exempt) to 60 (min 75)"], detail=str(y))
+    y = w.why(fake(**{sup: 99.6}), fake(dps=99, **{sup: 99.7}))
+    add("why", "a fractional floor move stays visible", y.get("moved") == [f"{sup} 99.6 to 99.7 (floor 100)"],
+        detail=str(y))
+    y = plain.why(fake(Mana=1000, ManaUnreserved=-50, violations=["Your unreserved Mana is negative"]),
+                  fake(Mana=1000, ManaUnreserved=-20, violations=["Your unreserved Mana is negative"]))
+    add("why", "a warning that moved says which way", y.get("moved") == ["Your unreserved Mana is negative: better"],
+        detail=str(y))
+    y = plain.why(fake(chaos=-20), {"error": "x"})
+    add("why", "an error result: decided by error, nothing listed as moved",
+        y["decidedBy"] == "error" and "moved" not in y, detail=str(y))
     k = Rules("CombinedDPS", fake(**{sup: 80}), floors={sup: 100}, floor_weight=2, floor_hard=0.7)
     add("weighted floors", "keep: a soft miss at the start isn't a broken rule", not k.start_short)
     add("weighted floors", "a soft miss at the start is still reported", k.describe()["brokenAtStart"] == [f"floor:{sup}"])
@@ -341,6 +376,10 @@ def unique_tests(add):
     bad = next((r for r in out["results"] if r["name"] == "Crown Bad"), {})
     add("uniques", "the report shows how a losing unique did against the build",
         bad.get("beats") is False and bad.get("gain", 0) < 0 and bad.get("slot") == "Helmet", detail=str(out["results"]))
+    add("uniques", "swaps and results say what decided them, with the EHP change",
+        all(x.get("decidedBy") in ("rules", "floors", "damage", "same") and isinstance(x.get("ehp"), float)
+            for x in out["swaps"] + out["results"]) and bad.get("decidedBy") in ("rules", "damage"),
+        detail=str(out["swaps"] + out["results"]))
     add("uniques", "a two-handed weapon empties the offhand", names["Weapon 2"] is None)
     add("uniques", "a unique poe.ninja doesn't list is unavailable",
         "unavailable" in out["skipped"].get("Unlisted Cap", ""), detail=str(out["skipped"]))

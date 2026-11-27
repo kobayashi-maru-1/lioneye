@@ -153,9 +153,10 @@ def _per_divine(rules, base, r, net):
 def compete(pool, rules, cands, prices, budget=None, fixed=(), item_type=None, main_skill=None, log=None,
             max_swaps=6):
     """Swap in candidate uniques where they beat the slot's current item. Returns {"swaps": [...], "tried": n,
-    "skipped": {name: reason}, "results": [{slot, name, divine, gain, beats}]}: each unique's last screen against
-    the build as it stood (gain = relative change in the metric; beats = better under the rules). Log entries are
-    added to `log`."""
+    "skipped": {name: reason}, "results": [{slot, name, divine, gain, beats, decidedBy, ehp, moved}]}: each
+    unique's last screen against the build as it stood (gain = relative change in the metric only; beats = better
+    under the rules; decidedBy = what decided it: rules, floors, damage or same; ehp = relative EHP change; moved =
+    the rules whose shortfall changed, readable). Swaps carry the same why fields. Log entries are added to `log`."""
     log = log if log is not None else []
     texts, tried, swaps, skipped, results_by = {}, set(), [], {}, {}
     for _ in range(max_swaps):
@@ -178,6 +179,7 @@ def compete(pool, rules, cands, prices, budget=None, fixed=(), item_type=None, m
                 results_by[t["name"]] = {"slot": t["slot"], "name": t["name"], "against": t["replaces"],
                                          "divine": round(t["divine"], 3),
                                          "gain": round(gain, 4), "beats": beats, "round": len(swaps),
+                                         **_why(rules, base, r),
                                          **({"broken": sorted(rules.hard_shortfalls(r))}
                                             if rules.hard_shortfalls(r) else {})}
             if not beats:
@@ -204,13 +206,14 @@ def compete(pool, rules, cands, prices, budget=None, fixed=(), item_type=None, m
                 continue
             net = _net_cost(budget, t)
             _buy(budget, t)
+            why = _why(rules, base, after)
             entry = {"step": "uniques", "change": f"{t['slot']}: {t['name']}", "divine": round(t["divine"], 3),
-                     "value": rules.value(after), "before": rules.value(base),
+                     "value": rules.value(after), "before": rules.value(base), "decidedBy": why["decidedBy"],
                      **({"netDivine": round(net, 3)} if budget is not None else {})}
             log.append(entry)
             swaps[:] = [x for x in swaps if x["slot"] != t["slot"] and not (t["empties"] and x["slot"] == "Weapon 2")]
             swaps.append({"slot": t["slot"], "name": t["name"], "replaced": t["replaces"], "divine": t["divine"],
-                          "gain": rules.value(after) / max(rules.value(base), 1e-9) - 1})
+                          "gain": rules.value(after) / max(rules.value(base), 1e-9) - 1, **why})
             done = True
             break
         if not done:
@@ -221,6 +224,13 @@ def compete(pool, rules, cands, prices, budget=None, fixed=(), item_type=None, m
     results = sorted(({k: v for k, v in r.items() if k != "round"} for r in results_by.values() if r["name"] not in kept),
                      key=lambda r: -r["gain"])
     return {"swaps": swaps, "tried": len(tried), "skipped": skipped, "results": results}
+
+
+def _why(rules, base, r):
+    """Why a unique won or lost, for the report: decidedBy, ehp and the rules it moved (the damage change is
+    already `gain`)."""
+    w = rules.why(base, r)
+    return {"decidedBy": w["decidedBy"], "ehp": w["ehp"], **({"moved": w["moved"]} if w.get("moved") else {})}
 
 
 def _sort_best(rules, ranked):

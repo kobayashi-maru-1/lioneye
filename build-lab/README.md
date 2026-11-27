@@ -224,6 +224,9 @@ docstring.
    the remaining rares are crafted again. Candidates: the spec's `unique_candidates` (with `unique_source`, where
    they came from: the designer reads them off poe.ninja's builds pages in Andy's browser, or he pastes them),
    else the uniques ladder players of the main skill wear (the ladder crawl below). Flasks aren't compared yet.
+   The report gives each unique, won or lost, its damage change (`gain`), EHP change, what decided it
+   (`decidedBy`: rules, floors, damage or same) and the rules it moved (`moved`, e.g. "ChaosResist -12 to 31
+   (min 0)"): a unique can win on the defence floors while costing a little damage.
 9. **Tier upgrades** (with a budget): single affixes up a tier, best gain per divine first.
 10. **Side skills:** if mana or life reservation is still overdrawn, auras, heralds and other side skills are
    turned off one at a time, best fix first, and refunded. The main group and weapon swap are never touched.

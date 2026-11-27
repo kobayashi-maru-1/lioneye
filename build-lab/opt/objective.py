@@ -64,6 +64,23 @@ _COST = {"Life": ("LifeCost", "LifeUnreserved"), "Mana": ("ManaCost", "ManaUnres
 _UNRESERVED = {"Mana": ("ManaUnreserved", "negative"), "Life": ("LifeUnreserved", "below 1")}
 
 
+def _num(x, fmt=",.0f"):
+    return format(x, fmt) if isinstance(x, (int, float)) else "?"
+
+
+def _stat(x):
+    """A stat for a report line: whole numbers from 1,000 up, one decimal below (99.6 suppression stays 99.6)."""
+    if not isinstance(x, (int, float)):
+        return "?"
+    return format(x, ",.0f") if abs(x) >= 1000 else f"{x:.1f}".rstrip("0").rstrip(".")
+
+
+def _net(p):
+    """The worse of net life regen and total net regen (what the sustain rule measures)."""
+    nets = [v for v in (p.get("NetLifeRegen"), p.get("TotalNetRegen")) if isinstance(v, (int, float))]
+    return min(nets) if nets else None
+
+
 def _share(need, have):
     if not isinstance(need, (int, float)) or not isinstance(have, (int, float)) or need <= 0:
         return 1.0
@@ -282,6 +299,66 @@ class Rules:
         if self.floor_weight:   # utility is a log: its difference is a relative gain, floors included
             return (1, (self.utility(r) - self.utility(base)) / cost, self._rel(base, r, "TotalEHP") / cost)
         return (1, self._rel(base, r, self.metric) / cost, self._rel(base, r, "TotalEHP") / cost)
+
+    def why(self, base, r):
+        """What decided how r compares with base, for reports: {"decidedBy", "damage", "ehp", "moved"}.
+        decidedBy: "rules" (the score tuple differs: a hard rule, or a floor below its hard minimum), "floors"
+        (same score; the soft floor band outweighed the damage change, or pushed the same way and further),
+        "damage" (same score; the metric decided), "same" (nothing to choose), "error" (a result PoB couldn't
+        calculate; no moved list). damage / ehp: relative change.
+        moved: each rule whose shortfall changed, readable ("ChaosResist -12 to 31 (min 0)")."""
+        out = {"damage": round(self._rel(base, r, self.metric), 4), "ehp": round(self._rel(base, r, "TotalEHP"), 4)}
+        if "error" in r or "error" in base:
+            return {**out, "decidedBy": "error"}
+        sb, sr = self.score(base), self.score(r)
+        if any(abs(x - y) > TOL for x, y in zip(sb, sr)):
+            out["decidedBy"] = "rules"
+        elif self.floor_weight:
+            dm = math.log(max(self.value(r), 1.0)) - math.log(max(self.value(base), 1.0))
+            df = (self.utility(r) - self.utility(base)) - dm   # the soft floor part of the utility change
+            if abs(dm + df) <= 1e-9:
+                out["decidedBy"] = "same"
+            else:
+                sign = 1 if dm + df > 0 else -1
+                out["decidedBy"] = "floors" if df * sign > max(dm * sign, 0.0) else "damage"
+        else:
+            vb, vr = self.value(base), self.value(r)
+            out["decidedBy"] = "damage" if abs(vr - vb) > max(1e-9, abs(vb) * 1e-9) else "same"
+        moved = self.moved(base, r)
+        if moved:
+            out["moved"] = moved
+        return out
+
+    def moved(self, base, r):
+        """Readable list of the rules whose shortfall differs between base and r."""
+        fb, fr = self.shortfalls(base), self.shortfalls(r)
+        pb, pr = base.get("player") or {}, r.get("player") or {}
+        out = []
+        for k in sorted(set(fb) | set(fr)):
+            if abs(fb.get(k, 0.0) - fr.get(k, 0.0)) <= TOL:
+                continue
+            if k.startswith("res:"):
+                key = k[4:]
+                need = self.chaos_min if key == "ChaosResist" else self.res_cap
+                el = key.replace("Resist", "")
+                side = [_num(p.get(key), "g") + (" (exempt)" if self._exempt(p, el) else "") for p in (pb, pr)]
+                out.append(f"{key} {side[0]} to {side[1]} (min {need:g})")
+            elif k == "ehp":
+                out.append(f"TotalEHP {_stat(pb.get('TotalEHP'))} to {_stat(pr.get('TotalEHP'))} "
+                           f"(floor {_stat(self.ehp_floor)})")
+            elif k.startswith("floor:"):
+                key = k[6:]
+                out.append(f"{key} {_stat(pb.get(key))} to {_stat(pr.get(key))} (floor {_stat(self.floors[key])})")
+            elif k == "sustain":
+                out.append(f"net regen {_stat(_net(pb))}/s to {_stat(_net(pr))}/s "
+                           f"(self-damage {_stat(pr.get('TotalBuildDegen'))}/s)")
+            else:
+                kind, _, what = k.partition(":")
+                what = {"req": f"{what} requirement", "cost": f"{what} for the skill cost"}.get(kind, what or k)
+                state = ("fixed" if k not in fr else "new" if k not in fb
+                         else "better" if fr[k] < fb[k] else "worse")
+                out.append(f"{what}: {state}")
+        return out
 
     @staticmethod
     def _rel(a, b, key):
