@@ -5,7 +5,8 @@
   concept.py complete --xml BUILD.xml --main-skill X --class C [--ascendancy A] ...   start from a build file
 
 complete: skeleton -> uniques equipped (their poe.ninja price charged to the budget) -> config -> tree grown from
-the class start (tree-build) -> 6-link (or `links`) supports -> crafted rares on every non-unique slot (base
+the class start (tree-build; with 5+ reference builds of the skill, from their common passives first, and their
+common supports to start the main group: design/learn.py) -> 6-link (or `links`) supports -> crafted rares on every non-unique slot (base
 implicits) -> jewels -> tier upgrades (with a budget) -> side skills turned off while mana or life reservation
 is still overdrawn -> supports and tree again. Every step ranks results in repair mode: rules first (75%
 elemental resists, chaos >= 0, PoB's warnings), then the metric. --quick stops after tree and gems, for screening
@@ -49,6 +50,9 @@ Spec (JSON):
                 --crawl). "none" or [] tries no uniques
   unique_source optional, with unique_candidates: where the list came from, shown in the report, e.g.
                 "poe.ninja builds, Covens, Penance Brand Inquisitor, 1,204 characters, 2026-11-27"
+  learn         default true: start from what 5+ reference builds of the skill commonly take (design/learn.py):
+                their common passives seed the tree and their common supports replace `supports` (keep_supports
+                stay); the optimizers then try to beat them. false: grow from the class start, spec supports
 """
 import argparse
 import base64
@@ -260,6 +264,8 @@ def check_spec(spec):
         raise ValueError("unique_source must be text (where the unique_candidates came from)")
     if us and not (isinstance(uc, list) and uc):
         raise ValueError("unique_source needs a unique_candidates list to describe (without one the crawl is used)")
+    if "learn" in spec and not isinstance(spec["learn"], bool):
+        raise ValueError("learn must be true or false")
 
 
 def plan_items(spec, db):
@@ -425,9 +431,10 @@ def charge_start_gems(pool, budget, log):
 def pipeline(pool, start_stats, metric, cls, ascendancy, links, budget=None, log=None, quick=False, tier=2,
              ehp_floor=None, owned=None, say=None, points=None, asc_points=None, seed=0, chaos_min=0, floors=None,
              keep_supports=(), floor_weight=FLOOR_WEIGHT, floor_hard=FLOOR_HARD, unique_cands=None, prices=None,
-             fixed_slots=(), item_type=None, unique_report=None):
+             fixed_slots=(), item_type=None, unique_report=None, start=None):
     """The optimizing part of complete(), on a loaded pool: tree grown from the class start (without the resist
-    rules), supports to `links`, then (unless quick) crafted rares, jewels, uniques competing with those rares
+    rules; from a learned start's common nodes when `start` is given, design/learn.py), supports to `links`, then
+    (unless quick) crafted rares, jewels, uniques competing with those rares
     (unique_cands, priced by `prices`; rares re-crafted after a swap), tier upgrades (with a budget), side skills,
     supports and tree again. Returns the full Rules the result is judged by.
 
@@ -472,7 +479,8 @@ def pipeline(pool, start_stats, metric, cls, ascendancy, links, budget=None, log
         gems(growth)
     say(f"tree: {cls} {ascendancy or ''}, {points} points")
     T.build(pool, growth, cls, ascendancy, points=points, asc_points=asc_points, max_dist=10,
-            main_skill=pool.main_skill(), log=log)
+            main_skill=pool.main_skill(), log=log, start=start)
+    protect = T.learned_keystones(pool, start) if start else ()   # never refunded by the later tree pass either
     gems(rules if not quick else growth)
     if not quick:
         say("gear")
@@ -497,19 +505,46 @@ def pipeline(pool, start_stats, metric, cls, ascendancy, links, budget=None, log
         say("gems and tree again")
         G.drop_side_skills(pool, rules, log=log, budget=budget)  # reservation still overdrawn after gear
         gems(rules)
-        T.improve(pool, rules, main_skill=pool.main_skill(), log=log)
+        T.improve(pool, rules, main_skill=pool.main_skill(), log=log, protect=protect)
     return rules
+
+
+def learned_report(pool, rules, learned, quick, say, keep=()):
+    """The report's `learned` section: where the start came from, how much of it the finished design kept, and
+    (unless quick: screening skips it) why players pick the popular choices, measured on the design
+    (learn.explain; keep: supports never swapped out there)."""
+    import learn as L
+    if "nodes" not in learned:  # too few references, or an error: say so
+        return learned
+    have = L._allocated(pool)
+    main = next((g for g in pool.groups() if g.get("main")), None) or {"gems": []}
+    sups = {(x["name"] or "").lower() for x in main["gems"] if x.get("support") and x.get("enabled", True)}
+    out = {k: learned[k] for k in ("refs", "basis", "sources", "withMainGroup", "sourcesUsed", "specSupports",
+                                   "unknownSupports") if k in learned}
+    out["nodes"] = {"learned": len(learned["nodes"]),
+                    "kept": sum(1 for n in learned["nodes"] if n["id"] in have),
+                    "keystones": [n["name"] for n in learned["nodes"] if n["type"] == "Keystone"]}
+    out["supports"] = [{**s, "kept": s["name"].lower() in sups} for s in learned.get("supports") or []]
+    if not quick:
+        try:
+            out["why"] = L.explain(pool, rules, learned, keep=keep, say=say)
+        except Exception as e:  # noqa: BLE001 - the explanation must never lose a finished design
+            out["why"] = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
+    return out
 
 
 def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, budget_div=None, quick=False,
              trade_check=False, league=None, workers=None, metric=None, tier=None, ehp_floor=None, log_progress=None,
-             config_xml=None, seed=0, links=None, floors=None, references=True):
+             config_xml=None, seed=0, links=None, floors=None, references=True, learn=True, learn_sources=None,
+             learn_exclude=()):
     """Run the pipeline; returns (report, final_xml). ehp_floor: a minimum total EHP the build must reach (a rule
     like the resists); default none. tier: the crafted rares' starting tier; default T2 with a budget (it moves
     them down or up), T1 without one (the strongest items, whatever they cost). A spec concept also tries
     uniques against its rares (unique_candidates); a loaded build (--xml) keeps its own items. references: compare
     the result with the reference builds of its main skill (design/refs.py; ladder and web), measured with the
-    design's own config."""
+    design's own config. learn: a spec concept starts from what the skill's references commonly take (design/
+    learn.py; the spec's "learn": false turns it off); learn_sources limits that to e.g. ("ladder",), and
+    learn_exclude leaves reference files out (a back-test's own reference)."""
     import evaluator as E
     import opt as O
     from objective import summary
@@ -542,6 +577,38 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
     cands, unique_info = ({}, None)
     if spec is not None and prices is not None:
         cands, unique_info = unique_candidates(spec, db, prices.league, main_skill)
+    learned = None
+    learn_league = prices.league if prices is not None else league
+    if spec is not None and learn and spec.get("learn", True) and learn_league:
+        import learn as L
+        say("learning from similar builds")
+        try:
+            learned = L.learn(learn_league, main_skill, cls, ascendancy, db,
+                              links=links or spec.get("links", DEFAULT_LINKS), budget=budget_div is not None,
+                              sources=learn_sources, say=say, exclude=learn_exclude)
+        except Exception as e:  # noqa: BLE001 - a design without learning beats no design
+            learned = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
+        known = []
+        for s in learned.get("supports") or []:
+            try:
+                db.gem(s["name"])
+                known.append(s)
+            except ValueError:   # a support the game database doesn't know (renamed, removed): left out
+                learned.setdefault("unknownSupports", []).append(s["name"])
+        if learned.get("unknownSupports"):
+            gone = set(learned["unknownSupports"])
+            learned["popular"] = [p for p in learned.get("popular") or []
+                                  if not (p["kind"] == "support" and p["name"] in gone)]
+        if "supports" in learned:
+            learned["supports"] = known
+        if known:
+            keep = list(spec.get("keep_supports") or [])
+            have = {k.lower() for k in keep}
+            learned["specSupports"] = list(spec.get("supports") or [])
+            spec = {**spec, "supports": keep + [s["name"] for s in known if s["name"].lower() not in have]}
+            xml, uniques = skeleton_xml(spec, db)
+            if config_xml:
+                xml = E.ph().copy_config(xml, config_xml)
     unique_done = {}
     design_cost = None
     with E.EvalPool(workers=E.default_workers() if workers is None else workers) as pool:
@@ -573,7 +640,7 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
                          floors=floors or (spec or {}).get("floors"),
                          keep_supports=(spec or {}).get("keep_supports") or (), unique_cands=cands, prices=prices,
                          fixed_slots={u["slot"] for u in uniques}, item_type=lambda b: db.base(b)["type"],
-                         unique_report=unique_done)
+                         unique_report=unique_done, start=learned if (learned or {}).get("nodes") else None)
         final = pool.stats()
         final_xml = pool.save_xml()
         report = {
@@ -611,6 +678,9 @@ def complete(spec=None, xml=None, main_skill=None, cls=None, ascendancy=None, bu
                 except Exception as e:  # noqa: BLE001 - never lose a finished design to the comparison
                     design_cost = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
         report["novelty"] = O.novelty(pool, league, pool.main_skill())
+        if learned is not None:
+            report["learned"] = learned_report(pool, rules, learned, quick, say,
+                                               keep=(spec or {}).get("keep_supports") or ())
     if references and prices is not None:
         import refs as RF
         try:
@@ -664,6 +734,8 @@ def main():
     p.add_argument("--workers", type=int)
     p.add_argument("--out")
     p.add_argument("--report")
+    p.add_argument("--no-learn", action="store_true", help="grow the tree from the class start, spec supports as "
+                   "given (default: start from what 5+ reference builds of the skill commonly take)")
     args = ap.parse_args()
 
     if args.cmd == "new":
@@ -701,7 +773,8 @@ def main():
         raise ValueError(f"no folder for --out: {os.path.dirname(os.path.abspath(out))}")
     report, final_xml = complete(spec, xml, args.main_skill, args.cls, args.ascendancy, args.budget, args.quick,
                                  args.trade_check, args.league, args.workers, args.metric, args.tier,
-                                 args.ehp_floor, log_progress=lambda m: print(m, file=sys.stderr, flush=True))
+                                 args.ehp_floor, log_progress=lambda m: print(m, file=sys.stderr, flush=True),
+                                 learn=not getattr(args, "no_learn", False))
     with open(out, "w", encoding="utf-8") as f:
         f.write(final_xml)
     report["saved"] = out

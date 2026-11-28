@@ -207,11 +207,127 @@ def refs_checks():
         and out["median"]["value"] == 250, out)
 
 
+REF_XML = """<?xml version="1.0"?><PathOfBuilding>
+<Build level="97" className="Marauder" ascendClassName="Chieftain" mainSocketGroup="2"/>
+<Tree activeSpec="2"><Spec nodes="1,2" masteryEffects=""/><Spec nodes="10,20,30" masteryEffects="{30,77},{40,88}"/></Tree>
+<Skills activeSkillSet="2"><SkillSet id="1"><Skill enabled="true"><Gem nameSpec="Righteous Fire" gemId="Metadata/Items/Gems/SkillGemRighteousFire"/><Gem nameSpec="Wrong Set" gemId="Metadata/Items/Gems/SupportGemX"/></Skill></SkillSet>
+<SkillSet id="2">
+<Skill enabled="false"><Gem nameSpec="Righteous Fire" gemId="Metadata/Items/Gems/SkillGemRighteousFire"/><Gem nameSpec="A" gemId="Metadata/Items/Gems/SupportGemA"/><Gem nameSpec="B" gemId="Metadata/Items/Gems/SupportGemB"/><Gem nameSpec="C" gemId="Metadata/Items/Gems/SupportGemC"/></Skill>
+<Skill enabled="true"><Gem nameSpec="Righteous Fire" gemId="Metadata/Items/Gems/SkillGemRighteousFire"/><Gem nameSpec="Efficacy" gemId="Metadata/Items/Gems/SupportGemEfficacy"/><Gem nameSpec="Off" gemId="Metadata/Items/Gems/SupportGemOff" enabled="false"/></Skill>
+<Skill enabled="true"><Gem nameSpec="Herald of Ash" gemId="Metadata/Items/Gems/SkillGemHeraldOfAsh"/><Gem nameSpec="Elemental Focus" gemId="Metadata/Items/Gems/SupportGemElementalFocus"/><Gem nameSpec="Lifetap" gemId="Metadata/Items/Gems/SupportGemLifetap"/></Skill>
+</SkillSet></Skills></PathOfBuilding>"""
+
+
+def learn_checks(pool, db):
+    """design/learn.py: reading a reference, grouping and shares offline; seeding and explaining on PoB."""
+    import learn as L
+    import tree as T
+    from objective import Rules
+    p = L.parse(REF_XML, "Righteous Fire")
+    add("learn: the active tree spec and skill set are read", p["nodes"] == [10, 20, 30]
+        and p["masteries"] == {30: 77, 40: 88} and p["class"] == "Marauder" and p["ascendancy"] == "Chieftain", p)
+    add("learn: supports from the enabled group holding the skill; disabled gems left out",
+        p["supports"] == ["Efficacy"], p["supports"])
+    add("learn: no group with the skill teaches only the tree", L.parse(REF_XML, "Fireball")["supports"] is None)
+
+    q = lambda sql, *a: db.con.execute(sql, a).fetchone()  # noqa: E731
+    key = q("SELECT id FROM nodes WHERE type = 'Keystone' AND ascendancy IS NULL ORDER BY id LIMIT 1")[0]
+    nota = q("SELECT id FROM nodes WHERE type = 'Notable' AND ascendancy IS NULL ORDER BY id LIMIT 1")[0]
+    norm = q("SELECT id FROM nodes WHERE type = 'Normal' AND ascendancy IS NULL ORDER BY id LIMIT 1")[0]
+    sock = q("SELECT id FROM nodes WHERE type = 'Socket' ORDER BY id LIMIT 1")[0]
+    mast = q("SELECT node_id FROM node_mastery_effects ORDER BY node_id LIMIT 1")[0]
+    chief = q("SELECT id FROM nodes WHERE type = 'Notable' AND ascendancy = 'Chieftain' ORDER BY id LIMIT 1")[0]
+    berserk = q("SELECT id FROM nodes WHERE type = 'Notable' AND ascendancy = 'Berserker' ORDER BY id LIMIT 1")[0]
+
+    def ref(asc, nodes, sups=("Efficacy", "Elemental Focus"), mastery_eff=1):
+        return {"file": f"f{len(nodes)}", "source": "ladder", "class": "Marauder", "ascendancy": asc,
+                "nodes": nodes, "masteries": {mast: mastery_eff}, "supports": list(sups)}
+    common = [key, nota, norm, sock, mast, chief, 70001]
+    five = [ref("Chieftain", common, mastery_eff=e) for e in (1, 1, 2, 1, 2)]
+    five[0]["supports"] = ["Efficacy", "Elemental Focus", "Rare Pick"]   # 1 of 5: not common
+    five[4]["nodes"] = [key, sock, mast, chief]          # 4/5 share the notable and the normal node
+    out = L.common(five, "Marauder", "Chieftain", db, links=3)
+    ids = [n["id"] for n in out.get("nodes", [])]
+    add("learn: 5 of the ascendancy: grouped by ascendancy, its nodes learned", out.get("basis") == "ascendancy"
+        and chief in ids and out["refs"] == 5, out)
+    add("learn: sockets and cluster-jewel nodes left out", sock not in ids and 70001 not in ids, ids)
+    add("learn: a mastery with its most common effect", out["masteries"].get(mast) == 1, out.get("masteries"))
+    add("learn: most common first", ids.index(key) < ids.index(nota), ids)
+    add("learn: supports by share, up to links - 1", [s["name"] for s in out["supports"]]
+        == ["Efficacy", "Elemental Focus"], out["supports"])
+    add("learn: keystones lead the popular list", out["popular"][0]["kind"] == "keystone", out["popular"])
+    mixed = [ref("Chieftain", common)] * 3 + [ref("Berserker", [key, berserk])] * 2
+    out = L.common(mixed, "Marauder", "Chieftain", db)
+    ids = [n["id"] for n in out.get("nodes", [])]
+    add("learn: too few of the ascendancy: grouped by class, no ascendancy nodes", out.get("basis") == "class"
+        and chief not in ids and berserk not in ids and key in ids and nota in ids, out)
+    out = L.common(mixed[:4], "Marauder", "Chieftain", db)
+    add("learn: fewer than 5: nothing learned, says why", "nodes" not in out and "fewer than 5" in out.get("note", ""),
+        out)
+    mast2 = q("SELECT node_id FROM node_mastery_effects WHERE node_id > ? ORDER BY node_id LIMIT 1", mast)[0]
+    two = [{**ref("Chieftain", [mast, mast2]), "masteries": {mast: 5, mast2: m2}} for m2 in (5, 5, 5, 6, 6)]
+    out = L.common(two, "Marauder", "Chieftain", db)
+    add("learn: two masteries never get the same effect", out["masteries"] == {mast: 5, mast2: 6}, out["masteries"])
+    lone = [ref("Chieftain", common)] + [{**ref("Chieftain", common), "supports": None}] * 4
+    add("learn: supports need 5 references showing the skill's group",
+        L.common(lone, "Marauder", "Chieftain", db)["supports"] == [])
+    ex = [ref("Chieftain", common, sups=("Empower", "Awakened Enlighten", "Efficacy"))] * 5
+    add("learn: with a budget exceptional supports are left out",
+        [s["name"] for s in L.common(ex, "Marauder", "Chieftain", db, budget=True)["supports"]] == ["Efficacy"])
+    aw = [ref("Chieftain", common, sups=("Awakened Elemental Focus",))] * 5
+    add("learn: with a budget an awakened support starts plain",
+        [s["name"] for s in L.common(aw, "Marauder", "Chieftain", db, budget=True)["supports"]] == ["Elemental Focus"]
+        and [s["name"] for s in L.common(aw, "Marauder", "Chieftain", db)["supports"]] == ["Awakened Elemental Focus"])
+
+    # seeding on a real tree
+    xml, _ = C.skeleton_xml({**BASE, "supports": ["Spell Echo"]}, db)
+    pool.load(xml, "Fireball")
+    pool.apply([{"op": "tree-reset", "class": "Witch", "ascendancy": "Necromancer"}], allow_main_change=True)
+    reach = pool.reachable_nodes(8)
+    near = next(n for n in reach if n["dist"] == 1)
+    far = next(n for n in sorted(reach, key=lambda n: -n["dist"]) if n["dist"] >= 5)
+    used = pool.points()["used"]
+    start = {"nodes": [{"id": far["id"], "type": "Notable", "ascendancy": None},
+                       {"id": near["id"], "type": "Normal", "ascendancy": None}]}
+    taken = T.seed(pool, start, points=used + 3, asc_points=0)
+    add("learn: a learned node that doesn't fit the points is skipped, the next taken", taken == [near["id"]],
+        f"{taken} far={far} near={near}")
+    taken = T.seed(pool, start, points=used + 40, asc_points=0)
+    add("learn: a far node comes with its path", taken == [far["id"]] and pool.points()["used"] >= used + far["dist"],
+        f"{taken} {pool.points()}")
+    asc = next(n for n in pool.reachable_nodes(3, ascendancy=True))
+    add("learn: ascendancy nodes keep to the ascendancy points",
+        T.seed(pool, {"nodes": [{"id": asc["id"], "type": "Notable", "ascendancy": "Necromancer"}]}, 999, 0) == [])
+
+    rules = Rules(E.main_metric(pool.stats()), pool.stats(), start_breaks="repair")
+    learned = {"popular": [{"kind": "notable", "name": "far", "id": far["id"], "share": 0.9},
+                           {"kind": "notable", "name": "other", "id": next(n for n in pool.reachable_nodes(4)
+                                                                        if n["dist"] >= 2)["id"], "share": 0.8},
+                           {"kind": "support", "name": "Spell Echo", "share": 1.0},
+                           {"kind": "support", "name": "Controlled Destruction", "share": 0.7}]}
+    before = pool.stats()
+    rows = {r["name"]: r for r in L.explain(pool, rules, learned)}
+    kept = L.explain(pool, rules, {"popular": learned["popular"][3:]}, keep=["Spell Echo"])
+    add("learn: a keep_supports gem is never swapped out in the explanation",
+        "replaces" not in kept[0] and kept[0].get("error") == "no support it could replace", kept)
+    add("learn: explain measures what's in the design and what isn't",
+        rows["far"]["inDesign"] and not rows["other"]["inDesign"] and rows["Spell Echo"]["inDesign"]
+        and not rows["Controlled Destruction"]["inDesign"]
+        and all(r.get("decidedBy") for r in rows.values()), rows)
+    add("learn: a node in the design is measured alone (1 point)", rows["far"].get("points") == 1, rows["far"])
+    add("learn: a missing support is tried in place of a current one",
+        rows["Controlled Destruction"].get("replaces") == "Spell Echo", rows["Controlled Destruction"])
+    add("learn: explaining leaves the build as it was", E.value(pool.stats(), rules.metric)
+        == E.value(before, rules.metric) and pool.stats()["player"].get("TotalEHP") == before["player"].get("TotalEHP"))
+    add("learn: Spell Echo's worth is positive damage", (rows["Spell Echo"].get("damage") or 0) > 0, rows["Spell Echo"])
+
+
 def main():
     db = C.GameDB()
     refs_checks()
     with E.EvalPool(workers=0) as pool:
         skeleton_checks(pool, db)
+        learn_checks(pool, db)
     if "--run" in sys.argv:
         run_check(db)
     print(f"\n{sum(RESULTS)}/{len(RESULTS)} passed")

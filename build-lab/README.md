@@ -211,8 +211,10 @@ docstring.
 2. **Uniques:** equipped from PoB's own data.
 3. **Budget:** a concept owns nothing, so the uniques and every starting gem are charged first.
 4. **Tree:** grown from the class start without the resist rules or the max-hit floors that stand on resists,
-   so points go to damage and life; gear caps resists later.
-5. **Supports:** chosen for the main group, up to `links`.
+   so points go to damage and life; gear caps resists later. With 5+ reference builds of the skill it starts
+   from their common passives first (learning, below).
+5. **Supports:** chosen for the main group, up to `links` (starting from the references' common supports when
+   learning).
 6. **Gear:** crafted rares with base implicits on every other slot. This caps the resists. They start at T2
    with a budget and T1 without one (no budget means the strongest items, whatever they cost).
 7. **Jewels.**
@@ -242,7 +244,28 @@ that decide how the skill is used.
 - novelty;
 - `uniques`: which uniques won their slot, which lost and by how much, which were skipped and why;
 - `references`: the design against the reference builds of its main skill (below);
+- `learned`: what the design started from and why players pick the popular choices (below);
 - a PoB import code.
+
+**Learning from similar builds** ([design/learn.py](design/learn.py)): a design starts from what the skill's
+reference builds commonly take; the optimizers then try to beat it and keep a change only when it measures
+better.
+
+- **Group:** the references of the design's ascendancy when there are 5+; else of its class (no ascendancy
+  nodes then); else nothing is learned and the tree grows from the class start.
+- **Start:** every passive at least half the group takes (keystones, notables, travel, masteries with their most
+  common effect; cluster-jewel nodes and sockets left out), most common first, each with its path, while the
+  points allow; then the usual fill and swap search, which never refunds a learned keystone. The main group
+  starts with the supports at least half use (an awakened one plain with a budget); `keep_supports` stay.
+- **Why** (`learned.why`): the 10 most common keystones, notables, ascendancy notables and supports measured on
+  the finished design. In it: what removing it costs. Not in it: what adding it (with its path) or swapping it
+  in for the best current support would give. Each with `decidedBy`, `damage`, `ehp`, `moved` and the points.
+- `"learn": false` in the spec (or `--no-learn`) turns it off. The back-test learns from ladder references only
+  (a guide can be a web reference of itself) and leaves a `--refs` run's own reference out.
+
+```powershell
+& $py build-lab\design\learn.py show --skill GEM --class C [--ascendancy A] [--budget] [--sources ladder]
+```
 
 **Reference builds** ([design/refs.py](design/refs.py)): real builds of the same skill to compare a design with.
 - **Ladder:** the night crawl keeps each counted character's gear and passive tree, with the account and

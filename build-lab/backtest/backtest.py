@@ -436,7 +436,10 @@ def run_one(args, b, xml, result, modes, prices, db, say):
             rep, lab_xml = C.complete(spec, budget_div=budget, ehp_floor=ehp_floor, metric=guide["metric"],
                                       floors=guide_floors(guide), workers=args.workers, league=args.league,
                                       config_xml=xml, seed=seed, log_progress=say, trade_check=not args.no_trade,
-                                      references=False)
+                                      references=False, learn=not args.no_learn,
+                                      # a guide can be a web reference of itself; a --refs run's own build is one
+                                      learn_sources=("ladder",),
+                                      learn_exclude=tuple(f for f in [(b.get("reference") or {}).get("file")] if f))
             stats = {"player": {"TotalEHP": rep["after"]["TotalEHP"], "Life": rep["after"]["Life"],
                                 "EnergyShield": rep["after"]["EnergyShield"], **rep["after"]["res"]}}
             snap = snapshot(stats, guide["metric"])
@@ -448,7 +451,8 @@ def run_one(args, b, xml, result, modes, prices, db, say):
                           "spent": (rep.get("spend") or {}).get("spent"),
                           **({"tradeChecks": rep["tradeChecks"]} if rep.get("tradeChecks") else {}),
                           "supports": next((g["gems"][1:] for g in rep["gems"]), []), "xml": lab_xml,
-                          **({"uniques": rep["uniques"]} if rep.get("uniques") else {})})
+                          **({"uniques": rep["uniques"]} if rep.get("uniques") else {}),
+                          **({"learned": rep["learned"]} if rep.get("learned") else {})})
         result.setdefault("runs", {})["budget"] = pick(tries, guide)
 
 
@@ -549,6 +553,8 @@ def main():
     p.add_argument("--league")
     p.add_argument("--force", action="store_true")
     p.add_argument("--no-trade", action="store_true")
+    p.add_argument("--no-learn", action="store_true", help="budget mode: grow from the class start (no learned "
+                   "start from the skill's ladder references)")
     p.add_argument("--refs", metavar="SKILL", help="back-test on the skill's reference builds (ladder and web) "
                    "instead of builds.json")
     p.add_argument("--top", type=int, default=3, help="with --refs: how many, strongest first")

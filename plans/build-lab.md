@@ -4,7 +4,7 @@ Andy asks Claude (Claude Code or a claude.ai chat) to design a build. Claude ask
 defences, proposes concepts from a game database, completes them with optimizers that run headless Path of
 Building, and returns 2–3 finished options with PoB codes, numbers, cost and blind spots.
 
-Status: phases 1–7 built 2026-11-25; phases 8–9 built 2026-11-26; the Covens ladder crawl ended 2026-11-27 with 301 reference builds.
+Status: phases 1–7 built 2026-11-25; phases 8–9 built 2026-11-26; the Covens ladder crawl ended 2026-11-27 with 301 reference builds; phase 10 (learn from similar builds) built 2026-11-27.
 
 ## Decisions
 
@@ -35,6 +35,7 @@ Status: phases 1–7 built 2026-11-25; phases 8–9 built 2026-11-26; the Covens
 | 7 | Back-test on known strong builds | Done |
 | 8 | Best item per slot: uniques compete with rares; per-skill unique data from a ladder crawl | Done; Covens crawl finished (337 characters) |
 | 9 | Reference builds: ladder characters and web guides of the same skill; every design compared with them | Done; 301 ladder builds |
+| 10 | Learn from similar builds: start from the skill's common passives and supports; explain popular choices | Done |
 
 ## Lab notebook (phase 6): what the designer learns and remembers
 
@@ -597,7 +598,84 @@ other six tried no uniques and match their earlier runs.
 Budget mode's limits (phase 7) and thin per-skill coverage decide these results, not the crawl. The poe.ninja
 browser step covers coverage for real designs; the back-test can't use it.
 
-**Next:** the "learn from similar builds" phase.
+**Next:** phase 10 (below) is done; see its results.
+
+## Phase 10 plan: learn from similar builds
+
+Andy (2026-11-27): designs start from **the skill's common choices** (not one reference copied), and the optimizers
+try to beat them, keeping a change only when it measures better. Reports **explain why** players pick what they
+pick. At least **5 references** are needed to learn; fewer and the tree grows from the class start as today. Rare
+mods per slot are **not this phase**.
+
+**What's learned** (`design/learn.py`, from every reference of the main skill: ladder crawl, web guides,
+poe.ninja characters):
+- **Group:** references of the design's ascendancy when there are 5+; else of its class (then no ascendancy
+  nodes are learned); else nothing.
+- **Nodes:** each passive taken by at least half the group (keystones, notables, travel, masteries with their
+  most common effect; ascendancy nodes with an ascendancy group). Cluster-jewel nodes and sockets are left out.
+- **Supports:** the main group's supports at least half the group use, up to `links - 1`. With a budget, an
+  awakened support starts as its plain version.
+- Parsed per reference and cached (`learned.json` in the refs folder, by file content and PoB version).
+
+**How a design uses it:**
+- The tree resets to the class start, then takes the learned nodes, most common first, each with its path, while
+  the point budgets allow; the usual greedy fill and swap search follow. Learned keystones are never refunded by
+  the swap search (players take several for recovery PoB's EHP doesn't count); the explanation measures them.
+- Learned supports replace the spec's `supports` (its `keep_supports` stay); the gem optimizer refines them.
+- A spec can say `"learn": false`. The back-test learns from ladder references only (a guide can be a web
+  reference of itself).
+
+**Why (the report's `learned.why`):** the 10 most common keystones, notables, ascendancy notables and supports,
+each measured on the finished design: in it, what removing it costs; not in it, what adding it (a node, with its
+path) or swapping it in for the best current support would give. Each with `Rules.why()` (decided by, damage,
+EHP, rules moved) and the points involved. Popular uniques are explained already by the unique step.
+
+**Tasks:**
+1. `design/learn.py`: read and cache references, group, common nodes and supports, `explain()`.
+2. `opt/tree.py`: `build(start=...)` seeds learned nodes; `improve()`/`_removals()` take nodes to protect.
+3. `concept.py`: learning in `complete()` and `pipeline()`, `learn` in the spec, `learned` in the report;
+   back-test learns from ladder references.
+4. Tests (offline: parsing, grouping, shares, seeding order), README, skill workflow.
+5. Budget back-test with learning on the skills with 5+ references (Righteous Fire, Ethereal Knives, Raise
+   Spectre), against the runs without it.
+6. Verify and review subagents; plan results.
+
+## Phase 10 results
+
+**Built:** `design/learn.py` (`show`, `profile`, `common`, `explain`), `tree.seed()` and `build(start=)`, keystone
+protection through the swap search and the pipeline's last tree pass, the spec's `learn` and `--no-learn`, the
+report's `learned` section, the back-test learning from ladder references only.
+
+**Choices made while building:**
+- The seed takes the learned nodes next to the tree first, round by round, and only bridges a gap with the most
+  common remaining node's path, then goes back to the rounds. Shortest paths first wasted about 15% of the RF
+  tree on detours (100 of 104 learned nodes in 118 points; now all 104 and the 8 ascendancy nodes in 110).
+- Two masteries never get the same effect; supports count only when 5 references show the skill's group; with a
+  budget an awakened support starts plain and an exceptional one (Empower, Enlighten, Enhance) is left out.
+- The `why` list puts keystones first, then the rest by share. A node in the design is measured alone (PoB's
+  `removeNodes`), so a junction notable isn't charged with its branch (Barbarism: 57 points before). `--quick`
+  screens skip `why`.
+- A `--refs` back-test leaves its own reference out, so a skill with exactly 5 ladder references (RF) learns
+  nothing there.
+
+**Budget back-test, 2 seeds, no trade checks** (% of the guide's damage / EHP; before = the run without learning):
+
+| Guide | Before | After | Learned from |
+|---|---|---|---|
+| Righteous Fire | 5.5% / 73% | 7.8% / 93% | 5 Chieftains: 112 nodes (95 kept), 5 supports (3 kept) |
+| Ethereal Knives | 67% / 193% | unchanged | nothing: 3 Chieftain references (5 needed, of the ascendancy or the class) |
+| Wretched Defiler | 0.1% / 98% | 0.1% / 113% | 5 Witches (class basis): 58 nodes (39 kept), 5 supports (none kept) |
+
+- **RF:** both seeds improved (332k and 483k against 296k and 345k), within budget, no hard rule broken. `why`:
+  Elemental Focus is worth 37% damage, Efficacy 26%; Unwavering Stance 5% EHP (stun immunity itself isn't in
+  PoB's numbers); Barbarism 2.5% damage and 8% EHP; Hinekora measures 0 (PoB doesn't model it in this config).
+- **Defiler:** the learned supports are the ladder spectres' (projectile spells: Pierce, Returning
+  Projectiles); on the lab's spectre each costs about 26% damage, so the gem optimizer dropped them all. The
+  budget design's spectres still do almost no damage (the phase 7 weakness). Learning supports for minion skills
+  needs the spectre type, not just the skill.
+
+Learning lifts a skill only when the references share its setup; the main limit is still how few references
+most skills have (crawl of 300) and budget mode's own weaknesses.
 
 ## Phase 9 plan: reference builds
 

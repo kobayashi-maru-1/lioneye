@@ -153,6 +153,14 @@ def ref_xml(league, name, ev):
     return ev.pob.save_xml()
 
 
+def load_xml(league, name, ev):
+    """ref_xml() with a guide's chosen loadout selected (its config set is the one a design's config replaces)."""
+    import evaluator as E
+    xml = ref_xml(league, name, ev)
+    loadout = _read(os.path.join(refs_dir(league), name)).get("loadout")
+    return E.ph().select_loadout(xml, loadout) if loadout else xml
+
+
 def _config_key(config_xml):
     """A cache key for the config part of a build (the <Config> block), so designs sharing a config share results."""
     if not config_xml:
@@ -166,10 +174,7 @@ def measure_one(league, name, skill, ev, prices=None, config_xml=None, metric=No
     """One reference's numbers: {value, metric, TotalEHP, Life, EnergyShield, res, cost, ...} or {"error"}."""
     import evaluator as E
     try:
-        xml = ref_xml(league, name, ev)
-        loadout = _read(os.path.join(refs_dir(league), name)).get("loadout")
-        if loadout:  # pick the guide's loadout first: its config set is the one the design's config replaces
-            xml = E.ph().select_loadout(xml, loadout)
+        xml = load_xml(league, name, ev)
         if config_xml:
             xml = E.ph().copy_config(xml, config_xml)
         # The design counts its main group in Full DPS; a ladder import counts none, so the same flag here.
